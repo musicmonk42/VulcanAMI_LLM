@@ -140,11 +140,163 @@ class NotReasoningEngineError(ValueError):
 
 
 # ============================================================
-# REASONING TASK DETECTION
+# DYNAMIC CONFIGURATION - Issue 4 Fix
 # ============================================================
 
-# Patterns that indicate a reasoning/problem-solving request (not formatting)
-REASONING_TASK_INDICATORS = [
+@dataclass
+class LLMConfig:
+    """
+    Dynamic configuration for LLM module - reads env vars at access time.
+    
+    This solves the configuration rigidity problem where environment variables
+    were locked at module import time, making testing difficult and preventing
+    runtime configuration changes.
+    
+    Features:
+    - Property-based getters read env vars at access time
+    - Setter methods allow runtime overrides for testing
+    - reset() method clears overrides for test cleanup
+    - Backwards compatible with existing code
+    
+    Example:
+        >>> config = LLMConfig()
+        >>> config.hard_timeout  # Reads VULCAN_LLM_HARD_TIMEOUT env var
+        300.0
+        >>> config.hard_timeout = 60.0  # Override for testing
+        >>> config.hard_timeout
+        60.0
+        >>> config.reset()  # Clear overrides
+        >>> config.hard_timeout  # Back to env var
+        300.0
+    """
+    # Private fields for overrides
+    _hard_timeout: Optional[float] = None
+    _per_token_timeout: Optional[float] = None
+    _fast_timeout: Optional[float] = None
+    _base_timeout: Optional[float] = None
+    _timeout_per_token: Optional[float] = None
+    _max_workers: Optional[int] = None
+    _hybrid_min_reasoning_confidence: Optional[float] = None
+    
+    @property
+    def hard_timeout(self) -> float:
+        """Hard timeout for LLM execution in seconds."""
+        if self._hard_timeout is not None:
+            return self._hard_timeout
+        return float(os.environ.get("VULCAN_LLM_HARD_TIMEOUT", "300.0"))
+    
+    @hard_timeout.setter
+    def hard_timeout(self, value: float):
+        """Set hard timeout override."""
+        self._hard_timeout = float(value)
+    
+    @property
+    def per_token_timeout(self) -> float:
+        """Timeout per token in seconds."""
+        if self._per_token_timeout is not None:
+            return self._per_token_timeout
+        return float(os.environ.get("VULCAN_LLM_PER_TOKEN_TIMEOUT", "30.0"))
+    
+    @per_token_timeout.setter
+    def per_token_timeout(self, value: float):
+        """Set per-token timeout override."""
+        self._per_token_timeout = float(value)
+    
+    @property
+    def fast_timeout(self) -> float:
+        """Fast mode timeout in seconds."""
+        if self._fast_timeout is not None:
+            return self._fast_timeout
+        return float(os.environ.get("VULCAN_LLM_FAST_TIMEOUT", "60.0"))
+    
+    @fast_timeout.setter
+    def fast_timeout(self, value: float):
+        """Set fast timeout override."""
+        self._fast_timeout = float(value)
+    
+    @property
+    def base_timeout(self) -> float:
+        """Base timeout for adaptive calculation."""
+        if self._base_timeout is not None:
+            return self._base_timeout
+        return float(os.environ.get("VULCAN_BASE_TIMEOUT", "5.0"))
+    
+    @base_timeout.setter
+    def base_timeout(self, value: float):
+        """Set base timeout override."""
+        self._base_timeout = float(value)
+    
+    @property
+    def timeout_per_token(self) -> float:
+        """Timeout per token for adaptive calculation."""
+        if self._timeout_per_token is not None:
+            return self._timeout_per_token
+        return float(os.environ.get("VULCAN_TIMEOUT_PER_TOKEN", "2.0"))
+    
+    @timeout_per_token.setter
+    def timeout_per_token(self, value: float):
+        """Set timeout-per-token override."""
+        self._timeout_per_token = float(value)
+    
+    @property
+    def max_workers(self) -> int:
+        """Maximum number of worker threads."""
+        if self._max_workers is not None:
+            return self._max_workers
+        # Scale based on CPU count (min 8, or CPU+4)
+        cpu_count = os.cpu_count() or 2
+        default_workers = min(8, cpu_count + 4)
+        return int(os.environ.get("VULCAN_LLM_MAX_WORKERS", str(default_workers)))
+    
+    @max_workers.setter
+    def max_workers(self, value: int):
+        """Set max workers override."""
+        self._max_workers = int(value)
+    
+    @property
+    def hybrid_min_reasoning_confidence(self) -> float:
+        """Minimum confidence threshold for reasoning results."""
+        if self._hybrid_min_reasoning_confidence is not None:
+            return self._hybrid_min_reasoning_confidence
+        try:
+            value = float(os.environ.get("VULCAN_HYBRID_MIN_REASONING_CONFIDENCE", "0.01"))
+            return max(0.0, min(1.0, value))  # Clamp to [0.0, 1.0]
+        except (ValueError, TypeError):
+            return 0.01
+    
+    @hybrid_min_reasoning_confidence.setter
+    def hybrid_min_reasoning_confidence(self, value: float):
+        """Set hybrid min reasoning confidence override."""
+        self._hybrid_min_reasoning_confidence = max(0.0, min(1.0, float(value)))
+    
+    def reset(self):
+        """Reset all overrides to read from environment variables."""
+        self._hard_timeout = None
+        self._per_token_timeout = None
+        self._fast_timeout = None
+        self._base_timeout = None
+        self._timeout_per_token = None
+        self._max_workers = None
+        self._hybrid_min_reasoning_confidence = None
+    
+    def get_all(self) -> Dict[str, Union[float, int]]:
+        """Get all configuration values as a dictionary."""
+        return {
+            "hard_timeout": self.hard_timeout,
+            "per_token_timeout": self.per_token_timeout,
+            "fast_timeout": self.fast_timeout,
+            "base_timeout": self.base_timeout,
+            "timeout_per_token": self.timeout_per_token,
+            "max_workers": self.max_workers,
+            "hybrid_min_reasoning_confidence": self.hybrid_min_reasoning_confidence,
+        }
+
+
+# Global configuration instance
+llm_config = LLMConfig()
+
+
+# Reasoning task indicators - queries containing these should NOT skip reasoning
     "solve", "calculate", "compute", "figure out", "work out",
     "what is the answer", "what's the answer", "find the solution",
     "prove", "derive", "demonstrate", "show that",
@@ -975,28 +1127,37 @@ class HybridLLMExecutor:
         self.openai_max_tokens = openai_max_tokens
         self.logger = logging.getLogger("HybridLLMExecutor")
         
-        # HARD TIMEOUT FIX: ThreadPoolExecutor for VULCAN calls
-        # asyncio.wait_for() only checks timeouts between await points
-        # ThreadPoolExecutor.submit().result(timeout=X) provides TRUE hard timeout
+        # ISSUE 3 FIX: Thread Pool Exhaustion - Dynamic sizing with fail-fast
+        # Use dynamic configuration for max_workers (scales with CPU count)
+        max_workers = llm_config.max_workers
         self._timeout_executor = ThreadPoolExecutor(
-            max_workers=4,
+            max_workers=max_workers,
             thread_name_prefix="hybrid_timeout_"
         )
-        # Parse VULCAN_LLM_TIMEOUT with error handling for invalid values
-        # Note: Use VULCAN_HARD_TIMEOUT constant (default 300s) for CPU-intensive reasoning
-        # CPU CLOUD FIX: Increased from 120s to 300s to allow more tokens before timeout
+        
+        # ISSUE 3 FIX: Fail-fast semaphore to prevent queue buildup
+        # If the semaphore is at capacity, reject immediately instead of queueing
+        # until timeout. This provides <100ms rejection vs 5-minute timeout wait.
+        self._execution_semaphore = asyncio.Semaphore(max_workers + 1)
+        
+        self.logger.info(
+            f"[HybridExecutor] Thread pool initialized: max_workers={max_workers} "
+            f"(configurable via VULCAN_LLM_MAX_WORKERS env var)"
+        )
+        
+        # Use dynamic configuration for timeout with error handling
         try:
             env_timeout = os.environ.get("VULCAN_LLM_TIMEOUT")
             if env_timeout:
                 self.vulcan_timeout = float(env_timeout)
             else:
-                # Use module-level constant as default
-                self.vulcan_timeout = VULCAN_HARD_TIMEOUT
+                # Use dynamic config
+                self.vulcan_timeout = llm_config.hard_timeout
         except (ValueError, TypeError):
             self.logger.warning(
-                f"[HybridExecutor] Invalid VULCAN_LLM_TIMEOUT value, using default {VULCAN_HARD_TIMEOUT}s"
+                f"[HybridExecutor] Invalid VULCAN_LLM_TIMEOUT value, using config default"
             )
-            self.vulcan_timeout = VULCAN_HARD_TIMEOUT
+            self.vulcan_timeout = llm_config.hard_timeout
         self.logger.info(f"[HybridExecutor] VULCAN hard timeout set to {self.vulcan_timeout}s")
         
         # TASK 2 FIX: Log reasoning preference settings
@@ -2516,7 +2677,6 @@ Output ONLY valid JSON, no other text.'''
         
         ARCHITECTURE: VULCAN is primary brain, OpenAI is language fallback only.
         This method attempts to use VULCAN's internal LLM first.
-        
         Note: Added detailed error logging to expose why local model
         generation fails silently. Previously, exceptions were caught and
         logged at debug level, hiding the real cause of 100% OpenAI fallback.
@@ -2524,6 +2684,41 @@ Output ONLY valid JSON, no other text.'''
         CPU CLOUD FIX: Limits max_tokens to prevent timeout on CPU-only instances.
         At ~500ms per token, max_tokens must be limited to ensure completion
         within the timeout period.
+        
+        ISSUE 3 FIX: Fail-fast with semaphore - reject immediately if queue is full.
+        """
+        import traceback
+        
+        # ISSUE 3 FIX: Fail-fast semaphore check
+        # Try to acquire semaphore with 1-second timeout. If we can't acquire,
+        # the queue is full and we should reject immediately instead of waiting
+        # for the hard timeout (5 minutes).
+        try:
+            await asyncio.wait_for(
+                self._execution_semaphore.acquire(),
+                timeout=1.0
+            )
+        except asyncio.TimeoutError:
+            self.logger.warning(
+                "[HybridExecutor] FAIL_FAST: Local LLM queue full, rejecting request "
+                "(semaphore timeout after 1s). This prevents long wait for hard timeout."
+            )
+            return None
+        
+        try:
+            # ISSUE 3 FIX: Use try/finally to ensure semaphore is always released
+            return await self._call_local_llm_with_semaphore(loop, prompt, max_tokens)
+        finally:
+            self._execution_semaphore.release()
+    
+    async def _call_local_llm_with_semaphore(
+        self, loop, prompt: str, max_tokens: int
+    ) -> Optional[str]:
+        """
+        Internal method for calling local LLM after semaphore is acquired.
+        
+        This is separated from _call_local_llm to ensure proper semaphore cleanup
+        in the finally block.
         """
         import traceback
         
@@ -3931,7 +4126,10 @@ __all__ = [
     "get_hybrid_executor",
     "set_hybrid_executor",
     "verify_hybrid_executor_setup",
-    # Configuration constants
+    # Configuration (Issue 4 fix)
+    "LLMConfig",
+    "llm_config",
+    # Configuration constants (backwards compatibility)
     "OPENAI_LANGUAGE_FORMATTING",
     "OPENAI_LANGUAGE_POLISH",
     # CPU Cloud execution constants
