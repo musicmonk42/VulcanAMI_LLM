@@ -355,29 +355,8 @@ def _compile_mega_pattern(patterns: Tuple[re.Pattern, ...], name: str) -> re.Pat
     return re.compile(combined, re.IGNORECASE)
 
 
-# Compile mega-patterns at module level (evaluated once at import time)
-# This provides maximum performance by avoiding recompilation on every classify() call
-
-CHITCHAT_MEGA_PATTERN = _compile_mega_pattern(CHITCHAT_PATTERNS, "CHITCHAT")
-PHILOSOPHICAL_MEGA_PATTERN = _compile_mega_pattern(PHILOSOPHICAL_PATTERNS, "PHILOSOPHICAL")
-SELF_INTROSPECTION_MEGA_PATTERN = _compile_mega_pattern(SELF_INTROSPECTION_PATTERNS, "SELF_INTROSPECTION")
-SPECULATION_MEGA_PATTERN = _compile_mega_pattern(SPECULATION_PATTERNS, "SPECULATION")
-MATHEMATICAL_PROOF_MEGA_PATTERN = _compile_mega_pattern(MATHEMATICAL_PROOF_PATTERNS, "MATHEMATICAL_PROOF")
-LANGUAGE_REASONING_MEGA_PATTERN = _compile_mega_pattern(LANGUAGE_REASONING_PATTERNS, "LANGUAGE_REASONING")
-CRYPTOGRAPHIC_MEGA_PATTERN = _compile_mega_pattern(CRYPTOGRAPHIC_PATTERNS, "CRYPTOGRAPHIC")
-VALUE_CONFLICT_MEGA_PATTERN = _compile_mega_pattern(VALUE_CONFLICT_PATTERNS, "VALUE_CONFLICT")
-SELF_AWARENESS_CHOICE_MEGA_PATTERN = _compile_mega_pattern(SELF_AWARENESS_CHOICE_PATTERNS, "SELF_AWARENESS_CHOICE")
-CREATIVE_MEGA_PATTERN = _compile_mega_pattern(CREATIVE_PATTERNS, "CREATIVE")
-CREATIVE_WITH_INTROSPECTIVE_THEME_MEGA_PATTERN = _compile_mega_pattern(CREATIVE_WITH_INTROSPECTIVE_THEME_PATTERNS, "CREATIVE_WITH_INTROSPECTIVE_THEME")
-CONVERSATIONAL_MEGA_PATTERN = _compile_mega_pattern(CONVERSATIONAL_PATTERNS, "CONVERSATIONAL")
-FACTUAL_MEGA_PATTERN = _compile_mega_pattern(FACTUAL_PATTERNS, "FACTUAL")
-
-# Count mega-patterns dynamically
-_MEGA_PATTERN_COUNT = len([
-    p for name, p in globals().items() 
-    if name.endswith('_MEGA_PATTERN') and isinstance(p, type(CHITCHAT_MEGA_PATTERN))
-])
-logger.info(f"[QueryClassifier] Compiled {_MEGA_PATTERN_COUNT} mega-patterns for O(1) regex matching")
+# NOTE: Mega-pattern compilation moved to after all pattern definitions (after line 1108)
+# to avoid NameError from forward references. See mega-pattern compilation block below.
 
 # Logical connective symbols (Unicode + ASCII representations) for SAT detection
 # Used in _classify_symbolic_logic() to detect logical formulas
@@ -1114,6 +1093,37 @@ SPECULATION_KEYWORDS: FrozenSet[str] = frozenset([
     "counterfactual",
     "conjecture",
 ])
+
+
+# =============================================================================
+# MEGA-PATTERN COMPILATION
+# =============================================================================
+# Compile mega-patterns at module level (evaluated once at import time)
+# This provides maximum performance by avoiding recompilation on every classify() call
+#
+# NOTE: This section MUST be placed after all pattern definitions to avoid NameError
+# from forward references. Previously at line 358, moved here to fix import failure.
+
+CHITCHAT_MEGA_PATTERN = _compile_mega_pattern(CHITCHAT_PATTERNS, "CHITCHAT")
+PHILOSOPHICAL_MEGA_PATTERN = _compile_mega_pattern(PHILOSOPHICAL_PATTERNS, "PHILOSOPHICAL")
+SELF_INTROSPECTION_MEGA_PATTERN = _compile_mega_pattern(SELF_INTROSPECTION_PATTERNS, "SELF_INTROSPECTION")
+SPECULATION_MEGA_PATTERN = _compile_mega_pattern(SPECULATION_PATTERNS, "SPECULATION")
+MATHEMATICAL_PROOF_MEGA_PATTERN = _compile_mega_pattern(MATHEMATICAL_PROOF_PATTERNS, "MATHEMATICAL_PROOF")
+LANGUAGE_REASONING_MEGA_PATTERN = _compile_mega_pattern(LANGUAGE_REASONING_PATTERNS, "LANGUAGE_REASONING")
+CRYPTOGRAPHIC_MEGA_PATTERN = _compile_mega_pattern(CRYPTOGRAPHIC_PATTERNS, "CRYPTOGRAPHIC")
+VALUE_CONFLICT_MEGA_PATTERN = _compile_mega_pattern(VALUE_CONFLICT_PATTERNS, "VALUE_CONFLICT")
+SELF_AWARENESS_CHOICE_MEGA_PATTERN = _compile_mega_pattern(SELF_AWARENESS_CHOICE_PATTERNS, "SELF_AWARENESS_CHOICE")
+CREATIVE_MEGA_PATTERN = _compile_mega_pattern(CREATIVE_PATTERNS, "CREATIVE")
+CREATIVE_WITH_INTROSPECTIVE_THEME_MEGA_PATTERN = _compile_mega_pattern(CREATIVE_WITH_INTROSPECTIVE_THEME_PATTERNS, "CREATIVE_WITH_INTROSPECTIVE_THEME")
+CONVERSATIONAL_MEGA_PATTERN = _compile_mega_pattern(CONVERSATIONAL_PATTERNS, "CONVERSATIONAL")
+FACTUAL_MEGA_PATTERN = _compile_mega_pattern(FACTUAL_PATTERNS, "FACTUAL")
+
+# Count mega-patterns dynamically
+_MEGA_PATTERN_COUNT = len([
+    p for name, p in globals().items() 
+    if name.endswith('_MEGA_PATTERN') and isinstance(p, type(CHITCHAT_MEGA_PATTERN))
+])
+logger.info(f"[QueryClassifier] Compiled {_MEGA_PATTERN_COUNT} mega-patterns for O(1) regex matching")
 
 
 # =============================================================================
