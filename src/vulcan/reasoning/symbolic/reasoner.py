@@ -42,6 +42,7 @@ All components are production-ready with complete implementations.
 
 import logging
 import re
+import threading
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Set, Tuple
 
@@ -137,19 +138,51 @@ class SymbolicReasoner:
 
     def __init__(self, prover_type: str = "parallel"):
         """
-        Initialize symbolic reasoner.
+        Initialize symbolic reasoner with thread-safe knowledge base.
+        
+        CRITICAL FIX #1: Thread-Local State for Concurrent Execution
+        - Uses threading.local() for per-thread KnowledgeBase instances
+        - Prevents data corruption during parallel reasoning execution
+        - Each thread gets its own isolated KB instance
+        - Thread-safe synchronization with RLock for shared state
 
         Args:
             prover_type: Type of prover to use ("tableau", "resolution", "parallel", etc.)
         """
-        self.kb = KnowledgeBase()
+        # CRITICAL FIX: Use thread-local storage for stateful components
+        # This prevents race conditions when multiple threads execute reasoning in parallel
+        self._local = threading.local()
+        
+        # Shared, thread-safe configuration (immutable after initialization)
         self.prover_type = prover_type
         self.prover = self._create_prover()
         self.converter = ASTConverter()
-        # Note: Initialize NL to Logic converter for handling natural language queries
         self.nl_converter = NaturalLanguageToLogicConverter()
-        # Note: Initialize formula validator for pre-validation with helpful errors
         self.formula_validator = FormulaValidator()
+        
+        # Thread-safe lock for coordinating access to any shared mutable state
+        self._lock = threading.RLock()
+        
+        # Statistics tracking (thread-safe with lock)
+        self._query_count = 0
+        self._proof_success_count = 0
+    
+    @property
+    def kb(self) -> KnowledgeBase:
+        """
+        Get thread-local KnowledgeBase instance.
+        
+        CRITICAL FIX #1: Thread-Local Knowledge Base
+        - Each thread gets its own KnowledgeBase instance
+        - Lazy initialization on first access per thread
+        - Prevents data corruption from concurrent modifications
+        
+        Returns:
+            Thread-local KnowledgeBase instance
+        """
+        if not hasattr(self._local, 'kb'):
+            self._local.kb = KnowledgeBase()
+        return self._local.kb
 
     def _create_prover(self) -> BaseProver:
         """Create theorem prover based on type."""

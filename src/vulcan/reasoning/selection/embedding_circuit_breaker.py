@@ -37,6 +37,8 @@ Usage:
 """
 
 import logging
+import math
+import random
 import threading
 import time
 from dataclasses import dataclass
@@ -58,10 +60,11 @@ class CircuitState(Enum):
 # Evidence from logs: Batches: 100%|██████████| 1/1 [00:20<00:00, 20.23s/it]
 # Issue: SemanticToolMatcher taking 6-30 seconds per query
 #
-# Note: RESET_TIMEOUT is *increased* to 60s because once circuit breaker opens
-# (embeddings are too slow), we want to stay in keyword-only mode longer before
-# retrying embeddings. This is different from QUERY_ROUTING_TIMEOUT (5s) in
-# query_router.py which limits how long we wait for routing to complete.
+# CRITICAL FIX #3: Exponential Backoff with Jitter
+# - Prevents flapping circuit breaker that creates sawtooth latency pattern
+# - Initial timeout: 60s, increases exponentially on repeated failures
+# - Jitter added to prevent thundering herd when multiple circuits recover
+# - Maximum timeout: 600s (10 minutes) to avoid indefinite blocking
 #
 # Note Issue #4: Increased DEFAULT_LATENCY_THRESHOLD_MS from 1000ms to 5000ms
 # The previous 1000ms threshold was too aggressive and caused the circuit breaker
@@ -70,7 +73,10 @@ class CircuitState(Enum):
 # still catches truly slow operations (>5s) while allowing normal operation.
 DEFAULT_LATENCY_THRESHOLD_MS = 5000.0  # 5 seconds - more realistic for CPU-only deployments
 DEFAULT_FAILURE_THRESHOLD = 3  # 3 slow operations before opening circuit (was 2 - too sensitive)
-DEFAULT_RESET_TIMEOUT_S = 60.0  # Wait longer before retrying slow embeddings (was 30s)
+DEFAULT_RESET_TIMEOUT_S = 60.0  # Initial backoff time before retrying slow embeddings
+DEFAULT_MAX_RESET_TIMEOUT_S = 600.0  # Maximum backoff time (10 minutes)
+DEFAULT_BACKOFF_MULTIPLIER = 2.0  # Exponential backoff multiplier
+DEFAULT_BACKOFF_JITTER = 0.2  # +/- 20% jitter to prevent thundering herd
 DEFAULT_SUCCESS_THRESHOLD = 3  # More successes needed to confirm recovery (was 2)
 DEFAULT_EMA_ALPHA = 0.3  # Exponential moving average smoothing factor
 
@@ -88,6 +94,8 @@ class CircuitBreakerStats:
     total_skipped: int
     total_allowed: int
     last_state_change: Optional[float]
+    consecutive_failures: int = 0  # CRITICAL FIX #3: Track consecutive failures
+    current_timeout_s: float = 0.0  # CRITICAL FIX #3: Current backoff timeout
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization"""
@@ -99,6 +107,8 @@ class CircuitBreakerStats:
             "total_skipped": self.total_skipped,
             "total_allowed": self.total_allowed,
             "last_state_change": self.last_state_change,
+            "consecutive_failures": self.consecutive_failures,
+            "current_timeout_s": self.current_timeout_s,
         }
 
 
@@ -135,20 +145,36 @@ class EmbeddingCircuitBreaker:
         reset_timeout_s: float = DEFAULT_RESET_TIMEOUT_S,
         success_threshold: int = DEFAULT_SUCCESS_THRESHOLD,
         ema_alpha: float = DEFAULT_EMA_ALPHA,
+        max_reset_timeout_s: float = DEFAULT_MAX_RESET_TIMEOUT_S,
+        backoff_multiplier: float = DEFAULT_BACKOFF_MULTIPLIER,
+        backoff_jitter: float = DEFAULT_BACKOFF_JITTER,
     ):
         """
-        Initialize embedding circuit breaker.
+        Initialize embedding circuit breaker with exponential backoff.
+        
+        CRITICAL FIX #3: Exponential Backoff to Prevent Flapping
+        - Implements exponential backoff with jitter to prevent sawtooth latency
+        - Each failure increases timeout exponentially: 60s → 120s → 240s → ...
+        - Jitter (+/- 20%) prevents thundering herd on recovery
+        - Maximum timeout caps at 600s (10 minutes)
         
         Args:
             latency_threshold_ms: Latency threshold to consider operation slow.
             failure_threshold: Number of slow operations before opening circuit.
-            reset_timeout_s: Seconds before testing recovery from open state.
+            reset_timeout_s: Initial backoff time before testing recovery.
             success_threshold: Fast operations needed in half-open to close.
             ema_alpha: Smoothing factor for exponential moving average (0-1).
+            max_reset_timeout_s: Maximum backoff time (caps exponential growth).
+            backoff_multiplier: Multiplier for exponential backoff (default 2.0).
+            backoff_jitter: Jitter factor for randomizing timeout (+/- percentage).
         """
         self.latency_threshold_ms = latency_threshold_ms
         self.failure_threshold = failure_threshold
         self.reset_timeout_s = reset_timeout_s
+        self.initial_reset_timeout_s = reset_timeout_s  # Store initial for reset
+        self.max_reset_timeout_s = max_reset_timeout_s
+        self.backoff_multiplier = backoff_multiplier
+        self.backoff_jitter = backoff_jitter
         self.success_threshold = success_threshold
         self.ema_alpha = ema_alpha
         
@@ -156,6 +182,7 @@ class EmbeddingCircuitBreaker:
         self._state = CircuitState.CLOSED
         self._failure_count = 0
         self._success_count = 0
+        self._consecutive_failures = 0  # Track consecutive failures for backoff
         self._last_failure_time: Optional[float] = None
         self._last_state_change: Optional[float] = None
         
@@ -171,10 +198,12 @@ class EmbeddingCircuitBreaker:
         self._lock = threading.RLock()
         
         logger.info(
-            f"{LOG_PREFIX} Initialized with thresholds: "
+            f"{LOG_PREFIX} Initialized with exponential backoff: "
             f"latency={latency_threshold_ms}ms, "
             f"failures={failure_threshold}, "
-            f"reset={reset_timeout_s}s"
+            f"initial_timeout={reset_timeout_s}s, "
+            f"max_timeout={max_reset_timeout_s}s, "
+            f"backoff={backoff_multiplier}x, jitter={backoff_jitter*100}%"
         )
     
     @property
@@ -212,12 +241,54 @@ class EmbeddingCircuitBreaker:
             return False
     
     def _should_try_half_open(self) -> bool:
-        """Check if we should transition from OPEN to HALF_OPEN"""
+        """
+        Check if we should transition from OPEN to HALF_OPEN.
+        
+        CRITICAL FIX #3: Uses exponential backoff with jitter
+        - Timeout increases exponentially with consecutive failures
+        - Jitter prevents thundering herd on recovery
+        """
         if self._last_failure_time is None:
             return True
         
         elapsed = time.time() - self._last_failure_time
-        return elapsed >= self.reset_timeout_s
+        
+        # Calculate current timeout with jitter
+        current_timeout = self._get_current_timeout_with_jitter()
+        
+        return elapsed >= current_timeout
+    
+    def _get_current_timeout_with_jitter(self) -> float:
+        """
+        Calculate current reset timeout with exponential backoff and jitter.
+        
+        CRITICAL FIX #3: Exponential Backoff Implementation
+        - Timeout = initial_timeout * (multiplier ^ consecutive_failures)
+        - Capped at max_reset_timeout_s
+        - Jitter added: +/- backoff_jitter percentage
+        - Uses math.pow() for efficiency and numerical stability
+        
+        Returns:
+            Current timeout in seconds with jitter applied
+        """
+        # Cap consecutive failures to prevent overflow (2^20 = ~1 million)
+        # This ensures we never overflow even with large multipliers
+        capped_failures = min(self._consecutive_failures, 20)
+        
+        # Calculate exponential backoff using math.pow for efficiency
+        exponent = math.pow(self.backoff_multiplier, capped_failures)
+        timeout = self.reset_timeout_s * exponent
+        
+        # Cap at maximum
+        timeout = min(timeout, self.max_reset_timeout_s)
+        
+        # Add jitter: random value in range [timeout * (1-jitter), timeout * (1+jitter)]
+        if self.backoff_jitter > 0:
+            jitter_range = timeout * self.backoff_jitter
+            jitter = random.uniform(-jitter_range, jitter_range)
+            timeout += jitter
+        
+        return max(timeout, 1.0)  # Ensure at least 1 second
     
     def record_latency(self, latency_ms: float) -> None:
         """
@@ -259,28 +330,42 @@ class EmbeddingCircuitBreaker:
         """Handle latency recording in CLOSED state"""
         if is_slow:
             self._failure_count += 1
+            self._consecutive_failures += 1
             self._last_failure_time = time.time()
             
             logger.warning(
                 f"{LOG_PREFIX} Slow embedding: {latency_ms:.0f}ms "
                 f"(threshold={self.latency_threshold_ms}ms, "
-                f"failures={self._failure_count}/{self.failure_threshold})"
+                f"failures={self._failure_count}/{self.failure_threshold}, "
+                f"consecutive={self._consecutive_failures})"
             )
             
             if self._failure_count >= self.failure_threshold:
                 self._transition_to(CircuitState.OPEN)
         else:
-            # Successful operation: decay failure count
+            # Successful operation: decay failure count and reset consecutive
             self._failure_count = max(0, self._failure_count - 1)
+            if self._failure_count == 0:
+                self._consecutive_failures = 0  # Reset backoff on full recovery
     
     def _handle_half_open_state(self, latency_ms: float, is_slow: bool) -> None:
-        """Handle latency recording in HALF_OPEN state"""
+        """
+        Handle latency recording in HALF_OPEN state.
+        
+        CRITICAL FIX #3: Increments consecutive failures on slow operation
+        to increase backoff timeout exponentially
+        """
         if is_slow:
-            # Still slow - go back to OPEN
+            # Still slow - go back to OPEN with increased backoff
+            self._consecutive_failures += 1
             self._last_failure_time = time.time()
             self._transition_to(CircuitState.OPEN)
+            
+            current_timeout = self._get_current_timeout_with_jitter()
             logger.warning(
-                f"{LOG_PREFIX} Recovery failed: {latency_ms:.0f}ms - reopening circuit"
+                f"{LOG_PREFIX} Recovery failed: {latency_ms:.0f}ms - reopening circuit "
+                f"(consecutive_failures={self._consecutive_failures}, "
+                f"next_timeout≈{current_timeout:.0f}s)"
             )
         else:
             self._success_count += 1
@@ -314,19 +399,27 @@ class EmbeddingCircuitBreaker:
                 self._transition_to(CircuitState.OPEN)
     
     def _transition_to(self, new_state: CircuitState) -> None:
-        """Transition to a new circuit state"""
+        """
+        Transition to a new circuit state.
+        
+        CRITICAL FIX #3: Resets consecutive failures on successful close
+        """
         self._state = new_state
         self._last_state_change = time.time()
         
         if new_state == CircuitState.CLOSED:
             self._failure_count = 0
             self._success_count = 0
-            logger.info(f"{LOG_PREFIX} Circuit CLOSED - embeddings fully enabled")
+            self._consecutive_failures = 0  # Reset exponential backoff
+            # Note: Do NOT modify reset_timeout_s as it's the base configuration
+            logger.info(f"{LOG_PREFIX} Circuit CLOSED - embeddings fully enabled, backoff reset")
         elif new_state == CircuitState.OPEN:
             self._success_count = 0
+            current_timeout = self._get_current_timeout_with_jitter()
             logger.warning(
                 f"{LOG_PREFIX} Circuit OPEN - skipping embeddings for "
-                f"{self.reset_timeout_s}s (latency_ema={self._latency_ema_ms:.0f}ms)"
+                f"≈{current_timeout:.0f}s (latency_ema={self._latency_ema_ms:.0f}ms, "
+                f"consecutive_failures={self._consecutive_failures})"
             )
         elif new_state == CircuitState.HALF_OPEN:
             self._success_count = 0
@@ -336,6 +429,8 @@ class EmbeddingCircuitBreaker:
         """
         Force reset the circuit breaker to CLOSED state.
         
+        CRITICAL FIX #3: Resets exponential backoff state
+        
         Use this for testing or when external conditions have changed
         (e.g., system resources freed up).
         """
@@ -343,15 +438,17 @@ class EmbeddingCircuitBreaker:
             self._state = CircuitState.CLOSED
             self._failure_count = 0
             self._success_count = 0
+            self._consecutive_failures = 0
+            # Note: Do NOT modify reset_timeout_s as it's the base configuration
             self._last_state_change = time.time()
-            logger.info(f"{LOG_PREFIX} Circuit force reset to CLOSED")
+            logger.info(f"{LOG_PREFIX} Circuit force reset to CLOSED with backoff cleared")
     
     def get_stats(self) -> CircuitBreakerStats:
         """
         Get circuit breaker statistics for monitoring.
         
         Returns:
-            CircuitBreakerStats with current metrics.
+            CircuitBreakerStats with current metrics including backoff state.
         """
         with self._lock:
             return CircuitBreakerStats(
@@ -362,6 +459,8 @@ class EmbeddingCircuitBreaker:
                 total_skipped=self._total_skipped,
                 total_allowed=self._total_allowed,
                 last_state_change=self._last_state_change,
+                consecutive_failures=self._consecutive_failures,
+                current_timeout_s=self._get_current_timeout_with_jitter(),
             )
 
 

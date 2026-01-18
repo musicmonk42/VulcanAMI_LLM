@@ -237,6 +237,9 @@ class UnifiedReasoner:
         ReasoningType.SYMBOLIC,
         ReasoningType.CAUSAL,
     ]
+    
+    # CRITICAL FIX #4: Maximum recursion depth for preventing infinite loops
+    MAX_RECURSION_DEPTH = 5
 
     def __init__(
         self,
@@ -1129,10 +1132,14 @@ class UnifiedReasoner:
         return False
 
     def _handle_self_referential_query(
-        self, task: ReasoningTask, reasoning_chain: ReasoningChain
+        self, task: ReasoningTask, reasoning_chain: ReasoningChain, _recursion_depth: int = 0
     ) -> ReasoningResult:
         """
         Handle self-referential queries using world model meta-reasoning.
+        
+        CRITICAL FIX #4: Added recursion depth tracking
+        - Passes depth to any internal reasoning calls
+        - Prevents infinite loops in meta-reasoning
         
         Self-referential queries about VULCAN's nature, choices, and objectives
         are analyzed through the world model's meta-reasoning infrastructure:
@@ -1145,6 +1152,7 @@ class UnifiedReasoner:
         Args:
             task: ReasoningTask containing the self-referential query
             reasoning_chain: ReasoningChain to accumulate reasoning steps
+            _recursion_depth: Current recursion depth (internal)
             
         Returns:
             ReasoningResult with PHILOSOPHICAL type and substantive analysis
@@ -1155,7 +1163,10 @@ class UnifiedReasoner:
                     boundaries, and counterfactual reasoning to provide substantive
                     response explaining VULCAN's perspective.
         """
-        logger.info("[SelfRef] Handling self-referential query via meta-reasoning")
+        logger.info(
+            f"[SelfRef] Handling self-referential query via meta-reasoning "
+            f"(recursion_depth={_recursion_depth})"
+        )
         
         try:
             # Import meta-reasoning components
@@ -1416,9 +1427,17 @@ class UnifiedReasoner:
         constraints: Optional[Dict[str, Any]] = None,
         pre_selected_tools: Optional[List[str]] = None,
         skip_tool_selection: bool = False,
+        _recursion_depth: int = 0,
+        _source: str = "external",
     ) -> ReasoningResult:
         """
         Enhanced reasoning interface with production tool selection.
+        
+        CRITICAL FIX #4: Recursive Meta-Reasoning Guard
+        - Tracks recursion depth to prevent infinite loops
+        - Maximum depth of 5 levels before returning error
+        - Source flag distinguishes external vs internal calls
+        - Prevents self-referential queries from spawning more meta-reasoning
         
         **SINGLE AUTHORITY PATTERN (Chain of Command Fix):**
         When `pre_selected_tools` is provided with `skip_tool_selection=True`,
@@ -1434,6 +1453,8 @@ class UnifiedReasoner:
             constraints: Optional execution constraints
             pre_selected_tools: Tools pre-selected by ToolSelector (authoritative)
             skip_tool_selection: If True, skip tool selection and use pre_selected_tools
+            _recursion_depth: Internal recursion tracking (DO NOT SET MANUALLY)
+            _source: Internal source tracking ("external" or "internal")
             
         Returns:
             ReasoningResult with the reasoning outcome
@@ -1442,6 +1463,24 @@ class UnifiedReasoner:
             The authority chain is: Router→hints, ToolSelector→authority, UnifiedReasoner→execution.
             When skip_tool_selection=True, this method respects ToolSelector's decision.
         """
+        
+        # CRITICAL FIX #4: Check recursion depth limit
+        if _recursion_depth >= self.MAX_RECURSION_DEPTH:
+            logger.error(
+                f"[Recursion Guard] Maximum recursion depth ({self.MAX_RECURSION_DEPTH}) "
+                f"exceeded. Preventing infinite loop."
+            )
+            return self._create_error_result(
+                f"Maximum reasoning recursion depth ({self.MAX_RECURSION_DEPTH}) exceeded. "
+                f"Possible infinite loop detected."
+            )
+        
+        # Log recursion depth for debugging
+        if _recursion_depth > 0:
+            logger.warning(
+                f"[Recursion Guard] Recursive reasoning call at depth {_recursion_depth} "
+                f"(source={_source})"
+            )
 
         with self._shutdown_lock:
             if self._is_shutdown:
@@ -1527,10 +1566,11 @@ class UnifiedReasoner:
                         logger.warning(f"[Cache] ✗ Invalid cache entry removed: {validation_reason}")
                         del self.result_cache[cache_key]
 
-            # Check for self-referential queries BEFORE normal reasoning
-            if self._is_self_referential_query(query):
+            # CRITICAL FIX #4: Check for self-referential queries BEFORE normal reasoning
+            # Prevent recursive meta-reasoning by blocking internal calls from triggering more meta-reasoning
+            if _source == "external" and self._is_self_referential_query(query):
                 logger.info("[SelfRef] Self-referential query detected, routing to meta-reasoning")
-                result = self._handle_self_referential_query(task, reasoning_chain)
+                result = self._handle_self_referential_query(task, reasoning_chain, _recursion_depth)
                 # Store in cache for future queries
                 with self._cache_lock:
                     if result and hasattr(result, 'metadata'):
@@ -1547,6 +1587,14 @@ class UnifiedReasoner:
                 self._add_to_history(task, result, elapsed_time)
                 self._add_audit_entry(task, result, strategy, elapsed_time)
                 return result
+            elif _source == "internal" and self._is_self_referential_query(query):
+                # CRITICAL FIX #4: Internal calls should never recurse on self-referential queries
+                logger.warning(
+                    "[Recursion Guard] Blocked internal self-referential query to prevent infinite loop"
+                )
+                return self._create_error_result(
+                    "Internal self-referential query blocked to prevent recursion"
+                )
 
             if self.enable_safety and self.safety_wrapper:
                 try:

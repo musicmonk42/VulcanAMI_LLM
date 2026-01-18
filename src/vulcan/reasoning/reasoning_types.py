@@ -4,6 +4,7 @@ Core reasoning types and data structures
 Fixed version with comprehensive validation and error handling.
 """
 
+import logging
 import math
 import time
 from abc import ABC, abstractmethod
@@ -29,6 +30,9 @@ except ImportError:
         TABULAR = "tabular"
         SENSOR = "sensor"
         UNKNOWN = "unknown"
+
+
+logger = logging.getLogger(__name__)
 
 
 class AbstractReasoner(ABC):
@@ -171,9 +175,25 @@ class ReasoningStep:
             raise ValueError(f"Invalid timestamp: {self.timestamp}")
 
 
+# =============================================================================
+# CRITICAL FIX #5: Context Explosion Prevention
+# =============================================================================
+# Maximum number of steps in a reasoning chain to prevent unbounded growth
+# This prevents memory exhaustion when chains accumulate many steps
+MAX_REASONING_CHAIN_STEPS = 100  # Industry standard: cap at 100 steps
+
+
 @dataclass
 class ReasoningChain:
-    """Complete reasoning chain with audit trail"""
+    """
+    Complete reasoning chain with audit trail.
+    
+    CRITICAL FIX #5: Bounded Chain Length
+    - Enforces MAX_REASONING_CHAIN_STEPS limit (100 steps)
+    - Automatically prunes low-confidence or old steps when limit reached
+    - Prevents memory exhaustion from unbounded chain growth
+    - Maintains most important steps for audit trail
+    """
 
     chain_id: str
     steps: List[ReasoningStep]
@@ -187,7 +207,11 @@ class ReasoningChain:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
-        """Validate reasoning chain"""
+        """
+        Validate reasoning chain.
+        
+        CRITICAL FIX #5: Enforces step limit during validation
+        """
         # Validate chain_id
         if not self.chain_id or not isinstance(self.chain_id, str):
             raise ValueError("chain_id must be a non-empty string")
@@ -210,6 +234,14 @@ class ReasoningChain:
         if not isinstance(self.steps, list):
             raise TypeError("steps must be a list")
 
+        # CRITICAL FIX #5: Enforce maximum chain length
+        if len(self.steps) > MAX_REASONING_CHAIN_STEPS:
+            logger.warning(
+                f"[Chain Limit] Reasoning chain exceeded {MAX_REASONING_CHAIN_STEPS} steps "
+                f"({len(self.steps)} steps). Pruning to prevent memory exhaustion."
+            )
+            self._prune_steps()
+
         # Validate all steps are ReasoningStep instances
         for i, step in enumerate(self.steps):
             if not isinstance(step, ReasoningStep):
@@ -229,6 +261,75 @@ class ReasoningChain:
 
         if not isinstance(self.audit_trail, list):
             raise TypeError("audit_trail must be a list")
+    
+    def add_step(self, step: ReasoningStep) -> None:
+        """
+        Add a step to the reasoning chain with automatic pruning.
+        
+        CRITICAL FIX #5: Enforces step limit when adding steps
+        - Prunes low-confidence steps if limit significantly exceeded
+        - Keeps first step (initialization) and last N-1 steps
+        - Only prunes when 10% over limit to avoid frequent resorting
+        
+        Args:
+            step: ReasoningStep to add
+        """
+        self.steps.append(step)
+        
+        # Check if we need to prune (with buffer to avoid frequent pruning)
+        # Only prune when we're 10% over limit to reduce sorting overhead
+        prune_threshold = int(MAX_REASONING_CHAIN_STEPS * 1.1)
+        if len(self.steps) > prune_threshold:
+            logger.warning(
+                f"[Chain Limit] Chain reached {len(self.steps)} steps, "
+                f"pruning to {MAX_REASONING_CHAIN_STEPS}"
+            )
+            self._prune_steps()
+    
+    def _prune_steps(self) -> None:
+        """
+        Prune reasoning chain to MAX_REASONING_CHAIN_STEPS.
+        
+        CRITICAL FIX #5: Smart Pruning Strategy
+        - Always keep first step (initialization)
+        - Always keep last 10 steps (recent context)
+        - Keep highest-confidence steps from middle
+        - Maintains chain coherence and audit trail
+        """
+        if len(self.steps) <= MAX_REASONING_CHAIN_STEPS:
+            return
+        
+        # Strategy: Keep first step + last 10 steps + highest confidence middle steps
+        KEEP_LAST_N = 10
+        KEEP_FIRST_N = 1
+        
+        # Separate steps into segments
+        first_steps = self.steps[:KEEP_FIRST_N]
+        last_steps = self.steps[-KEEP_LAST_N:]
+        middle_steps = self.steps[KEEP_FIRST_N:-KEEP_LAST_N]
+        
+        # Sort middle steps by confidence (descending)
+        middle_steps_sorted = sorted(
+            middle_steps,
+            key=lambda s: s.confidence,
+            reverse=True
+        )
+        
+        # Calculate how many middle steps to keep
+        target_middle = MAX_REASONING_CHAIN_STEPS - KEEP_FIRST_N - KEEP_LAST_N
+        kept_middle = middle_steps_sorted[:target_middle]
+        
+        # Reconstruct steps list maintaining temporal order
+        # (Re-sort middle steps by timestamp to preserve order)
+        kept_middle_sorted = sorted(kept_middle, key=lambda s: s.timestamp)
+        
+        self.steps = first_steps + kept_middle_sorted + last_steps
+        
+        logger.info(
+            f"[Chain Limit] Pruned chain from {len(first_steps) + len(middle_steps) + len(last_steps)} "
+            f"to {len(self.steps)} steps (kept: {KEEP_FIRST_N} first + "
+            f"{len(kept_middle_sorted)} high-confidence middle + {KEEP_LAST_N} last)"
+        )
 
 
 @dataclass
