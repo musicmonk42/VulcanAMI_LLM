@@ -296,7 +296,12 @@ class LLMConfig:
 llm_config = LLMConfig()
 
 
-# Reasoning task indicators - queries containing these should NOT skip reasoning
+# ============================================================
+# REASONING TASK DETECTION
+# ============================================================
+
+# Patterns that indicate a reasoning/problem-solving request (not formatting)
+REASONING_TASK_INDICATORS = [
     "solve", "calculate", "compute", "figure out", "work out",
     "what is the answer", "what's the answer", "find the solution",
     "prove", "derive", "demonstrate", "show that",

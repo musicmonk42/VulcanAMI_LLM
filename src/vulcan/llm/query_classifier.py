@@ -372,7 +372,12 @@ CREATIVE_WITH_INTROSPECTIVE_THEME_MEGA_PATTERN = _compile_mega_pattern(CREATIVE_
 CONVERSATIONAL_MEGA_PATTERN = _compile_mega_pattern(CONVERSATIONAL_PATTERNS, "CONVERSATIONAL")
 FACTUAL_MEGA_PATTERN = _compile_mega_pattern(FACTUAL_PATTERNS, "FACTUAL")
 
-logger.info(f"[QueryClassifier] Compiled {13} mega-patterns for O(1) regex matching")
+# Count mega-patterns dynamically
+_MEGA_PATTERN_COUNT = len([
+    p for name, p in globals().items() 
+    if name.endswith('_MEGA_PATTERN') and isinstance(p, type(CHITCHAT_MEGA_PATTERN))
+])
+logger.info(f"[QueryClassifier] Compiled {_MEGA_PATTERN_COUNT} mega-patterns for O(1) regex matching")
 
 # Logical connective symbols (Unicode + ASCII representations) for SAT detection
 # Used in _classify_symbolic_logic() to detect logical formulas
