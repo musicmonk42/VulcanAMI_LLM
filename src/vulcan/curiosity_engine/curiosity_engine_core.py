@@ -2548,9 +2548,34 @@ class CuriosityEngine:
         Note: Added support for outcome bridge gap types (slow_routing,
         complex_query_handling, high_error_rate, routing_variance) which
         were previously falling through to empty experiment list.
+        
+        FIX Defect #3: Phantom Gap Prevention
+        Checks persistent attempt counter before generating experiments.
+        Skips gaps that have been attempted 3+ times to prevent infinite loops.
         """
 
         try:
+            # FIX Defect #3: Check persistent attempt counter to prevent phantom gaps
+            # This prevents the same gap from being repeatedly attempted when the
+            # underlying issue hasn't been truly resolved
+            gap_attempts = _persistent_get_gap_attempts(gap.id)
+            MAX_ATTEMPTS = 3
+            
+            if gap_attempts >= MAX_ATTEMPTS:
+                logger.info(
+                    f"[CuriosityEngine] Skipping gap '{gap.id}' (type={gap.type}) - "
+                    f"already attempted {gap_attempts} times. "
+                    f"This prevents phantom gap infinite loops. "
+                    f"Gap will be re-evaluated after cooldown period."
+                )
+                return []
+            
+            # Log when approaching the limit
+            if gap_attempts > 0:
+                logger.debug(
+                    f"[CuriosityEngine] Gap '{gap.id}' attempt #{gap_attempts + 1}/{MAX_ATTEMPTS}"
+                )
+            
             # EXAMINE: Check available budget
             available_budget = self.exploration_budget.get_available()
 
@@ -2621,6 +2646,20 @@ class CuriosityEngine:
                 if self.exploration_budget.can_afford(exp.complexity * 10):
                     affordable_experiments.append(exp)
                     remaining_budget -= exp.complexity * 10
+            
+            # FIX Defect #3: Increment persistent attempt counter when experiments are created
+            # This ensures the counter survives subprocess restarts
+            if affordable_experiments:
+                try:
+                    new_attempts = _persistent_increment_gap_attempts(gap.id)
+                    logger.debug(
+                        f"[CuriosityEngine] Generated {len(affordable_experiments)} experiments "
+                        f"for gap '{gap.id}' (attempt #{new_attempts})"
+                    )
+                except Exception as e:
+                    logger.warning(
+                        f"[CuriosityEngine] Failed to increment gap attempts in persistent store: {e}"
+                    )
 
             return affordable_experiments
         except Exception as e:
