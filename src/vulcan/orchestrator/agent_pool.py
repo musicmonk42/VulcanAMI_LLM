@@ -543,6 +543,27 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+# ==============================================================================
+# Module-level constants for conclusion extraction (Bug #2 Fix)
+# ==============================================================================
+
+# Industry Standard: Define at module level to avoid recreation on every call
+# These keys are tried in priority order when extracting conclusions from dicts
+_CONCLUSION_EXTRACTION_KEYS = (
+    'world_model_response',  # World model specific
+    'conclusion',            # Standard key
+    'response',              # Common alternative
+    'output',                # Some engines use this
+    'result',                # Mathematical/computational engines
+    'answer',                # User-facing key
+    'content',               # Generic content key
+    'text',                  # Text-based responses
+)
+
+# Maximum recursion depth for nested dictionary extraction
+# Industry Standard: Prevent stack overflow from circular references
+_MAX_CONCLUSION_EXTRACTION_DEPTH = 3
+
 # ============================================================
 # SIMPLE MODE CONFIGURATION - Performance Optimization
 # ============================================================
@@ -4107,42 +4128,45 @@ class AgentPoolManager:
 
             raise
 
-    def _extract_conclusion_from_dict(self, data_dict: Dict[str, Any]) -> Optional[Any]:
+    def _extract_conclusion_from_dict(
+        self, 
+        data_dict: Dict[str, Any], 
+        _depth: int = 0
+    ) -> Optional[Any]:
         """
         Helper method to extract conclusion from a dictionary with multiple fallback keys.
         
         **Industry Standard Fix**: Enhanced extraction logic with:
-        - Recursive extraction for nested dictionaries
+        - Recursive extraction for nested dictionaries (depth-limited)
         - Multiple fallback keys for different engine formats
         - Validation of extracted conclusions (not None/"None")
         - Defensive handling of complex objects
+        - Circular reference protection
         
         BUG #2 FIX: Centralized extraction logic to avoid duplication.
         Tries multiple possible keys where reasoning engines store conclusions.
         
         Args:
             data_dict: Dictionary that may contain conclusion data
+            _depth: Internal parameter for recursion depth tracking (default: 0)
             
         Returns:
             Conclusion value if found and valid, None otherwise
         """
         if not isinstance(data_dict, dict):
             return None
+        
+        # Industry Standard: Prevent stack overflow from circular references
+        if _depth >= _MAX_CONCLUSION_EXTRACTION_DEPTH:
+            logger.warning(
+                f"[AgentPool] Max conclusion extraction depth ({_MAX_CONCLUSION_EXTRACTION_DEPTH}) "
+                f"reached - possible circular reference"
+            )
+            return None
             
         # Try multiple possible keys in priority order
-        # Different reasoning engines use different key names
-        CONCLUSION_KEYS = (
-            'world_model_response',  # World model specific
-            'conclusion',            # Standard key
-            'response',              # Common alternative
-            'output',                # Some engines use this
-            'result',                # Mathematical/computational engines
-            'answer',                # User-facing key
-            'content',               # Generic content key
-            'text',                  # Text-based responses
-        )
-        
-        for key in CONCLUSION_KEYS:
+        # Industry Standard: Use module-level constant to avoid recreation
+        for key in _CONCLUSION_EXTRACTION_KEYS:
             value = data_dict.get(key)
             
             # Skip invalid values
@@ -4156,8 +4180,8 @@ class AgentPoolManager:
             # **Industry Standard**: Handle nested dictionaries recursively
             # Some engines wrap conclusions in additional metadata layers
             if isinstance(value, dict):
-                # Check if this dict has its own conclusion key
-                nested_conclusion = self._extract_conclusion_from_dict(value)
+                # Check if this dict has its own conclusion key (recursive with depth tracking)
+                nested_conclusion = self._extract_conclusion_from_dict(value, _depth=_depth + 1)
                 if nested_conclusion is not None:
                     return nested_conclusion
                 # Otherwise use the dict itself if it has meaningful content
