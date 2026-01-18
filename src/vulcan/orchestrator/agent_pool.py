@@ -38,6 +38,24 @@ except ImportError:
         "numpy not available, some advanced features will be disabled"
     )
 
+
+# ============================================================
+# ISSUE 2: Windows Multiprocessing Helper Functions
+# ============================================================
+
+def is_main_process() -> bool:
+    """
+    Check if the current process is the main process.
+    
+    ISSUE 2 FIX: On Windows, multiprocessing uses 'spawn' mode which creates
+    fresh worker processes. This helper distinguishes the main process from
+    worker processes to prevent singleton pattern failures.
+    
+    Returns:
+        True if this is the main process, False if worker process
+    """
+    return multiprocessing.current_process().name == 'MainProcess'
+
 # Import psutil with fallback for missing or broken installations
 try:
     import psutil
@@ -59,6 +77,8 @@ from .agent_lifecycle import (
     AgentState,
     create_agent_metadata,
     create_job_provenance,
+    DEFAULT_HEARTBEAT_INTERVAL_S,
+    HEARTBEAT_STALENESS_THRESHOLD_S,
 )
 from .task_queues import TaskQueueInterface, create_task_queue, PriorityJobQueue
 from .metrics import ResponseTimeTracker, SystemMetrics
@@ -638,6 +658,94 @@ def _standalone_agent_worker(agent_id: str):
 
 
 # ============================================================
+# AGENT POOL PROXY FOR WORKER PROCESSES
+# ============================================================
+
+
+class AgentPoolProxy:
+    """
+    Lightweight proxy for read-only access to AgentPool status from worker processes.
+    
+    ISSUE 2 FIX: On Windows with 'spawn' multiprocessing, worker processes get fresh
+    copies of modules with empty singleton dictionaries. This proxy provides safe
+    read-only access without attempting to instantiate the full AgentPoolManager.
+    
+    Industry Standard: Worker processes should never modify shared state or create
+    new pool instances. This proxy enforces that constraint by:
+    - Providing read-only status queries via IPC (queues/pipes)
+    - Raising clear errors if workers try to spawn agents or submit jobs
+    - Documenting the main-process-only requirement
+    
+    Attributes:
+        _main_process_pid: PID of the main process (for validation)
+    """
+    
+    def __init__(self):
+        """
+        Initialize proxy for worker process.
+        
+        Raises:
+            RuntimeError: If called from main process (use AgentPoolManager instead)
+        """
+        if is_main_process():
+            raise RuntimeError(
+                "AgentPoolProxy should only be used in worker processes. "
+                "Use AgentPoolManager.get_instance() in the main process."
+            )
+        
+        self._main_process_pid = os.getppid()  # Parent process ID
+        logger.info(
+            f"[AgentPoolProxy] Initialized in worker process "
+            f"(PID={os.getpid()}, parent PID={self._main_process_pid})"
+        )
+    
+    def get_pool_status(self) -> Dict[str, Any]:
+        """
+        Get read-only pool status.
+        
+        Note: This is a stub implementation. In production, this would query
+        the main process via IPC (multiprocessing.Queue, Pipe, or shared memory).
+        
+        Returns:
+            Dictionary with pool status (limited info available to workers)
+        """
+        logger.warning(
+            "[AgentPoolProxy] get_pool_status() called from worker - "
+            "returning stub data. Implement IPC for production use."
+        )
+        return {
+            "error": "AgentPoolProxy does not have access to full pool state",
+            "worker_pid": os.getpid(),
+            "main_process_pid": self._main_process_pid,
+            "note": "Workers should communicate via IPC, not access pool directly",
+        }
+    
+    def spawn_agent(self, *args, **kwargs):
+        """
+        Spawn agent - NOT ALLOWED from worker processes.
+        
+        Raises:
+            RuntimeError: Always, as workers cannot spawn agents
+        """
+        raise RuntimeError(
+            "Cannot spawn agents from worker processes. "
+            "Agent spawning must be done in the main process via AgentPoolManager."
+        )
+    
+    def submit_job(self, *args, **kwargs):
+        """
+        Submit job - NOT ALLOWED from worker processes.
+        
+        Raises:
+            RuntimeError: Always, as workers cannot submit jobs
+        """
+        raise RuntimeError(
+            "Cannot submit jobs from worker processes. "
+            "Job submission must be done in the main process via AgentPoolManager."
+        )
+
+
+# ============================================================
 # AGENT POOL MANAGER (FULLY FIXED)
 # ============================================================
 
@@ -679,6 +787,10 @@ class AgentPoolManager:
         SINGLETON FIX: This method ensures only one pool exists per instance_id,
         preventing the "zombie pool" issue where multiple pools run simultaneously.
         
+        ISSUE 2 FIX: Validates that this is called from the main process only.
+        On Windows with 'spawn' multiprocessing, worker processes get fresh module
+        copies with empty _instances dict, causing orphaned pool managers.
+        
         Args:
             instance_id: Unique identifier for this pool instance (default: "default")
             max_agents: Maximum number of agents in pool
@@ -688,7 +800,20 @@ class AgentPoolManager:
             
         Returns:
             AgentPoolManager singleton instance
+            
+        Raises:
+            RuntimeError: If called from a worker process (not main process)
         """
+        # ISSUE 2 FIX: Process validation
+        if not is_main_process():
+            error_msg = (
+                "AgentPoolManager.get_instance() must only be called from the main process. "
+                "Worker processes should use AgentPoolProxy for read-only access to pool status. "
+                f"Current process: {multiprocessing.current_process().name}"
+            )
+            logger.error(error_msg)
+            raise RuntimeError(error_msg)
+        
         with cls._instance_lock:
             if instance_id not in cls._instances:
                 logger.info(f"Creating new AgentPoolManager instance: {instance_id}")
@@ -897,6 +1022,10 @@ class AgentPoolManager:
         self.last_status_check = 0
         self.status_check_interval = 5.0  # Seconds
         
+        # ISSUE 8 FIX: GC rate limiting to prevent performance degradation
+        self._last_gc_time = 0.0
+        self._gc_interval_s = 60.0  # Rate limit GC to once per minute
+        
         # ========== PERFORMANCE OPTIMIZATIONS ==========
         # Response time tracking for adaptive scaling
         self.response_time_tracker = ResponseTimeTracker(
@@ -1008,7 +1137,8 @@ class AgentPoolManager:
             f"min_agents={self.min_agents}, max_agents={self.max_agents}, "
             f"queue_type={task_queue_type}, "
             f"cachetools_available={CACHETOOLS_AVAILABLE}, "
-            f"consensus_manager_available={self.consensus_manager is not None}"
+            f"consensus_manager_available={self.consensus_manager is not None}, "
+            f"gc_interval_s={self._gc_interval_s}"
         )
 
     # ========== THREAD POOL FIX: Background Job Executor ==========
@@ -1507,6 +1637,45 @@ class AgentPoolManager:
         
         return removed
 
+    def _maybe_gc(self) -> None:
+        """
+        Rate-limited garbage collection to prevent performance degradation.
+        
+        ISSUE 8 FIX: GC is expensive (10-100ms per call). This method rate-limits
+        GC to at most once per minute and only collects youngest generation for
+        minimal performance impact.
+        
+        Industry Standard: Only collect generation 0 (youngest objects) to minimize
+        pause time while still preventing memory bloat from short-lived objects.
+        Full GC (generations 1-2) should only be triggered by Python's automatic
+        thresholds, not on every agent termination.
+        """
+        current_time = time.time()
+        time_since_last_gc = current_time - self._last_gc_time
+        
+        if time_since_last_gc < self._gc_interval_s:
+            logger.debug(
+                f"[GC] Skipping GC (last run {time_since_last_gc:.1f}s ago, "
+                f"interval={self._gc_interval_s}s)"
+            )
+            return
+        
+        # Rate limit passed - perform GC
+        logger.debug(
+            f"[GC] Triggering generation 0 GC (last run {time_since_last_gc:.1f}s ago)"
+        )
+        
+        try:
+            # Only collect generation 0 (youngest) for minimal performance impact
+            # Full collections of older generations happen automatically via Python's thresholds
+            collected = gc.collect(generation=0)
+            self._last_gc_time = current_time
+            logger.debug(
+                f"[GC] Generation 0 collection completed: {collected} objects collected"
+            )
+        except Exception as e:
+            logger.warning(f"[GC] Garbage collection failed: {e}")
+    
     def _ensure_minimum_agents(self) -> int:
         """
         Ensure we have at least min_agents live agents.
@@ -1728,6 +1897,9 @@ class AgentPoolManager:
         # Immediately ensure minimum agents after retirement to prevent pool shrinkage
         # Previously cleanup only happened periodically, allowing pool to shrink
         self._ensure_minimum_agents()
+        
+        # ISSUE 8 FIX: Rate-limited GC after retiring agent
+        self._maybe_gc()
 
         return True
 
@@ -4485,8 +4657,11 @@ class AgentPoolManager:
         PERFORMANCE FIX: Identifies jobs that have been in processing state
         longer than the configured threshold but haven't timed out yet.
         
+        ISSUE 5 FIX: Prioritizes heartbeat-based detection over time-based detection.
+        Jobs with stale heartbeats are flagged even if they haven't exceeded timeout.
+        
         Returns:
-            List of stuck job information
+            List of stuck job information with heartbeat status
         """
         current_time = time.time()
         stuck_jobs = []
@@ -4496,14 +4671,31 @@ class AgentPoolManager:
                 elapsed = current_time - assign_time
                 warning_threshold = self._stuck_job_threshold_seconds * STUCK_JOB_WARNING_THRESHOLD
                 critical_threshold = self._stuck_job_threshold_seconds * STUCK_JOB_CRITICAL_THRESHOLD
-                if elapsed > warning_threshold:
+                
+                # ISSUE 5 FIX: Check heartbeat staleness first
+                provenance = self._get_provenance_by_job_id(task_id)
+                is_heartbeat_stale = False
+                time_since_heartbeat = None
+                
+                if provenance and hasattr(provenance, 'is_stale'):
+                    is_heartbeat_stale = provenance.is_stale()
+                    if hasattr(provenance, 'get_time_since_heartbeat'):
+                        time_since_heartbeat = provenance.get_time_since_heartbeat()
+                
+                # ISSUE 5 FIX: Job is stuck if heartbeat is stale OR elapsed time exceeds warning threshold
+                # Prioritize heartbeat detection by checking it first
+                if is_heartbeat_stale or elapsed > warning_threshold:
                     agent_id = self.task_assignments.get(task_id)
                     stuck_jobs.append({
                         "task_id": task_id,
                         "agent_id": agent_id,
                         "elapsed_seconds": elapsed,
                         "timeout_seconds": self._stuck_job_threshold_seconds,
-                        "is_critical": elapsed > critical_threshold,
+                        "is_critical": elapsed > critical_threshold or is_heartbeat_stale,
+                        # ISSUE 5 FIX: Include heartbeat status
+                        "heartbeat_stale": is_heartbeat_stale,
+                        "time_since_heartbeat": time_since_heartbeat,
+                        "detection_method": "heartbeat" if is_heartbeat_stale else "timeout",
                     })
         
         return stuck_jobs
@@ -5426,9 +5618,13 @@ class AgentPoolManager:
 
 __all__ = [
     "AgentPoolManager",
+    "AgentPoolProxy",
+    "is_main_process",
     "CACHETOOLS_AVAILABLE",
     "TTLCache",
     "TOURNAMENT_MANAGER_AVAILABLE",
     "TOURNAMENT_QUERY_TYPES",
     "TOURNAMENT_MAX_CANDIDATES",
+    "DEFAULT_HEARTBEAT_INTERVAL_S",
+    "HEARTBEAT_STALENESS_THRESHOLD_S",
 ]

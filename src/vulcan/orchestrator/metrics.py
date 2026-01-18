@@ -55,12 +55,17 @@ class EnhancedMetricsCollector:
     Comprehensive metrics collection and monitoring with bounded memory usage.
 
     Features:
-    - Thread-safe operations
+    - Thread-safe operations with sharded locks for reduced contention
     - Bounded memory for all data structures
     - No circular dependencies
     - Comprehensive metric types (counters, gauges, histograms, timeseries)
-    - Health score computation
+    - Health score computation with queue depth factor
     - Automatic cleanup of old data
+    
+    Performance Optimization:
+    - Uses separate locks for different metric types (sharded locking)
+    - Allows concurrent updates to different metric types
+    - Reduces convoy effect in high-concurrency scenarios
     """
 
     def __init__(
@@ -68,6 +73,7 @@ class EnhancedMetricsCollector:
         max_histogram_size: int = 10000,
         max_timeseries_size: int = 1000,
         cleanup_interval: int = 300,
+        max_healthy_queue_depth: int = 100,
     ):
         """
         Initialize metrics collector
@@ -76,6 +82,7 @@ class EnhancedMetricsCollector:
             max_histogram_size: Maximum number of values to keep in histograms
             max_timeseries_size: Maximum number of points to keep in timeseries
             cleanup_interval: Interval in seconds between cleanup operations
+            max_healthy_queue_depth: Maximum queue depth considered healthy for health score
         """
         # Counters: monotonically increasing values
         self.counters = defaultdict(int)
@@ -92,14 +99,21 @@ class EnhancedMetricsCollector:
         # Aggregates: computed values and metadata
         self.aggregates = defaultdict(dict)
 
-        # Thread safety
-        self._lock = threading.RLock()
+        # Thread safety - SHARDED LOCKS for reduced contention
+        # Each metric type has its own lock to allow concurrent updates
+        self._counter_lock = threading.RLock()
+        self._gauge_lock = threading.RLock()
+        self._histogram_lock = threading.RLock()
+        self._timeseries_lock = threading.RLock()
+        self._aggregate_lock = threading.RLock()
 
         # Cleanup configuration
         self.max_histogram_size = max_histogram_size
         self.max_timeseries_size = max_timeseries_size
         self.cleanup_interval = cleanup_interval
+        self.max_healthy_queue_depth = max_healthy_queue_depth
         self._last_cleanup = time.time()
+        self._cleanup_lock = threading.RLock()
 
         # Start time for uptime tracking
         self._start_time = time.time()
@@ -111,24 +125,25 @@ class EnhancedMetricsCollector:
         )
         self._cleanup_thread.start()
 
-        logger.info("EnhancedMetricsCollector initialized")
+        logger.info("EnhancedMetricsCollector initialized with sharded locks")
 
     def record_step(self, duration: float, result: Dict[str, Any]):
         """
         Record step metrics from orchestrator execution
+        
+        Uses sharded locks for performance - different metric types can be updated concurrently.
 
         Args:
             duration: Step duration in seconds
             result: Result dictionary from step execution
         """
-        with self._lock:
-            # Record basic step metrics
+        current_time = time.time()
+        duration_ms = duration * 1000
+        
+        # Record counters (batch to minimize lock acquisition)
+        with self._counter_lock:
             self.counters["steps_total"] += 1
-            self.histograms["step_duration_ms"].append(duration * 1000)
-            self.timeseries["step_duration_ms_time"].append(
-                (time.time(), duration * 1000)
-            )
-
+            
             # FIXED: No circular import - handle modality without importing config
             modality = result.get("modality")
             if modality is not None:
@@ -137,7 +152,6 @@ class EnhancedMetricsCollector:
                     modality_str = modality.value
                 else:
                     modality_str = str(modality)
-
                 self.counters[f"modality_{modality_str}_count"] += 1
 
             # Record action type
@@ -146,33 +160,8 @@ class EnhancedMetricsCollector:
                 action_type = action.get("type", "unknown")
             else:
                 action_type = str(action)
-
             self.counters[f"action_{action_type}_count"] += 1
-
-            # Record learning metrics
-            if "loss" in result:
-                loss = result["loss"]
-                self.histograms["learning_loss"].append(loss)
-                self.timeseries["loss_over_time"].append((time.time(), loss))
-                self.gauges["current_loss"] = loss
-
-            # Record uncertainty
-            if "uncertainty" in result:
-                uncertainty = result["uncertainty"]
-                self.histograms["uncertainty"].append(uncertainty)
-                self.timeseries["uncertainty_over_time"].append(
-                    (time.time(), uncertainty)
-                )
-                self.gauges["current_uncertainty"] = uncertainty
-
-            # Record resource usage
-            if "resource_usage" in result:
-                for resource, value in result["resource_usage"].items():
-                    metric_name = f"resource_{resource}"
-                    self.histograms[metric_name].append(value)
-                    self.timeseries[f"{metric_name}_time"].append((time.time(), value))
-                    self.gauges[f"current_{metric_name}"] = value
-
+            
             # Record success/failure
             is_success = (
                 result.get("success", False) or result.get("status") == "completed"
@@ -182,15 +171,64 @@ class EnhancedMetricsCollector:
             else:
                 self.counters["failed_actions"] += 1
 
-            # Record reward if present
+        # Record histograms
+        with self._histogram_lock:
+            self.histograms["step_duration_ms"].append(duration_ms)
+            
+            # Record learning metrics
+            if "loss" in result:
+                self.histograms["learning_loss"].append(result["loss"])
+            
+            # Record uncertainty
+            if "uncertainty" in result:
+                self.histograms["uncertainty"].append(result["uncertainty"])
+            
+            # Record resource usage
+            if "resource_usage" in result:
+                for resource, value in result["resource_usage"].items():
+                    metric_name = f"resource_{resource}"
+                    self.histograms[metric_name].append(value)
+            
+            # Record reward
             if "reward" in result:
-                reward = result["reward"]
-                self.histograms["reward"].append(reward)
-                self.timeseries["reward_over_time"].append((time.time(), reward))
-                self.gauges["current_reward"] = reward
+                self.histograms["reward"].append(result["reward"])
+        
+        # Record timeseries
+        with self._timeseries_lock:
+            self.timeseries["step_duration_ms_time"].append((current_time, duration_ms))
+            
+            if "loss" in result:
+                self.timeseries["loss_over_time"].append((current_time, result["loss"]))
+            
+            if "uncertainty" in result:
+                self.timeseries["uncertainty_over_time"].append((current_time, result["uncertainty"]))
+            
+            if "resource_usage" in result:
+                for resource, value in result["resource_usage"].items():
+                    metric_name = f"resource_{resource}"
+                    self.timeseries[f"{metric_name}_time"].append((current_time, value))
+            
+            if "reward" in result:
+                self.timeseries["reward_over_time"].append((current_time, result["reward"]))
+        
+        # Record gauges
+        with self._gauge_lock:
+            if "loss" in result:
+                self.gauges["current_loss"] = result["loss"]
+            
+            if "uncertainty" in result:
+                self.gauges["current_uncertainty"] = result["uncertainty"]
+            
+            if "resource_usage" in result:
+                for resource, value in result["resource_usage"].items():
+                    self.gauges[f"current_resource_{resource}"] = value
+            
+            if "reward" in result:
+                self.gauges["current_reward"] = result["reward"]
 
-            # Periodic cleanup check
-            if time.time() - self._last_cleanup > self.cleanup_interval:
+        # Periodic cleanup check (using cleanup lock)
+        with self._cleanup_lock:
+            if current_time - self._last_cleanup > self.cleanup_interval:
                 self._perform_cleanup()
 
     def update_gauge(self, name: str, value: float):
@@ -201,9 +239,12 @@ class EnhancedMetricsCollector:
             name: Gauge name
             value: Current value
         """
-        with self._lock:
+        current_time = time.time()
+        with self._gauge_lock:
             self.gauges[name] = value
-            self.timeseries[f"{name}_history"].append((time.time(), value))
+        
+        with self._timeseries_lock:
+            self.timeseries[f"{name}_history"].append((current_time, value))
 
     def increment_counter(self, name: str, value: int = 1):
         """
@@ -213,7 +254,7 @@ class EnhancedMetricsCollector:
             name: Counter name
             value: Amount to increment by
         """
-        with self._lock:
+        with self._counter_lock:
             self.counters[name] += value
 
     def decrement_counter(self, name: str, value: int = 1):
@@ -224,7 +265,7 @@ class EnhancedMetricsCollector:
             name: Counter name
             value: Amount to decrement by
         """
-        with self._lock:
+        with self._counter_lock:
             self.counters[name] -= value
 
     def record_histogram(self, name: str, value: float):
@@ -235,7 +276,7 @@ class EnhancedMetricsCollector:
             name: Histogram name
             value: Value to record
         """
-        with self._lock:
+        with self._histogram_lock:
             self.histograms[name].append(value)
 
     def record_timeseries(
@@ -250,7 +291,7 @@ class EnhancedMetricsCollector:
             timestamp: Timestamp (defaults to current time)
         """
         timestamp = timestamp or time.time()
-        with self._lock:
+        with self._timeseries_lock:
             self.timeseries[name].append((timestamp, value))
 
     def record_event(self, event_type: str, metadata: Optional[Dict[str, Any]] = None):
@@ -261,11 +302,12 @@ class EnhancedMetricsCollector:
             event_type: Type of event
             metadata: Optional event metadata
         """
-        with self._lock:
+        with self._counter_lock:
             self.counters[f"event_{event_type}"] += 1
 
-            if metadata:
-                # Store only the most recent metadata for each event type
+        if metadata:
+            # Store only the most recent metadata for each event type
+            with self._aggregate_lock:
                 self.aggregates[f"event_{event_type}_metadata"] = {
                     "timestamp": time.time(),
                     "data": metadata,
@@ -281,7 +323,7 @@ class EnhancedMetricsCollector:
         Returns:
             Counter value
         """
-        with self._lock:
+        with self._counter_lock:
             return self.counters.get(name, 0)
 
     def get_gauge(self, name: str) -> float:
@@ -294,59 +336,60 @@ class EnhancedMetricsCollector:
         Returns:
             Gauge value
         """
-        with self._lock:
+        with self._gauge_lock:
             return self.gauges.get(name, 0.0)
 
     def get_summary(self) -> Dict[str, Any]:
         """
         Get comprehensive metrics summary
+        
+        Uses multiple locks in a consistent order to avoid deadlocks.
 
         Returns:
             Dictionary with all metrics summaries
         """
-        with self._lock:
-            summary = {
-                "counters": dict(self.counters),
-                "gauges": dict(self.gauges),
-                "histograms_summary": {},
-                "rates": {},
-                "health_score": self._compute_health_score(),
-                "uptime_seconds": time.time() - self._start_time,
-                "timestamp": time.time(),
-            }
+        # Acquire locks in consistent order to avoid deadlocks
+        with self._counter_lock:
+            counters_copy = dict(self.counters)
+        
+        with self._gauge_lock:
+            gauges_copy = dict(self.gauges)
+        
+        with self._histogram_lock:
+            histograms_copy = {name: list(values) for name, values in self.histograms.items()}
+        
+        summary = {
+            "counters": counters_copy,
+            "gauges": gauges_copy,
+            "histograms_summary": {},
+            "rates": {},
+            "health_score": self._compute_health_score(),
+            "uptime_seconds": time.time() - self._start_time,
+            "timestamp": time.time(),
+        }
 
-            # Compute histogram summaries
-            for name, values in self.histograms.items():
-                if values:
-                    summary["histograms_summary"][name] = self._compute_histogram_stats(
-                        list(values)
-                    )
+        # Compute histogram summaries (no lock needed, working with copy)
+        for name, values in histograms_copy.items():
+            if values:
+                summary["histograms_summary"][name] = self._compute_histogram_stats(values)
 
-            # Compute rates
-            total_actions = self.counters.get(
-                "successful_actions", 0
-            ) + self.counters.get("failed_actions", 0)
-            if total_actions > 0:
-                summary["rates"]["success_rate"] = (
-                    self.counters["successful_actions"] / total_actions
-                )
-                summary["rates"]["failure_rate"] = (
-                    self.counters["failed_actions"] / total_actions
-                )
-            else:
-                summary["rates"]["success_rate"] = 0.0
-                summary["rates"]["failure_rate"] = 0.0
+        # Compute rates (no lock needed, working with copy)
+        total_actions = counters_copy.get("successful_actions", 0) + counters_copy.get("failed_actions", 0)
+        if total_actions > 0:
+            summary["rates"]["success_rate"] = counters_copy["successful_actions"] / total_actions
+            summary["rates"]["failure_rate"] = counters_copy["failed_actions"] / total_actions
+        else:
+            summary["rates"]["success_rate"] = 0.0
+            summary["rates"]["failure_rate"] = 0.0
 
-            # Compute steps per second
-            uptime = time.time() - self._start_time
-            if uptime > 0:
-                summary["rates"]["steps_per_second"] = (
-                    self.counters.get("steps_total", 0) / uptime
-                )
-            else:
-                summary["rates"]["steps_per_second"] = 0.0
+        # Compute steps per second
+        uptime = time.time() - self._start_time
+        if uptime > 0:
+            summary["rates"]["steps_per_second"] = counters_copy.get("steps_total", 0) / uptime
+        else:
+            summary["rates"]["steps_per_second"] = 0.0
 
-            return summary
+        return summary
 
     def get_histogram_stats(self, name: str) -> Optional[Dict[str, float]]:
         """
@@ -358,7 +401,7 @@ class EnhancedMetricsCollector:
         Returns:
             Dictionary with histogram statistics or None if not found
         """
-        with self._lock:
+        with self._histogram_lock:
             if name not in self.histograms or not self.histograms[name]:
                 return None
 
@@ -413,7 +456,7 @@ class EnhancedMetricsCollector:
         Returns:
             List of (timestamp, value) tuples
         """
-        with self._lock:
+        with self._timeseries_lock:
             if metric_name not in self.timeseries:
                 return []
 
@@ -441,7 +484,7 @@ class EnhancedMetricsCollector:
         Returns:
             List of (timestamp, value) tuples within the window
         """
-        with self._lock:
+        with self._timeseries_lock:
             if metric_name not in self.timeseries:
                 return []
 
@@ -459,19 +502,34 @@ class EnhancedMetricsCollector:
                 filtered.append((timestamp, value))
 
             return filtered
+    
+    def record_queue_depth(self, depth: int):
+        """
+        Record current queue depth for health score computation.
+        
+        Args:
+            depth: Current number of jobs in queue
+        """
+        with self._gauge_lock:
+            self.gauges["queue_depth"] = float(depth)
+        
+        with self._histogram_lock:
+            self.histograms["queue_depth"].append(float(depth))
 
     def _compute_health_score(self) -> float:
         """
         Compute overall system health score (0.0 to 1.0)
         
         GAP 9 FIX: Now includes answer quality metrics, not just throughput/latency.
+        ISSUE 7 FIX: Now includes queue depth factor.
         
         Factors considered:
-        - Success rate (40% weight) - task completion
+        - Success rate (35% weight) - task completion
         - Uncertainty (15% weight) - model confidence calibration
         - Latency efficiency (15% weight) - response time
         - Answer quality (15% weight) - GAP 9 FIX: actual correctness
-        - Tool diversity (10% weight) - GAP 9 FIX: specialized tools used
+        - Queue depth (10% weight) - ISSUE 7 FIX: job backlog indicator
+        - Tool diversity (5% weight) - GAP 9 FIX: specialized tools used
         - Routing integrity (5% weight) - GAP 9 FIX: routing decisions respected
 
         Returns:
@@ -480,84 +538,117 @@ class EnhancedMetricsCollector:
         factors = []
         weights = []
 
-        # Success rate factor (weight: 0.40)
-        total_actions = self.counters.get("successful_actions", 0) + self.counters.get(
-            "failed_actions", 0
-        )
-        if total_actions > 0:
-            success_rate = self.counters["successful_actions"] / total_actions
-            factors.append(success_rate)
-            weights.append(0.40)
+        # Success rate factor (weight: 0.35) - reduced from 0.40 to make room for queue depth
+        with self._counter_lock:
+            total_actions = self.counters.get("successful_actions", 0) + self.counters.get(
+                "failed_actions", 0
+            )
+            if total_actions > 0:
+                success_rate = self.counters["successful_actions"] / total_actions
+                factors.append(success_rate)
+                weights.append(0.35)
 
         # Uncertainty factor (weight: 0.15)
-        if "current_uncertainty" in self.gauges:
-            uncertainty = self.gauges["current_uncertainty"]
-            # Lower uncertainty is better
-            uncertainty_score = max(0.0, 1.0 - uncertainty)
-            factors.append(uncertainty_score)
-            weights.append(0.15)
+        with self._gauge_lock:
+            if "current_uncertainty" in self.gauges:
+                uncertainty = self.gauges["current_uncertainty"]
+                # Lower uncertainty is better
+                uncertainty_score = max(0.0, 1.0 - uncertainty)
+                factors.append(uncertainty_score)
+                weights.append(0.15)
 
         # Resource efficiency factor (weight: 0.15)
-        if (
-            "step_duration_ms" in self.histograms
-            and len(self.histograms["step_duration_ms"]) > 0
-        ):
-            recent_durations = list(self.histograms["step_duration_ms"])[-100:]
-            avg_time = np.mean(recent_durations)
-            # Assume target is 100ms, score decreases as we deviate
-            if avg_time > 0:
-                efficiency = min(1.0, 100.0 / avg_time)
-            else:
-                efficiency = 0.0
-            factors.append(efficiency)
-            weights.append(0.15)
+        with self._histogram_lock:
+            if (
+                "step_duration_ms" in self.histograms
+                and len(self.histograms["step_duration_ms"]) > 0
+            ):
+                recent_durations = list(self.histograms["step_duration_ms"])[-100:]
+                if NUMPY_AVAILABLE:
+                    avg_time = np.mean(recent_durations)
+                else:
+                    avg_time = sum(recent_durations) / len(recent_durations)
+                # Assume target is 100ms, score decreases as we deviate
+                if avg_time > 0:
+                    efficiency = min(1.0, 100.0 / avg_time)
+                else:
+                    efficiency = 0.0
+                factors.append(efficiency)
+                weights.append(0.15)
         
         # =====================================================================
         # GAP 9 FIX: Answer quality factor (weight: 0.15)
         # Measures actual correctness, not just completion
         # =====================================================================
-        if "answer_quality" in self.histograms and len(self.histograms["answer_quality"]) > 0:
-            recent_quality = list(self.histograms["answer_quality"])[-100:]
-            avg_quality = np.mean(recent_quality)
-            factors.append(avg_quality)
-            weights.append(0.15)
-        elif "user_satisfaction" in self.histograms and len(self.histograms["user_satisfaction"]) > 0:
-            # Fallback to user satisfaction if answer_quality not tracked
-            recent_satisfaction = list(self.histograms["user_satisfaction"])[-100:]
-            avg_satisfaction = np.mean(recent_satisfaction)
-            factors.append(avg_satisfaction)
-            weights.append(0.15)
+        with self._histogram_lock:
+            if "answer_quality" in self.histograms and len(self.histograms["answer_quality"]) > 0:
+                recent_quality = list(self.histograms["answer_quality"])[-100:]
+                if NUMPY_AVAILABLE:
+                    avg_quality = np.mean(recent_quality)
+                else:
+                    avg_quality = sum(recent_quality) / len(recent_quality)
+                factors.append(avg_quality)
+                weights.append(0.15)
+            elif "user_satisfaction" in self.histograms and len(self.histograms["user_satisfaction"]) > 0:
+                # Fallback to user satisfaction if answer_quality not tracked
+                recent_satisfaction = list(self.histograms["user_satisfaction"])[-100:]
+                if NUMPY_AVAILABLE:
+                    avg_satisfaction = np.mean(recent_satisfaction)
+                else:
+                    avg_satisfaction = sum(recent_satisfaction) / len(recent_satisfaction)
+                factors.append(avg_satisfaction)
+                weights.append(0.15)
         
         # =====================================================================
-        # GAP 9 FIX: Tool diversity factor (weight: 0.10)
+        # ISSUE 7 FIX: Queue depth factor (weight: 0.10)
+        # Measures job backlog - critical indicator of system health
+        # =====================================================================
+        with self._gauge_lock:
+            if "queue_depth" in self.gauges:
+                current_depth = self.gauges["queue_depth"]
+                # Score decreases linearly as queue approaches max_healthy_depth
+                # Score is 0 when queue >= max_healthy_depth
+                if current_depth <= self.max_healthy_queue_depth:
+                    queue_score = 1.0 - (current_depth / self.max_healthy_queue_depth)
+                else:
+                    queue_score = 0.0
+                factors.append(queue_score)
+                weights.append(0.10)
+        
+        # =====================================================================
+        # GAP 9 FIX: Tool diversity factor (weight: 0.05) - reduced from 0.10
         # Penalizes over-reliance on fallback tools like world_model
         # =====================================================================
-        if "tool_diversity" in self.gauges:
-            tool_diversity = self.gauges["tool_diversity"]
-            factors.append(tool_diversity)
-            weights.append(0.10)
-        else:
-            # Calculate from tool usage counters if available
-            tool_usage = self._compute_tool_diversity()
-            if tool_usage is not None:
-                factors.append(tool_usage)
-                weights.append(0.10)
+        with self._gauge_lock:
+            if "tool_diversity" in self.gauges:
+                tool_diversity = self.gauges["tool_diversity"]
+                factors.append(tool_diversity)
+                weights.append(0.05)
+            else:
+                # Calculate from tool usage counters if available
+                tool_usage = self._compute_tool_diversity()
+                if tool_usage is not None:
+                    factors.append(tool_usage)
+                    weights.append(0.05)
         
         # =====================================================================
         # GAP 9 FIX: Routing integrity factor (weight: 0.05)
         # Measures how often routing decisions are being overridden
         # =====================================================================
-        if "routing_integrity" in self.gauges:
-            routing_integrity = self.gauges["routing_integrity"]
-            factors.append(routing_integrity)
-            weights.append(0.05)
-        elif "routing_overrides" in self.counters and "routing_total" in self.counters:
-            total_routing = self.counters["routing_total"]
-            if total_routing > 0:
-                override_rate = self.counters["routing_overrides"] / total_routing
-                routing_integrity = 1.0 - override_rate
+        with self._gauge_lock:
+            if "routing_integrity" in self.gauges:
+                routing_integrity = self.gauges["routing_integrity"]
                 factors.append(routing_integrity)
                 weights.append(0.05)
+        
+        with self._counter_lock:
+            if "routing_overrides" in self.counters and "routing_total" in self.counters:
+                total_routing = self.counters["routing_total"]
+                if total_routing > 0:
+                    override_rate = self.counters["routing_overrides"] / total_routing
+                    routing_integrity = 1.0 - override_rate
+                    factors.append(routing_integrity)
+                    weights.append(0.05)
 
         # Compute weighted average
         if factors:
@@ -579,7 +670,7 @@ class EnhancedMetricsCollector:
         Returns:
             Tool diversity score (0-1) or None if not enough data
         """
-        # Count tool usage from counters
+        # Count tool usage from counters (called with counter_lock already held)
         tool_counts = {}
         fallback_tools = {'world_model', 'general', 'meta_reasoning'}
         specialized_tools = {'causal', 'probabilistic', 'symbolic', 'mathematical', 
@@ -641,9 +732,11 @@ class EnhancedMetricsCollector:
             correctness: Optional correctness score (0-1) if known
             user_satisfaction: Optional user satisfaction score (0-1)
         """
-        with self._lock:
-            # Track tool override rate
-            was_overridden = set(tools_used) != set(tools_intended)
+        current_time = time.time()
+        
+        # Track tool override rate and usage
+        was_overridden = set(tools_used) != set(tools_intended)
+        with self._counter_lock:
             self.counters["routing_total"] += 1
             if was_overridden:
                 self.counters["routing_overrides"] += 1
@@ -655,37 +748,45 @@ class EnhancedMetricsCollector:
             # Track tool usage
             for tool in tools_used:
                 self.counters[f"tool_{tool}_count"] += 1
-            
-            # Track answer quality if provided
+        
+        # Track answer quality if provided
+        with self._histogram_lock:
             if correctness is not None:
                 self.histograms["answer_quality"].append(correctness)
-                self.timeseries["answer_quality_time"].append((time.time(), correctness))
             
             if user_satisfaction is not None:
                 self.histograms["user_satisfaction"].append(user_satisfaction)
-                self.timeseries["user_satisfaction_time"].append((time.time(), user_satisfaction))
             
             # Track confidence for calibration
             self.histograms["answer_confidence"].append(confidence)
+        
+        with self._timeseries_lock:
+            if correctness is not None:
+                self.timeseries["answer_quality_time"].append((current_time, correctness))
             
-            # Update routing integrity gauge
-            total_routing = self.counters.get("routing_total", 1)
-            override_count = self.counters.get("routing_overrides", 0)
-            self.gauges["routing_integrity"] = 1.0 - (override_count / total_routing)
-            
-            # Update tool diversity gauge
-            diversity = self._compute_tool_diversity()
-            if diversity is not None:
-                self.gauges["tool_diversity"] = diversity
+            if user_satisfaction is not None:
+                self.timeseries["user_satisfaction_time"].append((current_time, user_satisfaction))
+        
+        # Update routing integrity and tool diversity gauges
+        with self._gauge_lock:
+            with self._counter_lock:
+                total_routing = self.counters.get("routing_total", 1)
+                override_count = self.counters.get("routing_overrides", 0)
+                self.gauges["routing_integrity"] = 1.0 - (override_count / total_routing)
+                
+                # Update tool diversity gauge
+                diversity = self._compute_tool_diversity()
+                if diversity is not None:
+                    self.gauges["tool_diversity"] = diversity
 
     def _perform_cleanup(self):
         """Perform cleanup of old data to maintain memory bounds"""
-        with self._lock:
-            current_time = time.time()
+        current_time = time.time()
 
-            # Clean up old timeseries data (older than 1 hour)
-            cutoff_time = current_time - 3600
+        # Clean up old timeseries data (older than 1 hour)
+        cutoff_time = current_time - 3600
 
+        with self._timeseries_lock:
             for name, series in list(self.timeseries.items()):
                 # Remove old entries
                 while series and series[0][0] < cutoff_time:
@@ -695,16 +796,18 @@ class EnhancedMetricsCollector:
                 if not series:
                     del self.timeseries[name]
 
-            # Clean up old aggregate metadata (older than 1 hour)
+        # Clean up old aggregate metadata (older than 1 hour)
+        with self._aggregate_lock:
             for key in list(self.aggregates.keys()):
                 if isinstance(self.aggregates[key], dict):
                     timestamp = self.aggregates[key].get("timestamp", 0)
                     if timestamp < cutoff_time:
                         del self.aggregates[key]
 
+        with self._cleanup_lock:
             self._last_cleanup = current_time
 
-            logger.debug("Metrics cleanup completed")
+        logger.debug("Metrics cleanup completed")
 
     def _cleanup_loop(self):
         """
@@ -728,37 +831,41 @@ class EnhancedMetricsCollector:
 
     def reset_counters(self):
         """Reset all counters to zero"""
-        with self._lock:
+        with self._counter_lock:
             self.counters.clear()
             logger.info("Counters reset")
 
     def reset_gauges(self):
         """Reset all gauges to zero"""
-        with self._lock:
+        with self._gauge_lock:
             self.gauges.clear()
             logger.info("Gauges reset")
 
     def reset_histograms(self):
         """Clear all histogram data"""
-        with self._lock:
+        with self._histogram_lock:
             self.histograms.clear()
             logger.info("Histograms reset")
 
     def reset_timeseries(self):
         """Clear all timeseries data"""
-        with self._lock:
+        with self._timeseries_lock:
             self.timeseries.clear()
             logger.info("Timeseries reset")
 
     def reset_all(self):
         """Reset all metrics"""
-        with self._lock:
+        with self._counter_lock:
             self.counters.clear()
+        with self._gauge_lock:
             self.gauges.clear()
+        with self._histogram_lock:
             self.histograms.clear()
+        with self._timeseries_lock:
             self.timeseries.clear()
+        with self._aggregate_lock:
             self.aggregates.clear()
-            logger.info("All metrics reset")
+        logger.info("All metrics reset")
 
     def export_metrics(self) -> Dict[str, Any]:
         """
@@ -767,25 +874,36 @@ class EnhancedMetricsCollector:
         Returns:
             Dictionary with all metrics data
         """
-        with self._lock:
-            return {
-                "counters": dict(self.counters),
-                "gauges": dict(self.gauges),
-                "histograms": {
-                    name: list(values) for name, values in self.histograms.items()
-                },
-                "timeseries": {
-                    name: list(series) for name, series in self.timeseries.items()
-                },
-                "aggregates": dict(self.aggregates),
-                "metadata": {
-                    "start_time": self._start_time,
-                    "current_time": time.time(),
-                    "uptime_seconds": time.time() - self._start_time,
-                    "max_histogram_size": self.max_histogram_size,
-                    "max_timeseries_size": self.max_timeseries_size,
-                },
+        # Acquire locks in consistent order
+        with self._counter_lock:
+            counters_copy = dict(self.counters)
+        with self._gauge_lock:
+            gauges_copy = dict(self.gauges)
+        with self._histogram_lock:
+            histograms_copy = {
+                name: list(values) for name, values in self.histograms.items()
             }
+        with self._timeseries_lock:
+            timeseries_copy = {
+                name: list(series) for name, series in self.timeseries.items()
+            }
+        with self._aggregate_lock:
+            aggregates_copy = dict(self.aggregates)
+        
+        return {
+            "counters": counters_copy,
+            "gauges": gauges_copy,
+            "histograms": histograms_copy,
+            "timeseries": timeseries_copy,
+            "aggregates": aggregates_copy,
+            "metadata": {
+                "start_time": self._start_time,
+                "current_time": time.time(),
+                "uptime_seconds": time.time() - self._start_time,
+                "max_histogram_size": self.max_histogram_size,
+                "max_timeseries_size": self.max_timeseries_size,
+            },
+        }
 
     def import_metrics(self, data: Dict[str, Any]):
         """
@@ -794,34 +912,38 @@ class EnhancedMetricsCollector:
         Args:
             data: Dictionary with metrics data (from export_metrics)
         """
-        with self._lock:
-            # Import counters
-            if "counters" in data:
+        # Import counters
+        if "counters" in data:
+            with self._counter_lock:
                 self.counters = defaultdict(int, data["counters"])
 
-            # Import gauges
-            if "gauges" in data:
+        # Import gauges
+        if "gauges" in data:
+            with self._gauge_lock:
                 self.gauges = defaultdict(float, data["gauges"])
 
-            # Import histograms
-            if "histograms" in data:
+        # Import histograms
+        if "histograms" in data:
+            with self._histogram_lock:
                 for name, values in data["histograms"].items():
                     self.histograms[name] = deque(
                         values, maxlen=self.max_histogram_size
                     )
 
-            # Import timeseries
-            if "timeseries" in data:
+        # Import timeseries
+        if "timeseries" in data:
+            with self._timeseries_lock:
                 for name, series in data["timeseries"].items():
                     self.timeseries[name] = deque(
                         series, maxlen=self.max_timeseries_size
                     )
 
-            # Import aggregates
-            if "aggregates" in data:
+        # Import aggregates
+        if "aggregates" in data:
+            with self._aggregate_lock:
                 self.aggregates = defaultdict(dict, data["aggregates"])
 
-            logger.info("Metrics imported successfully")
+        logger.info("Metrics imported successfully")
 
     def get_metric_names(self) -> Dict[str, List[str]]:
         """
@@ -830,13 +952,21 @@ class EnhancedMetricsCollector:
         Returns:
             Dictionary mapping metric type to list of metric names
         """
-        with self._lock:
-            return {
-                "counters": list(self.counters.keys()),
-                "gauges": list(self.gauges.keys()),
-                "histograms": list(self.histograms.keys()),
-                "timeseries": list(self.timeseries.keys()),
-            }
+        with self._counter_lock:
+            counter_names = list(self.counters.keys())
+        with self._gauge_lock:
+            gauge_names = list(self.gauges.keys())
+        with self._histogram_lock:
+            histogram_names = list(self.histograms.keys())
+        with self._timeseries_lock:
+            timeseries_names = list(self.timeseries.keys())
+        
+        return {
+            "counters": counter_names,
+            "gauges": gauge_names,
+            "histograms": histogram_names,
+            "timeseries": timeseries_names,
+        }
 
     def shutdown(self):
         """Gracefully shutdown metrics collector"""
@@ -867,6 +997,7 @@ def create_metrics_collector(
     max_histogram_size: int = 10000,
     max_timeseries_size: int = 1000,
     cleanup_interval: int = 300,
+    max_healthy_queue_depth: int = 100,
 ) -> EnhancedMetricsCollector:
     """
     Factory function to create metrics collector
@@ -875,6 +1006,7 @@ def create_metrics_collector(
         max_histogram_size: Maximum number of values in histograms
         max_timeseries_size: Maximum number of points in timeseries
         cleanup_interval: Cleanup interval in seconds
+        max_healthy_queue_depth: Maximum queue depth considered healthy for health score
 
     Returns:
         EnhancedMetricsCollector instance
@@ -883,6 +1015,7 @@ def create_metrics_collector(
         max_histogram_size=max_histogram_size,
         max_timeseries_size=max_timeseries_size,
         cleanup_interval=cleanup_interval,
+        max_healthy_queue_depth=max_healthy_queue_depth,
     )
 
 

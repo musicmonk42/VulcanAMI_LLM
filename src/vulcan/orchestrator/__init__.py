@@ -175,12 +175,18 @@ try:
         create_agent_metadata,
         create_job_provenance,
         validate_state_machine,
+        # ISSUE 5 FIX: Heartbeat constants
+        DEFAULT_HEARTBEAT_INTERVAL_S,
+        HEARTBEAT_STALENESS_THRESHOLD_S,
     )
 
     # Agent pool management
     from .agent_pool import (
         AgentPoolManager,
         AGENT_SELECTION_TIMEOUT_SECONDS,
+        # ISSUE 2 FIX: New exports for main process validation
+        AgentPoolProxy,
+        is_main_process,
     )
     
     # Auto-scaling and recovery (now in deployment module)
@@ -244,6 +250,9 @@ try:
         PerformanceMonitor,
         ReasoningError,
         StrategySelector,
+        # ISSUE 3 FIX: Non-blocking job submission
+        TimeoutStrategy,
+        JobStatus,
     )
 
     _imports_successful = True
@@ -330,6 +339,9 @@ __all__ = [
     "create_agent_metadata",
     "create_job_provenance",
     "validate_state_machine",
+    # ISSUE 5 FIX: Heartbeat constants
+    "DEFAULT_HEARTBEAT_INTERVAL_S",
+    "HEARTBEAT_STALENESS_THRESHOLD_S",
     # Task Queues
     "TaskQueueInterface",
     "RayTaskQueue",
@@ -348,6 +360,9 @@ __all__ = [
     "AutoScaler",
     "RecoveryManager",
     "AGENT_SELECTION_TIMEOUT_SECONDS",  # Note: Agent selection timeout constant
+    # ISSUE 2 FIX: Main process validation
+    "AgentPoolProxy",
+    "is_main_process",
     # Metrics
     "EnhancedMetricsCollector",
     "MetricType",
@@ -378,6 +393,9 @@ __all__ = [
     "PerceptionError",
     "ReasoningError",
     "ExecutionError",
+    # ISSUE 3 FIX: Non-blocking job submission
+    "TimeoutStrategy",
+    "JobStatus",
     # Production
     "ProductionDeployment",
     # Experiment Generation & Problem Execution

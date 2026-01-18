@@ -7,15 +7,34 @@
 # UPDATED: Added experiment_generator, problem_executor, and self_improvement_drive
 # INTEGRATED: Self-improvement factory with proper initialization
 # META-REASONING INTEGRATION: Added imports from meta_reasoning directory
+# ISSUE 6 FIX: Added strict mode for production dependency enforcement
 # ============================================================
 
 import logging
+import os
 from dataclasses import dataclass, field
 from typing import Any, ClassVar, Dict, List, Optional, Set
 
 from .metrics import EnhancedMetricsCollector
 
 logger = logging.getLogger(__name__)
+
+
+# ============================================================
+# STRICT MODE CONFIGURATION (ISSUE 6 FIX)
+# ============================================================
+
+# ISSUE 6 FIX: Environment variable to enforce strict dependency checking
+# In strict mode, ImportErrors are raised instead of falling back to defaults
+# This prevents silent degradation in production that could cause issues
+# Usage: export VULCAN_STRICT_DEPS=1
+VULCAN_STRICT_DEPS = os.getenv("VULCAN_STRICT_DEPS", "0").lower() in ("1", "true", "yes")
+
+if VULCAN_STRICT_DEPS:
+    logger.info(
+        "STRICT MODE ENABLED: ImportErrors will be raised instead of falling back to defaults. "
+        "Set VULCAN_STRICT_DEPS=0 to disable."
+    )
 
 
 # ============================================================
@@ -779,9 +798,12 @@ def create_minimal_deps(
     enable_distributed: bool = False,
     enable_meta_reasoning: bool = False,
     max_agents: int = DEFAULT_MAX_AGENTS,
+    strict: bool = False,
 ) -> EnhancedCollectiveDeps:
     """
-    Create dependencies with core components and optionally learning/meta-reasoning
+    Create dependencies with core components and optionally learning/meta-reasoning.
+    
+    ISSUE 6 FIX: Added strict mode parameter for production dependency enforcement.
 
     Uses minimal/default configuration for all components. For more extensive
     configuration options, use create_full_deps() instead.
@@ -791,52 +813,99 @@ def create_minimal_deps(
         enable_distributed: Whether to initialize distributed coordinator
         enable_meta_reasoning: Whether to initialize meta-reasoning components
         max_agents: Maximum number of distributed agents (default: 8)
+        strict: If True, raises ImportError on missing dependencies instead of degrading
+                gracefully. Can also be set via VULCAN_STRICT_DEPS environment variable.
+                Default: False (graceful degradation)
 
     Returns:
         EnhancedCollectiveDeps with minimal configuration plus optional components
+        
+    Raises:
+        ImportError: If strict=True and a requested dependency cannot be imported
+
+    Examples:
+        >>> # Development mode - graceful degradation
+        >>> deps = create_minimal_deps(enable_learning=True)
+        
+        >>> # Production mode - strict enforcement
+        >>> deps = create_minimal_deps(enable_learning=True, strict=True)
+        >>> # or via environment: VULCAN_STRICT_DEPS=1
     """
+    # Check if strict mode is enabled via parameter or environment variable
+    use_strict = strict or VULCAN_STRICT_DEPS
+    
     deps = EnhancedCollectiveDeps()
 
     # If any optional components requested, initialize them with minimal config
     if enable_learning or enable_distributed or enable_meta_reasoning:
         # Initialize learning components - minimal config (no parameters required)
-        if enable_learning and learning_deps.get("continual", False):
-            try:
-                from vulcan.learning.continual_learning import ContinualLearner
+        if enable_learning:
+            if not learning_deps.get("continual", False):
+                error_msg = "ContinualLearner not available (missing dependency)"
+                if use_strict:
+                    raise ImportError(
+                        f"{error_msg}. Install required packages or set strict=False"
+                    )
+                logger.warning(f"{error_msg}. Continuing with degraded functionality.")
+            else:
+                try:
+                    from vulcan.learning.continual_learning import ContinualLearner
 
-                deps.continual = ContinualLearner()
-                logger.info("✓ ContinualLearner initialized (minimal config)")
-            except Exception as e:
-                logger.debug(f"Could not initialize ContinualLearner: {e}")
+                    deps.continual = ContinualLearner()
+                    logger.info("✓ ContinualLearner initialized (minimal config)")
+                except Exception as e:
+                    error_msg = f"Could not initialize ContinualLearner: {e}"
+                    if use_strict:
+                        raise ImportError(error_msg) from e
+                    logger.debug(error_msg)
 
         # Initialize distributed coordinator - minimal config (configurable max_agents)
-        if enable_distributed and distributed_deps.get("distributed", False):
-            try:
-                from vulcan.planning import DistributedCoordinator
+        if enable_distributed:
+            if not distributed_deps.get("distributed", False):
+                error_msg = "DistributedCoordinator not available (missing dependency)"
+                if use_strict:
+                    raise ImportError(
+                        f"{error_msg}. Install required packages or set strict=False"
+                    )
+                logger.warning(f"{error_msg}. Continuing with degraded functionality.")
+            else:
+                try:
+                    from vulcan.planning import DistributedCoordinator
 
-                deps.distributed = DistributedCoordinator(max_agents=max_agents)
-                logger.info(
-                    f"✓ DistributedCoordinator initialized (minimal config, max_agents={max_agents})"
-                )
-            except Exception as e:
-                logger.debug(f"Could not initialize DistributedCoordinator: {e}")
+                    deps.distributed = DistributedCoordinator(max_agents=max_agents)
+                    logger.info(
+                        f"✓ DistributedCoordinator initialized (minimal config, max_agents={max_agents})"
+                    )
+                except Exception as e:
+                    error_msg = f"Could not initialize DistributedCoordinator: {e}"
+                    if use_strict:
+                        raise ImportError(error_msg) from e
+                    logger.debug(error_msg)
 
         # Initialize meta-reasoning components - minimal config via helper
         if enable_meta_reasoning:
-            _initialize_meta_reasoning_components(deps)
+            _initialize_meta_reasoning_components(deps, use_strict)
 
     return deps
 
 
-def _initialize_meta_reasoning_components(deps: EnhancedCollectiveDeps) -> None:
+def _initialize_meta_reasoning_components(
+    deps: EnhancedCollectiveDeps, strict: bool = False
+) -> None:
     """
-    Helper function to initialize meta-reasoning components with minimal configuration
+    Helper function to initialize meta-reasoning components with minimal configuration.
+    
+    ISSUE 6 FIX: Added strict mode parameter for production dependency enforcement.
 
     Initializes components with default parameters suitable for minimal setups.
     For more extensive configuration, use create_full_deps() instead.
 
     Args:
         deps: EnhancedCollectiveDeps instance to populate
+        strict: If True, raises ImportError on missing dependencies
+        
+    Raises:
+        ImportError: If strict=True and a required dependency cannot be imported
     """
     # PreferenceLearner - minimal config
     if meta_reasoning_deps.get("preference_learner", False):
@@ -848,7 +917,10 @@ def _initialize_meta_reasoning_components(deps: EnhancedCollectiveDeps) -> None:
             deps.preference_learner = PreferenceLearner()
             logger.info("✓ PreferenceLearner initialized (minimal config)")
         except Exception as e:
-            logger.debug(f"Could not initialize PreferenceLearner: {e}")
+            error_msg = f"Could not initialize PreferenceLearner: {e}"
+            if strict:
+                raise ImportError(error_msg) from e
+            logger.debug(error_msg)
 
     # ValueEvolutionTracker - minimal config
     if meta_reasoning_deps.get("value_evolution_tracker", False):
@@ -860,7 +932,10 @@ def _initialize_meta_reasoning_components(deps: EnhancedCollectiveDeps) -> None:
             deps.value_evolution_tracker = ValueEvolutionTracker()
             logger.info("✓ ValueEvolutionTracker initialized (minimal config)")
         except Exception as e:
-            logger.debug(f"Could not initialize ValueEvolutionTracker: {e}")
+            error_msg = f"Could not initialize ValueEvolutionTracker: {e}"
+            if strict:
+                raise ImportError(error_msg) from e
+            logger.debug(error_msg)
 
     # EthicalBoundaryMonitor - minimal config
     # Note: load_defaults=False to avoid automatic boundary loading in minimal setups
@@ -904,10 +979,16 @@ def _initialize_meta_reasoning_components(deps: EnhancedCollectiveDeps) -> None:
 
 
 def create_full_deps(
-    config: Any = None, env: Any = None, enable_distributed: bool = False, **kwargs
+    config: Any = None, 
+    env: Any = None, 
+    enable_distributed: bool = False,
+    strict: bool = False,
+    **kwargs
 ) -> EnhancedCollectiveDeps:
     """
-    Create fully initialized dependencies container with extensive configuration
+    Create fully initialized dependencies container with extensive configuration.
+    
+    ISSUE 6 FIX: Added strict mode parameter for production dependency enforcement.
 
     Initializes components with full configuration options including cross-dependencies
     and integration with validation, transparency, and other subsystems. For simpler
@@ -917,19 +998,36 @@ def create_full_deps(
         config: Configuration object (AgentConfig) with component-specific settings
         env: Environment interface
         enable_distributed: Whether to enable distributed processing
+        strict: If True, raises ImportError on missing dependencies instead of degrading
+                gracefully. Can also be set via VULCAN_STRICT_DEPS environment variable.
+                Default: False (graceful degradation)
         **kwargs: Additional component instances (will override auto-initialization)
 
     Returns:
         EnhancedCollectiveDeps with components initialized based on availability
+        
+    Raises:
+        ImportError: If strict=True and a requested dependency cannot be imported
 
     Note:
         - Components are only initialized if their imports succeed (checked via *_deps dicts)
         - Provided kwargs override auto-initialization for specific components
         - Meta-reasoning components get full configuration with cross-dependencies
         - Use create_minimal_deps() for simpler initialization with default parameters
+        
+    Examples:
+        >>> # Development mode - graceful degradation
+        >>> deps = create_full_deps(config=agent_config)
+        
+        >>> # Production mode - strict enforcement
+        >>> deps = create_full_deps(config=agent_config, strict=True)
+        >>> # or via environment: VULCAN_STRICT_DEPS=1
     """
+    # Check if strict mode is enabled via parameter or environment variable
+    use_strict = strict or VULCAN_STRICT_DEPS
+    
     deps = EnhancedCollectiveDeps(env=env)
-    logger.info("Initializing full dependencies container...")
+    logger.info(f"Initializing full dependencies container (strict={use_strict})...")
 
     # Set any explicitly provided components first
     for key, value in kwargs.items():

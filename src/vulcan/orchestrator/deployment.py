@@ -62,24 +62,36 @@ def atomic_write_with_retry(
     data: bytes, target_path: str, max_retries: int = 5, retry_delay: float = 0.1
 ) -> bool:
     """
-    Atomic file write with Windows-compatible retry logic
+    Atomic file write with Windows-compatible retry logic and exponential backoff with jitter.
+    
+    ISSUE 4 FIX: Enhanced atomic write pattern for Windows reliability:
+    - Writes to temp file in same directory (same filesystem)
+    - Uses os.fsync() to ensure data hits disk
+    - Handles Windows-specific file locking (antivirus, cloud sync)
+    - Uses exponential backoff with jitter to avoid thundering herd
+    - Uses os.replace() for atomic rename on Windows
 
     Handles Windows file locking issues by:
     - Writing to temporary file first
     - Properly closing file handles
-    - Implementing exponential backoff retry
+    - Implementing exponential backoff with jitter
     - Cleaning up on failure
     - Using os.replace for Windows-safe atomic operations
 
     Args:
         data: Binary data to write
         target_path: Target file path
-        max_retries: Maximum retry attempts
-        retry_delay: Initial delay between retries (exponential backoff)
+        max_retries: Maximum retry attempts (default: 5)
+        retry_delay: Initial delay between retries in seconds (default: 0.1)
 
     Returns:
         True if successful, False otherwise
+        
+    Raises:
+        PermissionError: If file cannot be written after max retries
+        OSError: For other file system errors
     """
+    import random
     import tempfile
 
     # FIXED: Convert to absolute path immediately and ensure parent exists
@@ -91,8 +103,9 @@ def atomic_write_with_retry(
 
     try:
         # Create temporary file in same directory for atomic operation
+        # ISSUE 4 FIX: Same directory = same filesystem = atomic rename
         temp_fd, temp_path = tempfile.mkstemp(
-            dir=str(target_path_obj.parent),  # FIXED: Convert to string
+            dir=str(target_path_obj.parent),
             prefix=".tmp_checkpoint_",
             suffix=".pkl",
         )
@@ -100,38 +113,55 @@ def atomic_write_with_retry(
         # Write data to temporary file
         try:
             os.write(temp_fd, data)
-            os.fsync(temp_fd)  # Ensure data is written to disk
+            # ISSUE 4 FIX: Ensure data hits disk before rename
+            os.fsync(temp_fd)
         finally:
             # Always close the file descriptor
             os.close(temp_fd)
             temp_fd = None
 
-        # Attempt atomic rename with retry logic
+        # Attempt atomic rename with exponential backoff and jitter
         for attempt in range(max_retries):
             try:
-                # FIXED: Use os.replace for Windows-safe atomic replacement
-                # os.replace works atomically on both Unix and Windows
-                # and doesn't require unlinking the target file first
+                # ISSUE 4 FIX: os.replace works atomically on both Unix and Windows
+                # On Windows, it handles the "remove before rename" requirement internally
                 os.replace(temp_path, str(target_path_obj))
 
                 # Success!
+                logger.debug(
+                    f"Atomic write successful on attempt {attempt + 1}: {target_path_obj}"
+                )
                 return True
 
             except PermissionError as e:
                 if attempt < max_retries - 1:
+                    # ISSUE 4 FIX: Exponential backoff with jitter
+                    # Base delay doubles each retry: 0.1, 0.2, 0.4, 0.8, 1.6
+                    # Jitter adds randomness (±20%) to prevent thundering herd
+                    base_delay = retry_delay * (2 ** attempt)
+                    jitter = base_delay * 0.2 * (2 * random.random() - 1)  # ±20%
+                    actual_delay = base_delay + jitter
+                    
                     logger.debug(
                         f"File locked on attempt {attempt + 1}/{max_retries}, "
-                        f"retrying in {retry_delay * (2**attempt):.2f}s: {e}"
+                        f"retrying in {actual_delay:.3f}s (base={base_delay:.3f}s, jitter={jitter:+.3f}s): {e}"
                     )
-                    time.sleep(retry_delay * (2**attempt))
+                    time.sleep(actual_delay)
                 else:
                     logger.error(
                         f"Failed to write file after {max_retries} attempts: {e}"
                     )
                     # Re-raise the exception after max retries
                     raise PermissionError(
-                        f"Failed to replace file after retries: {e}"
+                        f"Failed to replace file {target_path_obj} after {max_retries} attempts. "
+                        f"File may be locked by antivirus or cloud sync. Error: {e}"
                     ) from e
+            except OSError as e:
+                # Other OS errors (disk full, invalid path, etc.)
+                logger.error(f"OS error during atomic write: {e}")
+                raise OSError(
+                    f"Failed to write file {target_path_obj}: {e}"
+                ) from e
             except Exception as e:
                 logger.error(f"Unexpected error during atomic write: {e}")
                 raise  # Re-raise other unexpected exceptions
@@ -140,7 +170,7 @@ def atomic_write_with_retry(
         return False
 
     except Exception as e:
-        logger.error(f"Failed to perform atomic write: {e}", exc_info=True)
+        logger.error(f"Failed to perform atomic write to {target_path_obj}: {e}", exc_info=True)
         return False
 
     finally:

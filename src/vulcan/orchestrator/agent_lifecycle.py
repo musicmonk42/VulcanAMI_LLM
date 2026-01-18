@@ -2,6 +2,7 @@
 # VULCAN-AGI Orchestrator - Agent Lifecycle Module
 # Agent states, capabilities, metadata, and job provenance tracking
 # FULLY FIXED VERSION - Enhanced with state validation and safety checks
+# ISSUE 5 FIX: Added heartbeat mechanism for stuck job detection
 # ============================================================
 
 import logging
@@ -11,6 +12,19 @@ from enum import Enum
 from typing import Any, Dict, FrozenSet, List, Optional
 
 logger = logging.getLogger(__name__)
+
+
+# ============================================================
+# HEARTBEAT CONFIGURATION CONSTANTS
+# ============================================================
+
+# ISSUE 5 FIX: Heartbeat mechanism for stuck job detection
+# Heartbeat interval: how often a job should send a heartbeat (seconds)
+DEFAULT_HEARTBEAT_INTERVAL_S = 30.0
+
+# Staleness threshold: how long before a job without heartbeat is considered stale (seconds)
+# Should be at least 2x the heartbeat interval to account for scheduling delays
+HEARTBEAT_STALENESS_THRESHOLD_S = 90.0
 
 
 # ============================================================
@@ -510,7 +524,13 @@ class AgentMetadata:
 
 @dataclass
 class JobProvenance:
-    """Complete provenance for a job with enhanced tracking"""
+    """
+    Complete provenance for a job with enhanced tracking and heartbeat mechanism.
+    
+    ISSUE 5 FIX: Added heartbeat mechanism to distinguish between
+    "agent thinking hard" vs "agent frozen". Jobs should call update_heartbeat()
+    periodically to signal they're still alive.
+    """
 
     job_id: str
     agent_id: str
@@ -536,6 +556,10 @@ class JobProvenance:
     queue_time: Optional[float] = None  # Time spent in queue
     execution_start_time: Optional[float] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
+    
+    # ISSUE 5 FIX: Heartbeat mechanism fields
+    last_heartbeat: float = field(default_factory=time.time)
+    heartbeat_interval_s: float = DEFAULT_HEARTBEAT_INTERVAL_S
 
     def __post_init__(self):
         """Initialize computed fields"""
@@ -562,6 +586,9 @@ class JobProvenance:
 
         if self.start_time:
             self.queue_time = self.execution_start_time - self.start_time
+        
+        # Update heartbeat when execution starts
+        self.update_heartbeat()
 
     def is_complete(self) -> bool:
         """Check if job is complete"""
@@ -607,6 +634,83 @@ class JobProvenance:
         """Add checkpoint path"""
         if checkpoint_path not in self.checkpoint_paths:
             self.checkpoint_paths.append(checkpoint_path)
+    
+    # ========================================================================
+    # ISSUE 5 FIX: Heartbeat mechanism methods
+    # ========================================================================
+    
+    def update_heartbeat(self) -> None:
+        """
+        Update heartbeat timestamp to signal job is still alive.
+        
+        Jobs should call this periodically (every heartbeat_interval_s seconds)
+        to indicate they're still making progress. This distinguishes between
+        "agent thinking hard" vs "agent frozen".
+        
+        Raises:
+            RuntimeError: If job is already complete
+        """
+        if self.is_complete():
+            raise RuntimeError(
+                f"Cannot update heartbeat for completed job {self.job_id}"
+            )
+        
+        self.last_heartbeat = time.time()
+        logger.debug(
+            f"[JobProvenance] Heartbeat updated for job {self.job_id} "
+            f"(agent={self.agent_id})"
+        )
+    
+    def is_stale(self, threshold_s: float = HEARTBEAT_STALENESS_THRESHOLD_S) -> bool:
+        """
+        Check if job's heartbeat is stale (hasn't updated recently).
+        
+        A stale heartbeat indicates the job might be frozen or stuck, even if
+        it hasn't exceeded its timeout. This allows for earlier detection of
+        hung jobs.
+        
+        Args:
+            threshold_s: Staleness threshold in seconds (default from constant)
+        
+        Returns:
+            True if heartbeat is stale, False otherwise
+        """
+        if self.is_complete():
+            return False  # Completed jobs are not stale
+        
+        time_since_heartbeat = time.time() - self.last_heartbeat
+        return time_since_heartbeat > threshold_s
+    
+    def get_time_since_heartbeat(self) -> float:
+        """
+        Get time elapsed since last heartbeat.
+        
+        Returns:
+            Time in seconds since last heartbeat
+        """
+        return time.time() - self.last_heartbeat
+    
+    def get_heartbeat_status(self) -> Dict[str, Any]:
+        """
+        Get comprehensive heartbeat status information.
+        
+        Returns:
+            Dictionary with heartbeat metrics and status
+        """
+        time_since_heartbeat = self.get_time_since_heartbeat()
+        is_stale = self.is_stale()
+        
+        return {
+            "job_id": self.job_id,
+            "agent_id": self.agent_id,
+            "last_heartbeat": self.last_heartbeat,
+            "time_since_heartbeat_s": time_since_heartbeat,
+            "heartbeat_interval_s": self.heartbeat_interval_s,
+            "staleness_threshold_s": HEARTBEAT_STALENESS_THRESHOLD_S,
+            "is_stale": is_stale,
+            "is_complete": self.is_complete(),
+            "staleness_ratio": time_since_heartbeat / HEARTBEAT_STALENESS_THRESHOLD_S,
+        }
 
     def add_child_job(self, child_job_id: str):
         """Add child job ID"""
@@ -788,12 +892,19 @@ except Exception as e:
 # ============================================================
 
 __all__ = [
+    # Enumerations
     "AgentState",
     "AgentCapability",
+    # Classes
     "AgentMetadata",
     "JobProvenance",
     "StateTransitionRules",
+    # Factory functions
     "create_agent_metadata",
     "create_job_provenance",
+    # Validation
     "validate_state_machine",
+    # ISSUE 5 FIX: Heartbeat constants
+    "DEFAULT_HEARTBEAT_INTERVAL_S",
+    "HEARTBEAT_STALENESS_THRESHOLD_S",
 ]
