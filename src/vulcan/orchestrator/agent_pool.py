@@ -3982,18 +3982,11 @@ class AgentPoolManager:
                     reasoning_type_str = str(reasoning_type_obj) if reasoning_type_obj else "unknown"
                     explanation = getattr(reasoning_result, "explanation", None)
                     
-                    # BUG #2 FIX: Check metadata for world_model response FIRST
+                    # BUG #2 FIX: Check metadata using helper method
                     # The world_model and other engines store actual content in metadata
                     if hasattr(reasoning_result, "metadata") and reasoning_result.metadata:
-                        # Try multiple possible keys in order of preference
-                        metadata_conclusion = (
-                            reasoning_result.metadata.get("world_model_response") or
-                            reasoning_result.metadata.get("conclusion") or
-                            reasoning_result.metadata.get("response") or
-                            reasoning_result.metadata.get("output") or
-                            reasoning_result.metadata.get("result")
-                        )
-                        if metadata_conclusion and (not conclusion or str(conclusion) == "None"):
+                        metadata_conclusion = self._extract_conclusion_from_dict(reasoning_result.metadata)
+                        if metadata_conclusion and not self._is_valid_conclusion(conclusion):
                             conclusion = metadata_conclusion
                             logger.debug("[AgentPool] BUG #2 FIX: Extracted conclusion from metadata")
                         
@@ -4002,41 +3995,29 @@ class AgentPoolManager:
                 
                 # Case 2: Dictionary format (from world_model or other tools)
                 elif isinstance(reasoning_result, dict):
-                    # BUG #2 FIX: Try multiple keys in priority order
-                    conclusion = (
-                        reasoning_result.get("conclusion") or 
-                        reasoning_result.get("response") or
-                        reasoning_result.get("output") or
-                        reasoning_result.get("result")
-                    )
+                    # BUG #2 FIX: Use helper method for extraction
+                    conclusion = self._extract_conclusion_from_dict(reasoning_result)
                     confidence = reasoning_result.get("confidence")
                     reasoning_type_str = str(reasoning_result.get("reasoning_type", "unknown"))
                     explanation = reasoning_result.get("explanation")
                     
                     # Also check nested metadata if present
-                    if not conclusion or str(conclusion) == "None":
+                    if not self._is_valid_conclusion(conclusion):
                         metadata = reasoning_result.get("metadata", {})
-                        if isinstance(metadata, dict):
-                            metadata_conclusion = (
-                                metadata.get("world_model_response") or
-                                metadata.get("conclusion") or
-                                metadata.get("response") or
-                                metadata.get("output") or
-                                metadata.get("result")
-                            )
-                            if metadata_conclusion:
-                                conclusion = metadata_conclusion
-                                logger.debug("[AgentPool] BUG #2 FIX: Extracted conclusion from dict metadata")
+                        metadata_conclusion = self._extract_conclusion_from_dict(metadata)
+                        if metadata_conclusion:
+                            conclusion = metadata_conclusion
+                            logger.debug("[AgentPool] BUG #2 FIX: Extracted conclusion from dict metadata")
                 
-                # BUG #2 FIX: Improved logging - don't show "None" string when conclusion is actually None
-                if conclusion is not None and str(conclusion).strip() and str(conclusion) != "None":
+                # BUG #2 FIX: Improved logging using helper method
+                if self._is_valid_conclusion(conclusion):
                     conclusion_preview = str(conclusion)[:100]
                 else:
                     conclusion_preview = "<no conclusion extracted>"
                 
                 logger.info(
                     f"[AgentPool] Reasoning output extracted: "
-                    f"has_conclusion={conclusion is not None and str(conclusion) != 'None'}, "
+                    f"has_conclusion={self._is_valid_conclusion(conclusion)}, "
                     f"conclusion_preview='{conclusion_preview}', "
                     f"confidence={confidence}, "
                     f"type={reasoning_type_str}"
@@ -4049,8 +4030,8 @@ class AgentPoolManager:
                     "explanation": explanation,
                 }
                 
-                # CRITICAL FIX: Warn if we have high confidence but no conclusion
-                if confidence is not None and confidence >= 0.5 and (conclusion is None or str(conclusion) == "None"):
+                # CRITICAL FIX: Warn if we have high confidence but no valid conclusion
+                if confidence is not None and confidence >= 0.5 and not self._is_valid_conclusion(conclusion):
                     logger.warning(
                         f"[AgentPool] BUG DETECTED: Reasoning has high confidence ({confidence:.2f}) "
                         f"but conclusion is None or 'None' string! This indicates content loss. "
@@ -4125,6 +4106,49 @@ class AgentPoolManager:
             self._persist_state_to_redis()
 
             raise
+
+    def _extract_conclusion_from_dict(self, data_dict: Dict[str, Any]) -> Optional[Any]:
+        """
+        Helper method to extract conclusion from a dictionary with multiple fallback keys.
+        
+        BUG #2 FIX: Centralized extraction logic to avoid duplication.
+        Tries multiple possible keys where reasoning engines store conclusions.
+        
+        Args:
+            data_dict: Dictionary that may contain conclusion data
+            
+        Returns:
+            Conclusion value if found, None otherwise
+        """
+        if not isinstance(data_dict, dict):
+            return None
+            
+        # Try multiple possible keys in priority order
+        for key in ('world_model_response', 'conclusion', 'response', 'output', 'result'):
+            value = data_dict.get(key)
+            if value is not None:
+                return value
+        
+        return None
+    
+    def _is_valid_conclusion(self, conclusion: Any) -> bool:
+        """
+        Helper method to check if a conclusion is valid (not None or string "None").
+        
+        BUG #2 FIX: Centralized validation logic to avoid duplication.
+        
+        Args:
+            conclusion: Conclusion value to check
+            
+        Returns:
+            True if conclusion is valid, False if None or string "None"
+        """
+        if conclusion is None:
+            return False
+        if isinstance(conclusion, str):
+            # Check for empty string or literal "None" string
+            return conclusion.strip() and conclusion != "None"
+        return True
 
     def _complete_agent_task(self, agent_id: str, task_id: str, result: Any):
         """

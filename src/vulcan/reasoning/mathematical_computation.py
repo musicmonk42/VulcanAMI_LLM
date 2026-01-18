@@ -994,6 +994,10 @@ result = simplify(integral)
         # Use LLM for complex problems
         if llm is not None and strategy in [SolutionStrategy.LLM_GENERATED, SolutionStrategy.SYMBOLIC, SolutionStrategy.HYBRID]:
             # BUG #1 FIX: Pass kwargs to _generate_llm_code to avoid NameError
+            # The _generate_llm_code method references kwargs.get('skip_gate_check', False)
+            # but kwargs was not in the function signature, causing:
+            # "NameError: name 'kwargs' is not defined" in production logs
+            # Fixed by adding **kwargs to both _generate_code and _generate_llm_code signatures
             llm_code = self._generate_llm_code(query, llm, **kwargs)
             if llm_code:
                 return llm_code
