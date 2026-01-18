@@ -4472,8 +4472,41 @@ class QueryAnalyzer:
         # Mathematical queries (Bayesian probability, statistics, calculations) should
         # bypass arena/multi-agent orchestration that causes 60+ second delays.
         # Route directly to probabilistic/symbolic reasoning with short timeout.
+        #
+        # ============================================================================
+        # ISSUE #2 FIX (P1 - High): Respect LLM's Tool Classification
+        # ============================================================================
+        # PROBLEM: MATH-FAST-PATH was hardcoding ["probabilistic", "symbolic", "mathematical"]
+        # even when LLM correctly classified query as LOGICAL→['symbolic'] or CAUSAL→['causal']
+        #
+        # EVIDENCE: Logs showed:
+        #   [QueryRouter] LLM Classification: category=LOGICAL, tools=['symbolic']
+        #   [QueryRouter] MATH-FAST-PATH detected ← WRONG OVERRIDE
+        #   [Routing] tools=['probabilistic', 'symbolic', 'mathematical'] ← Ignored LLM!
+        #
+        # FIX: Check if LLM provided tool classification. If yes, use LLM's tools.
+        # Only use fallback tools if LLM didn't classify or has no suggested_tools.
+        #
+        # Industry Standard: Single Source of Truth - Router decides once, not multiple times
+        # ============================================================================
         if query and self._is_mathematical_query(query):
-            logger.info(f"[QueryRouter] {query_id}: MATH-FAST-PATH detected for query")
+            # Check if LLM already classified this query with specific tools
+            llm_classified_tools = None
+            llm_category = None
+            try:
+                # Try to access classification from earlier in route_query()
+                # The 'classification' variable exists if LLM classification succeeded
+                if 'classification' in locals() and hasattr(classification, 'suggested_tools'):
+                    llm_classified_tools = classification.suggested_tools
+                    llm_category = classification.category
+                    if llm_classified_tools:
+                        logger.info(
+                            f"[QueryRouter] {query_id}: MATH-FAST-PATH respecting LLM classification: "
+                            f"category={llm_category}, tools={llm_classified_tools}"
+                        )
+            except NameError:
+                # classification variable not defined - LLM classification not run
+                pass
 
             # Determine learning mode
             if source == "user":
@@ -4508,6 +4541,7 @@ class QueryAnalyzer:
                     "learning_mode": learning_mode.value,
                     "fast_path": True,
                     "math_fast_path": True,  # Mark as math fast-path
+                    "llm_override_respected": llm_classified_tools is not None,  # Issue #2 tracking
                 },
             )
 
@@ -4515,16 +4549,34 @@ class QueryAnalyzer:
             plan.safety_passed = True
             plan.detected_patterns.append("mathematical_calculation")
 
+            # ============================================================================
+            # ISSUE #2 FIX: Use LLM's tools if available, fallback to default otherwise
+            # ============================================================================
+            if llm_classified_tools and len(llm_classified_tools) > 0:
+                # Priority 1: Use LLM's classification (Single Source of Truth)
+                selected_tools = llm_classified_tools
+                primary_tool = selected_tools[0]  # Use first tool as primary
+                logger.info(
+                    f"[QueryRouter] {query_id}: MATH-FAST-PATH using LLM tools: {selected_tools}"
+                )
+            else:
+                # Priority 2: Fallback to default math tools if LLM didn't provide classification
+                selected_tools = ["probabilistic", "symbolic", "mathematical"]
+                primary_tool = "probabilistic"
+                logger.info(
+                    f"[QueryRouter] {query_id}: MATH-FAST-PATH using fallback tools: {selected_tools}"
+                )
+
             # PRIORITY 4 FIX: Create mathematical execution tasks with specialized tools
-            # Route to probabilistic/symbolic/mathematical tools instead of general
+            # Route to LLM-selected tools or fallback tools
             plan.agent_tasks = [
                 AgentTask(
                     task_id=f"task_{uuid.uuid4().hex[:8]}_math",
                     task_type="mathematical_task",
-                    capability="reasoning",  # Use probabilistic reasoning
+                    capability="reasoning",  # Use reasoning capability
                     prompt=query,
                     reasoning_type="mathematical",  # MANDATORY: math reasoning
-                    tool_name="probabilistic",  # MANDATORY: primary tool for math
+                    tool_name=primary_tool,  # MANDATORY: Use LLM's primary tool or fallback
                     priority=2,  # Higher priority for math
                     timeout_seconds=MATH_QUERY_TIMEOUT_SECONDS,  # Short timeout (5s)
                     parameters={
@@ -4533,26 +4585,24 @@ class QueryAnalyzer:
                         "prompt": query,  # FIX: Explicitly include prompt in parameters
                         "skip_heavy_analysis": True,
                         "skip_arena": True,
-                        # PRIORITY 4 FIX: Route to specialized mathematical tools
-                        "tools": ["probabilistic", "symbolic", "mathematical"],
-                        "preferred_tool": "probabilistic",  # Hint to use probabilistic tool
+                        # ISSUE #2 FIX: Use LLM-selected tools, not hardcoded
+                        "tools": selected_tools,
+                        "preferred_tool": primary_tool,
                         "mathematical_scenario_override": True,  # Safety override
                         "require_verification": True,  # Trigger mathematical verification
                         "reasoning_context": {
                             "original_query": query,
                             "query_type": "mathematical",
                             "source": source,
+                            "llm_category": llm_category,  # Pass LLM's category for debugging
                         },
                     },
                 )
             ]
 
-            # PRIORITY 4 FIX: Store selected tools in telemetry for downstream use
-            plan.telemetry_data["selected_tools"] = [
-                "probabilistic",
-                "symbolic",
-                "mathematical",
-            ]
+            # ISSUE #2 FIX: Store LLM-selected tools in telemetry for downstream use
+            plan.telemetry_data["selected_tools"] = selected_tools
+            plan.telemetry_data["llm_category"] = llm_category  # Track LLM's decision
             plan.telemetry_data["reasoning_strategy"] = "mathematical_execution"
 
             # ARCHITECTURE: Set LLM mode based on query characteristics
