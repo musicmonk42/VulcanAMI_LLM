@@ -5038,7 +5038,7 @@ class AgentPoolManager:
                 "min_agents": self.min_agents,
                 "max_agents": self.max_agents,
             }
-            logger.info("Agent pool status: %s", status)
+            logger.debug("[AutoScaler] - Agent pool status: %s", status)
             return status
 
     def _cached_status(self) -> Dict[str, Any]:
