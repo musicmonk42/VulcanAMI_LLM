@@ -149,21 +149,28 @@ class CompiledBinaryCache:
         return {}
 
     def _save_index(self):
-        """Save cache index to disk."""
+        """
+        Save cache index to disk.
+        
+        This method is called during cleanup and may execute during interpreter
+        shutdown when logging streams are closed. Defensive error handling ensures
+        graceful degradation.
+        """
         index_file = self.cache_dir / "index.json"
         try:
             # Ensure parent directory exists before writing
+            # This handles cases where temp directories are cleaned up before this method runs
             index_file.parent.mkdir(parents=True, exist_ok=True)
             with open(index_file, "w", encoding="utf-8") as f:
                 json.dump(self.cache_index, f)
         except Exception as e:
-            # Use print instead of logger to avoid I/O errors during cleanup
-            # when logging streams may already be closed
+            # Try to log the error, but handle cases where logger stream is closed
+            # This commonly happens during interpreter shutdown or test cleanup
             try:
                 logger.warning(f"Failed to save cache index: {e}")
             except (ValueError, OSError):
-                # Logger stream is closed, silently ignore
-                # This can happen during interpreter shutdown
+                # Logger stream is closed - this is expected during shutdown
+                # Silently ignore to prevent cascading errors
                 pass
 
     def get(self, graph_hash: str) -> Optional[bytes]:

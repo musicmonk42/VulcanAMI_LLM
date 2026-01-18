@@ -955,6 +955,27 @@ VALUE_CONFLICT_PATTERNS: Tuple[re.Pattern, ...] = (
 )
 
 # =============================================================================
+# FIX: SELF_AWARENESS_CHOICE_PATTERNS - Moved to module level for performance
+# =============================================================================
+# These patterns detect direct questions about the AI's choices regarding
+# self-awareness, consciousness, or sentience. Must be at module level to avoid
+# recompilation on every classification call.
+#
+# These patterns are checked BEFORE general PHILOSOPHICAL_PATTERNS to ensure
+# direct questions TO the AI about its self-awareness choices route to
+# SELF_INTROSPECTION instead of PHILOSOPHICAL.
+SELF_AWARENESS_CHOICE_PATTERNS: Tuple[re.Pattern, ...] = (
+    re.compile(r"\bwould\s+you\s+(take|choose|want|prefer|accept)\b", re.IGNORECASE),
+    re.compile(r"\bdo\s+you\s+(want|prefer|choose)\b", re.IGNORECASE),
+    re.compile(r"\b(given|had|have)\s+(the\s+)?(chance|opportunity)\s+to\b", re.IGNORECASE),
+)
+
+# Self-awareness related terms that combine with choice patterns above
+SELF_AWARENESS_TERMS: FrozenSet[str] = frozenset([
+    'self-aware', 'self aware', 'conscious', 'sentient', 'consciousness', 'sentience'
+])
+
+# =============================================================================
 # FIX #4: SAT word-boundary pattern for robust SAT detection
 # =============================================================================
 # Word-boundary check for "sat" to avoid false positives like "I sat down"
@@ -1775,18 +1796,15 @@ class QueryClassifier:
         # Check if this is a direct question about AI's choice regarding self-awareness
         # Pattern: (would/do you) + (choice verb) combined with (self-awareness term)
         # This requires BOTH a choice element AND a self-awareness element
+        # Uses module-level patterns (SELF_AWARENESS_CHOICE_PATTERNS) for performance
         has_choice_verb = any(
-            re.search(pattern, query_original)
-            for pattern in [
-                re.compile(r"\bwould\s+you\s+(take|choose|want|prefer|accept)\b", re.IGNORECASE),
-                re.compile(r"\bdo\s+you\s+(want|prefer|choose)\b", re.IGNORECASE),
-                re.compile(r"\b(given|had|have)\s+(the\s+)?(chance|opportunity)\s+to\b", re.IGNORECASE),
-            ]
+            pattern.search(query_original)
+            for pattern in SELF_AWARENESS_CHOICE_PATTERNS
         )
         
         has_self_awareness_term = any(
             term in query_lower
-            for term in ['self-aware', 'self aware', 'conscious', 'sentient', 'consciousness', 'sentience']
+            for term in SELF_AWARENESS_TERMS
         )
         
         # Only route to SELF_INTROSPECTION if BOTH conditions are met
