@@ -971,8 +971,12 @@ SELF_AWARENESS_CHOICE_PATTERNS: Tuple[re.Pattern, ...] = (
 )
 
 # Self-awareness related terms that combine with choice patterns above
+# Includes all variations: hyphenated, spaced, and underscored for consistency
+# with SELF_INTROSPECTION_KEYWORDS (line 933)
 SELF_AWARENESS_TERMS: FrozenSet[str] = frozenset([
-    'self-aware', 'self aware', 'conscious', 'sentient', 'consciousness', 'sentience'
+    'self-aware', 'self aware', 'self_aware',  # All variations of self-aware
+    'conscious', 'consciousness',  # Consciousness terms
+    'sentient', 'sentience'  # Sentience terms
 ])
 
 # =============================================================================
