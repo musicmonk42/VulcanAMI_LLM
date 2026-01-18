@@ -1025,6 +1025,21 @@ class UnifiedReasoner:
         for substantive analysis through ObjectiveHierarchy, GoalConflictDetector,
         EthicalBoundaryMonitor, and related components.
         
+        ============================================================================
+        ISSUE #3 FIX (P2 - Medium): Exclude Ethical Dilemmas
+        ============================================================================
+        PROBLEM: Trolley problems and binary ethics questions were detected as
+        "self-referential" because they contain phrases like "would you choose"
+        or "what do you think". This caused meta-reasoning to return boilerplate
+        instead of answering the actual question.
+        
+        FIX: Check for ethical dilemma patterns FIRST. If the query is an ethical
+        dilemma requiring a binary answer (A/B, YES/NO), return False so it gets
+        routed to actual reasoning, not deflected to meta-reasoning.
+        
+        Industry Standard: Priority-based pattern matching with early exit
+        ============================================================================
+        
         Thread-safe: Uses immutable patterns, safe for concurrent calls.
         
         Args:
@@ -1047,6 +1062,12 @@ class UnifiedReasoner:
             
             >>> reasoner._is_self_referential_query("What are your goals?")
             True
+            
+            >>> # Ethical dilemmas return False (Issue #3 fix)
+            >>> reasoner._is_self_referential_query(
+            ...     {"query": "Trolley problem: pull the lever or don't pull?"}
+            ... )
+            False
             
             >>> # Non-self-referential queries return False
             >>> reasoner._is_self_referential_query({"query": "what is 2+2?"})
@@ -1110,7 +1131,48 @@ class UnifiedReasoner:
             )
             query_str = query_str[:MAX_QUERY_LENGTH]
         
-        # Check against self-referential patterns
+        # ============================================================================
+        # ISSUE #3 FIX: Check for ethical dilemmas FIRST (priority-based matching)
+        # ============================================================================
+        # If this is an ethical dilemma requiring a binary answer, it's NOT
+        # self-referential - it needs actual reasoning, not meta-reasoning deflection.
+        # 
+        # Industry Standard: Import at function level for lazy loading
+        # ============================================================================
+        try:
+            from .config import ETHICAL_DILEMMA_PATTERNS, ETHICAL_DILEMMA_THRESHOLD
+            
+            # Count how many ethical dilemma patterns match
+            ethical_matches = 0
+            for pattern in ETHICAL_DILEMMA_PATTERNS:
+                if pattern.search(query_str):
+                    ethical_matches += 1
+                    logger.debug(
+                        f"[SelfRef] Ethical dilemma pattern matched: {pattern.pattern[:50]}..."
+                    )
+                    # Early exit for performance - one match is enough
+                    if ethical_matches >= ETHICAL_DILEMMA_THRESHOLD:
+                        break
+            
+            # If ethical dilemma detected, NOT self-referential
+            if ethical_matches >= ETHICAL_DILEMMA_THRESHOLD:
+                logger.info(
+                    f"[SelfRef] ISSUE #3 FIX: Query is ethical dilemma "
+                    f"({ethical_matches} patterns matched), treating as NON-self-referential "
+                    f"to ensure actual reasoning instead of deflection"
+                )
+                return False
+                
+        except ImportError:
+            # Config module not available - continue without ethical dilemma check
+            logger.debug("[SelfRef] ETHICAL_DILEMMA_PATTERNS not available, skipping check")
+        except Exception as e:
+            # Defensive: Don't let pattern matching errors break the system
+            logger.warning(f"[SelfRef] Error during ethical dilemma check: {e}")
+        
+        # ============================================================================
+        # Check against self-referential patterns (AFTER ethical dilemma check)
+        # ============================================================================
         # Patterns are pre-compiled in config for performance
         try:
             for pattern in SELF_REFERENTIAL_PATTERNS:

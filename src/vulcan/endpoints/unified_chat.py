@@ -168,13 +168,19 @@ def _get_reasoning_attr(obj: Any, attr: str, default: Any = None) -> Any:
     can be either structured (dict) or object-oriented, depending on the
     reasoning engine used.
     
+    **CRITICAL FIX (Issue #1)**: Special handling for safety_status attribute
+    to prevent KeyError when reasoning results are passed as dicts instead of
+    ReasoningResult objects. When attr='safety_status', returns empty dict {}
+    instead of None if attribute is missing, maintaining type consistency.
+    
     Args:
         obj: The reasoning output object (dict, ReasoningResult, or other)
-        attr: Name of the attribute to extract (e.g., 'conclusion', 'confidence')
+        attr: Name of the attribute to extract (e.g., 'conclusion', 'confidence', 'safety_status')
         default: Default value to return if attribute is not found (default: None)
     
     Returns:
         The extracted attribute value, or default if not found
+        For safety_status specifically: returns {} if not found and default is None
     
     Examples:
         >>> result = {"conclusion": "answer", "confidence": 0.9}
@@ -191,16 +197,29 @@ def _get_reasoning_attr(obj: Any, attr: str, default: Any = None) -> Any:
         
         >>> _get_reasoning_attr({}, "missing", default="N/A")
         "N/A"
+        
+        >>> # Issue #1 fix: safety_status always returns dict type
+        >>> _get_reasoning_attr({}, "safety_status")
+        {}
     """
     if obj is None:
-        return default
+        # Issue #1: Special case for safety_status - return empty dict
+        return {} if (attr == "safety_status" and default is None) else default
     
     # Handle dictionary-based results (most common case)
     if isinstance(obj, dict):
-        return obj.get(attr, default)
+        value = obj.get(attr, default)
+        # Issue #1: Ensure safety_status is always dict type
+        if attr == "safety_status" and value is None:
+            return {}
+        return value
     
     # Handle object-based results (ReasoningResult, custom classes, etc.)
-    return getattr(obj, attr, default)
+    value = getattr(obj, attr, default)
+    # Issue #1: Ensure safety_status is always dict type
+    if attr == "safety_status" and value is None:
+        return {}
+    return value
 
 
 def _calculate_aggregate_confidence(reasoning_results: Dict[str, Any]) -> float:

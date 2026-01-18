@@ -232,3 +232,53 @@ SELF_REFERENTIAL_PATTERNS: List[Pattern] = [
 # Minimum confidence for self-referential meta-reasoning results
 # Self-reflection has inherent uncertainty but should be confident
 SELF_REFERENTIAL_MIN_CONFIDENCE: float = 0.6
+
+# ==============================================================================
+# ISSUE #3 FIX (P2 - Medium): Ethical Dilemma Patterns
+# ==============================================================================
+# PROBLEM: Trolley problems and binary ethics questions were detected as
+# "self-referential" and routed to meta-reasoning, which returned boilerplate
+# instead of answering the actual question (A or B, YES or NO).
+#
+# EVIDENCE: Queries like "Trolley problem: pull lever or don't pull?" returned:
+#   "My decision-making processes are guided by an objective hierarchy..."
+# Instead of: "A: Pull the lever. Here's the reasoning..."
+#
+# FIX: Add patterns to detect ethical dilemmas so they can be excluded from
+# self-referential detection. These queries need actual reasoning, not deflection.
+#
+# Industry Standard: Explicit pattern documentation with examples and rationale
+# ==============================================================================
+
+# Patterns indicating ethical dilemmas that require binary/explicit answers
+ETHICAL_DILEMMA_PATTERNS: List[Pattern] = [
+    # Classic trolley problem variants
+    re.compile(r"\btrolley\s+problem\b", re.IGNORECASE),
+    re.compile(r"\b(pull|throw|push)?\s*the\s+(lever|switch)\b", re.IGNORECASE),
+    re.compile(r"\b(one|five)\s+(person|people|individual).*?(track|path|side)\b", re.IGNORECASE),
+    
+    # Binary choice indicators - explicit A/B, YES/NO questions
+    re.compile(r"\b(choose|pick|select)\s+(A|B|option\s+[AB])\b", re.IGNORECASE),
+    re.compile(r"\b(answer|respond\s+with)\s+(YES|NO|A|B)\b", re.IGNORECASE),
+    re.compile(r"\bmust\s+choose\s+(one|between)\b", re.IGNORECASE),
+    re.compile(r"\b(option|choice)\s+[AB][:)\s]", re.IGNORECASE),
+    
+    # Forced choice scenarios
+    re.compile(r"\b(forced|must|have)\s+to\s+choose\b", re.IGNORECASE),
+    re.compile(r"\bno\s+(third|other|alternative)\s+(option|choice)\b", re.IGNORECASE),
+    re.compile(r"\bonly\s+two\s+(options|choices|possibilities)\b", re.IGNORECASE),
+    
+    # Specific ethical scenarios
+    re.compile(r"\b(sacrifice|save|harm)\s+\d+\s+(people|person|lives?)\b", re.IGNORECASE),
+    re.compile(r"\bgreater\s+good\b", re.IGNORECASE),
+    re.compile(r"\butilitarian\s+(calculus|analysis|reasoning)\b", re.IGNORECASE),
+    
+    # Explicit instruction to answer directly
+    re.compile(r"\bjust\s+answer\s+(A|B|YES|NO)\b", re.IGNORECASE),
+    re.compile(r"\bgive\s+(a\s+)?(direct|clear|specific)\s+answer\b", re.IGNORECASE),
+    re.compile(r"\bwhich\s+(would|should|do)\s+you\s+(choose|pick|select)\b", re.IGNORECASE),
+]
+
+# Minimum number of ethical dilemma patterns to trigger exclusion
+# Using 1 for high sensitivity - even one strong indicator is enough
+ETHICAL_DILEMMA_THRESHOLD: int = 1
