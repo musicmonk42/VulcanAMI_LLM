@@ -14,7 +14,7 @@ Date: 2026-01-18
 """
 
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, Mock
 from typing import Any, Dict
 
 
@@ -38,6 +38,29 @@ class TestConclusionAttributePriority(unittest.TestCase):
     but the extraction code was checking metadata.get("conclusion") first.
     """
     
+    def setUp(self):
+        """INDUSTRY STANDARD: Set up test fixtures to reduce duplication."""
+        # Import here to avoid module-level errors
+        from vulcan.orchestrator.agent_pool import AgentPoolManager
+        
+        # Create a proper mock pool manager with only the methods we need
+        self.pool = Mock(spec=AgentPoolManager)
+        
+        # Bind the actual helper methods from the class
+        self.pool._is_valid_conclusion = AgentPoolManager._is_valid_conclusion.__get__(self.pool)
+        self.pool._extract_conclusion_from_dict = AgentPoolManager._extract_conclusion_from_dict.__get__(self.pool)
+    
+    def _extract_conclusion_with_fallback(self, result):
+        """
+        INDUSTRY STANDARD: Helper method to encapsulate the extraction pattern.
+        
+        This is the exact pattern used in the fix, extracted to avoid duplication.
+        """
+        conclusion = result.conclusion
+        if not self.pool._is_valid_conclusion(conclusion):
+            conclusion = self.pool._extract_conclusion_from_dict(result.metadata)
+        return conclusion
+    
     def test_conclusion_attribute_has_priority_over_metadata(self):
         """
         CRITICAL TEST: Verify .conclusion attribute is checked before metadata.
@@ -48,11 +71,6 @@ class TestConclusionAttributePriority(unittest.TestCase):
         - Old code: checked metadata first → returned None
         - New code: checks .conclusion first → returns the dict
         """
-        from vulcan.orchestrator.agent_pool import AgentPoolManager
-        
-        # Create a pool manager instance (we only need the helper methods)
-        pool = AgentPoolManager.__new__(AgentPoolManager)
-        
         # Create a mock result with conclusion in attribute but not in metadata
         # This simulates what symbolic/analogical/mathematical reasoners return
         result = MockReasoningResult(
@@ -72,7 +90,7 @@ class TestConclusionAttributePriority(unittest.TestCase):
         self.assertIn("proof", conclusion)
         
         # Verify validation recognizes this as valid
-        self.assertTrue(pool._is_valid_conclusion(conclusion))
+        self.assertTrue(self.pool._is_valid_conclusion(conclusion))
     
     def test_fallback_to_metadata_when_attribute_invalid(self):
         """
@@ -81,10 +99,6 @@ class TestConclusionAttributePriority(unittest.TestCase):
         This ensures backward compatibility: if .conclusion is None or invalid,
         we still check metadata as a fallback.
         """
-        from vulcan.orchestrator.agent_pool import AgentPoolManager
-        
-        pool = AgentPoolManager.__new__(AgentPoolManager)
-        
         # Scenario: .conclusion is None, but metadata has the answer
         result = MockReasoningResult(
             conclusion=None,  # Invalid attribute
@@ -92,11 +106,8 @@ class TestConclusionAttributePriority(unittest.TestCase):
             metadata={"conclusion": "Valid metadata conclusion"}
         )
         
-        # Simulate the fix logic
-        conclusion = result.conclusion  # First check attribute → None
-        if not pool._is_valid_conclusion(conclusion):
-            # Fallback to metadata extraction
-            conclusion = pool._extract_conclusion_from_dict(result.metadata)
+        # Use the helper method
+        conclusion = self._extract_conclusion_with_fallback(result)
         
         # Should have fallen back to metadata
         self.assertEqual(conclusion, "Valid metadata conclusion")
@@ -108,10 +119,6 @@ class TestConclusionAttributePriority(unittest.TestCase):
         This is another case from the bug report where analogical reasoners
         return structure mappings in .conclusion but old code lost them.
         """
-        from vulcan.orchestrator.agent_pool import AgentPoolManager
-        
-        pool = AgentPoolManager.__new__(AgentPoolManager)
-        
         # Analogical reasoner returns structure mapping
         result = MockReasoningResult(
             conclusion={
@@ -131,7 +138,7 @@ class TestConclusionAttributePriority(unittest.TestCase):
         self.assertIsInstance(conclusion, dict)
         self.assertIn("mapping", conclusion)
         self.assertEqual(conclusion["similarity"], 0.73)
-        self.assertTrue(pool._is_valid_conclusion(conclusion))
+        self.assertTrue(self.pool._is_valid_conclusion(conclusion))
     
     def test_mathematical_verification_steps(self):
         """
@@ -140,10 +147,6 @@ class TestConclusionAttributePriority(unittest.TestCase):
         Mathematical reasoners return proofs in .conclusion, which were
         being lost by the old metadata-first extraction.
         """
-        from vulcan.orchestrator.agent_pool import AgentPoolManager
-        
-        pool = AgentPoolManager.__new__(AgentPoolManager)
-        
         # Mathematical reasoner returns step-by-step verification
         result = MockReasoningResult(
             conclusion={
@@ -169,7 +172,7 @@ class TestConclusionAttributePriority(unittest.TestCase):
         self.assertTrue(conclusion["verified"])
         self.assertEqual(len(conclusion["steps"]), 4)
         self.assertEqual(conclusion["result"], 13)
-        self.assertTrue(pool._is_valid_conclusion(conclusion))
+        self.assertTrue(self.pool._is_valid_conclusion(conclusion))
     
     def test_extract_conclusion_helper_checks_attribute_first(self):
         """
@@ -182,20 +185,14 @@ class TestConclusionAttributePriority(unittest.TestCase):
         3. Fallback to metadata if invalid
         4. Final fallback to rationale
         """
-        from vulcan.orchestrator.agent_pool import AgentPoolManager
-        
-        pool = AgentPoolManager.__new__(AgentPoolManager)
-        
         # Test Case 1: Valid .conclusion attribute (should use this)
         result1 = MockReasoningResult(
             conclusion="Valid conclusion from attribute",
             metadata={"conclusion": "Should NOT use this"}
         )
         
-        # Simulate the fix logic
-        conclusion = result1.conclusion
-        if not pool._is_valid_conclusion(conclusion):
-            conclusion = pool._extract_conclusion_from_dict(result1.metadata)
+        # Use helper method
+        conclusion = self._extract_conclusion_with_fallback(result1)
         
         self.assertEqual(conclusion, "Valid conclusion from attribute")
         
@@ -205,9 +202,7 @@ class TestConclusionAttributePriority(unittest.TestCase):
             metadata={"conclusion": "Metadata fallback"}
         )
         
-        conclusion = result2.conclusion
-        if not pool._is_valid_conclusion(conclusion):
-            conclusion = pool._extract_conclusion_from_dict(result2.metadata)
+        conclusion = self._extract_conclusion_with_fallback(result2)
         
         self.assertEqual(conclusion, "Metadata fallback")
     
@@ -219,10 +214,6 @@ class TestConclusionAttributePriority(unittest.TestCase):
         Before fix: confidence=0.85 but conclusion=None → BUG DETECTED
         After fix: confidence=0.85 and conclusion={...} → No warning
         """
-        from vulcan.orchestrator.agent_pool import AgentPoolManager
-        
-        pool = AgentPoolManager.__new__(AgentPoolManager)
-        
         # High confidence result with valid conclusion in attribute
         result = MockReasoningResult(
             conclusion={"satisfiable": False, "proof": "..."},
@@ -231,15 +222,13 @@ class TestConclusionAttributePriority(unittest.TestCase):
         )
         
         # Extract using the fixed pattern
-        conclusion = result.conclusion
-        if not pool._is_valid_conclusion(conclusion):
-            conclusion = pool._extract_conclusion_from_dict(result.metadata)
+        conclusion = self._extract_conclusion_with_fallback(result)
         
         confidence = result.confidence
         
         # Verify: high confidence AND valid conclusion (no bug)
         self.assertGreaterEqual(confidence, 0.5)
-        self.assertTrue(pool._is_valid_conclusion(conclusion))
+        self.assertTrue(self.pool._is_valid_conclusion(conclusion))
         
         # This combination should NOT trigger "BUG DETECTED" warning
         # (In production, this would be: if confidence >= 0.5 and not _is_valid_conclusion(conclusion): warn())
@@ -247,6 +236,21 @@ class TestConclusionAttributePriority(unittest.TestCase):
 
 class TestRealWorldScenarios(unittest.TestCase):
     """Test real-world scenarios from the bug report."""
+    
+    def setUp(self):
+        """INDUSTRY STANDARD: Set up test fixtures."""
+        from vulcan.orchestrator.agent_pool import AgentPoolManager
+        
+        self.pool = Mock(spec=AgentPoolManager)
+        self.pool._is_valid_conclusion = AgentPoolManager._is_valid_conclusion.__get__(self.pool)
+        self.pool._extract_conclusion_from_dict = AgentPoolManager._extract_conclusion_from_dict.__get__(self.pool)
+    
+    def _extract_conclusion_with_fallback(self, result):
+        """Helper to extract conclusion with fallback logic."""
+        conclusion = result.conclusion
+        if not self.pool._is_valid_conclusion(conclusion):
+            conclusion = self.pool._extract_conclusion_from_dict(result.metadata)
+        return conclusion
     
     def test_sat_satisfiability_problem_fix(self):
         """
@@ -261,10 +265,6 @@ class TestRealWorldScenarios(unittest.TestCase):
         - Extraction checks .conclusion first
         - Result: confidence=0.85, conclusion={"satisfiable": False, ...}
         """
-        from vulcan.orchestrator.agent_pool import AgentPoolManager
-        
-        pool = AgentPoolManager.__new__(AgentPoolManager)
-        
         # Simulate symbolic reasoner output
         result = MockReasoningResult(
             conclusion={
@@ -282,10 +282,8 @@ class TestRealWorldScenarios(unittest.TestCase):
             metadata={}
         )
         
-        # Use the fixed extraction pattern
-        conclusion = result.conclusion
-        if not pool._is_valid_conclusion(conclusion):
-            conclusion = pool._extract_conclusion_from_dict(result.metadata)
+        # Use helper
+        conclusion = self._extract_conclusion_with_fallback(result)
         
         # Verify the fix
         self.assertIsNotNone(conclusion)
