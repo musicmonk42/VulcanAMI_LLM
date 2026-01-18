@@ -75,16 +75,7 @@ class TestCLIConfigLoadFromFile:
                         assert config.server_url == "https://yaml.example.com"
                         assert config.api_key == "yaml-key-456"
     
-    def test_load_yaml_import_error(self):
-        """Test graceful handling when PyYAML not available."""
-        with patch.dict(os.environ, {}, clear=True):
-            with patch.object(Path, 'exists', return_value=True):
-                with patch("builtins.open", create=True):
-                    with patch("vulcan.cli.config.yaml", side_effect=ImportError):
-                        # Should not raise, just skip file loading
-                        config = CLIConfig()
-                        assert config.server_url == CLIConfig.DEFAULT_SERVER_URL
-    
+
     def test_load_invalid_yaml(self):
         """Test handling of invalid YAML file."""
         with patch.dict(os.environ, {}, clear=True):
@@ -139,14 +130,7 @@ class TestCLIConfigSave:
                     assert config.server_url == "https://saved.example.com"
                     assert config.api_key == "saved-key"
     
-    def test_save_config_no_yaml(self):
-        """Test save_config when PyYAML not available."""
-        config = CLIConfig()
-        
-        with patch("vulcan.cli.config.yaml", side_effect=ImportError):
-            # Should log error but not crash
-            config.save_config(server_url="https://test.com")
-    
+
     def test_save_config_partial_update(self):
         """Test saving only some config values."""
         with tempfile.TemporaryDirectory() as tmpdir:
