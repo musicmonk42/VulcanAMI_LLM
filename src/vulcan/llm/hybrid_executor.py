@@ -60,6 +60,9 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
+# Initialize logger early for error handling in imports
+logger = logging.getLogger(__name__)
+
 # Industry Standard: Import LLMMode from router for type safety and consistency
 try:
     from vulcan.routing.query_router import LLMMode
@@ -77,8 +80,6 @@ except ImportError:
 # Module metadata
 __version__ = "1.7.0"  # P0 FIX: Added NotReasoningEngineError and reasoning task detection
 __author__ = "VULCAN-AGI Team"
-
-logger = logging.getLogger(__name__)
 
 # ============================================================
 # MODULE-LEVEL CONFIGURATION

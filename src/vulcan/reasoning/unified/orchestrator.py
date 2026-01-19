@@ -409,14 +409,37 @@ class UnifiedReasoner:
             logger.error(f"[MathTool] ✗ Error initializing mathematical computation tool: {e}", exc_info=True)
             logger.error("[MathTool] Mathematical reasoning will not be available")
 
-        # PHILOSOPHICAL REASONER REMOVED: Ethical reasoning now handled by World Model
-        # The World Model has full meta-reasoning machinery:
+        # Register WorldModel as PHILOSOPHICAL reasoner
+        # The World Model has full meta-reasoning machinery for ethical/philosophical reasoning:
         # - predict_interventions() for causal predictions
         # - InternalCritic for multi-framework evaluation
         # - GoalConflictDetector for dilemma analysis
         # - EthicalBoundaryMonitor for ethical constraints
         # Philosophical queries are routed to World Model via mode='philosophical'
-        logger.info("Philosophical reasoning: Routed to World Model (PhilosophicalReasoner removed)")
+        try:
+            from vulcan.world_model import WorldModel
+            # Get or create WorldModel instance
+            # Use singleton pattern to avoid multiple instances
+            try:
+                from vulcan.reasoning.singletons import get_world_model
+                world_model = get_world_model()
+                if world_model is None:
+                    logger.info("[PhilosophicalReasoner] Creating new WorldModel instance")
+                    world_model = WorldModel(config={'bootstrap_mode': True, 'enable_meta_reasoning': True})
+                else:
+                    logger.info("[PhilosophicalReasoner] Using existing WorldModel singleton")
+            except (ImportError, AttributeError):
+                logger.info("[PhilosophicalReasoner] Singleton not available, creating new WorldModel")
+                world_model = WorldModel(config={'bootstrap_mode': True, 'enable_meta_reasoning': True})
+            
+            self.reasoners[ReasoningType.PHILOSOPHICAL] = world_model
+            logger.info("[PhilosophicalReasoner] ✓ WorldModel registered as PHILOSOPHICAL reasoner")
+        except ImportError as e:
+            logger.warning(f"[PhilosophicalReasoner] ✗ Could not import WorldModel: {e}")
+            logger.warning("[PhilosophicalReasoner] Philosophical reasoning will not be available")
+        except Exception as e:
+            logger.warning(f"[PhilosophicalReasoner] ✗ Error initializing WorldModel: {e}")
+            logger.warning("[PhilosophicalReasoner] Philosophical reasoning will not be available")
 
         # Note: Normalize enum keys to string keys for portfolio executor and warm pool
         tools_by_name = {k.value: v for k, v in self.reasoners.items()}
@@ -2439,6 +2462,10 @@ class UnifiedReasoner:
             'philosophical': ReasoningType.PHILOSOPHICAL,
             'philosophy': ReasoningType.PHILOSOPHICAL,
             'ethical': ReasoningType.PHILOSOPHICAL,
+            'world_model': ReasoningType.PHILOSOPHICAL,
+            'worldmodel': ReasoningType.PHILOSOPHICAL,
+            'ethics': ReasoningType.PHILOSOPHICAL,
+            'moral': ReasoningType.PHILOSOPHICAL,
         }
         
         # Try exact match first
@@ -4301,7 +4328,8 @@ class UnifiedReasoner:
                         else:
                             problem['input'] = task.input_data
 
-                    raw_result = reasoner.reason(problem, None)
+                    # INDUSTRY STANDARD: Pass mode='philosophical' to engage ethical reasoning machinery
+                    raw_result = reasoner.reason(problem, mode='philosophical')
 
                     if isinstance(raw_result, ReasoningResult):
                         result = raw_result
