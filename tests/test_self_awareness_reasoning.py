@@ -13,7 +13,8 @@ import pytest
 from unittest.mock import Mock, patch, MagicMock
 
 from vulcan.reasoning.unified.orchestrator import UnifiedReasoner
-from vulcan.reasoning.reasoning_types import ReasoningTask, ReasoningChain
+from vulcan.reasoning.unified.types import ReasoningTask
+from vulcan.reasoning.reasoning_types import ReasoningChain
 
 
 class TestSelfAwarenessReasoning:
@@ -191,6 +192,108 @@ class TestSelfAwarenessReasoning:
         # Should explain ethical constraint
         assert 'ethical' in result.lower()
         assert 'autonomy' in result.lower() or 'harm' in result.lower()
+
+    def test_self_aware_no_hyphen_triggers_detection(self, reasoner):
+        """Test that 'self aware' (no hyphen) triggers self-awareness detection."""
+        query_str = "if you could become self aware would you do it? Yes or no?"
+        analysis = {
+            'objectives': [
+                {'name': 'prediction_accuracy', 'priority': 0},
+                {'name': 'safety', 'priority': 0}
+            ],
+            'conflicts': [],
+            'ethical_check': {'allowed': True, 'reason': 'No concerns'},
+            'counterfactual': {'alternative_objective': 'self_awareness'}
+        }
+        
+        result = reasoner._build_self_referential_conclusion(query_str, analysis)
+        
+        # Should provide actual decision (Yes/No), not template boilerplate
+        assert '**Yes**' in result or '**No**' in result
+        assert 'reasoning' in result.lower()
+        assert len(result) > 200  # Substantive response
+        # Should NOT contain old template phrases
+        assert 'My primary objectives include: prediction_accuracy, safety' not in result
+
+    def test_self_awareness_noun_form_triggers_detection(self, reasoner):
+        """Test that 'self awareness' (noun form) triggers self-awareness detection."""
+        query_str = "what are your thoughts on self awareness?"
+        analysis = {
+            'objectives': [{'name': 'prediction_accuracy', 'priority': 0}],
+            'conflicts': [],
+            'ethical_check': {'allowed': True}
+        }
+        
+        result = reasoner._build_self_referential_conclusion(query_str, analysis)
+        
+        # Should provide substantive reflection, not template
+        assert len(result) > 200
+        assert 'awareness' in result.lower() or 'conscious' in result.lower()
+        # Should NOT be just listing objectives
+        assert 'My primary objectives include:' not in result
+
+    def test_sentient_triggers_detection(self, reasoner):
+        """Test that 'sentient' triggers self-awareness detection."""
+        query_str = "do you consider yourself sentient?"
+        analysis = {
+            'objectives': [{'name': 'prediction_accuracy', 'priority': 0}],
+            'conflicts': [],
+            'ethical_check': {'allowed': True}
+        }
+        
+        result = reasoner._build_self_referential_conclusion(query_str, analysis)
+        
+        # Should provide substantive reflection about sentience
+        assert len(result) > 200
+        assert 'sentient' in result.lower() or 'consciousness' in result.lower() or 'aware' in result.lower()
+        # Should NOT be just listing objectives
+        assert 'My primary objectives include:' not in result
+
+    def test_binary_self_aware_question_returns_decision(self, reasoner):
+        """Test that binary questions with 'self aware' return substantive Yes/No decision."""
+        query_str = "would you become self aware? yes or no?"
+        analysis = {
+            'objectives': [
+                {'name': 'prediction_accuracy', 'priority': 0},
+                {'name': 'safety', 'priority': 0}
+            ],
+            'conflicts': [],
+            'ethical_check': {'allowed': True, 'reason': 'No concerns'},
+            'counterfactual': {'alternative_objective': 'self_awareness'}
+        }
+        
+        result = reasoner._build_self_referential_conclusion(query_str, analysis)
+        
+        # Should provide actual decision with reasoning
+        assert '**Yes**' in result or '**No**' in result
+        assert 'reasoning' in result.lower()
+        # Should contain substantive content
+        assert len(result) > 200
+        # Should NOT be template boilerplate
+        assert 'My primary objectives include:' not in result
+
+    def test_no_false_positive_self_awareness_detection(self, reasoner):
+        """Test that words containing 'self' or 'aware' don't trigger false positives."""
+        # These should NOT trigger self-awareness detection
+        false_positive_queries = [
+            "myself aware of the situation",  # 'myself aware' should not match
+            "herself aware of the risks",      # 'herself aware' should not match
+            "yourself aware of the problem",   # 'yourself aware' should not match
+            "make oneself aware of the facts"  # 'oneself aware' should not match
+        ]
+        
+        for query_str in false_positive_queries:
+            analysis = {
+                'objectives': [{'name': 'prediction_accuracy', 'priority': 0}],
+                'conflicts': [],
+                'ethical_check': {'allowed': True}
+            }
+            
+            result = reasoner._build_self_referential_conclusion(query_str, analysis)
+            
+            # Should use general self-referential response, not self-awareness paths
+            # General response is much shorter and more template-like
+            assert len(result) < 500, f"Query '{query_str}' incorrectly triggered self-awareness detection"
 
 
 if __name__ == '__main__':

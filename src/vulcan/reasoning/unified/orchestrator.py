@@ -58,6 +58,7 @@ from .config import (
     CONFIDENCE_FLOOR_SYMBOLIC_HAS_PROOF,
     CONFIDENCE_FLOOR_SYMBOLIC_PROVEN,
     CREATIVE_TASK_KEYWORDS,
+    FALLBACK_SELF_AWARENESS_PATTERNS,
     INAPPLICABILITY_EXPLANATION_PHRASES,
     MATH_ACCURACY_PENALTY,
     MATH_ACCURACY_REWARD,
@@ -1422,17 +1423,30 @@ class UnifiedReasoner:
         
         query_lower = query_str.lower()
         
-        philosophical_analysis = self._get_world_model_philosophical_analysis(query_str)
-        
         if not ethical_check.get('allowed', True):
             return self._generate_ethically_constrained_response(query_str, ethical_check)
         
         is_binary_choice = self._is_binary_choice_question(query_lower)
-        is_self_awareness = (
-            'self-aware' in query_lower or 
-            'conscious' in query_lower or
-            'become aware' in query_lower
-        )
+        
+        # ARCHITECTURAL FIX: Use query classification from query_classifier.py
+        # The LLM interface (query_classifier) is responsible for determining query category
+        # This follows industry-standard separation of concerns
+        query_category = analysis.get('query_category', '').upper()
+        is_self_awareness = query_category == 'SELF_INTROSPECTION'
+        
+        # Fallback: If no classification provided, check keywords directly
+        # This ensures backward compatibility during architecture transition
+        if not query_category:
+            # Use word boundaries to avoid false positives like "myself aware"
+            # FALLBACK_SELF_AWARENESS_PATTERNS is imported from config and aligns with
+            # SELF_INTROSPECTION_PATTERNS in query_classifier.py for consistency
+            is_self_awareness = any(pattern.search(query_lower) for pattern in FALLBACK_SELF_AWARENESS_PATTERNS)
+        
+        # Only retrieve rich philosophical analysis for self-awareness queries
+        # For general queries, we use a brief template response
+        philosophical_analysis = None
+        if is_self_awareness:
+            philosophical_analysis = self._get_world_model_philosophical_analysis(query_str)
         
         if is_self_awareness and is_binary_choice:
             return self._generate_self_awareness_decision(

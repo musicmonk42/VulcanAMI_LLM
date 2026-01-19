@@ -1031,8 +1031,9 @@ SELF_INTROSPECTION_KEYWORDS: FrozenSet[str] = frozenset([
     # Metaphysical and philosophical keywords
     "nature", "metaphysical", "consciousness", "self-awareness",
     "existence", "being", "essence", "identity",
-    # Self-awareness and sentience keywords
-    "self-aware", "self_aware", "sentient", "sentience",
+    # Self-awareness and sentience keywords (FIXED: added noun form variants)
+    "self-aware", "self aware", "self awareness", "selfaware",  # all variants
+    "self_aware", "sentient", "sentience",
     "choose", "choice", "prefer", "preference",
     "opportunity", "chance",
     # Introspection and self-reflection keywords

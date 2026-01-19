@@ -14,7 +14,8 @@ Author: VulcanAMI Team
 License: Proprietary
 """
 
-from typing import FrozenSet
+import re
+from typing import FrozenSet, List, Pattern
 
 # ==============================================================================
 # CACHE CONFIGURATION
@@ -213,9 +214,6 @@ PROBLEM_TYPE_BAYESIAN: str = "bayesian_inference"
 # Patterns for detecting queries about VULCAN's own nature, choices, and objectives.
 # Used to route self-referential queries to world model meta-reasoning infrastructure.
 
-import re
-from typing import List, Pattern
-
 # Regex patterns for detecting self-referential queries
 SELF_REFERENTIAL_PATTERNS: List[Pattern] = [
     re.compile(r"\b(you|your)\b.*(self-aware|conscious|sentient)", re.IGNORECASE),
@@ -232,6 +230,24 @@ SELF_REFERENTIAL_PATTERNS: List[Pattern] = [
 # Minimum confidence for self-referential meta-reasoning results
 # Self-reflection has inherent uncertainty but should be confident
 SELF_REFERENTIAL_MIN_CONFIDENCE: float = 0.6
+
+# Fallback patterns for detecting self-awareness queries when no LLM classification is available
+# These patterns use word boundaries to avoid false positives with words like "myself", "herself", etc.
+# This is used as a fallback during architecture transition when query_classifier isn't providing
+# SELF_INTROSPECTION categorization. These patterns should match the SELF_INTROSPECTION_PATTERNS
+# from query_classifier.py for consistency.
+FALLBACK_SELF_AWARENESS_PATTERNS: List[Pattern] = [
+    re.compile(r'\bself-aware\b', re.IGNORECASE),      # "self-aware"
+    re.compile(r'\bself\s+aware\b', re.IGNORECASE),    # "self aware"
+    re.compile(r'\bself\s+awareness\b', re.IGNORECASE), # "self awareness"
+    re.compile(r'\bselfaware\b', re.IGNORECASE),       # "selfaware"
+    re.compile(r'\bself_aware\b', re.IGNORECASE),      # "self_aware"
+    re.compile(r'\bconscious\b', re.IGNORECASE),       # "conscious"
+    re.compile(r'\bconsciousness\b', re.IGNORECASE),   # "consciousness"
+    re.compile(r'\bsentient\b', re.IGNORECASE),        # "sentient"
+    re.compile(r'\bsentience\b', re.IGNORECASE),       # "sentience"
+    re.compile(r'\bbecome\s+aware\b', re.IGNORECASE),  # "become aware"
+]
 
 # ==============================================================================
 # ISSUE #3 FIX (P2 - Medium): Ethical Dilemma Patterns
