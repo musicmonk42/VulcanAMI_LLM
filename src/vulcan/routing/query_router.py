@@ -5187,12 +5187,15 @@ class QueryAnalyzer:
             # - InternalCritic for multi-framework evaluation
             # - GoalConflictDetector for dilemma analysis
             # - EthicalBoundaryMonitor for ethical constraints
+            # BUG FIX #3: Add reasoning_type and tool_name to AgentTask
             plan.agent_tasks = [
                 AgentTask(
                     task_id=f"task_{uuid.uuid4().hex[:8]}_philosophical",
                     task_type="philosophical_task",
                     capability="world_model",  # Route to World Model for ethical reasoning
                     prompt=query,
+                    reasoning_type="philosophical",  # BUG FIX #3: Provide reasoning_type
+                    tool_name="world_model",  # BUG FIX #3: Provide tool_name
                     priority=1,
                     timeout_seconds=PHILOSOPHICAL_TIMEOUT_SECONDS,
                     parameters={
@@ -5208,6 +5211,7 @@ class QueryAnalyzer:
                             "query_type": "philosophical",
                             "source": source,
                         },
+                        "selected_tools": ["world_model", "causal", "analogical"],  # BUG FIX #3
                     },
                 )
             ]

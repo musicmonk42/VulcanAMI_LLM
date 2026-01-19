@@ -1399,6 +1399,79 @@ class HybridLLMExecutor:
             self._capture_for_distillation(prompt, result)
 
         return result
+    
+    def execute_sync(
+        self,
+        prompt: str,
+        max_tokens: int = 1000,
+        temperature: float = 0.7,
+        system_prompt: Optional[str] = None,
+        enable_distillation: bool = True,
+        conversation_history: Optional[List[Dict[str, str]]] = None,
+        llm_mode: Optional[Union[str, "LLMMode"]] = None,
+        skip_reasoning: Optional[bool] = None,
+    ) -> Dict[str, Any]:
+        """
+        BUG FIX #1: Synchronous wrapper for execute() method.
+        
+        WorldModel._format_with_llm() calls this method synchronously.
+        This method wraps the async execute() with asyncio.run() for
+        synchronous contexts.
+        
+        Industry Standard: Provide both sync and async interfaces for
+        maximum API compatibility.
+        """
+        try:
+            # Try to get existing event loop
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # We're in an async context - create new loop in thread
+                # Industry Standard: Use existing import from top of file
+                with ThreadPoolExecutor() as pool:
+                    future = pool.submit(
+                        asyncio.run,
+                        self.execute(
+                            prompt=prompt,
+                            max_tokens=max_tokens,
+                            temperature=temperature,
+                            system_prompt=system_prompt,
+                            enable_distillation=enable_distillation,
+                            conversation_history=conversation_history,
+                            llm_mode=llm_mode,
+                            skip_reasoning=skip_reasoning,
+                        )
+                    )
+                    return future.result(timeout=self.timeout)
+            else:
+                # No loop running - use asyncio.run()
+                return asyncio.run(
+                    self.execute(
+                        prompt=prompt,
+                        max_tokens=max_tokens,
+                        temperature=temperature,
+                        system_prompt=system_prompt,
+                        enable_distillation=enable_distillation,
+                        conversation_history=conversation_history,
+                        llm_mode=llm_mode,
+                        skip_reasoning=skip_reasoning,
+                    )
+                )
+        except RuntimeError as e:
+            if "no running event loop" in str(e).lower():
+                # Create new event loop
+                return asyncio.run(
+                    self.execute(
+                        prompt=prompt,
+                        max_tokens=max_tokens,
+                        temperature=temperature,
+                        system_prompt=system_prompt,
+                        enable_distillation=enable_distillation,
+                        conversation_history=conversation_history,
+                        llm_mode=llm_mode,
+                        skip_reasoning=skip_reasoning,
+                    )
+                )
+            raise
 
     async def execute_with_structured_output(
         self,
