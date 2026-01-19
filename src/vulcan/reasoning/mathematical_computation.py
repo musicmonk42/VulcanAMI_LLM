@@ -57,6 +57,10 @@ EXPLICIT_MATH_KEYWORDS: Tuple[str, ...] = (
 # ============================================================================
 # Compiled regex patterns for efficient proof verification detection.
 # These are compiled once at module load time for optimal performance.
+#
+# INDUSTRY STANDARD: More specific patterns with proof context to avoid false positives.
+# The "step X:" pattern requires proof-specific context (verify/check/proof) to avoid
+# matching cooking recipes, instructions, etc.
 
 PROOF_VERIFICATION_PATTERNS: Tuple[re.Pattern, ...] = (
     re.compile(r"verify\s+(this\s+)?proof", re.IGNORECASE),
@@ -64,7 +68,9 @@ PROOF_VERIFICATION_PATTERNS: Tuple[re.Pattern, ...] = (
     re.compile(r"proof\s+check", re.IGNORECASE),
     re.compile(r"find\s+the\s+flaw", re.IGNORECASE),
     re.compile(r"(is|are)\s+(this|the)\s+proof", re.IGNORECASE),
-    re.compile(r"step\s+\d+:", re.IGNORECASE),  # Structured proof steps
+    # More specific: requires "proof" or "step" in context, not standalone
+    re.compile(r"proof.*step\s+\d+", re.IGNORECASE),  # "proof: step 1"
+    re.compile(r"step\s+\d+.*proof", re.IGNORECASE),  # "step 1 of proof"
 )
 
 

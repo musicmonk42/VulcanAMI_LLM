@@ -2457,16 +2457,36 @@ class QueryAnalyzer:
         This function ensures that the router always provides reasoning_type based on
         the LLM classifier's category, preventing the COMMAND PATTERN VIOLATION error.
         
+        INDUSTRY STANDARD: Single Source of Truth for routing decisions.
+        The router determines reasoning_type once based on LLM classification,
+        and the agent pool executes without re-classification.
+        
         Args:
-            category: QueryCategory value (e.g., "LOGICAL", "MATHEMATICAL")
+            category: QueryCategory enum value as string. Expected values:
+                - "LOGICAL", "MATHEMATICAL", "PROBABILISTIC", "CAUSAL"
+                - "ANALOGICAL", "PHILOSOPHICAL", "CRYPTOGRAPHIC"
+                - "LANGUAGE", "SPECULATION", "SELF_INTROSPECTION"
+                - "CREATIVE", "FACTUAL", "CONVERSATIONAL", "CHITCHAT"
+                - "GREETING", "COMPLEX_RESEARCH", "UNKNOWN"
             
         Returns:
-            reasoning_type string for AgentTask (e.g., "symbolic", "mathematical")
+            reasoning_type string for AgentTask:
+                - "symbolic" (for logical/cryptographic reasoning)
+                - "mathematical", "probabilistic", "causal", "analogical"
+                - "philosophical" (for ethics/meta-reasoning)
+                - "hybrid" (for complex research)
+                - "general" (fallback for unknown/conversational)
+            
+        Fallback Behavior:
+            Unknown categories default to "general" reasoning type.
+            This ensures the system always provides routing instructions
+            even for new or unrecognized category values.
             
         Examples:
             - category="LOGICAL" returns "symbolic"
             - category="MATHEMATICAL" returns "mathematical"
             - category="CAUSAL" returns "causal"
+            - category="UNKNOWN" returns "general" (fallback)
         """
         # Map QueryCategory enum values to ReasoningType values
         category_to_reasoning_type = {
@@ -4586,6 +4606,13 @@ class QueryAnalyzer:
         # If query has keywords from 2+ domains, it's multimodal
         is_multimodal = domains_present >= 2
         
+        # INDUSTRY STANDARD: Double-check ensures multimodal query also matches math patterns
+        # The multimodal detection uses keyword matching (fast, broad), while
+        # _is_mathematical_query uses more sophisticated pattern matching (slow, precise).
+        # This AND condition ensures we only bypass MATH-FAST-PATH for queries that are:
+        # 1. Genuinely multimodal (2+ domains via keywords), AND
+        # 2. Actually mathematical (confirmed by precise pattern matching)
+        # This prevents false positives from keyword-only detection.
         if is_multimodal and self._is_mathematical_query(query):
             logger.info(
                 f"[QueryRouter] {query_id}: ISSUE #4 FIX - Multimodal query detected "
