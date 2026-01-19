@@ -23,10 +23,11 @@ Date: 2026-01-10
 from __future__ import annotations
 
 import logging
+import re
 from collections import defaultdict, deque
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Optional, Set, List
+from typing import TYPE_CHECKING, Any, Dict, Optional, Set, List, Tuple
 
 if TYPE_CHECKING:
     from vulcan.reasoning.analogical.types import Entity, AnalogicalMapping, MappingType
@@ -853,3 +854,460 @@ class AnalogicalReasoner(AbstractReasoner):
     def _compute_semantic_similarity(self, source: Dict, target: Dict) -> float:
         """Compute semantic similarity (compatibility wrapper)."""
         return self.structure_mapper._compute_semantic_similarity(source, target)
+
+    # =========================================================================
+    # ISSUE #7 FIX: Complete Analogical Mapping for Batch Queries
+    # =========================================================================
+    # These methods implement complete mapping for multiple concepts, ensuring
+    # all requested mappings are processed rather than returning early after
+    # the first match. This follows industry-standard practices from:
+    # - Structure-Mapping Engine (SME) by Forbus et al.
+    # - Analogical Retrieval by MAC/FAC (Forbus, Gentner, Law, 1995)
+    # =========================================================================
+
+    def extract_mapping_targets(self, query: str) -> List[str]:
+        """
+        Extract all concepts user wants mapped from a natural language query.
+        
+        ISSUE #7 FIX: Parses queries to extract ALL requested mapping targets,
+        not just the first one. Supports multiple query formats:
+        
+        - Comma-separated lists: "Map A, B, C to domain X"
+        - Numbered lists: "1. concept A\\n2. concept B\\n3. concept C"
+        - Arrow notation: "A → ?\\nB → ?\\nC → ?"
+        - Bullet points: "• concept A\\n• concept B"
+        - Question format: "What corresponds to A, B, and C?"
+        
+        Args:
+            query: Natural language query requesting concept mappings
+            
+        Returns:
+            List of concept strings to be mapped
+            
+        Examples:
+            >>> reasoner = AnalogicalReasoner()
+            >>> concepts = reasoner.extract_mapping_targets(
+            ...     "Map leader election, quorum, fencing token to biology"
+            ... )
+            >>> assert concepts == ["leader election", "quorum", "fencing token"]
+            
+            >>> concepts = reasoner.extract_mapping_targets(
+            ...     "1. Leader election → ?\\n2. Quorum → ?\\n3. Split brain → ?"
+            ... )
+            >>> assert len(concepts) == 3
+        """
+        concepts = []
+        
+        # Normalize whitespace
+        query = query.strip()
+        query_lower = query.lower()
+        
+        # Pattern 1: "Map X, Y, Z to domain" or "Map X, Y and Z to domain"
+        map_pattern = r'map\s+(.+?)\s+(?:to|in|into|onto)\s+\w+'
+        match = re.search(map_pattern, query_lower, re.IGNORECASE)
+        if match:
+            concepts_str = match.group(1)
+            # Split by commas, "and", and semicolons
+            parts = re.split(r'[,;]|\s+and\s+', concepts_str)
+            concepts = [p.strip() for p in parts if p.strip()]
+            if concepts:
+                return concepts
+        
+        # Pattern 2: Numbered list "1. concept\n2. concept\n..."
+        numbered_pattern = r'^\s*\d+[.)]\s*(.+?)(?:\s*→\s*\?|\s*$)'
+        numbered_matches = re.findall(numbered_pattern, query, re.MULTILINE)
+        if numbered_matches:
+            concepts = [m.strip() for m in numbered_matches if m.strip()]
+            if concepts:
+                return concepts
+        
+        # Pattern 3: Arrow notation "concept → ?"
+        arrow_pattern = r'([^→\n]+?)\s*→\s*\?'
+        arrow_matches = re.findall(arrow_pattern, query)
+        if arrow_matches:
+            concepts = [m.strip() for m in arrow_matches if m.strip()]
+            if concepts:
+                return concepts
+        
+        # Pattern 4: Bullet points "• concept" or "- concept"
+        bullet_pattern = r'^[\s]*[•\-\*]\s*(.+?)$'
+        bullet_matches = re.findall(bullet_pattern, query, re.MULTILINE)
+        if bullet_matches:
+            concepts = [m.strip() for m in bullet_matches if m.strip()]
+            if concepts:
+                return concepts
+        
+        # Pattern 5: "What corresponds to X, Y, Z" or "How does X, Y, Z map"
+        correspond_pattern = r'(?:corresponds?\s+to|map(?:s|ped)?(?:\s+to)?|equivalent\s+to)\s+(.+?)(?:\?|$|\s+in\s+)'
+        correspond_match = re.search(correspond_pattern, query_lower, re.IGNORECASE)
+        if correspond_match:
+            concepts_str = correspond_match.group(1)
+            parts = re.split(r'[,;]|\s+and\s+', concepts_str)
+            concepts = [p.strip() for p in parts if p.strip()]
+            if concepts:
+                return concepts
+        
+        # Pattern 6: Colon-separated concepts "Concepts: A, B, C"
+        colon_pattern = r'concepts?\s*:\s*(.+?)(?:\s+to\s+|\s+in\s+|\?|$)'
+        colon_match = re.search(colon_pattern, query_lower, re.IGNORECASE)
+        if colon_match:
+            concepts_str = colon_match.group(1)
+            parts = re.split(r'[,;]|\s+and\s+', concepts_str)
+            concepts = [p.strip() for p in parts if p.strip()]
+            if concepts:
+                return concepts
+        
+        # Fallback: No structured pattern found, return empty list
+        logger.debug(f"Could not extract mapping targets from query: {query[:100]}...")
+        return []
+
+    def map_all_concepts(
+        self,
+        source_concepts: List[str],
+        target_domain: str,
+        mapping_type: Optional[MappingType] = None
+    ) -> Dict[str, Optional[Dict[str, Any]]]:
+        """
+        Map ALL source concepts to target domain, ensuring complete mapping.
+        
+        ISSUE #7 FIX: Maps each concept individually to ensure no concepts are
+        missed, unlike the previous behavior which could return early after
+        finding the first match.
+        
+        Args:
+            source_concepts: List of concepts to map from source domain
+            target_domain: Name of target domain to map to
+            mapping_type: Type of mapping to use (default: STRUCTURAL)
+            
+        Returns:
+            Dict mapping each source concept to its mapping result (or None if not found)
+            Each result contains:
+                - target_concept: The mapped concept in target domain
+                - confidence: Confidence score for this mapping
+                - explanation: Human-readable explanation
+                - found: Whether a mapping was found
+                
+        Examples:
+            >>> reasoner = AnalogicalReasoner()
+            >>> reasoner.add_domain("distributed_systems", {...})
+            >>> reasoner.add_domain("biology", {...})
+            >>> results = reasoner.map_all_concepts(
+            ...     ["leader election", "quorum", "split brain"],
+            ...     "biology"
+            ... )
+            >>> for concept, result in results.items():
+            ...     if result and result["found"]:
+            ...         print(f"{concept} → {result['target_concept']}")
+        """
+        from vulcan.reasoning.analogical.types import MappingType as MT
+        
+        if mapping_type is None:
+            mapping_type = MT.STRUCTURAL
+        
+        results: Dict[str, Optional[Dict[str, Any]]] = {}
+        
+        for concept in source_concepts:
+            try:
+                # Create a minimal source structure for this concept
+                source_struct = {
+                    "name": concept,
+                    "entities": [{"name": concept, "type": "concept", "attributes": []}],
+                    "relations": [],
+                    "attributes": [concept],
+                }
+                
+                # Find mapping to target domain
+                mapping_result = self.find_structural_analogy(
+                    source_struct,
+                    target_domain,
+                    mapping_type
+                )
+                
+                if mapping_result.get("found") and mapping_result.get("mapping"):
+                    # Extract the best target mapping for this concept
+                    entity_mappings = mapping_result["mapping"].entity_mappings
+                    
+                    # Find the target concept that corresponds to our source
+                    target_concept = None
+                    if concept in entity_mappings:
+                        target_concept = entity_mappings[concept]
+                    elif entity_mappings:
+                        # Use first available mapping as approximation
+                        target_concept = list(entity_mappings.values())[0]
+                    
+                    results[concept] = {
+                        "found": target_concept is not None,
+                        "target_concept": target_concept,
+                        "confidence": mapping_result.get("confidence", 0.0),
+                        "explanation": mapping_result.get("explanation", ""),
+                        "mapping": entity_mappings,
+                    }
+                else:
+                    # No mapping found
+                    results[concept] = {
+                        "found": False,
+                        "target_concept": None,
+                        "confidence": 0.0,
+                        "explanation": f"No mapping found for '{concept}' in {target_domain}",
+                        "mapping": {},
+                    }
+                    logger.info(
+                        f"[AnalogicalReasoner] Could not find mapping for "
+                        f"'{concept}' in domain '{target_domain}'"
+                    )
+                    
+            except Exception as e:
+                logger.error(f"Error mapping concept '{concept}': {e}")
+                results[concept] = {
+                    "found": False,
+                    "target_concept": None,
+                    "confidence": 0.0,
+                    "explanation": f"Error during mapping: {str(e)}",
+                    "mapping": {},
+                }
+        
+        return results
+
+    def check_mapping_completeness(
+        self,
+        requested: List[str],
+        mapped: Dict[str, Optional[Dict[str, Any]]]
+    ) -> Tuple[bool, List[str], float]:
+        """
+        Verify that all requested concepts were successfully mapped.
+        
+        ISSUE #7 FIX: Validates mapping completeness and reports which concepts
+        could not be mapped, enabling proper user feedback.
+        
+        Args:
+            requested: List of concepts that were requested to be mapped
+            mapped: Dict of mapping results from map_all_concepts()
+            
+        Returns:
+            Tuple of (is_complete, unmapped_concepts, completeness_ratio):
+                - is_complete: True if all concepts were mapped
+                - unmapped_concepts: List of concepts that couldn't be mapped
+                - completeness_ratio: Fraction of concepts successfully mapped (0.0 to 1.0)
+                
+        Examples:
+            >>> reasoner = AnalogicalReasoner()
+            >>> requested = ["A", "B", "C", "D", "E"]
+            >>> mapped = {"A": {..., "found": True}, "B": {..., "found": True}, 
+            ...           "C": None, "D": {..., "found": False}, "E": {..., "found": True}}
+            >>> is_complete, unmapped, ratio = reasoner.check_mapping_completeness(requested, mapped)
+            >>> assert not is_complete
+            >>> assert set(unmapped) == {"C", "D"}
+            >>> assert ratio == 0.6  # 3 out of 5 mapped
+        """
+        unmapped = []
+        successful_count = 0
+        
+        for concept in requested:
+            result = mapped.get(concept)
+            if result is None:
+                unmapped.append(concept)
+            elif not result.get("found", False):
+                unmapped.append(concept)
+            else:
+                successful_count += 1
+        
+        is_complete = len(unmapped) == 0
+        completeness_ratio = successful_count / len(requested) if requested else 1.0
+        
+        if not is_complete:
+            logger.warning(
+                f"Incomplete mapping: {len(unmapped)}/{len(requested)} concepts unmapped: "
+                f"{unmapped}"
+            )
+        
+        return is_complete, unmapped, completeness_ratio
+
+    def format_mapping_response(
+        self,
+        mappings: Dict[str, Optional[Dict[str, Any]]],
+        source_domain: str,
+        target_domain: str,
+        unmapped: List[str] = None
+    ) -> str:
+        """
+        Format complete mapping results as human-readable text.
+        
+        ISSUE #7 FIX: Creates a comprehensive response showing ALL requested
+        mappings, including those that couldn't be found, ensuring users
+        receive complete feedback on their query.
+        
+        Args:
+            mappings: Dict of mapping results from map_all_concepts()
+            source_domain: Name of source domain
+            target_domain: Name of target domain
+            unmapped: Optional list of unmapped concepts (for explicit reporting)
+            
+        Returns:
+            Human-readable string with complete mapping results
+            
+        Examples:
+            >>> response = reasoner.format_mapping_response(
+            ...     {"A": {"found": True, "target_concept": "X", "confidence": 0.85},
+            ...      "B": {"found": False, "target_concept": None, "confidence": 0.0}},
+            ...     "distributed_systems",
+            ...     "biology"
+            ... )
+            >>> print(response)
+            Analogical Mappings: distributed_systems → biology
+            ============================================================
+            
+            1. A → X (confidence: 0.85)
+            2. B → (no mapping found)
+            
+            ============================================================
+            Summary: 1/2 concepts successfully mapped (50.0%)
+        """
+        lines = [
+            f"Analogical Mappings: {source_domain} → {target_domain}",
+            "=" * 60,
+            "",
+        ]
+        
+        successful_count = 0
+        total_count = len(mappings)
+        total_confidence = 0.0
+        
+        for i, (concept, result) in enumerate(mappings.items(), 1):
+            if result and result.get("found"):
+                target = result.get("target_concept", "unknown")
+                confidence = result.get("confidence", 0.0)
+                lines.append(f"{i}. {concept} → {target} (confidence: {confidence:.2f})")
+                successful_count += 1
+                total_confidence += confidence
+                
+                # Include explanation if available
+                explanation = result.get("explanation", "")
+                if explanation and len(explanation) < 200:
+                    # Indent explanation on next line
+                    lines.append(f"   Rationale: {explanation[:150]}")
+            else:
+                lines.append(f"{i}. {concept} → (no mapping found)")
+                if result and result.get("explanation"):
+                    lines.append(f"   Note: {result['explanation'][:100]}")
+        
+        # Add summary
+        lines.append("")
+        lines.append("=" * 60)
+        
+        completeness = (successful_count / total_count * 100) if total_count > 0 else 0
+        avg_confidence = (total_confidence / successful_count) if successful_count > 0 else 0
+        
+        lines.append(
+            f"Summary: {successful_count}/{total_count} concepts successfully mapped "
+            f"({completeness:.1f}%)"
+        )
+        
+        if successful_count > 0:
+            lines.append(f"Average confidence: {avg_confidence:.2f}")
+        
+        # Note unmapped concepts explicitly
+        if unmapped:
+            lines.append("")
+            lines.append(f"Note: Could not find mappings for: {', '.join(unmapped)}")
+            lines.append(
+                "Consider providing more context about these concepts or checking "
+                "if they exist in the source domain."
+            )
+        
+        return "\n".join(lines)
+
+    def reason_with_complete_mapping(
+        self,
+        query: str,
+        source_domain: str,
+        target_domain: str,
+        mapping_type: Optional[MappingType] = None
+    ) -> Dict[str, Any]:
+        """
+        Perform analogical reasoning with complete mapping of all concepts.
+        
+        ISSUE #7 FIX: This is the main entry point for batch analogical reasoning
+        that ensures ALL concepts in a query are mapped, not just the first one.
+        
+        This method:
+        1. Extracts all mapping targets from the query
+        2. Maps each concept individually
+        3. Validates completeness
+        4. Returns formatted results with all mappings
+        
+        Args:
+            query: Natural language query with concepts to map
+            source_domain: Name of source domain (must be added via add_domain)
+            target_domain: Name of target domain (must be added via add_domain)
+            mapping_type: Type of mapping to use (default: STRUCTURAL)
+            
+        Returns:
+            Dict containing:
+                - success: Whether the operation completed
+                - complete: Whether all concepts were mapped
+                - mappings: Dict of concept → result
+                - unmapped: List of concepts that couldn't be mapped
+                - completeness_ratio: Fraction of concepts mapped
+                - formatted_response: Human-readable response string
+                - concepts_found: Number of concepts extracted from query
+                
+        Examples:
+            >>> reasoner = AnalogicalReasoner()
+            >>> reasoner.add_domain("distributed_systems", {...})
+            >>> reasoner.add_domain("biology", {...})
+            >>> result = reasoner.reason_with_complete_mapping(
+            ...     "Map leader election, quorum, fencing token, split brain, "
+            ...     "write divergence to biology",
+            ...     "distributed_systems",
+            ...     "biology"
+            ... )
+            >>> if result["success"]:
+            ...     print(result["formatted_response"])
+            ...     if not result["complete"]:
+            ...         print(f"Unmapped: {result['unmapped']}")
+        """
+        from vulcan.reasoning.analogical.types import MappingType as MT
+        
+        if mapping_type is None:
+            mapping_type = MT.STRUCTURAL
+        
+        # Step 1: Extract all concepts to map
+        concepts = self.extract_mapping_targets(query)
+        
+        if not concepts:
+            # Fallback: treat entire query as single concept if no pattern matched
+            logger.info(
+                f"No structured concepts found in query, treating as single concept search"
+            )
+            # Try to extract the key concept from the query
+            concepts = [query.strip()]
+        
+        logger.info(
+            f"[AnalogicalReasoner] Extracted {len(concepts)} concepts to map: {concepts}"
+        )
+        
+        # Step 2: Map all concepts
+        mappings = self.map_all_concepts(concepts, target_domain, mapping_type)
+        
+        # Step 3: Check completeness
+        is_complete, unmapped, completeness_ratio = self.check_mapping_completeness(
+            concepts, mappings
+        )
+        
+        # Step 4: Format response
+        formatted_response = self.format_mapping_response(
+            mappings, source_domain, target_domain, unmapped
+        )
+        
+        return {
+            "success": True,
+            "complete": is_complete,
+            "mappings": mappings,
+            "unmapped": unmapped,
+            "completeness_ratio": completeness_ratio,
+            "formatted_response": formatted_response,
+            "concepts_found": len(concepts),
+            "concepts_mapped": len(concepts) - len(unmapped),
+            "source_domain": source_domain,
+            "target_domain": target_domain,
+        }

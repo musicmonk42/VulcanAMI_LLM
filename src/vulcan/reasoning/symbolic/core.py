@@ -5,11 +5,13 @@ Includes terms, literals, clauses, unification, and proof nodes.
 All core functionality extracted from symbolic_reasoning.py.
 """
 
+from __future__ import annotations
+
 import copy
 import logging
 from abc import ABC
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 logger = logging.getLogger(__name__)
 
@@ -216,6 +218,227 @@ class Clause:
 
     def __hash__(self) -> int:
         return hash(frozenset(self.literals))
+
+
+# ============================================================================
+# ISSUE #4 FIX: Annotated Clause for Derivation Tracking
+# ============================================================================
+
+
+@dataclass
+class AnnotatedClause:
+    """
+    Clause with derivation history for contradiction proof tracking.
+    
+    This dataclass extends the basic Clause concept by tracking HOW each clause
+    was derived, enabling construction of complete proof trees when a 
+    contradiction (empty clause) is found.
+    
+    Industry-standard approach for proof logging in automated theorem provers.
+    Based on proof logging techniques from:
+    - OTTER/Prover9 proof logging
+    - Vampire proof objects
+    - E-prover derivation trees
+    
+    Attributes:
+        clause: The underlying logical clause
+        derived_from: List of AnnotatedClauses this was derived from (empty for premises)
+        rule_used: Name of the inference rule used ("premise", "resolution", etc.)
+        iteration: The iteration/step number when this clause was derived
+        resolvent_literal: The literal that was resolved (for resolution steps)
+        
+    Examples:
+        >>> # A premise clause
+        >>> premise = AnnotatedClause(
+        ...     clause=Clause([Literal("A", [])]),
+        ...     derived_from=[],
+        ...     rule_used="premise",
+        ...     iteration=0
+        ... )
+        
+        >>> # A derived clause from resolution
+        >>> derived = AnnotatedClause(
+        ...     clause=Clause([]),  # Empty clause = contradiction
+        ...     derived_from=[clause1, clause2],
+        ...     rule_used="resolution",
+        ...     iteration=5,
+        ...     resolvent_literal="A"
+        ... )
+    """
+    
+    clause: Clause
+    derived_from: List["AnnotatedClause"] = field(default_factory=list)
+    rule_used: str = "premise"
+    iteration: int = 0
+    resolvent_literal: Optional[str] = None
+    
+    def __str__(self) -> str:
+        return str(self.clause)
+    
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, AnnotatedClause):
+            return False
+        return self.clause == other.clause
+    
+    def __hash__(self) -> int:
+        return hash(self.clause)
+    
+    def is_premise(self) -> bool:
+        """Check if this clause is a premise (not derived)."""
+        return self.rule_used == "premise"
+    
+    def is_empty(self) -> bool:
+        """Check if this is the empty clause (contradiction)."""
+        return self.clause.is_empty()
+
+
+def build_proof_tree_from_annotated(
+    empty_clause: AnnotatedClause,
+    max_depth: int = 100
+) -> "ProofNode":
+    """
+    Build a ProofNode tree from an AnnotatedClause derivation.
+    
+    Recursively traces back through the derivation history to construct
+    a complete proof tree showing how the contradiction was reached.
+    
+    Args:
+        empty_clause: The empty clause (contradiction) to trace back from
+        max_depth: Maximum recursion depth to prevent infinite loops
+        
+    Returns:
+        ProofNode representing the complete proof tree
+        
+    Examples:
+        >>> proof_tree = build_proof_tree_from_annotated(empty_clause)
+        >>> print(proof_tree.to_string())
+    """
+    def build_recursive(annotated: AnnotatedClause, depth: int) -> "ProofNode":
+        if depth > max_depth:
+            return ProofNode(
+                conclusion=str(annotated.clause),
+                premises=[],
+                rule_used="max_depth_reached",
+                confidence=0.5,
+                depth=depth
+            )
+        
+        # Build premise proof nodes recursively
+        premise_proofs = []
+        for parent in annotated.derived_from:
+            premise_proofs.append(build_recursive(parent, depth + 1))
+        
+        # Create proof node for this clause
+        conclusion = str(annotated.clause) if not annotated.is_empty() else "⊥ (contradiction)"
+        
+        metadata = {"iteration": annotated.iteration}
+        if annotated.resolvent_literal:
+            metadata["resolved_on"] = annotated.resolvent_literal
+        
+        return ProofNode(
+            conclusion=conclusion,
+            premises=premise_proofs,
+            rule_used=annotated.rule_used,
+            confidence=1.0 if annotated.is_premise() else 0.95,
+            depth=depth,
+            metadata=metadata
+        )
+    
+    return build_recursive(empty_clause, 0)
+
+
+def format_contradiction_proof(proof_tree: "ProofNode", max_steps: int = 20) -> str:
+    """
+    Format a proof tree as a human-readable contradiction explanation.
+    
+    Converts the recursive proof tree into a numbered list of steps,
+    showing how premises lead to a contradiction through resolution.
+    
+    This follows the standard proof format used in logic textbooks and
+    automated theorem provers like Prover9 and Vampire.
+    
+    Args:
+        proof_tree: The ProofNode representing the proof
+        max_steps: Maximum number of steps to include
+        
+    Returns:
+        Human-readable string explaining the contradiction
+        
+    Examples:
+        >>> explanation = format_contradiction_proof(proof_tree)
+        >>> print(explanation)
+        Step 1: A → B (premise)
+        Step 2: B → C (premise)
+        Step 3: ¬C (premise)
+        Step 4: ¬B (from steps 2, 3 via resolution on C)
+        Step 5: ¬A (from steps 1, 4 via resolution on B)
+        Step 6: A ∨ B (premise)
+        Step 7: ⊥ (from steps 5, 6 via resolution - CONTRADICTION)
+    """
+    steps = []
+    step_map = {}  # Map proof nodes to step numbers
+    
+    def collect_steps(node: "ProofNode", visited: set):
+        """Collect all steps in bottom-up order (premises first)."""
+        if id(node) in visited:
+            return
+        visited.add(id(node))
+        
+        # Process premises first (bottom-up)
+        for premise in node.premises:
+            collect_steps(premise, visited)
+        
+        # Add this step
+        if len(steps) < max_steps:
+            step_num = len(steps) + 1
+            step_map[id(node)] = step_num
+            steps.append(node)
+    
+    # Collect all steps
+    collect_steps(proof_tree, set())
+    
+    # Format output
+    lines = ["Contradiction Proof:", "=" * 60]
+    
+    for i, step in enumerate(steps, 1):
+        conclusion = step.conclusion
+        rule = step.rule_used
+        
+        # Build premise references
+        premise_refs = []
+        for premise in step.premises:
+            premise_id = id(premise)
+            if premise_id in step_map:
+                premise_refs.append(str(step_map[premise_id]))
+        
+        # Format the step
+        if rule == "premise":
+            lines.append(f"Step {i}: {conclusion} (premise)")
+        elif rule == "resolution":
+            resolved_on = step.metadata.get("resolved_on", "")
+            if premise_refs:
+                refs = ", ".join(premise_refs)
+                if resolved_on:
+                    lines.append(f"Step {i}: {conclusion} (from steps {refs} via resolution on {resolved_on})")
+                else:
+                    lines.append(f"Step {i}: {conclusion} (from steps {refs} via resolution)")
+            else:
+                lines.append(f"Step {i}: {conclusion} ({rule})")
+        else:
+            if premise_refs:
+                refs = ", ".join(premise_refs)
+                lines.append(f"Step {i}: {conclusion} (from steps {refs} via {rule})")
+            else:
+                lines.append(f"Step {i}: {conclusion} ({rule})")
+    
+    # Add final conclusion
+    lines.append("=" * 60)
+    if proof_tree.conclusion == "⊥ (contradiction)":
+        lines.append("CONCLUSION: The formula is UNSATISFIABLE (contradiction derived)")
+    else:
+        lines.append(f"CONCLUSION: {proof_tree.conclusion}")
+    
+    return "\n".join(lines)
 
 
 # ============================================================================
