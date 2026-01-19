@@ -203,9 +203,11 @@ try:
         log_to_governance_async,
         log_to_governance_fire_and_forget,
         get_governance_logger,
+        shutdown_governance_logger,
         # Non-blocking buffered logging
         BufferedGovernanceLogger,
         get_buffered_governance_logger,
+        shutdown_buffered_governance_logger,
         log_routing_result,
     )
 
@@ -221,8 +223,10 @@ except ImportError as e:
     log_to_governance_async = None
     log_to_governance_fire_and_forget = None
     get_governance_logger = None
+    shutdown_governance_logger = None
     BufferedGovernanceLogger = None
     get_buffered_governance_logger = None
+    shutdown_buffered_governance_logger = None
     log_routing_result = None
 
 # Experiment Trigger
@@ -482,9 +486,11 @@ __all__ = [
     "log_to_governance_async",
     "log_to_governance_fire_and_forget",
     "get_governance_logger",
+    "shutdown_governance_logger",
     # Non-blocking buffered logging
     "BufferedGovernanceLogger",
     "get_buffered_governance_logger",
+    "shutdown_buffered_governance_logger",
     "log_routing_result",
     # Experiments
     "ExperimentTrigger",
