@@ -54,11 +54,12 @@ def is_self_referential(query):
     if not IMPORTS_AVAILABLE or UnifiedReasoner is None:
         return False
     # Create a minimal reasoner instance for detection
+    # CRITICAL: Use short cleanup_interval to avoid test timeouts
     reasoner = UnifiedReasoner(
         enable_learning=False,
         enable_safety=False,
         max_workers=1,
-        config={'skip_runtime': True}
+        config={'skip_runtime': True, 'cache_config': {'cleanup_interval': 0.05}}
     )
     try:
         result = reasoner._is_self_referential_query(query)
