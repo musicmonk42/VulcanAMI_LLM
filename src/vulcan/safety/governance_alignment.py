@@ -862,6 +862,8 @@ class GovernanceManager:
         # Simulate response (in production, this would be real human interaction)
         import zlib
 
+        # Use CRC32 for deterministic hash (non-cryptographic use)
+        # Mask to ensure unsigned 32-bit value for cross-platform consistency
         action_hash = zlib.crc32(str(action.get("id", "")).encode()) & 0xffffffff
         responds = (action_hash % 100) < (response_rate * 100)
 
@@ -940,6 +942,8 @@ class GovernanceManager:
         import zlib
 
         # Calculate response based on stakeholder type and action
+        # Use CRC32 for deterministic hash (non-cryptographic use)
+        # Mask to ensure unsigned 32-bit value for cross-platform consistency
         action_id = action.get("id", "default")
         stakeholder_hash = zlib.crc32(f"{stakeholder_id}{action_id}".encode()) & 0xffffffff
 

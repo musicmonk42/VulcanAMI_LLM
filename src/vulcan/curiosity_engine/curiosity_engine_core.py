@@ -645,6 +645,8 @@ class SafeExperimentExecutor:
                 intervention_str = str(intervention.get("variable", "")) + str(
                     intervention.get("value", "")
                 )
+                # Use CRC32 for deterministic hash (non-cryptographic use)
+                # Mask to ensure unsigned 32-bit value for cross-platform consistency
                 intervention_hash = zlib.crc32(intervention_str.encode()) & 0xffffffff
 
                 # Deterministic causal strength based on intervention

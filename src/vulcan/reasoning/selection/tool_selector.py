@@ -4726,6 +4726,8 @@ class ToolSelector:
                 # Deterministic confidence based on tool name and config
                 import zlib
 
+                # Use CRC32 for deterministic hash (non-cryptographic use)
+                # Mask to ensure unsigned 32-bit value for cross-platform consistency
                 tool_hash = zlib.crc32(f"{name}{str(config)}".encode()) & 0xffffffff
                 confidence = 0.5 + (tool_hash % 500) / 1000.0  # Range: 0.5 to 1.0
 
