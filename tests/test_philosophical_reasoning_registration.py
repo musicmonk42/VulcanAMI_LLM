@@ -273,7 +273,7 @@ class TestPhilosophicalQueryExecution:
             def mock_reason(query, mode=None, **kwargs):
                 nonlocal mode_captured
                 mode_captured = mode
-                return original_reason(query, mode, **kwargs)
+                return original_reason(query, mode=mode, **kwargs)
             
             philosophical_reasoner.reason = mock_reason
             

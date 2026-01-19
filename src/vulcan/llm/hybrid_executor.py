@@ -81,8 +81,6 @@ except ImportError:
 __version__ = "1.7.0"  # P0 FIX: Added NotReasoningEngineError and reasoning task detection
 __author__ = "VULCAN-AGI Team"
 
-logger = logging.getLogger(__name__)
-
 # ============================================================
 # MODULE-LEVEL CONFIGURATION
 # Industry Standard: Parse environment variables once at module load time
