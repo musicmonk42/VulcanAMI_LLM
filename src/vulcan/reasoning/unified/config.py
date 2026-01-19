@@ -14,7 +14,8 @@ Author: VulcanAMI Team
 License: Proprietary
 """
 
-from typing import FrozenSet
+import re
+from typing import FrozenSet, List, Pattern
 
 # ==============================================================================
 # CACHE CONFIGURATION
@@ -212,9 +213,6 @@ PROBLEM_TYPE_BAYESIAN: str = "bayesian_inference"
 # ==============================================================================
 # Patterns for detecting queries about VULCAN's own nature, choices, and objectives.
 # Used to route self-referential queries to world model meta-reasoning infrastructure.
-
-import re
-from typing import List, Pattern
 
 # Regex patterns for detecting self-referential queries
 SELF_REFERENTIAL_PATTERNS: List[Pattern] = [
