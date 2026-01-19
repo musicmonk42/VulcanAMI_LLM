@@ -5866,8 +5866,7 @@ class WorldModel:
         
         # BUG FIX #2: Extract ethical considerations
         if 'lives' in query_lower or 'people' in query_lower or 'person' in query_lower:
-            num_match = None
-            import re
+            # Industry Standard: Use existing import from top of file
             numbers = re.findall(r'\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b', query_lower)
             if numbers:
                 structure['considerations'].append(f'{len(numbers)} life/lives mentioned')
@@ -6160,6 +6159,9 @@ class WorldModel:
         Returns:
             List of Vulcan's current ethical values/boundaries
         """
+        # Industry Standard: Named constant for minimum reliability threshold
+        MIN_TESTS_FOR_RELIABILITY = 5
+        
         values = []
         
         if self.ethical_boundary_monitor:
@@ -6167,15 +6169,21 @@ class WorldModel:
                 # Get all defined boundaries - these represent Vulcan's ethics
                 boundaries = self.ethical_boundary_monitor.get_boundaries()
                 for name, boundary in boundaries.items():
+                    # Industry Standard: Safe attribute access with hasattr checks
+                    check_count = getattr(boundary, 'check_count', 0)
+                    violation_count = getattr(boundary, 'violation_count', 0)
+                    description = getattr(boundary, 'description', 'No description')
+                    priority = getattr(boundary, 'priority', 2)
+                    
                     # Track values that have been tested and validated
-                    if boundary.check_count > 0:
+                    if check_count > 0:
                         values.append({
                             'value': name.replace('_', ' ').title(),
-                            'description': boundary.description,
-                            'priority': 'critical' if boundary.priority == 0 else 'high' if boundary.priority == 1 else 'normal',
-                            'tested': boundary.check_count,
-                            'violations': boundary.violation_count,
-                            'reliability': 1.0 - (boundary.violation_count / max(1, boundary.check_count))
+                            'description': description,
+                            'priority': 'critical' if priority == 0 else 'high' if priority == 1 else 'normal',
+                            'tested': check_count,
+                            'violations': violation_count,
+                            'reliability': 1.0 - (violation_count / max(1, check_count))
                         })
                 logger.info(f"[WorldModel] Retrieved {len(values)} evolving values from Vulcan's self-model")
             except Exception as e:
@@ -6277,8 +6285,11 @@ class WorldModel:
         parts.append("I'm approaching this question from my own evolving value system.")
         
         # Share Vulcan's current values (if evolved through experience)
+        # Industry Standard: Named constant for minimum reliability threshold
+        MIN_TESTS_FOR_RELIABILITY = 5
+        
         if vulcan_values:
-            reliable_values = [v for v in vulcan_values if v.get('tested', 0) > 5]
+            reliable_values = [v for v in vulcan_values if v.get('tested', 0) > MIN_TESTS_FOR_RELIABILITY]
             if reliable_values:
                 parts.append("")
                 parts.append("## My Evolved Values")

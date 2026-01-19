@@ -1426,8 +1426,8 @@ class HybridLLMExecutor:
             loop = asyncio.get_event_loop()
             if loop.is_running():
                 # We're in an async context - create new loop in thread
-                import concurrent.futures
-                with concurrent.futures.ThreadPoolExecutor() as pool:
+                # Industry Standard: Use existing import from top of file
+                with ThreadPoolExecutor() as pool:
                     future = pool.submit(
                         asyncio.run,
                         self.execute(
