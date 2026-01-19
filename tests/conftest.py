@@ -30,6 +30,7 @@ from dotenv import load_dotenv  # <<< --- ADDED DOTENV --- >>>
 # - VULCAN_FAST_FIXTURES=1 (use minimal fixtures)
 #
 # Use flexible checks to handle variations like 'True', '1', 'yes', etc.
+# Only treat specific truthy values as True, everything else as False
 CI_MODE = (
     os.environ.get("CI", "").lower() in ("true", "1", "yes") or
     os.environ.get("VULCAN_CI_MODE", "").lower() in ("1", "true", "yes")
