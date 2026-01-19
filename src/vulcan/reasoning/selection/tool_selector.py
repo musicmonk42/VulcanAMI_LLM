@@ -4724,11 +4724,16 @@ class ToolSelector:
                 time.sleep(0.1)  # Simulate work
 
                 # Deterministic confidence based on tool name and config
-                import hashlib
+                import zlib
 
-                tool_hash = int(
-                    hashlib.md5(f"{name}{str(config)}".encode()).hexdigest()[:8], 16
-                )
+                # SECURITY NOTE: Using CRC32 instead of MD5 for deterministic hashing
+                # CRC32 is appropriate here because:
+                # 1. This is NOT cryptographic use (just deterministic mock simulation)
+                # 2. No security properties required (collision resistance not needed)
+                # 3. Better performance than MD5 (4-8x faster)
+                # 4. Clearer intent (CRC32 is explicitly non-cryptographic)
+                # Mask with 0xffffffff to ensure unsigned 32-bit value for cross-platform consistency
+                tool_hash = zlib.crc32(f"{name}{str(config)}".encode()) & 0xffffffff
                 confidence = 0.5 + (tool_hash % 500) / 1000.0  # Range: 0.5 to 1.0
 
                 return {

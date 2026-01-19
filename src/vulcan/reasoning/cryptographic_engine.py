@@ -760,7 +760,7 @@ class CryptographicEngine:
             return hashlib.sha256(input_bytes).hexdigest()
         
         elif operation == CryptoOperation.SHA1:
-            return hashlib.sha1(input_bytes).hexdigest()
+            return hashlib.sha1(input_bytes, usedforsecurity=False).hexdigest()
         
         elif operation == CryptoOperation.SHA512:
             return hashlib.sha512(input_bytes).hexdigest()
@@ -799,7 +799,7 @@ class CryptographicEngine:
         # Legacy Hash Operations
         # =====================================================================
         elif operation == CryptoOperation.MD5:
-            return hashlib.md5(input_bytes).hexdigest()
+            return hashlib.md5(input_bytes, usedforsecurity=False).hexdigest()
         
         elif operation == CryptoOperation.RIPEMD160:
             # RIPEMD-160 may not be available in all Python installations
@@ -896,10 +896,54 @@ class CryptographicEngine:
         return hashlib.sha256(data).hexdigest()
     
     def sha1(self, data: Union[str, bytes]) -> str:
-        """Compute SHA-1 hash."""
+        """Compute SHA-1 hash (CRYPTOGRAPHICALLY BROKEN - DO NOT USE FOR SECURITY).
+        
+        ⚠️  SECURITY WARNING: SHA-1 is cryptographically broken (NIST deprecated since 2011)
+        
+        SHA-1 MUST NOT be used for:
+        - Password hashing (use Argon2id, bcrypt, or scrypt)
+        - Digital signatures (use RSA-PSS with SHA-256+, or Ed25519)
+        - Security certificates (use SHA-256 or SHA-384)
+        - HMAC authentication (use HMAC-SHA256 or HMAC-SHA512)
+        - Any security-critical operations
+        
+        SHA-1 may ONLY be used for:
+        - Non-cryptographic checksums (consider CRC32 for better performance)
+        - Legacy system compatibility (e.g., Git commit hashing)
+        - Cache keys for non-sensitive data
+        
+        Known attacks:
+        - Collision attacks demonstrated in 2017 (SHAttered attack)
+        - Practical collision attacks possible with moderate resources
+        
+        Recommended alternatives:
+        - General purpose: SHA-256, SHA3-256, or BLAKE2b
+        - Password hashing: Argon2id (OWASP recommended)
+        - Fast checksums: CRC32, xxHash
+        
+        References:
+        - NIST SP 800-131A: Deprecated SHA-1 for digital signatures (2011)
+        - RFC 6194: Security Considerations for SHA-0 and SHA-1
+        - SHAttered attack: https://shattered.io/
+        - OWASP: https://cheatsheetseries.owasp.org/cheatsheets/Cryptographic_Storage_Cheat_Sheet.html
+        
+        Args:
+            data: Input data (string or bytes). Strings are encoded as UTF-8.
+        
+        Returns:
+            Hexadecimal digest string (40 characters)
+        """
+        import warnings
+        warnings.warn(
+            "SHA-1 is cryptographically broken (collision attacks demonstrated 2017). "
+            "Use SHA-256, SHA-3, or BLAKE2 for security purposes. "
+            "Use CRC32 or xxHash for fast non-cryptographic checksums.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         if isinstance(data, str):
             data = data.encode('utf-8')
-        return hashlib.sha1(data).hexdigest()
+        return hashlib.sha1(data, usedforsecurity=False).hexdigest()
     
     def sha512(self, data: Union[str, bytes]) -> str:
         """Compute SHA-512 hash."""
@@ -959,10 +1003,49 @@ class CryptographicEngine:
     
     # Legacy Hashes
     def md5(self, data: Union[str, bytes]) -> str:
-        """Compute MD5 hash."""
+        """Compute MD5 hash (CRYPTOGRAPHICALLY BROKEN - DO NOT USE FOR SECURITY).
+        
+        ⚠️  SECURITY WARNING: MD5 is cryptographically broken (NIST deprecated since 2011)
+        
+        MD5 MUST NOT be used for:
+        - Password hashing (use Argon2id, bcrypt, or scrypt)
+        - Digital signatures (use RSA-PSS with SHA-256+, or Ed25519)
+        - Security certificates (use SHA-256 or SHA-384)
+        - HMAC authentication (use HMAC-SHA256 or HMAC-SHA512)
+        - Any security-critical operations
+        
+        MD5 may ONLY be used for:
+        - Non-cryptographic checksums (consider CRC32 for better performance)
+        - Legacy system compatibility (where security is not a concern)
+        - Cache keys for non-sensitive data
+        
+        Recommended alternatives:
+        - General purpose: SHA-256, SHA3-256, or BLAKE2b
+        - Password hashing: Argon2id (OWASP recommended)
+        - Fast checksums: CRC32, xxHash
+        
+        References:
+        - NIST SP 800-131A: Deprecated MD5 for all security applications
+        - RFC 6151: Updated Security Considerations for MD5
+        - OWASP: https://cheatsheetseries.owasp.org/cheatsheets/Cryptographic_Storage_Cheat_Sheet.html
+        
+        Args:
+            data: Input data (string or bytes). Strings are encoded as UTF-8.
+        
+        Returns:
+            Hexadecimal digest string (32 characters)
+        """
+        import warnings
+        warnings.warn(
+            "MD5 is cryptographically broken (NIST deprecated 2011). "
+            "Use SHA-256, SHA-3, or BLAKE2 for security purposes. "
+            "Use CRC32 or xxHash for fast non-cryptographic checksums.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         if isinstance(data, str):
             data = data.encode('utf-8')
-        return hashlib.md5(data).hexdigest()
+        return hashlib.md5(data, usedforsecurity=False).hexdigest()
     
     def ripemd160(self, data: Union[str, bytes]) -> str:
         """Compute RIPEMD-160 hash."""

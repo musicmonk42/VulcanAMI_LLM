@@ -674,5 +674,28 @@ def internal_error(error):
 
 
 if __name__ == "__main__":
-    # For standalone testing
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    # SECURITY WARNING: This is for development/testing only
+    # Production deployments MUST use a production WSGI server (gunicorn, uwsgi)
+    # with proper process management, worker count, and timeout settings
+    
+    debug_mode = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
+    
+    if debug_mode:
+        logger.warning(
+            "Running Flask app with debug=True. "
+            "This exposes the Werkzeug debugger and allows arbitrary code execution. "
+            "NEVER use debug=True in production!"
+        )
+    
+    # Use localhost by default for security; override with FLASK_HOST if needed
+    host = os.environ.get("FLASK_HOST", "127.0.0.1")
+    if host == "0.0.0.0":
+        logger.warning(
+            "Binding to 0.0.0.0 exposes the service to all network interfaces. "
+            "Ensure proper firewall rules are in place."
+        )
+    
+    port = int(os.environ.get("FLASK_PORT", "5000"))
+    
+    logger.info(f"Starting Flask development server on {host}:{port} (debug={debug_mode})")
+    app.run(host=host, port=port, debug=debug_mode)

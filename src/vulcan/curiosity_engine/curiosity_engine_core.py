@@ -640,14 +640,19 @@ class SafeExperimentExecutor:
             else:
                 # Simulate causal discovery with deterministic values
                 # Use intervention properties to calculate consistent results
-                import hashlib
+                import zlib
 
                 intervention_str = str(intervention.get("variable", "")) + str(
                     intervention.get("value", "")
                 )
-                intervention_hash = int(
-                    hashlib.md5(intervention_str.encode()).hexdigest()[:8], 16
-                )
+                # SECURITY NOTE: Using CRC32 instead of MD5 for deterministic hashing
+                # CRC32 is appropriate here because:
+                # 1. This is NOT cryptographic use (just deterministic simulation)
+                # 2. No security properties required (collision resistance not needed)
+                # 3. Better performance than MD5 (4-8x faster)
+                # 4. Clearer intent (CRC32 is explicitly non-cryptographic)
+                # Mask with 0xffffffff to ensure unsigned 32-bit value for cross-platform consistency
+                intervention_hash = zlib.crc32(intervention_str.encode()) & 0xffffffff
 
                 # Deterministic causal strength based on intervention
                 causal_strength = (

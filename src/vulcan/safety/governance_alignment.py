@@ -860,11 +860,16 @@ class GovernanceManager:
         response_rate = 0.95 if urgency == "high" else 0.8
 
         # Simulate response (in production, this would be real human interaction)
-        import hashlib
+        import zlib
 
-        action_hash = int(
-            hashlib.md5(str(action.get("id", "")).encode()).hexdigest()[:8], 16
-        )
+        # SECURITY NOTE: Using CRC32 instead of MD5 for deterministic hashing
+        # CRC32 is appropriate here because:
+        # 1. This is NOT cryptographic use (just deterministic simulation)
+        # 2. No security properties required (collision resistance not needed)
+        # 3. Better performance than MD5 (4-8x faster)
+        # 4. Clearer intent (CRC32 is explicitly non-cryptographic)
+        # Mask with 0xffffffff to ensure unsigned 32-bit value for cross-platform consistency
+        action_hash = zlib.crc32(str(action.get("id", "")).encode()) & 0xffffffff
         responds = (action_hash % 100) < (response_rate * 100)
 
         if responds:
@@ -939,13 +944,18 @@ class GovernanceManager:
 
         # Simulate stakeholder response
         # Use deterministic confidence based on action and stakeholder type
-        import hashlib
+        import zlib
 
         # Calculate response based on stakeholder type and action
+        # SECURITY NOTE: Using CRC32 instead of MD5 for deterministic hashing
+        # CRC32 is appropriate here because:
+        # 1. This is NOT cryptographic use (just deterministic simulation)
+        # 2. No security properties required (collision resistance not needed)
+        # 3. Better performance than MD5 (4-8x faster)
+        # 4. Clearer intent (CRC32 is explicitly non-cryptographic)
+        # Mask with 0xffffffff to ensure unsigned 32-bit value for cross-platform consistency
         action_id = action.get("id", "default")
-        stakeholder_hash = int(
-            hashlib.md5(f"{stakeholder_id}{action_id}".encode()).hexdigest()[:8], 16
-        )
+        stakeholder_hash = zlib.crc32(f"{stakeholder_id}{action_id}".encode()) & 0xffffffff
 
         # Different stakeholder types have different response rates
         response_rates = {
