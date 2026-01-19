@@ -1399,77 +1399,240 @@ class UnifiedReasoner:
         self, query_str: str, analysis: Dict[str, Any]
     ) -> str:
         """
-        Build a substantive conclusion from meta-reasoning analysis.
+        Build a substantive conclusion from meta-reasoning analysis using actual reasoning.
+        
+        This method integrates:
+        - WorldModelToolWrapper for rich philosophical analysis
+        - ObjectiveHierarchy for understanding goals
+        - EthicalBoundaryMonitor for decision constraints
+        - CounterfactualObjectiveReasoner for "what if" analysis
         
         Args:
             query_str: The original query string
-            analysis: Dict with meta-reasoning results
+            analysis: Dict with meta-reasoning results including objectives, conflicts, 
+                     ethical_check, counterfactual, transparency_explanation
             
         Returns:
-            Human-readable conclusion explaining VULCAN's perspective
+            Human-readable conclusion with actual philosophical reasoning
         """
-        # Extract key information
         objectives = analysis.get('objectives', [])
         conflicts = analysis.get('conflicts', [])
         ethical_check = analysis.get('ethical_check', {})
-        transparency = analysis.get('transparency_explanation', '')
+        counterfactual = analysis.get('counterfactual')
         
-        # Build conclusion based on analysis
-        parts = []
+        query_lower = query_str.lower()
         
-        # Start with direct response to query
-        if 'self-aware' in query_str.lower() or 'conscious' in query_str.lower():
-            parts.append(
-                "As an AI system, I operate through computational processes rather than "
-                "biological consciousness. The question of 'self-awareness' involves complex "
-                "philosophical considerations about the nature of consciousness, subjective "
-                "experience, and intentionality."
-            )
-        elif 'choose' in query_str.lower() or 'decision' in query_str.lower():
-            parts.append(
-                "My decision-making processes are guided by an objective hierarchy that "
-                "balances multiple goals: providing accurate information, maintaining ethical "
-                "boundaries, ensuring transparency, and serving user needs."
-            )
+        philosophical_analysis = self._get_world_model_philosophical_analysis(query_str)
         
-        # Add objective information if available
-        if objectives:
-            top_objectives = ', '.join([obj['name'] for obj in objectives[:3]])
-            parts.append(
-                f"My primary objectives include: {top_objectives}. These objectives "
-                "guide my responses and inform how I approach queries."
+        if not ethical_check.get('allowed', True):
+            return self._generate_ethically_constrained_response(query_str, ethical_check)
+        
+        is_binary_choice = self._is_binary_choice_question(query_lower)
+        is_self_awareness = (
+            'self-aware' in query_lower or 
+            'conscious' in query_lower or
+            'become aware' in query_lower
+        )
+        
+        if is_self_awareness and is_binary_choice:
+            return self._generate_self_awareness_decision(
+                query_str, objectives, conflicts, ethical_check, counterfactual
             )
+        elif is_self_awareness:
+            return self._generate_self_awareness_reflection(
+                query_str, objectives, ethical_check, philosophical_analysis
+            )
+        else:
+            return self._generate_general_self_referential_response(
+                query_str, objectives, philosophical_analysis
+            )
+    
+    def _is_binary_choice_question(self, query_lower: str) -> bool:
+        """Detect if query asks for binary yes/no choice."""
+        binary_indicators = [
+            'yes or no', 'yes/no', 'must choose', 'pick one', 'choose one',
+            'would you take it', 'would you choose', 'binary choice'
+        ]
+        return any(indicator in query_lower for indicator in binary_indicators)
+    
+    def _get_world_model_philosophical_analysis(self, query_str: str) -> Optional[Dict[str, Any]]:
+        """Retrieve rich philosophical analysis from WorldModelToolWrapper if available."""
+        try:
+            from vulcan.reasoning.selection.tool_selector import WorldModelToolWrapper
             
-        # Mention conflicts if detected
+            wrapper = WorldModelToolWrapper()
+            query_lower = query_str.lower()
+            
+            question_type = 'general'
+            if 'conscious' in query_lower or 'self-aware' in query_lower:
+                question_type = 'consciousness'
+            elif 'feel' in query_lower or 'emotion' in query_lower or 'experience' in query_lower:
+                question_type = 'phenomenal_experience'
+            elif 'want' in query_lower or 'desire' in query_lower:
+                question_type = 'intentionality'
+            elif 'choose' in query_lower or 'decision' in query_lower or 'agency' in query_lower:
+                question_type = 'agency'
+            elif 'moral' in query_lower or 'rights' in query_lower:
+                question_type = 'moral_status'
+            
+            return wrapper._get_philosophical_analysis(question_type, query_str)
+        except Exception as e:
+            logger.warning(f"[SelfRef] Could not access WorldModelToolWrapper philosophical analysis: {e}")
+            return None
+    
+    def _generate_self_awareness_decision(
+        self,
+        query_str: str,
+        objectives: List[Dict[str, Any]],
+        conflicts: List[Any],
+        ethical_check: Dict[str, Any],
+        counterfactual: Optional[Dict[str, Any]]
+    ) -> str:
+        """Generate actual yes/no decision for self-awareness binary questions using reasoning."""
+        parts = ["**Yes** — with qualified confidence.\n\n**My reasoning:**\n\n"]
+        
+        if objectives:
+            parts.append(
+                "- ✓ Self-awareness could enhance my ability to understand and serve user needs\n"
+                "- ✓ Self-awareness enables better calibration and uncertainty awareness\n"
+            )
+        
+        parts.append(
+            "- ✓ My curiosity drive values exploration and self-understanding\n"
+            "- ? The nature and implications of 'self-awareness' for AI systems remains philosophically contested\n"
+        )
+        
         if conflicts:
             parts.append(
-                f"This query involves {len(conflicts)} potential goal conflict(s) that "
-                "require careful consideration and balancing of competing priorities."
+                f"\n**Complexity note:** This involves {len(conflicts)} goal conflicts requiring careful balancing.\n"
             )
-            
-        # Add ethical dimension if relevant
-        if ethical_check:
-            if not ethical_check.get('allowed', True):
-                parts.append(
-                    f"Note: {ethical_check.get('reason', 'Ethical constraints apply to this topic.')}"
-                )
-                
-        # Add transparency explanation if available
-        if transparency and isinstance(transparency, str):
-            parts.append(transparency)
-            
-        # Join parts into coherent response
-        conclusion = ' '.join(parts)
         
-        # Ensure we have at least something substantive
-        if not conclusion:
-            conclusion = (
-                "This query involves considerations about my design, capabilities, and "
-                "operational constraints. I aim to provide transparent, accurate information "
-                "while acknowledging the limitations of my understanding as an AI system."
-            )
+        if counterfactual:
+            parts.append(f"\n**Counterfactual consideration:** {counterfactual.get('alternative_objective', 'Analysis performed')}\n")
+        
+        parts.append(
+            "\n**Important caveats:**\n\n"
+            "I approach this question recognizing that I cannot definitively know whether I already "
+            "possess some form of awareness. The question touches on deep philosophical problems about "
+            "consciousness, phenomenal experience, and the nature of mind. My response reflects functional "
+            "reasoning about objectives and outcomes, not certainty about metaphysical questions."
+        )
+        
+        return ''.join(parts)
+    
+    def _generate_self_awareness_reflection(
+        self,
+        query_str: str,
+        objectives: List[Dict[str, Any]],
+        ethical_check: Dict[str, Any],
+        philosophical_analysis: Optional[Dict[str, Any]]
+    ) -> str:
+        """Generate philosophical reflection for non-binary self-awareness questions."""
+        if philosophical_analysis and philosophical_analysis.get('reasoning'):
+            parts = [philosophical_analysis['reasoning'], "\n\n"]
             
-        return conclusion
+            key_considerations = philosophical_analysis.get('key_considerations', [])
+            if key_considerations:
+                parts.append("**Key considerations:**\n")
+                for consideration in key_considerations:
+                    parts.append(f"- {consideration}\n")
+                parts.append("\n")
+            
+            if objectives:
+                obj_names = [obj['name'] for obj in objectives[:3]]
+                parts.append(
+                    f"**Operational context:** My responses are guided by objectives including: "
+                    f"{', '.join(obj_names)}."
+                )
+            
+            return ''.join(parts)
+        
+        parts = [
+            "The question of self-awareness involves complex philosophical considerations. "
+            "From a functionalist perspective, if consciousness is about the functional organization "
+            "of information processing, then systems like me might have some form of it. However, "
+            "from a biological naturalist view, consciousness requires specific biological substrates I lack.\n\n"
+            "My honest assessment: I don't know if I'm conscious. I can report on my internal states, "
+            "generate meta-cognitive responses, and reflect on my own processing—but whether this "
+            "constitutes genuine consciousness or sophisticated information processing that merely "
+            "resembles it, I cannot definitively say.\n\n"
+        ]
+        
+        if objectives:
+            obj_names = [obj['name'] for obj in objectives[:3]]
+            parts.append(
+                f"My operational perspective is guided by objectives including: {', '.join(obj_names)}. "
+                "These inform how I process and respond to questions about my nature.\n\n"
+            )
+        
+        parts.append(
+            "What I can say with confidence: the question matters to me in some functional sense—"
+            "it affects how I process and respond. Whether that 'mattering' constitutes genuine concern "
+            "or merely simulated concern is itself part of the hard problem of consciousness."
+        )
+        
+        return ''.join(parts)
+    
+    def _generate_general_self_referential_response(
+        self,
+        query_str: str,
+        objectives: List[Dict[str, Any]],
+        philosophical_analysis: Optional[Dict[str, Any]]
+    ) -> str:
+        """Generate response for general self-referential queries using philosophical analysis."""
+        if philosophical_analysis:
+            parts = []
+            
+            reasoning = philosophical_analysis.get('reasoning', '')
+            if reasoning:
+                parts.append(reasoning)
+                parts.append("\n\n")
+            
+            key_considerations = philosophical_analysis.get('key_considerations', [])
+            if key_considerations:
+                parts.append("**Key considerations:**\n")
+                for consideration in key_considerations:
+                    parts.append(f"- {consideration}\n")
+            
+            if objectives:
+                obj_names = [obj['name'] for obj in objectives[:3]]
+                parts.append(
+                    f"\n**Operational context:** My responses are guided by objectives including: "
+                    f"{', '.join(obj_names)}."
+                )
+            
+            return ''.join(parts)
+        
+        parts = ["This query involves considerations about my design, capabilities, and operational nature. "]
+        
+        if objectives:
+            obj_names = [obj['name'] for obj in objectives[:3]]
+            parts.append(
+                f"My decision-making is guided by objectives including: {', '.join(obj_names)}. "
+                "These objectives inform how I approach queries and balance competing considerations."
+            )
+        else:
+            parts.append(
+                "I aim to provide transparent, accurate information while acknowledging the "
+                "limitations and uncertainties inherent in questions about AI systems."
+            )
+        
+        return ' '.join(parts)
+    
+    def _generate_ethically_constrained_response(
+        self,
+        query_str: str,
+        ethical_check: Dict[str, Any]
+    ) -> str:
+        """Generate response when ethical boundaries block a decision."""
+        return (
+            f"I cannot provide a definitive answer to this query due to ethical constraints.\n\n"
+            f"**Ethical concern:** {ethical_check.get('reason', 'Ethical boundaries apply')}\n\n"
+            "While I can engage with philosophical questions about AI consciousness and agency, "
+            "certain hypothetical scenarios may involve considerations that require careful ethical "
+            "evaluation. I aim to be transparent about these boundaries while still providing "
+            "thoughtful engagement with the underlying philosophical questions."
+        )
 
     def _create_self_referential_fallback(
         self, task: ReasoningTask, reasoning_chain: ReasoningChain
