@@ -2652,6 +2652,58 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
         query_str = str(input_data) if not isinstance(input_data, str) else input_data
         
         # INDUSTRY-STANDARD: Skip gate check if LLM has high confidence
+        # ISSUE #5 FIX: Reject linguistic/NLP queries early
+        # =================================================================
+        # Problem: Queries about "coreference", "pronoun", "parsing", etc.
+        # were being routed to probabilistic reasoning, which then rejected them.
+        #
+        # Industry Standard Solution:
+        # - Explicit early rejection for wrong query types
+        # - Clear error messages directing to correct tool
+        # - Minimal wasted computation
+        #
+        # This prevents linguistic queries from reaching the probabilistic
+        # reasoning pipeline, which is designed for probability calculations.
+        # =================================================================
+        LINGUISTIC_KEYWORDS = frozenset([
+            'coreference', 'pronoun', 'parse', 'parsing', 'syntax',
+            'semantic parsing', 'quantifier scope', 'scope ambiguity',
+            'anaphora', 'cataphora', 'disambiguation', 'ambiguous',
+            'sentence structure', 'grammatical', 'linguistic',
+            'part of speech', 'pos tagging', 'dependency',
+            'constituency', 'phrase structure',
+        ])
+        
+        has_linguistic_keywords = any(kw in query_str.lower() for kw in LINGUISTIC_KEYWORDS)
+        
+        if has_linguistic_keywords:
+            logger.info(
+                f"[ProbabilisticReasoner] ISSUE #5 FIX: Linguistic query detected. "
+                f"Returning 'not applicable' - should route to language tool instead."
+            )
+            return ReasoningResult(
+                conclusion={
+                    "applicable": False,
+                    "reason": "Query involves linguistic/NLP concepts, not probability",
+                    "not_applicable": True,
+                    "recommended_tool": "language",
+                },
+                confidence=0.0,
+                reasoning_type=ReasoningType.PROBABILISTIC,
+                explanation=(
+                    "This query appears to involve linguistic or natural language processing concepts "
+                    "(parsing, coreference, pronouns, etc.) rather than probability or statistics. "
+                    "This should be handled by the language reasoning tool, which specializes in "
+                    "syntax, semantics, and discourse understanding."
+                ),
+                metadata={
+                    "gate_check": "passed",
+                    "linguistic_check": "failed",
+                    "reason": "Linguistic query, not probabilistic",
+                    "recommended_tool": "language",
+                },
+            )
+        
         if not skip_gate_check and not self._is_probability_query(query_str):
             logger.info(
                 f"[ProbabilisticReasoner] Gate check: Query does not contain probability keywords. "

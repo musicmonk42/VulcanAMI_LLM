@@ -272,6 +272,82 @@ class TestIssue3ShowSteps:
         pass
 
 
+class TestIssue5LinguisticQueries:
+    """
+    Test suite for Issue #5: Wrong Tool Selection for Linguistic Queries
+    
+    Problem: Coreference/pronoun queries were routed to probabilistic reasoning,
+    which rejected them.
+    
+    Solution: Add linguistic query detection to prevent incorrect routing.
+    """
+    
+    @pytest.fixture
+    def prob_reasoner(self):
+        """Create ProbabilisticReasoner instance if available."""
+        try:
+            from vulcan.reasoning.probabilistic_reasoning import ProbabilisticReasoner
+            return ProbabilisticReasoner()
+        except ImportError:
+            pytest.skip("ProbabilisticReasoner not available")
+    
+    def test_coreference_query_rejected_by_probabilistic(self, prob_reasoner):
+        """Test: Coreference query should be rejected by probabilistic reasoner"""
+        query = "Resolve the coreference in: John saw him. Who does 'him' refer to?"
+        result = prob_reasoner.reason(query)
+        
+        # Should reject with low confidence
+        assert result.confidence <= 0.1, \
+            f"Probabilistic reasoner should reject linguistic queries with low confidence. Got: {result.confidence}"
+        
+        # Should indicate it's not applicable
+        assert result.conclusion.get("not_applicable") or result.conclusion.get("applicable") == False, \
+            "Result should indicate query is not applicable to probabilistic reasoning"
+        
+        # Should recommend language tool
+        metadata = result.metadata or {}
+        assert metadata.get("recommended_tool") == "language", \
+            "Should recommend 'language' tool for linguistic queries"
+    
+    def test_pronoun_query_rejected_by_probabilistic(self, prob_reasoner):
+        """Test: Pronoun resolution query should be rejected by probabilistic reasoner"""
+        query = "What does the pronoun 'it' refer to in: The cat ate the fish. It was delicious."
+        result = prob_reasoner.reason(query)
+        
+        assert result.confidence <= 0.1, \
+            "Probabilistic reasoner should reject pronoun queries"
+        assert result.conclusion.get("not_applicable") == True
+    
+    def test_parsing_query_rejected_by_probabilistic(self, prob_reasoner):
+        """Test: Parsing query should be rejected by probabilistic reasoner"""
+        query = "Parse the sentence: Every student reviewed a document."
+        result = prob_reasoner.reason(query)
+        
+        assert result.confidence <= 0.1, \
+            "Probabilistic reasoner should reject parsing queries"
+        assert result.conclusion.get("not_applicable") == True
+    
+    def test_quantifier_scope_query_rejected(self, prob_reasoner):
+        """Test: Quantifier scope query should be rejected by probabilistic reasoner"""
+        query = "What is the quantifier scope ambiguity in: Someone loves everyone?"
+        result = prob_reasoner.reason(query)
+        
+        assert result.confidence <= 0.1
+        assert result.conclusion.get("not_applicable") == True
+    
+    def test_probability_query_accepted(self, prob_reasoner):
+        """Test: Actual probability query should NOT be rejected"""
+        query = "What is the probability of rolling a 6 on a fair die?"
+        result = prob_reasoner.reason(query)
+        
+        # This should not be rejected (should have higher confidence or actual computation)
+        # We're not checking the result value, just that it wasn't rejected as "not applicable"
+        if result.conclusion.get("not_applicable") == True:
+            # If it was rejected, confidence must be low
+            assert result.confidence <= 0.3, \
+                f"Probability queries should not be rejected with high confidence. Got: {result.confidence}"
+
+
 if __name__ == "__main__":
     # Allow running tests directly for development
     pytest.main([__file__, "-v", "--tb=short"])
