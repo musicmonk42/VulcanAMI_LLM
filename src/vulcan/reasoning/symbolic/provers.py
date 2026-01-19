@@ -941,8 +941,9 @@ class ResolutionProver(BaseProver):
                     confidence=min(clause1.confidence, clause2.confidence),
                 )
 
-                # Track which literal was resolved
-                resolved_literal = str(lit1) if not lit1.negated else str(lit2)
+                # Track which literal was resolved (use predicate name for clarity)
+                # The resolved literal is the one that was eliminated via resolution
+                resolved_literal = lit1.predicate
                 results.append((resolvent, resolved_literal))
 
         return results

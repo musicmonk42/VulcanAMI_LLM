@@ -903,7 +903,8 @@ class AnalogicalReasoner(AbstractReasoner):
         query_lower = query.lower()
         
         # Pattern 1: "Map X, Y, Z to domain" or "Map X, Y and Z to domain"
-        map_pattern = r'map\s+(.+?)\s+(?:to|in|into|onto)\s+\w+'
+        # Domain names can contain spaces, hyphens, underscores (e.g., "cellular biology")
+        map_pattern = r'map\s+(.+?)\s+(?:to|in|into|onto)\s+[\w\s\-_]+'
         match = re.search(map_pattern, query_lower, re.IGNORECASE)
         if match:
             concepts_str = match.group(1)
@@ -1275,12 +1276,25 @@ class AnalogicalReasoner(AbstractReasoner):
         concepts = self.extract_mapping_targets(query)
         
         if not concepts:
-            # Fallback: treat entire query as single concept if no pattern matched
+            # Fallback: try to extract noun phrases or key terms from query
+            # This is better than using the entire query as a single concept
             logger.info(
-                f"No structured concepts found in query, treating as single concept search"
+                f"No structured concepts found in query, attempting keyword extraction"
             )
-            # Try to extract the key concept from the query
-            concepts = [query.strip()]
+            # Simple keyword extraction: split on common delimiters and filter
+            # This extracts potential concept terms rather than the whole query
+            potential_terms = re.split(r'[,;:?!.\n]+', query)
+            potential_terms = [t.strip() for t in potential_terms if t.strip() and len(t.strip()) > 2]
+            
+            if potential_terms:
+                # Filter out common stop words and very short terms
+                stop_words = {'map', 'to', 'from', 'the', 'a', 'an', 'in', 'on', 'for', 'and', 'or', 'what', 'how', 'is', 'are'}
+                concepts = [t for t in potential_terms if t.lower() not in stop_words and len(t) > 3]
+            
+            if not concepts:
+                # Last resort: use the cleaned query, but limit length
+                clean_query = query.strip()[:100]  # Limit to 100 chars
+                concepts = [clean_query] if clean_query else []
         
         logger.info(
             f"[AnalogicalReasoner] Extracted {len(concepts)} concepts to map: {concepts}"
