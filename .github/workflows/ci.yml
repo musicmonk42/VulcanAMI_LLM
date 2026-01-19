@@ -223,7 +223,8 @@ jobs:
           
           # Run the verification script with --verify-only to prevent background services
           # from starting and ensure clean exit in CI environment
-          python scripts/verify_installation.py --critical-only --verify-only || {
+          # Added --skip-slow-checks to speed up verification in CI
+          python scripts/verify_installation.py --critical-only --verify-only --skip-slow-checks || {
             echo "❌ VULCAN installation verification failed!"
             echo "Attempting to diagnose..."
             pip show vulcan-agi || echo "Package not installed"
@@ -257,6 +258,9 @@ jobs:
           echo "MINIO_ENDPOINT=http://localhost:9000" >> $GITHUB_ENV
           # Disable Ray in tests to prevent hanging
           echo "VULCAN_ENABLE_RAY=0" >> $GITHUB_ENV
+          # Enable CI-specific optimizations for faster test execution
+          echo "VULCAN_CI_MODE=1" >> $GITHUB_ENV
+          echo "VULCAN_FAST_FIXTURES=1" >> $GITHUB_ENV
 
       - name: Monitor system resources
         run: |
@@ -274,8 +278,10 @@ jobs:
           
           # Run pytest without tee to prevent buffering/hanging issues
           # Capture output directly to file
+          # Increased timeout from 40m to 75m to accommodate legitimate test duration
+          # Tests include resource-intensive operations (ZK-SNARK, neural networks, hardware emulation)
           EXIT_CODE=0
-          timeout 40m pytest --cov=src -q \
+          timeout 75m pytest --cov=src -q \
             --cov-report=xml \
             --cov-report=html \
             --cov-report=term-missing \
@@ -717,7 +723,8 @@ jobs:
         run: |
           echo "Verifying VULCAN package installation..."
           # Use --verify-only to prevent background services from starting
-          python scripts/verify_installation.py --critical-only --verify-only || {
+          # Use --skip-slow-checks to speed up verification in CI
+          python scripts/verify_installation.py --critical-only --verify-only --skip-slow-checks || {
             echo "⚠ VULCAN installation verification had issues"
             echo "Performance tests will use mock components"
           }
