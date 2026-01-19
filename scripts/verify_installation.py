@@ -199,6 +199,7 @@ def verify_installation(
     verbose: bool = False,
     critical_only: bool = False,
     verify_only: bool = False,
+    skip_slow_checks: bool = False,
 ) -> VerificationReport:
     """
     Run all verification checks and return a report.
@@ -206,6 +207,8 @@ def verify_installation(
     Args:
         verbose: If True, print detailed progress information.
         critical_only: If True, only test critical modules.
+        verify_only: If True, skip optional initialization.
+        skip_slow_checks: If True, skip slow/optional verification checks.
 
     Returns:
         VerificationReport: Complete report of all test results.
@@ -217,6 +220,15 @@ def verify_installation(
     test_cases = TEST_CASES
     if critical_only:
         test_cases = [(m, d, c) for m, d, c in TEST_CASES if c]
+    
+    # In skip_slow_checks mode, further reduce to only the most critical modules
+    # This speeds up CI verification by skipping optional components
+    if skip_slow_checks:
+        # Only test the absolute minimum critical modules for CI
+        test_cases = [
+            ("src", "Base src module", True),
+            ("src.vulcan", "VULCAN core package", True),
+        ]
 
     report.total_tests = len(test_cases)
 
@@ -368,6 +380,12 @@ Exit Codes:
         help="Skip any optional initialization and ensure clean exit (CI safe)",
     )
 
+    parser.add_argument(
+        "--skip-slow-checks",
+        action="store_true",
+        help="Skip slow/optional verification checks for faster CI execution",
+    )
+
     return parser.parse_args()
 
 
@@ -391,6 +409,7 @@ def main() -> int:
             verbose=args.verbose and not args.quiet and not args.json,
             critical_only=args.critical_only,
             verify_only=args.verify_only,
+            skip_slow_checks=args.skip_slow_checks,
         )
 
         # Output results

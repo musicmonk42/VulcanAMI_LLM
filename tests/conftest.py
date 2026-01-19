@@ -16,6 +16,38 @@ import numpy as np
 import pytest
 from dotenv import load_dotenv  # <<< --- ADDED DOTENV --- >>>
 
+# ============================================================
+# CI-Specific Optimizations for Faster Test Execution
+# ============================================================
+# When running in CI mode, apply optimizations to reduce test overhead:
+# - Skip expensive fixture initialization when not needed
+# - Use faster timeouts for CI environment
+# - Reduce default complexity of test fixtures
+#
+# Environment variables that enable CI optimizations:
+# - CI=true (standard CI indicator)
+# - VULCAN_CI_MODE=1 (explicit VULCAN CI mode)
+# - VULCAN_FAST_FIXTURES=1 (use minimal fixtures)
+#
+CI_MODE = os.environ.get("CI") == "true" or os.environ.get("VULCAN_CI_MODE") == "1"
+FAST_FIXTURES = os.environ.get("VULCAN_FAST_FIXTURES") == "1"
+
+if CI_MODE:
+    # Reduce pytest timeouts in CI for faster failure detection
+    # Individual tests can still override with @pytest.mark.timeout(N)
+    DEFAULT_TEST_TIMEOUT = 180  # 3 minutes instead of default 300
+    
+    # Set environment variables for faster test execution
+    os.environ.setdefault("VULCAN_SKIP_SLOW_INIT", "1")
+    os.environ.setdefault("VULCAN_MINIMAL_FIXTURES", "1")
+    
+    print(f"[conftest] CI mode enabled - using optimized configuration")
+    print(f"[conftest] - Fast fixtures: {FAST_FIXTURES}")
+    print(f"[conftest] - Default test timeout: {DEFAULT_TEST_TIMEOUT}s")
+else:
+    DEFAULT_TEST_TIMEOUT = 300  # 5 minutes for local development
+
+# ============================================================
 # CRITICAL FIX: Ensure cryptography and other critical packages are never mocked
 # This must happen BEFORE any imports that might use these packages
 PROTECTED_MODULES = ["cryptography", "OpenSSL", "ssl"]
@@ -272,6 +304,8 @@ def fresh_pytorch_model():
     - Models stuck in eval() mode from previous tests
 
     The model is explicitly set to train() mode and is NOT shared across tests.
+    
+    In CI mode with FAST_FIXTURES, returns a smaller model for faster initialization.
     """
     try:
         import torch
@@ -280,6 +314,10 @@ def fresh_pytorch_model():
         class FreshTestModel(nn.Module):
             def __init__(self, input_dim=512, hidden_dim=256):
                 super().__init__()
+                # In CI fast mode, use smaller dimensions
+                if FAST_FIXTURES:
+                    input_dim = min(input_dim, 128)
+                    hidden_dim = min(hidden_dim, 64)
                 self.fc1 = nn.Linear(input_dim, hidden_dim)
                 self.fc2 = nn.Linear(hidden_dim, input_dim)
 
