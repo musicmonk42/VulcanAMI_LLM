@@ -1470,28 +1470,55 @@ class UnifiedReasoner:
         return any(indicator in query_lower for indicator in binary_indicators)
     
     def _get_world_model_philosophical_analysis(self, query_str: str) -> Optional[Dict[str, Any]]:
-        """Retrieve rich philosophical analysis from WorldModelToolWrapper if available."""
+        """
+        Retrieve rich philosophical analysis from WorldModelToolWrapper using actual WorldModel.
+        
+        ISSUE 8 FIX (Jan 2026): Call _apply_philosophical_reasoning_from_world_model() which
+        delegates to the ACTUAL WorldModel._philosophical_reasoning() method instead of returning
+        static templates from _get_philosophical_analysis().
+        
+        This ensures responses use genuine meta-reasoning components:
+        - MotivationalIntrospection for actual objective analysis
+        - ObjectiveHierarchy for real hierarchy structure
+        - CounterfactualObjectiveReasoner for hypothetical reasoning
+        - EthicalBoundaryMonitor for ethical constraints
+        - InternalCritic for self-evaluation
+        
+        Industry Standard: Delegate to authoritative components, avoid templates.
+        
+        Returns:
+            Dict with philosophical analysis from actual WorldModel reasoning,
+            or None if WorldModel unavailable.
+        """
         try:
             from vulcan.reasoning.selection.tool_selector import WorldModelToolWrapper
             
             wrapper = WorldModelToolWrapper()
             query_lower = query_str.lower()
             
-            question_type = 'general'
-            if 'conscious' in query_lower or 'self-aware' in query_lower:
-                question_type = 'consciousness'
-            elif 'feel' in query_lower or 'emotion' in query_lower or 'experience' in query_lower:
-                question_type = 'phenomenal_experience'
-            elif 'want' in query_lower or 'desire' in query_lower:
-                question_type = 'intentionality'
-            elif 'choose' in query_lower or 'decision' in query_lower or 'agency' in query_lower:
-                question_type = 'agency'
-            elif 'moral' in query_lower or 'rights' in query_lower:
-                question_type = 'moral_status'
+            # CRITICAL FIX: Use _apply_philosophical_reasoning_from_world_model()
+            # which calls the actual WorldModel._philosophical_reasoning() method
+            # instead of _get_philosophical_analysis() which returns static templates
+            logger.info(f"[SelfRef] Routing to WorldModel for authentic philosophical reasoning")
+            result = wrapper._apply_philosophical_reasoning_from_world_model(query_lower)
             
-            return wrapper._get_philosophical_analysis(question_type, query_str)
+            # Extract key_considerations from the result for backward compatibility
+            # The _apply_philosophical_reasoning_from_world_model returns different structure
+            if result and 'response' in result:
+                # Transform to expected format
+                return {
+                    'reasoning': result.get('response', ''),
+                    'key_considerations': result.get('considerations', []),
+                    'perspectives': result.get('perspectives', []),
+                    'principles': result.get('principles', []),
+                    'confidence': result.get('confidence', 0.75),
+                    'reasoning_trace': result.get('reasoning_trace', {}),
+                    'source': 'world_model_authentic'
+                }
+            
+            return None
         except Exception as e:
-            logger.warning(f"[SelfRef] Could not access WorldModelToolWrapper philosophical analysis: {e}")
+            logger.warning(f"[SelfRef] Could not access WorldModelToolWrapper philosophical analysis: {e}", exc_info=True)
             return None
     
     def _generate_self_awareness_decision(

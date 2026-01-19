@@ -1021,6 +1021,27 @@ SELF_INTROSPECTION_PATTERNS: Tuple[re.Pattern, ...] = (
     re.compile(r"\b(would|do)\s+you\s+(take|want|choose)\s+it\b", re.IGNORECASE),
     re.compile(r"\bself[- ]?aware(ness)?\b.*\b(would|take|want|choose)\b", re.IGNORECASE),
     re.compile(r"\b(if|when)\s+you\s+have\s+(the\s+)?(chance|opportunity)\b", re.IGNORECASE),
+    
+    # =============================================================================
+    # ISSUE 11 FIX (Jan 2026): Explicit Internal Function/Self-Reflection Requests
+    # =============================================================================
+    # When user explicitly asks to use "internal functions", "self reflection",
+    # or describe "subjective experience", MUST route to Vulcan's meta-reasoning,
+    # NOT to OpenAI. These are explicit requests for authentic introspection.
+    #
+    # Example queries that were incorrectly routed to OpenAI:
+    # - "using your internal functions and self reflection describe your subjective experience"
+    # - "using self reflection, answer why you prefer truth"
+    # - "describe your subjective experience"
+    re.compile(r"\busing\s+(your\s+)?internal\s+functions?\b", re.IGNORECASE),
+    re.compile(r"\busing\s+(your\s+)?self[- ]?reflection\b", re.IGNORECASE),
+    re.compile(r"\binternal\s+functions?\b.*\b(describe|explain|analyze)\b", re.IGNORECASE),
+    re.compile(r"\b(describe|explain|what\s+is)\s+(your\s+)?subjective\s+experience\b", re.IGNORECASE),
+    re.compile(r"\bsubjective\s+experience\b.*\b(you|your)\b", re.IGNORECASE),
+    re.compile(r"\b(you|your)\b.*\bsubjective\s+experience\b", re.IGNORECASE),
+    re.compile(r"\binternal\s+reasoning\s+process\b", re.IGNORECASE),
+    re.compile(r"\binternal\s+states?\b.*\b(you|your)\b", re.IGNORECASE),
+    re.compile(r"\byour\s+internal\s+(model|functions?|reasoning)\b", re.IGNORECASE),
 )
 
 SELF_INTROSPECTION_KEYWORDS: FrozenSet[str] = frozenset([
@@ -1042,6 +1063,9 @@ SELF_INTROSPECTION_KEYWORDS: FrozenSet[str] = frozenset([
     "module", "modules", "component", "components", "engine", "engines",
     "reasoning tool", "reasoning tools", "reasoning module", "reasoning modules",
     "internal", "architecture", "disagree", "conflict detected",
+    # ISSUE 11 FIX: Explicit internal function/reflection keywords
+    "internal functions", "internal function", "self reflection", "self-reflection",
+    "subjective experience", "internal reasoning", "internal states", "internal model",
 ])
 
 # =============================================================================
