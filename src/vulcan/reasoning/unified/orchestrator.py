@@ -1430,8 +1430,13 @@ class UnifiedReasoner:
         is_binary_choice = self._is_binary_choice_question(query_lower)
         is_self_awareness = (
             'self-aware' in query_lower or 
+            'self aware' in query_lower or      # space variant (no hyphen)
+            'self awareness' in query_lower or  # noun form
+            'selfaware' in query_lower or       # concatenated variant
             'conscious' in query_lower or
-            'become aware' in query_lower
+            'become aware' in query_lower or
+            'sentient' in query_lower or        # related concept
+            'sentience' in query_lower          # related concept
         )
         
         if is_self_awareness and is_binary_choice:
