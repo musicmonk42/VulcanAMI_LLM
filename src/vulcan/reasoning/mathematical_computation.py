@@ -1672,11 +1672,28 @@ result = simplify(integral)
                 logger.info(f"[MathTool] SUMMATION FIX: Fallback pattern matched expression: {expr}")
                 return self._templates.summation(expr, "k", "1", "n")
             
-            # Default summation - only if no expression could be extracted
-            # MAX_QUERY_LOG_LENGTH: Truncate long queries in log messages for readability
-            MAX_QUERY_LOG_LENGTH = 100
-            logger.warning(f"[MathTool] SUMMATION: No expression found, using default 'k'. Query: {query[:MAX_QUERY_LOG_LENGTH]}...")
-            return self._templates.summation("k", "k", "1", "n")
+            # ISSUE #1 FIX (Industry Standard): NEVER return incorrect default
+            # =================================================================
+            # ROOT CAUSE: Original code fell back to summation("k") when expression
+            # extraction failed. This caused queries like "∑(2k-1)" to compute ∑k instead.
+            #
+            # INDUSTRY STANDARD FIX:
+            # - Explicit failure is better than wrong results
+            # - Return None to signal extraction failure
+            # - Let caller handle error appropriately (show user-friendly message)
+            # - Log detailed information for debugging
+            #
+            # This follows the "fail fast" principle and prevents incorrect mathematical
+            # results from being presented as correct.
+            # =================================================================
+            MAX_QUERY_LOG_LENGTH = 150
+            logger.error(
+                f"[MathTool] ISSUE #1 FIX: Summation expression extraction failed. "
+                f"Returning None instead of incorrect default. "
+                f"Query: {query[:MAX_QUERY_LOG_LENGTH]}..."
+            )
+            # Return None to signal failure - caller will generate appropriate error
+            return None
         
         # PRIORITY 4: Limits (check before integration since both are calculus)
         if "limit" in query_lower:
