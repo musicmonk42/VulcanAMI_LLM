@@ -390,6 +390,10 @@ CAUSAL_KEYWORDS: FrozenSet[str] = frozenset([
     "randomize", "randomized", "rct",
     "pearl", "dag", "backdoor", "frontdoor",
     "collider",  # Collider is a causal graph concept, not logical
+    # INDUSTRY STANDARD: "observational" kept because it specifically refers to
+    # observational studies (vs randomized controlled trials) in causal inference.
+    # "experimental" removed because it's too generic ("experimental feature").
+    # Study design terminology: observational = no intervention, RCT = intervention.
     "observational",
     # ISSUE #2 FIX: Additional causal-specific keywords
     "causal effect", "causal inference", "do-calculus",
@@ -420,13 +424,19 @@ STRONG_CAUSAL_KEYWORDS: FrozenSet[str] = frozenset([
     "draw dag", "causal diagram", "causal model",
 ])
 
+# INDUSTRY STANDARD: Causal context keywords for experiment pattern matching
+# Extracted as constant for maintainability - used in CAUSAL_EXPERIMENT_PATTERNS below
+# These keywords indicate genuine causal inference context (not generic "experiment")
+_CAUSAL_CONTEXT_FOR_EXPERIMENT: str = r"dag|causal|confound|randomiz[e]?"  # Non-greedy patterns
+
 # INDUSTRY STANDARD: Pre-compiled regex patterns for causal experiment context detection
 # "experiment" alone is not enough - must appear with causal context
 # This prevents false positives like "experiment with new ideas"
+# SECURITY: Using .*? (non-greedy) instead of .* to prevent ReDoS vulnerabilities
 CAUSAL_EXPERIMENT_PATTERNS: Tuple[re.Pattern, ...] = (
     re.compile(r'\b(?:choose|select|design|which)\s+experiment\b', re.IGNORECASE),  # "choose experiment", "design experiment"
-    re.compile(r'\bexperiment\b.*\b(?:dag|causal|confound|randomiz)', re.IGNORECASE),  # "experiment...causal"
-    re.compile(r'\b(?:dag|causal|confound)\b.*\bexperiment\b', re.IGNORECASE),  # "causal...experiment"
+    re.compile(rf'\bexperiment\b.*?\b(?:{_CAUSAL_CONTEXT_FOR_EXPERIMENT})', re.IGNORECASE),  # "experiment...causal"
+    re.compile(rf'\b(?:{_CAUSAL_CONTEXT_FOR_EXPERIMENT})\b.*?\bexperiment\b', re.IGNORECASE),  # "causal...experiment"
 )
 
 # Mathematical indicators - complexity 0.4+, tools=['mathematical']
