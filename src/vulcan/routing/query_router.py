@@ -2449,6 +2449,55 @@ class QueryAnalyzer:
             return self._strategy_orchestrator.get_health_status()
         return {"status": "tool_monitoring_not_available"}
 
+    def _map_category_to_reasoning_type(self, category: str) -> str:
+        """
+        Map LLM classification category to reasoning_type for command pattern.
+        
+        ISSUE #1 FIX: Router Doesn't Provide Routing Instructions to Agent Pool
+        This function ensures that the router always provides reasoning_type based on
+        the LLM classifier's category, preventing the COMMAND PATTERN VIOLATION error.
+        
+        Args:
+            category: QueryCategory value (e.g., "LOGICAL", "MATHEMATICAL")
+            
+        Returns:
+            reasoning_type string for AgentTask (e.g., "symbolic", "mathematical")
+            
+        Example:
+            >>> _map_category_to_reasoning_type("LOGICAL")
+            "symbolic"
+            >>> _map_category_to_reasoning_type("MATHEMATICAL")
+            "mathematical"
+        """
+        # Map QueryCategory enum values to ReasoningType values
+        category_to_reasoning_type = {
+            "LOGICAL": "symbolic",
+            "MATHEMATICAL": "mathematical",
+            "PROBABILISTIC": "probabilistic",
+            "CAUSAL": "causal",
+            "ANALOGICAL": "analogical",
+            "PHILOSOPHICAL": "philosophical",
+            "CRYPTOGRAPHIC": "symbolic",  # Crypto uses symbolic reasoning
+            "LANGUAGE": "symbolic",  # Language formalization uses symbolic
+            "SPECULATION": "philosophical",  # Counterfactual reasoning
+            "SELF_INTROSPECTION": "philosophical",  # Meta-reasoning
+            "CREATIVE": "general",
+            "FACTUAL": "general",
+            "CONVERSATIONAL": "general",
+            "CHITCHAT": "general",
+            "GREETING": "general",
+            "COMPLEX_RESEARCH": "hybrid",
+            "UNKNOWN": "general",
+        }
+        
+        reasoning_type = category_to_reasoning_type.get(category, "general")
+        
+        logger.debug(
+            f"[QueryRouter] ISSUE #1 FIX: Mapped category={category} → reasoning_type={reasoning_type}"
+        )
+        
+        return reasoning_type
+
     def _is_complex_physics_query(self, query: str) -> bool:
         """
         Detect if query involves complex physics/control theory requiring full analysis.
@@ -3700,12 +3749,15 @@ class QueryAnalyzer:
             plan.detected_patterns.append("bypass_tool_selector")
             
             # Create task for WorldModel meta-reasoning
+            # ISSUE #1 FIX: Add reasoning_type and tool_name for command pattern
             plan.agent_tasks = [
                 AgentTask(
                     task_id=f"task_{uuid.uuid4().hex[:8]}_wm_{worldmodel_category}",
                     task_type=f"worldmodel_{worldmodel_category}",
                     capability="reasoning",
                     prompt=query,
+                    reasoning_type="philosophical",  # ISSUE #1 FIX: WorldModel uses philosophical reasoning
+                    tool_name="world_model",  # ISSUE #1 FIX: MANDATORY routing instruction
                     priority=3,  # High priority
                     timeout_seconds=5.0,  # Quick meta-reasoning response
                     parameters={
@@ -3935,12 +3987,15 @@ class QueryAnalyzer:
                 plan.detected_patterns.append("safety_governor_bypass")
                 
                 # Create task for world_model introspection
+                # ISSUE #1 FIX: Add reasoning_type and tool_name for command pattern
                 plan.agent_tasks = [
                     AgentTask(
                         task_id=f"task_{uuid.uuid4().hex[:8]}_self_intro",
                         task_type="self_introspection_task",
                         capability="reasoning",
                         prompt=query,
+                        reasoning_type="philosophical",  # ISSUE #1 FIX: Self-introspection uses philosophical reasoning
+                        tool_name="world_model",  # ISSUE #1 FIX: MANDATORY routing instruction
                         priority=3,  # High priority
                         timeout_seconds=3.0,  # Fast response
                         parameters={
@@ -4137,12 +4192,23 @@ class QueryAnalyzer:
                     f"llm_authoritative={llm_authoritative}, skip_gate_checks={skip_gate_checks}"
                 )
                 
+                # ISSUE #1 FIX: Map classification category to reasoning_type for command pattern
+                reasoning_type = self._map_category_to_reasoning_type(classification.category)
+                primary_tool = tools_to_use[0] if tools_to_use else "general"
+                
+                logger.info(
+                    f"[QueryRouter] {query_id}: ISSUE #1 FIX - Setting routing instructions: "
+                    f"reasoning_type={reasoning_type}, tool_name={primary_tool}"
+                )
+                
                 plan.agent_tasks = [
                     AgentTask(
                         task_id=f"task_{uuid.uuid4().hex[:8]}_{classification.category.lower()}",
                         task_type="general_task",
                         capability="general",
                         prompt=query,
+                        reasoning_type=reasoning_type,  # ISSUE #1 FIX: MANDATORY routing instruction
+                        tool_name=primary_tool,  # ISSUE #1 FIX: MANDATORY routing instruction
                         priority=1,
                         timeout_seconds=10.0,
                         parameters={
@@ -4226,12 +4292,15 @@ class QueryAnalyzer:
             )
 
             # Create a single simple task for trivial queries
+            # ISSUE #1 FIX: Add reasoning_type and tool_name for command pattern
             plan.agent_tasks = [
                 AgentTask(
                     task_id=f"task_{uuid.uuid4().hex[:8]}_trivial",
                     task_type="general_task",
                     capability="reasoning",
                     prompt=query,
+                    reasoning_type="general",  # ISSUE #1 FIX: Trivial queries use general reasoning
+                    tool_name="general",  # ISSUE #1 FIX: MANDATORY routing instruction
                     priority=1,
                     timeout_seconds=5.0,
                     parameters={"is_trivial": True, "skip_heavy_analysis": True},
@@ -4304,12 +4373,15 @@ class QueryAnalyzer:
 
             # Create comprehensive task with ALL mathematical reasoning tools
             # FIX: Activate symbolic, mathematical, probabilistic, causal, and analogical
+            # ISSUE #1 FIX: Add reasoning_type and tool_name for command pattern
             plan.agent_tasks = [
                 AgentTask(
                     task_id=f"task_{uuid.uuid4().hex[:8]}_physics",
                     task_type="complex_physics_task",
                     capability="reasoning",
                     prompt=query,
+                    reasoning_type="mathematical",  # ISSUE #1 FIX: Complex physics uses mathematical reasoning
+                    tool_name="mathematical",  # ISSUE #1 FIX: MANDATORY routing instruction
                     priority=3,  # High priority for complex physics
                     timeout_seconds=COMPLEX_PHYSICS_TIMEOUT_SECONDS,  # 120s+ timeout
                     parameters={
@@ -4430,12 +4502,15 @@ class QueryAnalyzer:
             # (poems, stories) should go to LLM.
             creative_tools = ["general"]
             
+            # ISSUE #1 FIX: Add reasoning_type and tool_name for command pattern
             plan.agent_tasks = [
                 AgentTask(
                     task_id=f"task_{uuid.uuid4().hex[:8]}_creative",
                     task_type="creative_task",
                     capability="reasoning",
                     prompt=query,
+                    reasoning_type="general",  # ISSUE #1 FIX: Creative tasks use general reasoning
+                    tool_name="general",  # ISSUE #1 FIX: MANDATORY routing instruction
                     priority=2,  # Moderate priority
                     timeout_seconds=30.0,  # Creative needs more time
                     parameters={
@@ -4692,11 +4767,14 @@ class QueryAnalyzer:
             
             plan.agent_tasks = [
                 # PRIMARY TASK: Meta-reasoning to form Vulcan's position
+                # ISSUE #1 FIX: Add reasoning_type and tool_name for command pattern
                 AgentTask(
                     task_id=f"task_{uuid.uuid4().hex[:8]}_introspect_primary",
                     task_type="self_introspection_task",
                     capability="meta_reasoning",
                     prompt=query,
+                    reasoning_type="philosophical",  # ISSUE #1 FIX: Self-introspection uses philosophical reasoning
+                    tool_name="meta_reasoning",  # ISSUE #1 FIX: MANDATORY routing instruction
                     priority=3,  # High priority - this is the PRIMARY
                     timeout_seconds=30.0,
                     parameters={
@@ -4717,11 +4795,14 @@ class QueryAnalyzer:
                     },
                 ),
                 # REFERENCE TASK: World Model philosophical analysis (to be consulted)
+                # ISSUE #1 FIX: Add reasoning_type and tool_name for command pattern
                 AgentTask(
                     task_id=f"task_{uuid.uuid4().hex[:8]}_introspect_reference",
                     task_type="philosophical_reference_task",
                     capability="world_model",  # Route to World Model
                     prompt=f"Provide philosophical frameworks relevant to: {query}",
+                    reasoning_type="philosophical",  # ISSUE #1 FIX: World Model uses philosophical reasoning
+                    tool_name="world_model",  # ISSUE #1 FIX: MANDATORY routing instruction
                     priority=2,  # Lower priority - this is REFERENCE
                     timeout_seconds=15.0,
                     parameters={
@@ -6848,6 +6929,7 @@ class QueryAnalyzer:
         query_lower = query.lower()
 
         # Analysis support task
+        # ISSUE #1 FIX: Add reasoning_type to support tasks for consistency
         if query_type != QueryType.PERCEPTION and any(
             kw in query_lower for kw in ("analyze", "examine", "data")
         ):
@@ -6857,6 +6939,8 @@ class QueryAnalyzer:
                     task_type="perception_support",
                     capability="perception",
                     prompt=f"Analyze input for: {query[:100]}",
+                    reasoning_type="perception",  # ISSUE #1 FIX: Support task reasoning type
+                    tool_name="general",  # ISSUE #1 FIX: MANDATORY routing instruction
                     priority=1,
                     timeout_seconds=10.0,
                     parameters={
@@ -6870,6 +6954,7 @@ class QueryAnalyzer:
             )
 
         # Planning support task
+        # ISSUE #1 FIX: Add reasoning_type to support tasks for consistency
         if query_type != QueryType.PLANNING and any(
             kw in query_lower for kw in ("step", "how to", "process", "plan")
         ):
@@ -6879,6 +6964,8 @@ class QueryAnalyzer:
                     task_type="planning_support",
                     capability="planning",
                     prompt=f"Create plan for: {query[:100]}",
+                    reasoning_type="planning",  # ISSUE #1 FIX: Support task reasoning type
+                    tool_name="general",  # ISSUE #1 FIX: MANDATORY routing instruction
                     priority=1,
                     timeout_seconds=10.0,
                     parameters={
@@ -6906,6 +6993,7 @@ class QueryAnalyzer:
 
             # Create introspection support task
             # This task will call the INTROSPECT node to retrieve agent state
+            # ISSUE #1 FIX: Add reasoning_type to support tasks for consistency
             tasks.insert(
                 0,
                 AgentTask(  # Insert at start so it runs first
@@ -6917,6 +7005,8 @@ class QueryAnalyzer:
                         f"check your internal state (entropy, valence, curiosity, energy). "
                         f"Task: {query[:100]}"
                     ),
+                    reasoning_type="philosophical",  # ISSUE #1 FIX: Introspection uses philosophical reasoning
+                    tool_name="world_model",  # ISSUE #1 FIX: MANDATORY routing instruction
                     priority=3,  # Higher priority - should run first
                     timeout_seconds=5.0,
                     parameters={
@@ -6933,6 +7023,7 @@ class QueryAnalyzer:
 
             # Create memory query support task
             # This task will call the QUERY_MEMORIES node
+            # ISSUE #1 FIX: Add reasoning_type to support tasks for consistency
             tasks.insert(
                 1,
                 AgentTask(  # Insert after introspection
@@ -6943,6 +7034,8 @@ class QueryAnalyzer:
                         f"MEMORY QUERY REQUIRED: Retrieve relevant past experiences "
                         f"for creative task: {query[:100]}"
                     ),
+                    reasoning_type="perception",  # ISSUE #1 FIX: Memory query uses perception reasoning
+                    tool_name="general",  # ISSUE #1 FIX: MANDATORY routing instruction
                     priority=2,  # Run after introspection, before primary
                     timeout_seconds=5.0,
                     parameters={
