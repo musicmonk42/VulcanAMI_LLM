@@ -1449,7 +1449,8 @@ class CounterfactualObjectiveReasoner(SerializationMixin):
                 context = {"scenario": scenario_str}
                 
                 # Track if cache is used for accurate metadata
-                cache_key_for_check = f"{alternative_objective}_{hashlib.md5(str(context).encode()).hexdigest()}"
+                # Use MD5 for cache key generation (non-cryptographic use)
+                cache_key_for_check = f"{alternative_objective}_{hashlib.md5(str(context).encode(), usedforsecurity=False).hexdigest()}"
                 cache_was_used = cache_key_for_check in self.prediction_cache
                 
                 predicted_outcome = self.predict_under_objective(alternative_objective, context)

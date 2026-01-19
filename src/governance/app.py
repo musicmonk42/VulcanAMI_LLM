@@ -675,4 +675,7 @@ def internal_error(error):
 
 if __name__ == "__main__":
     # For standalone testing
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    # SECURITY: debug=True should only be used in development environments
+    # In production, use a proper WSGI server like gunicorn or uwsgi
+    debug_mode = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
+    app.run(host="0.0.0.0", port=5000, debug=debug_mode)
