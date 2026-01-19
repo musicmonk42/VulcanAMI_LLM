@@ -1596,6 +1596,13 @@ result = simplify(integral)
             
             # SUMMATION FIX: Try to extract expression from query before falling back
             # Look for any expression after ∑ that might be the summand
+            # Pattern explanation:
+            #   ∑             - Summation symbol
+            #   [\s_{}^0-9nk]* - Optional subscript/superscript notation (whitespace, {}, ^, digits, n, k)
+            #   \(?           - Optional opening parenthesis
+            #   ([0-9]+[a-z][\s\-+*/0-9a-z]*) - Capture: digit(s)+letter followed by math expression
+            #   \)?           - Optional closing parenthesis
+            # Examples matched: "∑(2k-1)", "∑_{k=1}^n 2k-1", "∑(3n+2)"
             fallback_expr_match = re.search(r'∑[\s_{}^0-9nk]*\(?([0-9]+[a-z][\s\-+*/0-9a-z]*)\)?', query_normalized)
             if fallback_expr_match:
                 expr = fallback_expr_match.group(1).strip()
@@ -1604,7 +1611,9 @@ result = simplify(integral)
                 return self._templates.summation(expr, "k", "1", "n")
             
             # Default summation - only if no expression could be extracted
-            logger.warning(f"[MathTool] SUMMATION: No expression found, using default 'k'. Query: {query[:100]}...")
+            # MAX_QUERY_LOG_LENGTH: Truncate long queries in log messages for readability
+            MAX_QUERY_LOG_LENGTH = 100
+            logger.warning(f"[MathTool] SUMMATION: No expression found, using default 'k'. Query: {query[:MAX_QUERY_LOG_LENGTH]}...")
             return self._templates.summation("k", "k", "1", "n")
         
         # PRIORITY 4: Limits (check before integration since both are calculus)

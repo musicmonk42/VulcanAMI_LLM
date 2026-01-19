@@ -72,9 +72,10 @@ def _preprocess_math_code(code: str) -> str:
     # - \ufeff: Zero-width no-break space (BOM)
     # - \u2060: Word joiner
     # - \u180e: Mongolian vowel separator
+    # Using str.translate() for better performance (O(n) instead of O(n*m))
     zero_width_chars = '\u200b\u200c\u200d\ufeff\u2060\u180e'
-    for char in zero_width_chars:
-        code = code.replace(char, '')
+    zero_width_table = str.maketrans('', '', zero_width_chars)
+    code = code.translate(zero_width_table)
     
     # Comprehensive Unicode normalization for mathematical alphanumeric symbols
     # Unicode range: U+1D400–U+1D7FF (Mathematical Alphanumeric Symbols)
