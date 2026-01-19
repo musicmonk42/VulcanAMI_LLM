@@ -1453,6 +1453,30 @@ class QueryClassifier:
             logger.debug(f"[QueryClassifier] Greeting fast-path: '{query[:30]}...'")
             return greeting_result
         
+        # =================================================================
+        # ISSUE 10 FIX (Jan 2026): Feedback Detection Fast-Path
+        # =================================================================
+        # User feedback like "this answer is unacceptable", "that's wrong", "try again"
+        # should NOT be routed to reasoning engines (causal, mathematical, etc.) but
+        # handled as conversational feedback.
+        #
+        # Industry Standard: Fast-path for common patterns before expensive classification.
+        # =================================================================
+        if self._is_user_feedback(query_lower):
+            with self._stats_lock:
+                self._stats["fast_path_hits"] += 1
+            feedback_result = QueryClassification(
+                category=QueryCategory.CONVERSATIONAL.value,
+                complexity=0.1,  # Low complexity - not a reasoning task
+                suggested_tools=[],
+                skip_reasoning=False,  # Don't skip entirely, but route to conversational handler
+                confidence=0.9,
+                source="feedback_detection",
+            )
+            self._cache_result(query_hash, feedback_result)
+            logger.debug(f"[QueryClassifier] User feedback detected: '{query[:30]}...'")
+            return feedback_result
+        
         # Check if LLM-first classification is enabled
         # Default to keyword-first for safety when settings unavailable
         try:
@@ -1539,6 +1563,74 @@ class QueryClassifier:
         )
         self._cache_result(query_hash, default_result)
         return default_result
+    
+    def _is_user_feedback(self, query_lower: str) -> bool:
+        """
+        Detect if query is user feedback about a previous response.
+        
+        ISSUE 10 FIX (Jan 2026): User feedback should not be misclassified as
+        CAUSAL, MATHEMATICAL, or other reasoning categories. Route to CONVERSATIONAL.
+        
+        Feedback patterns:
+        - "this answer is unacceptable"
+        - "that's wrong" / "that's incorrect"
+        - "try again" / "please try again"
+        - "not what I asked"
+        - "wrong answer"
+        - "incorrect response"
+        
+        Industry Standard: Fast pattern matching for common user feedback phrases.
+        
+        Args:
+            query_lower: Lowercased query string
+            
+        Returns:
+            True if query appears to be user feedback
+        """
+        # Exact phrase matches (most specific)
+        feedback_exact_phrases = [
+            "this answer is unacceptable",
+            "that answer is unacceptable",
+            "this is unacceptable",
+            "that's wrong",
+            "that is wrong",
+            "you're wrong",
+            "you are wrong",
+            "that's incorrect",
+            "that is incorrect",
+            "try again",
+            "please try again",
+            "not what i asked",
+            "that's not right",
+            "that is not right",
+            "wrong answer",
+            "incorrect answer",
+            "incorrect response",
+            "bad answer",
+            "poor response",
+        ]
+        
+        for phrase in feedback_exact_phrases:
+            if phrase in query_lower:
+                return True
+        
+        # Pattern-based detection for variations
+        feedback_patterns = [
+            # Negative feedback about answers
+            r"\b(this|that|your)\s+(answer|response)\s+is\s+(wrong|incorrect|unacceptable|bad)",
+            r"\bthat'?s\s+(wrong|incorrect|not\s+right|unacceptable)",
+            r"\b(try|please\s+try)\s+again\b",
+            r"\b(not|isn'?t)\s+what\s+i\s+(asked|wanted|meant)",
+            r"\byou'?re?\s+(wrong|mistaken|incorrect)",
+            r"\bwrong\s+(answer|response)\b",
+            r"\bincorrect\s+(answer|response)\b",
+        ]
+        
+        for pattern in feedback_patterns:
+            if re.search(pattern, query_lower):
+                return True
+        
+        return False
     
     def _count_crypto_keywords(self, query_lower: str) -> Tuple[int, int, int]:
         """
