@@ -380,6 +380,8 @@ PROBABILISTIC_KEYWORDS: FrozenSet[str] = frozenset([
 ])
 
 # Causal inference indicators - complexity 0.6+, tools=['causal']
+# ISSUE #2 FIX: Enhanced causal keywords to distinguish from probabilistic reasoning
+# Added more Pearl-style causal inference keywords to prevent misrouting to probabilistic
 CAUSAL_KEYWORDS: FrozenSet[str] = frozenset([
     "causal", "causation", "cause", "effect",
     "confound", "confounder", "confounding",
@@ -388,6 +390,10 @@ CAUSAL_KEYWORDS: FrozenSet[str] = frozenset([
     "pearl", "dag", "backdoor", "frontdoor",
     "collider",  # Collider is a causal graph concept, not logical
     "observational", "experimental",
+    # ISSUE #2 FIX: Additional causal-specific keywords
+    "causal effect", "causal inference", "do-calculus",
+    "mediator", "confounder", "instrumental variable",
+    "treatment effect", "randomized control",
 ])
 
 # Mathematical indicators - complexity 0.4+, tools=['mathematical']
@@ -2036,14 +2042,56 @@ class QueryClassifier:
             )
         
         # =================================================================
-        # FIX: Check CAUSAL indicators BEFORE LOGICAL
+        # ISSUE #2 FIX: Check CAUSAL indicators BEFORE PROBABILISTIC
         # =================================================================
-        # Causal keywords (confounding, causation, pearl) are more specific
-        # than logical keywords (iff, hence). Moving this check before LOGICAL
-        # prevents "difference" → "iff" false positive from overriding causal.
+        # Problem: Causal queries that mention probability (e.g., "P(X|+)", "confounding") 
+        # were being misrouted to probabilistic reasoner because:
+        # 1. They contain "probability" or "P(" keywords
+        # 2. The probabilistic check didn't distinguish causal DAG reasoning from Bayesian probability
+        #
+        # Solution: Check for causal indicators FIRST. If query has BOTH probability AND
+        # causal keywords, prefer CAUSAL routing (Pearl-style DAG analysis).
+        #
+        # Causal keywords (more specific than probabilistic):
+        # - confound, confounder, confounding
+        # - intervention, do(, counterfactual
+        # - randomize, randomized, RCT
+        # - Pearl, DAG, backdoor, frontdoor
+        # - causal effect, causal inference
         # =================================================================
+        
+        # Count causal keywords
         causal_count = sum(1 for kw in CAUSAL_KEYWORDS if kw in query_lower)
+        
+        # ISSUE #2 FIX: Also check if query mentions both probability and causation
+        # This is a strong indicator of causal inference (e.g., "P(X|+) with confounding")
+        has_prob_notation = "p(" in query_lower or "probability" in query_lower
+        has_causal_intent = causal_count >= 1 or any(
+            strong_causal in query_lower 
+            for strong_causal in ["confound", "intervention", "do(", "pearl", "dag", "causal"]
+        )
+        
+        # If query has both probability notation AND causal intent, route to CAUSAL
+        # This handles queries like "What is P(X|+) when there's confounding?"
+        if has_prob_notation and has_causal_intent:
+            logger.info(
+                f"[QueryClassifier] ISSUE #2 FIX: Query has probability notation ({has_prob_notation}) "
+                f"AND causal intent ({has_causal_intent}) - routing to CAUSAL (NOT probabilistic)"
+            )
+            return QueryClassification(
+                category=QueryCategory.CAUSAL.value,
+                complexity=0.7 + min(0.2, causal_count * 0.05),
+                suggested_tools=["causal"],
+                skip_reasoning=False,
+                confidence=0.95,  # High confidence for this specific pattern
+                source="keyword",
+            )
+        
+        # Standard causal classification (without probability notation)
         if causal_count >= CAUSAL_KEYWORD_THRESHOLD or "do(" in query_lower:
+            logger.info(
+                f"[QueryClassifier] CAUSAL classification - keywords={causal_count}"
+            )
             return QueryClassification(
                 category=QueryCategory.CAUSAL.value,
                 complexity=0.6 + min(0.3, causal_count * 0.05),
