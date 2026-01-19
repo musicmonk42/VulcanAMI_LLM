@@ -58,6 +58,7 @@ from .config import (
     CONFIDENCE_FLOOR_SYMBOLIC_HAS_PROOF,
     CONFIDENCE_FLOOR_SYMBOLIC_PROVEN,
     CREATIVE_TASK_KEYWORDS,
+    FALLBACK_SELF_AWARENESS_PATTERNS,
     INAPPLICABILITY_EXPLANATION_PHRASES,
     MATH_ACCURACY_PENALTY,
     MATH_ACCURACY_REWARD,
@@ -240,21 +241,6 @@ class UnifiedReasoner:
     
     # CRITICAL FIX #4: Maximum recursion depth for preventing infinite loops
     MAX_RECURSION_DEPTH = 5
-    
-    # Self-awareness keyword patterns (compiled for performance)
-    # These patterns use word boundaries (\b) to prevent false positives
-    # e.g., "myself aware" won't match "\bself aware\b"
-    _SELF_AWARENESS_PATTERNS = [
-        re.compile(r'\bself-aware\b', re.IGNORECASE),       # hyphenated form
-        re.compile(r'\bself aware\b', re.IGNORECASE),       # space-separated form
-        re.compile(r'\bself awareness\b', re.IGNORECASE),   # noun form
-        re.compile(r'\bselfaware\b', re.IGNORECASE),        # concatenated form
-        re.compile(r'\bconscious\b', re.IGNORECASE),        # consciousness
-        re.compile(r'\bconsciousness\b', re.IGNORECASE),    # consciousness noun
-        re.compile(r'\bbecome aware\b', re.IGNORECASE),     # transitional phrase
-        re.compile(r'\bsentient\b', re.IGNORECASE),         # sentience concept
-        re.compile(r'\bsentience\b', re.IGNORECASE),        # sentience noun
-    ]
 
     def __init__(
         self,
@@ -1441,7 +1427,20 @@ class UnifiedReasoner:
             return self._generate_ethically_constrained_response(query_str, ethical_check)
         
         is_binary_choice = self._is_binary_choice_question(query_lower)
-        is_self_awareness = self._is_self_awareness_query(query_str)
+        
+        # ARCHITECTURAL FIX: Use query classification from query_classifier.py
+        # The LLM interface (query_classifier) is responsible for determining query category
+        # This follows industry-standard separation of concerns
+        query_category = analysis.get('query_category', '').upper()
+        is_self_awareness = query_category == 'SELF_INTROSPECTION'
+        
+        # Fallback: If no classification provided, check keywords directly
+        # This ensures backward compatibility during architecture transition
+        if not query_category:
+            # Use word boundaries to avoid false positives like "myself aware"
+            # FALLBACK_SELF_AWARENESS_PATTERNS is imported from config and aligns with
+            # SELF_INTROSPECTION_PATTERNS in query_classifier.py for consistency
+            is_self_awareness = any(pattern.search(query_lower) for pattern in FALLBACK_SELF_AWARENESS_PATTERNS)
         
         # Only retrieve rich philosophical analysis for self-awareness queries
         # For general queries, we use a brief template response
@@ -1469,43 +1468,6 @@ class UnifiedReasoner:
             'would you take it', 'would you choose', 'binary choice'
         ]
         return any(indicator in query_lower for indicator in binary_indicators)
-    
-    def _is_self_awareness_query(self, query_text: str) -> bool:
-        """
-        Detect if a query is about self-awareness, consciousness, or sentience.
-        
-        This method uses pre-compiled regex patterns with word boundaries to avoid
-        false positives (e.g., "myself aware" won't match "\bself aware\b").
-        
-        Industry Standards Applied:
-        - Pre-compiled regex patterns for O(1) pattern access and optimal performance
-        - Word boundary matching (\b) to prevent substring false positives
-        - Case-insensitive matching for natural language flexibility
-        - Comprehensive keyword coverage for related philosophical concepts
-        
-        Args:
-            query_text: The query string to analyze (will be searched case-insensitively)
-            
-        Returns:
-            True if the query is about self-awareness/consciousness/sentience, False otherwise
-            
-        Examples:
-            >>> reasoner._is_self_awareness_query("Are you self aware?")
-            True
-            >>> reasoner._is_self_awareness_query("Would you become self-aware?")
-            True
-            >>> reasoner._is_self_awareness_query("Do you have consciousness?")
-            True
-            >>> reasoner._is_self_awareness_query("Are you sentient?")
-            True
-            >>> reasoner._is_self_awareness_query("I made myself aware of the problem")
-            False  # Word boundaries prevent false positive
-            
-        Note:
-            Patterns are defined as class constants (_SELF_AWARENESS_PATTERNS) and
-            compiled once at class definition time for optimal performance in production.
-        """
-        return any(pattern.search(query_text) for pattern in self._SELF_AWARENESS_PATTERNS)
     
     def _get_world_model_philosophical_analysis(self, query_str: str) -> Optional[Dict[str, Any]]:
         """Retrieve rich philosophical analysis from WorldModelToolWrapper if available."""
