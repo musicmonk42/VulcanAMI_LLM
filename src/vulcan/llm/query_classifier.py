@@ -94,6 +94,11 @@ MATH_KEYWORD_THRESHOLD = 2      # Minimum keyword matches to classify as MATHEMA
 ANALOG_KEYWORD_THRESHOLD = 2    # Minimum keyword matches to classify as ANALOGICAL
 PHIL_KEYWORD_THRESHOLD = 2      # Minimum keyword matches to classify as PHILOSOPHICAL
 
+# ISSUE 10 FIX: Feedback classification constants
+# Industry Standard: Named constants for all magic numbers
+FEEDBACK_COMPLEXITY = 0.1  # Low complexity - feedback is not a reasoning task
+FEEDBACK_CONFIDENCE = 0.9  # High confidence when feedback patterns match
+
 # Reasoning indicators - queries containing these should NOT skip reasoning
 # Used to distinguish casual queries from queries that need formal reasoning
 REASONING_INDICATORS: FrozenSet[str] = frozenset([
@@ -1467,10 +1472,10 @@ class QueryClassifier:
                 self._stats["fast_path_hits"] += 1
             feedback_result = QueryClassification(
                 category=QueryCategory.CONVERSATIONAL.value,
-                complexity=0.1,  # Low complexity - not a reasoning task
+                complexity=FEEDBACK_COMPLEXITY,  # Low complexity - not a reasoning task
                 suggested_tools=[],
                 skip_reasoning=False,  # Don't skip entirely, but route to conversational handler
-                confidence=0.9,
+                confidence=FEEDBACK_CONFIDENCE,
                 source="feedback_detection",
             )
             self._cache_result(query_hash, feedback_result)

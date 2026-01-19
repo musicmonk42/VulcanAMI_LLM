@@ -17,6 +17,14 @@ from vulcan.reasoning.unified.orchestrator import UnifiedReasoner
 from vulcan.llm.query_classifier import QueryClassifier, QueryCategory, QueryClassification
 
 
+# =============================================================================
+# Test Constants (Industry Standard: Named constants for maintainability)
+# =============================================================================
+MIN_SUBSTANTIVE_RESPONSE_LENGTH = 500  # Minimum chars for substantive response
+MIN_BASIC_RESPONSE_LENGTH = 100  # Minimum chars for basic response
+MAX_TRUNCATED_QUERY_LENGTH = 100  # Max query length for debug storage
+
+
 class TestIssue8SelfReferentialTemplateResponses:
     """
     Issue 8: Self-Referential Questions Return Same Template Repeatedly
@@ -72,8 +80,8 @@ class TestIssue8SelfReferentialTemplateResponses:
             )
         
         # Responses should differ or be substantive
-        assert response1 != response2 or len(response1) > 500, (
-            "Responses should either be different or substantive (>500 chars)"
+        assert response1 != response2 or len(response1) > MIN_SUBSTANTIVE_RESPONSE_LENGTH, (
+            f"Responses should either be different or substantive (>{MIN_SUBSTANTIVE_RESPONSE_LENGTH} chars)"
         )
         
         # Should NOT be the old hardcoded template
@@ -425,4 +433,4 @@ class TestIndustryStandardPatterns:
         
         # Should fallback to default reasoning without crashing
         assert isinstance(result, str)
-        assert len(result) > 100  # Should still be substantive
+        assert len(result) > MIN_BASIC_RESPONSE_LENGTH  # Should still be substantive

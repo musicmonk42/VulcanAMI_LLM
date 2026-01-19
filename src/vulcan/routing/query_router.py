@@ -131,6 +131,34 @@ MATH_NOTATION_PATTERN: re.Pattern = re.compile(
     re.IGNORECASE
 )
 
+# =============================================================================
+# ISSUE 9 FIX: Pre-compiled Follow-Up Detection Patterns (Performance)
+# =============================================================================
+# Industry Standard: Pre-compile regex patterns at module level for O(1) matching
+# performance instead of compiling on every query.
+#
+# These patterns detect continuation phrases that indicate a follow-up query:
+# - "what is your answer?"
+# - "what do you think?"
+# - "can you explain more?"
+# =============================================================================
+FOLLOWUP_CONTINUATION_PATTERNS: Tuple[re.Pattern, ...] = tuple([
+    re.compile(r'\bwhat\s+is\s+your\s+answer\b', re.IGNORECASE),
+    re.compile(r'\bwhat\s+do\s+you\s+think\b', re.IGNORECASE),
+    re.compile(r'\b(?:can|could)\s+you\s+explain\s+(?:more|further)\b', re.IGNORECASE),
+    re.compile(r'\belaborate\s+on\s+that\b', re.IGNORECASE),
+    re.compile(r'\btell\s+me\s+more\b', re.IGNORECASE),
+    re.compile(r'\band\s+(?:about|regarding)\s+that\b', re.IGNORECASE),
+    re.compile(r'\bwhat\s+about\s+(?:your|that)\b', re.IGNORECASE),
+    re.compile(r'\byour\s+(?:answer|response|thoughts?)\b', re.IGNORECASE),
+    re.compile(r'\bmore\s+(?:detail|information|context)\b', re.IGNORECASE),
+    re.compile(r'\bexpand\s+on\s+that\b', re.IGNORECASE),
+])
+
+# Maximum word count for short query detection in follow-up context
+# Industry Standard: Named constants for magic numbers
+MAX_SHORT_QUERY_WORDS: int = 5
+
 
 def _has_unicode_math(query: str) -> bool:
     """
@@ -3335,25 +3363,13 @@ class QueryAnalyzer:
             
         query_lower = query.lower().strip()
         
-        # Check for explicit continuation phrases
-        continuation_phrases = [
-            r"\bwhat\s+is\s+your\s+answer\b",
-            r"\bwhat\s+do\s+you\s+think\b",
-            r"\b(?:can|could)\s+you\s+explain\s+(?:more|further)\b",
-            r"\belaborate\s+on\s+that\b",
-            r"\btell\s+me\s+more\b",
-            r"\band\s+(?:about|regarding)\s+that\b",
-            r"\bwhat\s+about\s+(?:your|that)\b",
-            r"\byour\s+(?:answer|response|thoughts?)\b",
-            r"\bmore\s+(?:detail|information|context)\b",
-            r"\bexpand\s+on\s+that\b",
-        ]
-        
+        # Check for explicit continuation phrases using pre-compiled patterns
+        # Industry Standard: Use module-level pre-compiled patterns for performance
         is_continuation_phrase = False
-        for pattern in continuation_phrases:
-            if re.search(pattern, query_lower):
+        for pattern in FOLLOWUP_CONTINUATION_PATTERNS:
+            if pattern.search(query_lower):
                 is_continuation_phrase = True
-                logger.debug(f"[QueryRouter] Follow-up phrase detected: {pattern}")
+                logger.debug(f"[QueryRouter] Follow-up phrase detected in query")
                 break
         
         # Get previous category from session history if available
@@ -3376,7 +3392,7 @@ class QueryAnalyzer:
         # 2. It's very short and there's previous context (user might be answering)
         is_followup = is_continuation_phrase
         
-        if not is_followup and previous_category and len(query_lower.split()) <= 5:
+        if not is_followup and previous_category and len(query_lower.split()) <= MAX_SHORT_QUERY_WORDS:
             # Short query with previous context might be a follow-up
             # e.g., "yes", "no", "I see", "interesting"
             is_followup = True
