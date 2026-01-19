@@ -111,7 +111,7 @@ jobs:
   test:
     name: Test Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -277,7 +277,9 @@ jobs:
             --cov-report=html \
             --cov-report=term-missing \
             --junitxml=results/junit.xml \
-            --timeout=600 \
+            --timeout=300 \
+            --timeout-method=thread \
+            -n auto \
             --maxfail=10 \
             -m "not slow and not load_test and not benchmark" \
             -v 2>&1 | tee $GITHUB_WORKSPACE/logs/pytest-output.log
