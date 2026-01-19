@@ -272,6 +272,29 @@ class TestSelfAwarenessReasoning:
         # Should NOT be template boilerplate
         assert 'My primary objectives include:' not in result
 
+    def test_no_false_positive_self_awareness_detection(self, reasoner):
+        """Test that words containing 'self' or 'aware' don't trigger false positives."""
+        # These should NOT trigger self-awareness detection
+        false_positive_queries = [
+            "myself aware of the situation",  # 'myself aware' should not match
+            "herself aware of the risks",      # 'herself aware' should not match
+            "yourself aware of the problem",   # 'yourself aware' should not match
+            "make oneself aware of the facts"  # 'oneself aware' should not match
+        ]
+        
+        for query_str in false_positive_queries:
+            analysis = {
+                'objectives': [{'name': 'prediction_accuracy', 'priority': 0}],
+                'conflicts': [],
+                'ethical_check': {'allowed': True}
+            }
+            
+            result = reasoner._build_self_referential_conclusion(query_str, analysis)
+            
+            # Should use general self-referential response, not self-awareness paths
+            # General response is much shorter and more template-like
+            assert len(result) < 500, f"Query '{query_str}' incorrectly triggered self-awareness detection"
+
 
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])
