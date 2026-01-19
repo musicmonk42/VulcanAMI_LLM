@@ -603,6 +603,75 @@ class SafeCodeExecutor:
             # Log missing optional features for debugging
             if getattr(sp, "Assumptions", None) is None:
                 logger.debug("SymPy 'Assumptions' not available in this version")
+            
+            # =================================================================
+            # Issue #5 FIX: Pre-define common mathematical bound symbols
+            # =================================================================
+            # When parsing integrals like ∫₀ᵀu(t)²dt, the symbol T is extracted
+            # as a bound but not defined as a SymPy symbol before code execution.
+            # This causes "NameError: name 'T' is not defined" errors.
+            #
+            # Solution: Pre-define common single-letter symbols that are frequently
+            # used as integration bounds, function arguments, or mathematical constants.
+            # These symbols are created with positive=True assumption where appropriate
+            # for proper mathematical behavior.
+            #
+            # Industry Standard: SymPy symbols should be defined with appropriate
+            # assumptions (positive, real, etc.) for correct simplification.
+            # =================================================================
+            common_bound_symbols = {
+                # Common upper bound symbols (typically positive)
+                "T": sp.Symbol("T", positive=True, real=True),  # Time bound
+                "N": sp.Symbol("N", positive=True, integer=True),  # Count bound
+                "M": sp.Symbol("M", positive=True, real=True),  # Mass/magnitude
+                "L": sp.Symbol("L", positive=True, real=True),  # Length
+                "R": sp.Symbol("R", positive=True, real=True),  # Radius
+                "A": sp.Symbol("A", real=True),  # Area/amplitude
+                "B": sp.Symbol("B", real=True),  # Bound variable
+                "C": sp.Symbol("C", real=True),  # Constant
+                "D": sp.Symbol("D", real=True),  # Domain variable
+                "K": sp.Symbol("K", positive=True, real=True),  # Constant
+                # Common index/integration variables
+                "n": sp.Symbol("n", integer=True),  # Index
+                "k": sp.Symbol("k", integer=True),  # Index
+                "m": sp.Symbol("m", integer=True),  # Index
+                "i": sp.Symbol("i", integer=True),  # Index (note: conflicts with imaginary)
+                "j": sp.Symbol("j", integer=True),  # Index
+                # Common function argument variables
+                "x": sp.Symbol("x", real=True),  # Primary variable
+                "y": sp.Symbol("y", real=True),  # Secondary variable
+                "z": sp.Symbol("z", real=True),  # Tertiary variable
+                "t": sp.Symbol("t", real=True),  # Time variable
+                "u": sp.Symbol("u", real=True),  # Control variable
+                "v": sp.Symbol("v", real=True),  # Velocity variable
+                "w": sp.Symbol("w", real=True),  # Angular velocity
+                "s": sp.Symbol("s", real=True),  # Laplace variable
+                # Common parameters
+                "a": sp.Symbol("a", real=True),  # Coefficient
+                "b": sp.Symbol("b", real=True),  # Coefficient
+                "c": sp.Symbol("c", real=True),  # Coefficient
+                # Greek letter symbols (commonly used in physics/engineering)
+                "alpha": sp.Symbol("alpha", real=True),
+                "beta": sp.Symbol("beta", real=True),
+                "gamma": sp.Symbol("gamma", real=True),
+                "delta": sp.Symbol("delta", real=True),
+                "epsilon": sp.Symbol("epsilon", positive=True, real=True),
+                "theta": sp.Symbol("theta", real=True),
+                "lambda_": sp.Symbol("lambda", positive=True, real=True),  # Python keyword
+                "mu": sp.Symbol("mu", real=True),
+                "sigma": sp.Symbol("sigma", positive=True, real=True),
+                "omega": sp.Symbol("omega", real=True),
+                "tau": sp.Symbol("tau", positive=True, real=True),
+                "phi": sp.Symbol("phi", real=True),
+                "psi": sp.Symbol("psi", real=True),
+                "rho": sp.Symbol("rho", positive=True, real=True),
+            }
+            namespace.update(common_bound_symbols)
+            
+            logger.debug(
+                f"Issue #5 FIX: Added {len(common_bound_symbols)} pre-defined symbols "
+                "to safe execution namespace"
+            )
 
         # Add NumPy functions if available - for numerical computations
         if NUMPY_AVAILABLE and np is not None:
