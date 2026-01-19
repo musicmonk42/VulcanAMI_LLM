@@ -232,6 +232,33 @@ class Settings(BaseSettings):
         default=0.8, env="TOOL_SELECTOR_LLM_CONFIDENCE_THRESHOLD"
     )
 
+    # ================================================================
+    # LLM QUERY ROUTER CONFIGURATION
+    # Use LLM for semantic query routing instead of keyword patterns
+    # ================================================================
+    # Enable LLM-based query routing (replaces keyword pattern matching)
+    # When True: Uses LLM for semantic classification with deterministic guards
+    # When False: Uses existing keyword pattern matching (query_classifier.py)
+    use_llm_router: bool = Field(
+        default=False, env="USE_LLM_ROUTER"
+    )
+    # Timeout for LLM router classification requests (seconds)
+    llm_router_timeout: float = Field(
+        default=3.0, env="LLM_ROUTER_TIMEOUT"
+    )
+    # Maximum cache entries for LLM router
+    llm_router_cache_size: int = Field(
+        default=5000, env="LLM_ROUTER_CACHE_SIZE"
+    )
+    # Cache TTL for LLM router entries (seconds)
+    llm_router_cache_ttl: float = Field(
+        default=3600.0, env="LLM_ROUTER_CACHE_TTL"
+    )
+    # Include few-shot examples in LLM router prompt
+    llm_router_include_examples: bool = Field(
+        default=False, env="LLM_ROUTER_INCLUDE_EXAMPLES"
+    )
+
     class Config:
         env_file = ".env"
         case_sensitive = False

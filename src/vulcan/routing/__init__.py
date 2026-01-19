@@ -296,6 +296,41 @@ except ImportError as e:
     classify_query = None
     _LLMClientWrapper = None
 
+# LLM Query Router
+# New LLM-based routing (replaces keyword pattern matching)
+try:
+    from .llm_router import (
+        LLMQueryRouter,
+        RoutingDecision,
+        RoutingCache,
+        RoutingDestination,
+        ReasoningEngine,
+        get_llm_router,
+    )
+    from .routing_prompts import (
+        LLM_ROUTER_SYSTEM_PROMPT,
+        LLM_ROUTER_USER_PROMPT,
+        LLM_ROUTER_EXAMPLES,
+        build_router_prompt,
+        build_messages,
+    )
+    
+    LLM_ROUTER_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"LLM router module not available: {e}")
+    LLM_ROUTER_AVAILABLE = False
+    LLMQueryRouter = None
+    RoutingDecision = None
+    RoutingCache = None
+    RoutingDestination = None
+    ReasoningEngine = None
+    get_llm_router = None
+    LLM_ROUTER_SYSTEM_PROMPT = None
+    LLM_ROUTER_USER_PROMPT = None
+    LLM_ROUTER_EXAMPLES = None
+    build_router_prompt = None
+    build_messages = None
+
 
 # ============================================================
 # MODULE INITIALIZATION
@@ -515,6 +550,19 @@ __all__ = [
     "classify_query",
     "_LLMClientWrapper",
     "QUERY_CLASSIFIER_AVAILABLE",
+    # LLM Query Router
+    "LLMQueryRouter",
+    "RoutingDecision",
+    "RoutingCache",
+    "RoutingDestination",
+    "ReasoningEngine",
+    "get_llm_router",
+    "LLM_ROUTER_SYSTEM_PROMPT",
+    "LLM_ROUTER_USER_PROMPT",
+    "LLM_ROUTER_EXAMPLES",
+    "build_router_prompt",
+    "build_messages",
+    "LLM_ROUTER_AVAILABLE",
     # Module functions
     "initialize_routing_components",
     "get_routing_status",
