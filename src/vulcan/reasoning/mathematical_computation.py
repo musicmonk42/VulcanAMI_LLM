@@ -37,6 +37,26 @@ DEFAULT_OPENAI_MODEL = "gpt-3.5-turbo"
 # Maximum attributes to log when debugging unknown LLM interface
 DEBUG_LOG_MAX_ATTRS = 10
 
+# =============================================================================
+# Issue #4 FIX: Formatting characters to strip before parsing math expressions
+# =============================================================================
+# These characters can appear in HTML/text rendering of mathematical expressions
+# and cause parsing failures when captured by regex patterns.
+#
+# Characters included:
+# - \n (newline)
+# - \r (carriage return)
+# - \t (tab)
+# - \u200b (zero-width space)
+# - \u200c (zero-width non-joiner)
+# - \u200d (zero-width joiner)
+# - \ufeff (zero-width no-break space / BOM)
+# - \u2060 (word joiner)
+# - \u180e (Mongolian vowel separator)
+# =============================================================================
+FORMATTING_CHARS_TO_STRIP: str = '\n\r\t\u200b\u200c\u200d\ufeff\u2060\u180e'
+FORMATTING_CHARS_TABLE: dict = str.maketrans('', '', FORMATTING_CHARS_TO_STRIP)
+
 # ============================================================================
 # CONSTANTS - Explicit Mathematical Notation Detection (Issue #1 Fix)
 # ============================================================================
@@ -1096,6 +1116,32 @@ result = simplify(integral)
         bounds = None
         
         try:
+            # =================================================================
+            # Issue #4 FIX: Strip HTML/text formatting characters before parsing
+            # =================================================================
+            # Problem: Unicode math symbols (∫, ∑) are being parsed incorrectly
+            # because raw HTML/text formatting (\n, \t, \u200b zero-width space)
+            # is captured along with the actual mathematical expression.
+            #
+            # Example error:
+            #   Parsed Unicode integral: integrand=\n0\nT\n\t\u200b\n\nu(t)\n2\n
+            #   SyntaxError: unexpected character after line continuation
+            #
+            # Solution: Strip all formatting characters BEFORE regex matching
+            # to ensure we only capture the actual mathematical content.
+            # Uses module-level constants FORMATTING_CHARS_TABLE for performance.
+            # =================================================================
+            
+            # Clean the query before parsing using module-level constant
+            cleaned_query = query.translate(FORMATTING_CHARS_TABLE)
+            # Also normalize multiple spaces to single space
+            cleaned_query = re.sub(r'\s+', ' ', cleaned_query)
+            
+            logger.debug(
+                f"[MathTool] Issue #4 FIX: Cleaned query for integral parsing: "
+                f"original_len={len(query)}, cleaned_len={len(cleaned_query)}"
+            )
+            
             # Pattern 1: Unicode integral with subscript/superscript bounds
             # Matches: ∫₀ᵀu(t)²dt, ∫₁ⁿk²dk
             # Subscripts: ₀₁₂₃₄₅₆₇₈₉, Superscripts: ⁰¹²³⁴⁵⁶⁷⁸⁹
@@ -1110,12 +1156,17 @@ result = simplify(integral)
                 re.UNICODE
             )
             
-            match = unicode_integral_pattern.search(query)
+            # Use cleaned_query for matching (Issue #4 FIX)
+            match = unicode_integral_pattern.search(cleaned_query)
             if match:
                 lower_bound_unicode = match.group(1)
                 upper_bound_unicode = match.group(2)
                 integrand_raw = match.group(3).strip()
                 variable = match.group(4)
+                
+                # Issue #4 FIX: Additional cleaning of integrand_raw
+                # Strip any remaining whitespace and formatting
+                integrand_raw = integrand_raw.strip()
                 
                 # Convert Unicode subscripts/superscripts to ASCII
                 if lower_bound_unicode and upper_bound_unicode:
@@ -1129,11 +1180,19 @@ result = simplify(integral)
                 for unicode_sup, ascii_num in unicode_superscript_map.items():
                     integrand = integrand.replace(unicode_sup, f'**{ascii_num}')
                 
-                logger.info(
-                    f"[MathTool] Parsed Unicode integral: integrand={integrand}, "
-                    f"variable={variable}, bounds={bounds}"
-                )
-                return (integrand, variable, bounds)
+                # Issue #4 FIX: Final validation - ensure integrand is not empty or just whitespace
+                if not integrand or not integrand.strip():
+                    logger.warning(
+                        f"[MathTool] Issue #4: Empty integrand after parsing, "
+                        f"raw={repr(integrand_raw)}, cleaned={repr(integrand)}"
+                    )
+                    # Continue to try other patterns
+                else:
+                    logger.info(
+                        f"[MathTool] Parsed Unicode integral: integrand={integrand}, "
+                        f"variable={variable}, bounds={bounds}"
+                    )
+                    return (integrand, variable, bounds)
             
             # Pattern 2: LaTeX integral notation
             # Matches: \int_0^T u(t)^2 dt, \int_{0}^{T} f(x) dx
@@ -1142,7 +1201,8 @@ result = simplify(integral)
                 re.IGNORECASE
             )
             
-            match = latex_integral_pattern.search(query)
+            # Use cleaned_query for matching (Issue #4 FIX)
+            match = latex_integral_pattern.search(cleaned_query)
             if match:
                 lower = match.group(1)
                 upper = match.group(2)
@@ -1167,7 +1227,8 @@ result = simplify(integral)
                 re.IGNORECASE
             )
             
-            match = english_integral_pattern.search(query)
+            # Use cleaned_query for matching (Issue #4 FIX)
+            match = english_integral_pattern.search(cleaned_query)
             if match:
                 integrand = match.group(1).strip()
                 variable = match.group(2) if match.group(2) else None
@@ -1197,10 +1258,11 @@ result = simplify(integral)
             
             # Pattern 4: Bare integral symbol with expression after it
             # Matches: "∫ x^2", "calculate ∫ sin(x)"
-            if '∫' in query:
+            # Use cleaned_query for matching (Issue #4 FIX)
+            if '∫' in cleaned_query:
                 # Find text after ∫ up to common delimiters
-                integral_pos = query.find('∫')
-                after_integral = query[integral_pos + 1:].strip()
+                integral_pos = cleaned_query.find('∫')
+                after_integral = cleaned_query[integral_pos + 1:].strip()
                 
                 # Extract expression (up to "from", "with", or end of meaningful content)
                 expr_match = re.match(r'^([^,\.\?!]+?)(?:\s+(?:from|with|for)\b|$)', after_integral)
@@ -1792,6 +1854,41 @@ Generate ONLY the Python code:"""
                 )
                 code = response.choices[0].message.content
                 logger.debug("Using OpenAI chat.completions interface")
+            
+            # =================================================================
+            # Issue #6 FIX: Support GraphixLLMClient.chat() callable interface
+            # =================================================================
+            # Problem: GraphixLLMClient has a .chat attribute but it's a callable
+            # method (client.chat()), not the OpenAI-style client.chat.completions.
+            # The previous code only checked for chat.completions, missing this case.
+            #
+            # Solution: Add check for callable chat attribute AFTER checking for
+            # chat.completions to maintain backward compatibility with OpenAI clients.
+            # =================================================================
+            elif hasattr(llm, "chat") and callable(llm.chat):
+                # GraphixLLMClient-style: client.chat(prompt) returns response
+                response = llm.chat(prompt)
+                # Handle different response formats
+                if isinstance(response, str):
+                    code = response
+                elif hasattr(response, "content"):
+                    code = response.content
+                elif hasattr(response, "text"):
+                    code = response.text
+                elif hasattr(response, "message"):
+                    msg = response.message
+                    code = msg.content if hasattr(msg, "content") else str(msg)
+                elif hasattr(response, "choices") and response.choices:
+                    choice = response.choices[0]
+                    if hasattr(choice, "message"):
+                        code = choice.message.content
+                    elif hasattr(choice, "text"):
+                        code = choice.text
+                    else:
+                        code = str(choice)
+                else:
+                    code = str(response)
+                logger.debug("Using GraphixLLMClient-style chat() interface (Issue #6 FIX)")
                 
             # 2. Direct create method (OpenAI Completion API)
             elif hasattr(llm, "create"):
@@ -1835,7 +1932,7 @@ Generate ONLY the Python code:"""
                 llm_type = type(llm).__name__
                 logger.warning(
                     f"Unknown LLM interface (type={llm_type}). "
-                    f"Expected an LLM client with one of: chat.completions, create, invoke, predict, generate, or complete. "
+                    f"Expected an LLM client with one of: chat.completions, chat(), create, invoke, predict, generate, or complete. "
                     f"Available attrs: {available_attrs[:DEBUG_LOG_MAX_ATTRS]}..."
                 )
                 return None

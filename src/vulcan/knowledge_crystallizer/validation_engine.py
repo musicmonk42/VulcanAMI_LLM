@@ -9,6 +9,7 @@ IMPLEMENTATION COMPLETE:
 4. Added execution result comparison and scoring
 5. Enhanced sandboxing and security
 6. Added thread safety and validation improvements
+7. Issue #3 FIX: Support for CrystallizedPrinciple type from principle_extractor
 """
 
 import copy
@@ -28,9 +29,30 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import numpy as np
+
+# =============================================================================
+# Issue #3 FIX: Import CrystallizedPrinciple for type checking in validation
+# =============================================================================
+# Problem: 100% of extracted principles were being rejected because the validator
+# was checking `isinstance(principle, Principle)` where Principle is defined in
+# this module, but the principles passed in are CrystallizedPrinciple from
+# principle_extractor.py - they are different classes with similar fields.
+#
+# Solution: Import CrystallizedPrinciple and accept both types in validation.
+# =============================================================================
+try:
+    from .principle_extractor import CrystallizedPrinciple
+    CRYSTALLIZED_PRINCIPLE_AVAILABLE = True
+except ImportError:
+    CrystallizedPrinciple = None
+    CRYSTALLIZED_PRINCIPLE_AVAILABLE = False
+    logging.debug(
+        "CrystallizedPrinciple not available for import - "
+        "validation will only accept Principle type"
+    )
 
 # Platform-specific imports with fallbacks
 try:
@@ -538,10 +560,42 @@ class KnowledgeValidator:
                         f"Detected exploratory experiment principle from source: {source}"
                     )
 
-            # Validate principle is correct type
-            if not isinstance(principle, Principle):
-                errors.append(f"Invalid principle type: {type(principle)}")
-                return ValidationResult(is_valid=False, confidence=0.0, errors=errors)
+            # =================================================================
+            # Issue #3 FIX: Accept both Principle and CrystallizedPrinciple types
+            # =================================================================
+            # Problem: The validator was rejecting all CrystallizedPrinciple objects
+            # because they are a different class than the Principle defined here.
+            # 
+            # Solution: Check for either Principle (validation_engine) or
+            # CrystallizedPrinciple (principle_extractor) types. Both have compatible
+            # fields (id, confidence, core_pattern, applicable_domains).
+            # =================================================================
+            is_valid_principle_type = isinstance(principle, Principle)
+            if CRYSTALLIZED_PRINCIPLE_AVAILABLE and CrystallizedPrinciple is not None:
+                is_valid_principle_type = is_valid_principle_type or isinstance(
+                    principle, CrystallizedPrinciple
+                )
+            
+            if not is_valid_principle_type:
+                # Also accept duck-typed objects with required fields
+                has_required_attrs = (
+                    hasattr(principle, 'id') and
+                    hasattr(principle, 'confidence') and
+                    hasattr(principle, 'core_pattern')
+                )
+                if not has_required_attrs:
+                    errors.append(f"Invalid principle type: {type(principle)}")
+                    logger.warning(
+                        f"Issue #3: Principle type validation failed. "
+                        f"Type={type(principle).__name__}, "
+                        f"Expected Principle or CrystallizedPrinciple"
+                    )
+                    return ValidationResult(is_valid=False, confidence=0.0, errors=errors)
+                else:
+                    # Duck-typed - accept it with a warning
+                    logger.debug(
+                        f"Issue #3 FIX: Accepting duck-typed principle: {type(principle).__name__}"
+                    )
 
             # Check basic requirements
             if not hasattr(principle, "id") or not principle.id:
