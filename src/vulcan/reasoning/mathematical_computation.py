@@ -1550,17 +1550,39 @@ result = simplify(integral)
             
             # Bug #2 FIX Pattern 1.5: ∑(expression) from index=lower to upper
             # Handles queries like: "Compute ∑(2k-1) from k=1 to n"
-            sum_match1_5 = re.search(r'∑\s*\(([^)]+)\)\s+from\s+(\w+)\s*=\s*(\d+)\s+to\s+(\w+)', query, re.IGNORECASE)
+            # SUMMATION FIX: Normalize Unicode minus before regex to ensure matching
+            query_normalized = query.replace('−', '-')  # Unicode minus → ASCII
+            sum_match1_5 = re.search(r'∑\s*\(([^)]+)\)\s+from\s+(\w+)\s*=\s*(\d+)\s+to\s+(\w+)', query_normalized, re.IGNORECASE)
             if sum_match1_5:
                 expr = sum_match1_5.group(1).strip()  # e.g., "2k-1"
                 index = sum_match1_5.group(2)  # e.g., "k"
                 lower = sum_match1_5.group(3)  # e.g., "1"
                 upper = sum_match1_5.group(4)  # e.g., "n"
-                # Convert to SymPy format (− → -, 2k → 2*k)
-                expr = expr.replace('−', '-')
+                # Convert to SymPy format (2k → 2*k)
                 expr = re.sub(r'(\d)([a-z])', r'\1*\2', expr)  # 2k → 2*k
-                logger.info(f"[MathTool] Bug #2 FIX: Matched ∑(expr) from {index}={lower} to {upper} pattern: expr={expr}")
+                logger.info(f"[MathTool] SUMMATION FIX: Matched ∑(expr) from {index}={lower} to {upper} pattern: expr={expr}")
                 return self._templates.summation(expr, index, lower, upper)
+            
+            # SUMMATION FIX Pattern 1.6: Compute/Calculate ∑(expression) 
+            # Even more flexible pattern for "Compute ∑(2k-1)" style queries
+            # Captures expression from ∑(...) anywhere in the query
+            sum_match1_6 = re.search(r'∑\s*\(([^)]+)\)', query_normalized)
+            if sum_match1_6:
+                expr = sum_match1_6.group(1).strip()  # e.g., "2k-1"
+                # Convert to SymPy format (2k → 2*k)
+                expr = re.sub(r'(\d)([a-z])', r'\1*\2', expr)  # 2k → 2*k
+                # Try to extract bounds from "from k=1 to n" or "k=1 to n" anywhere
+                bounds_match = re.search(r'(?:from\s+)?(\w+)\s*=\s*(\d+)\s+to\s+(\w+)', query_normalized, re.IGNORECASE)
+                if bounds_match:
+                    index = bounds_match.group(1)
+                    lower = bounds_match.group(2)
+                    upper = bounds_match.group(3)
+                    logger.info(f"[MathTool] SUMMATION FIX: Pattern 1.6 matched ∑({expr}) with bounds {index}={lower} to {upper}")
+                    return self._templates.summation(expr, index, lower, upper)
+                else:
+                    # Default bounds if not specified
+                    logger.info(f"[MathTool] SUMMATION FIX: Pattern 1.6 matched ∑({expr}) with default bounds k=1 to n")
+                    return self._templates.summation(expr, "k", "1", "n")
             
             # Pattern 2: sum from k=lower to upper of expression
             sum_match2 = re.search(r'sum(?:mation)?\s+(?:from\s+)?(\w+)\s*=\s*(\d+)\s+to\s+(\w+)\s+(?:of\s+)?(.+)', query_lower)
@@ -1572,7 +1594,26 @@ result = simplify(integral)
                 expr = re.sub(r'(\d)([a-z])', r'\1*\2', expr)
                 return self._templates.summation(expr, index, lower, upper)
             
-            # Default summation
+            # SUMMATION FIX: Try to extract expression from query before falling back
+            # Look for any expression after ∑ that might be the summand
+            # Pattern explanation:
+            #   ∑             - Summation symbol
+            #   [\s_{}^0-9nk]* - Optional subscript/superscript notation (whitespace, {}, ^, digits, n, k)
+            #   \(?           - Optional opening parenthesis
+            #   ([0-9]+[a-z][\s\-+*/0-9a-z]*) - Capture: digit(s)+letter followed by math expression
+            #   \)?           - Optional closing parenthesis
+            # Examples matched: "∑(2k-1)", "∑_{k=1}^n 2k-1", "∑(3n+2)"
+            fallback_expr_match = re.search(r'∑[\s_{}^0-9nk]*\(?([0-9]+[a-z][\s\-+*/0-9a-z]*)\)?', query_normalized)
+            if fallback_expr_match:
+                expr = fallback_expr_match.group(1).strip()
+                expr = re.sub(r'(\d)([a-z])', r'\1*\2', expr)
+                logger.info(f"[MathTool] SUMMATION FIX: Fallback pattern matched expression: {expr}")
+                return self._templates.summation(expr, "k", "1", "n")
+            
+            # Default summation - only if no expression could be extracted
+            # MAX_QUERY_LOG_LENGTH: Truncate long queries in log messages for readability
+            MAX_QUERY_LOG_LENGTH = 100
+            logger.warning(f"[MathTool] SUMMATION: No expression found, using default 'k'. Query: {query[:MAX_QUERY_LOG_LENGTH]}...")
             return self._templates.summation("k", "k", "1", "n")
         
         # PRIORITY 4: Limits (check before integration since both are calculus)

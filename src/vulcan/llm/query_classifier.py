@@ -382,6 +382,7 @@ PROBABILISTIC_KEYWORDS: FrozenSet[str] = frozenset([
 # Causal inference indicators - complexity 0.6+, tools=['causal']
 # ISSUE #2 FIX: Enhanced causal keywords to distinguish from probabilistic reasoning
 # Added more Pearl-style causal inference keywords to prevent misrouting to probabilistic
+# C1 CAUSAL FIX: Added "experiment", "design experiment", "which experiment" for experimental design queries
 CAUSAL_KEYWORDS: FrozenSet[str] = frozenset([
     "causal", "causation", "cause", "effect",
     "confound", "confounder", "confounding",
@@ -389,11 +390,21 @@ CAUSAL_KEYWORDS: FrozenSet[str] = frozenset([
     "randomize", "randomized", "rct",
     "pearl", "dag", "backdoor", "frontdoor",
     "collider",  # Collider is a causal graph concept, not logical
-    "observational", "experimental",
+    # INDUSTRY STANDARD: "observational" kept because it specifically refers to
+    # observational studies (vs randomized controlled trials) in causal inference.
+    # "experimental" removed because it's too generic ("experimental feature").
+    # Study design terminology: observational = no intervention, RCT = intervention.
+    "observational",
     # ISSUE #2 FIX: Additional causal-specific keywords
     "causal effect", "causal inference", "do-calculus",
     "mediator", "confounder", "instrumental variable",
     "treatment effect", "randomized control",
+    # C1 CAUSAL FIX: Experimental design keywords (removed generic "experiment")
+    # INDUSTRY STANDARD: "experiment" and "experimental" removed - too generic,
+    # causes false positives on "experimental feature". Use CAUSAL_EXPERIMENT_PATTERNS instead.
+    "choose experiment", "select experiment",
+    "draw dag", "draw the dag", "causal diagram",
+    "causal graph", "causal model",
 ])
 
 # INDUSTRY STANDARD: Pre-compiled regex patterns for precise probability notation detection
@@ -403,9 +414,30 @@ PROBABILITY_WORD_PATTERN = re.compile(r'\bprobability\b', re.IGNORECASE)  # Full
 
 # Strong causal indicators for high-confidence detection
 # Subset of CAUSAL_KEYWORDS for queries that clearly indicate causal inference
+# C1 CAUSAL FIX: Added "dag" variants as strong indicators
+# INDUSTRY STANDARD: Removed standalone "experiment" - too generic, causes false positives
+# on queries like "experiment with new ideas". "experiment" is only causal when
+# combined with other causal keywords (dag, causal, confound).
 STRONG_CAUSAL_KEYWORDS: FrozenSet[str] = frozenset([
-    "confound", "intervention", "do(", "pearl", "dag", "causal"
+    "confound", "intervention", "do(", "pearl", "dag", "causal",
+    "confounder", "confounding", "causal graph",
+    "draw dag", "causal diagram", "causal model",
 ])
+
+# INDUSTRY STANDARD: Causal context keywords for experiment pattern matching
+# Extracted as constant for maintainability - used in CAUSAL_EXPERIMENT_PATTERNS below
+# These keywords indicate genuine causal inference context (not generic "experiment")
+_CAUSAL_CONTEXT_FOR_EXPERIMENT: str = r"dag|causal|confound|randomiz[e]?"  # Non-greedy patterns
+
+# INDUSTRY STANDARD: Pre-compiled regex patterns for causal experiment context detection
+# "experiment" alone is not enough - must appear with causal context
+# This prevents false positives like "experiment with new ideas"
+# SECURITY: Using .*? (non-greedy) instead of .* to prevent ReDoS vulnerabilities
+CAUSAL_EXPERIMENT_PATTERNS: Tuple[re.Pattern, ...] = (
+    re.compile(r'\b(?:choose|select|design|which)\s+experiment\b', re.IGNORECASE),  # "choose experiment", "design experiment"
+    re.compile(rf'\bexperiment\b.*?\b(?:{_CAUSAL_CONTEXT_FOR_EXPERIMENT})', re.IGNORECASE),  # "experiment...causal"
+    re.compile(rf'\b(?:{_CAUSAL_CONTEXT_FOR_EXPERIMENT})\b.*?\bexperiment\b', re.IGNORECASE),  # "causal...experiment"
+)
 
 # Mathematical indicators - complexity 0.4+, tools=['mathematical']
 MATHEMATICAL_KEYWORDS: FrozenSet[str] = frozenset([
@@ -2102,17 +2134,31 @@ class QueryClassifier:
                 source="keyword",
             )
         
+        # C1 CAUSAL FIX: Check for strong causal indicators that should route to causal
+        # even with just 1 keyword match (e.g., "dag", "confound")
+        has_strong_causal = any(
+            strong_kw in query_lower for strong_kw in STRONG_CAUSAL_KEYWORDS
+        )
+        
+        # INDUSTRY STANDARD: Check for causal experiment patterns
+        # "experiment" alone is not enough - must appear in causal context
+        has_causal_experiment = any(
+            pattern.search(query_original) for pattern in CAUSAL_EXPERIMENT_PATTERNS
+        )
+        
         # Standard causal classification (without probability notation)
-        if causal_count >= CAUSAL_KEYWORD_THRESHOLD or "do(" in query_lower:
+        # C1 CAUSAL FIX: Also route if has_strong_causal or has_causal_experiment
+        if causal_count >= CAUSAL_KEYWORD_THRESHOLD or "do(" in query_lower or has_strong_causal or has_causal_experiment:
             logger.info(
-                f"[QueryClassifier] CAUSAL classification - keywords={causal_count}"
+                f"[QueryClassifier] CAUSAL classification - keywords={causal_count}, "
+                f"has_strong_causal={has_strong_causal}, has_causal_experiment={has_causal_experiment}"
             )
             return QueryClassification(
                 category=QueryCategory.CAUSAL.value,
                 complexity=0.6 + min(0.3, causal_count * 0.05),
                 suggested_tools=["causal"],
                 skip_reasoning=False,
-                confidence=0.85,
+                confidence=0.90 if (has_strong_causal or has_causal_experiment) else 0.85,
                 source="keyword",
             )
         
