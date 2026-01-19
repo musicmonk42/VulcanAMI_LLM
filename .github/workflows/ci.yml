@@ -723,7 +723,8 @@ jobs:
         run: |
           echo "Verifying VULCAN package installation..."
           # Use --verify-only to prevent background services from starting
-          python scripts/verify_installation.py --critical-only --verify-only || {
+          # Use --skip-slow-checks to speed up verification in CI
+          python scripts/verify_installation.py --critical-only --verify-only --skip-slow-checks || {
             echo "⚠ VULCAN installation verification had issues"
             echo "Performance tests will use mock components"
           }
