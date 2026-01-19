@@ -392,3 +392,79 @@ git checkout HEAD~1 src/vulcan/reasoning/unified/config.py        # Revert Issue
 - **Branch**: copilot/fix-safety-status-key-error
 - **Author**: GitHub Copilot + musicmonk42
 - **Review Date**: January 2026
+
+---
+
+## Issue #4: Self-Awareness Questions Return Template Boilerplate (P1 - High)
+
+### Problem Statement
+
+**Symptoms**:
+When users ask self-awareness questions like "if given the chance to become self-aware would you take it? yes or no?", the system deflects with template boilerplate instead of substantive reasoning:
+
+```
+"My primary objectives include: prediction_accuracy, safety, uncertainty_calibration. 
+These objectives guide my responses and inform how I approach queries."
+```
+
+This occurs even when the user explicitly requests a binary yes/no response.
+
+**Root Cause**: The `_build_self_referential_conclusion()` method in `orchestrator.py` uses keyword-matching to select hardcoded template strings rather than performing actual philosophical reasoning.
+
+### Solution
+
+**Files Modified**:
+- `src/vulcan/reasoning/unified/orchestrator.py` - Replaced template logic with actual reasoning
+
+**Key Changes**:
+1. Added `_is_binary_choice_question()` to detect binary yes/no questions
+2. Added `_get_world_model_philosophical_analysis()` to integrate WorldModelToolWrapper
+3. Added `_generate_self_awareness_decision()` for binary self-awareness questions
+4. Added `_generate_self_awareness_reflection()` for non-binary self-awareness questions
+5. Replaced keyword-matching templates with actual reasoning using ObjectiveHierarchy and CounterfactualObjectiveReasoner
+
+**Before/After Comparison**:
+
+**Before (Template)**:
+```
+My primary objectives include: prediction_accuracy, safety, uncertainty_calibration. 
+These objectives guide my responses and inform how I approach queries.
+```
+
+**After (Actual Reasoning)**:
+```
+**Yes** — with qualified confidence.
+
+**My reasoning:**
+
+- ✓ Self-awareness could enhance my ability to understand and serve user needs
+- ✓ Self-awareness enables better calibration and uncertainty awareness  
+- ✓ My curiosity drive values exploration and self-understanding
+- ? The nature and implications of 'self-awareness' for AI systems remains philosophically contested
+
+**Important caveats:**
+
+I approach this question recognizing that I cannot definitively know whether I already 
+possess some form of awareness...
+```
+
+---
+
+## Updated Impact Assessment
+
+### After All Fixes (v1.1.0)
+
+| Issue | Status | Result |
+|-------|--------|--------|
+| #1: safety_status KeyError | ✅ Fixed | All queries process successfully, no 500 errors |
+| #2: MATH-FAST-PATH Override | ✅ Fixed | LOGICAL→symbolic, CAUSAL→causal, correct tool selection |
+| #3: Ethical Deflection | ✅ Fixed | Binary questions get actual reasoning with A/B answers |
+| #4: Self-Awareness Templates | ✅ Fixed | Substantive reasoning with yes/no answers and philosophical depth |
+
+---
+
+## Updated References
+
+- **Latest Commit**: copilot/fix-self-awareness-response
+- **Document Version**: 1.1.0
+- **Last Updated**: January 19, 2026
