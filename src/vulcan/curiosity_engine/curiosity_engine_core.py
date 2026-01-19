@@ -1808,7 +1808,7 @@ class CuriosityEngine:
             domain = getattr(gap, 'domain', 'general')
         return f"{gap_type}:{domain}"
     
-    def mark_gap_resolved(self, gap: Union[KnowledgeGap, Dict], success: bool = True, cycle_id: Optional[int] = None) -> None:
+    def mark_gap_resolved(self, gap: Union[KnowledgeGap, Dict, str], domain: Optional[str] = None, success: bool = True, cycle_id: Optional[int] = None) -> None:
         """Mark a gap as resolved after successful experiment.
         
         Note: Ensures gaps don't accumulate forever by tracking
@@ -1823,11 +1823,21 @@ class CuriosityEngine:
         via resolution_bridge, so resolutions survive subprocess restarts.
         
         Args:
-            gap: The gap to mark as resolved
+            gap: The gap to mark as resolved (KnowledgeGap object, dict, or gap_type string)
+            domain: Domain string (required if gap is a string, otherwise extracted from gap object)
             success: Whether resolution was successful (default True)
             cycle_id: Optional learning cycle ID for tracking (default None)
         """
-        key = self._gap_key(gap)
+        # Handle different calling patterns
+        if isinstance(gap, str):
+            # Called with (gap_type, domain, success) pattern
+            if domain is None:
+                raise ValueError("domain is required when gap is a string")
+            key = f"{gap}:{domain}"
+        else:
+            # Called with gap object or dict
+            key = self._gap_key(gap)
+        
         current_time = time.time()
         
         # FIX Bug #1: Persist to SQLite for cross-process visibility using batch operation
