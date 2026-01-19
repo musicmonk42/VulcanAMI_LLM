@@ -272,7 +272,10 @@ jobs:
           mkdir -p $GITHUB_WORKSPACE/logs
           ulimit -Sn 10240 || true
           
-          pytest --cov=src -q \
+          # Run pytest without tee to prevent buffering/hanging issues
+          # Capture output directly to file
+          EXIT_CODE=0
+          timeout 40m pytest --cov=src -q \
             --cov-report=xml \
             --cov-report=html \
             --cov-report=term-missing \
@@ -282,7 +285,18 @@ jobs:
             -n auto \
             --maxfail=10 \
             -m "not slow and not load_test and not benchmark" \
-            -v 2>&1 | tee $GITHUB_WORKSPACE/logs/pytest-output.log
+            -v > $GITHUB_WORKSPACE/logs/pytest-output.log 2>&1 || EXIT_CODE=$?
+          
+          # Display the captured output
+          cat $GITHUB_WORKSPACE/logs/pytest-output.log
+          
+          # Force cleanup of any background processes
+          # Kill any pytest worker processes that may be hanging
+          pkill -9 -f "pytest" || true
+          pkill -9 -f "python.*test" || true
+          
+          # Exit with the captured code
+          exit $EXIT_CODE
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
