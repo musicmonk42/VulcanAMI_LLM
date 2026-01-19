@@ -52,6 +52,21 @@ EXPLICIT_MATH_KEYWORDS: Tuple[str, ...] = (
     'summation', 'sigma notation',
 )
 
+# ============================================================================
+# ISSUE #3 FIX: Proof Verification Detection Patterns (Compiled for Performance)
+# ============================================================================
+# Compiled regex patterns for efficient proof verification detection.
+# These are compiled once at module load time for optimal performance.
+
+PROOF_VERIFICATION_PATTERNS: Tuple[re.Pattern, ...] = (
+    re.compile(r"verify\s+(this\s+)?proof", re.IGNORECASE),
+    re.compile(r"check\s+(this\s+)?proof", re.IGNORECASE),
+    re.compile(r"proof\s+check", re.IGNORECASE),
+    re.compile(r"find\s+the\s+flaw", re.IGNORECASE),
+    re.compile(r"(is|are)\s+(this|the)\s+proof", re.IGNORECASE),
+    re.compile(r"step\s+\d+:", re.IGNORECASE),  # Structured proof steps
+)
+
 
 # ============================================================================
 # ENUMS AND DATA STRUCTURES
@@ -2113,6 +2128,9 @@ Generate ONLY the corrected Python code (no markdown, no explanations):"""
         ISSUE #3 FIX: Math tool is for computation, not proof verification.
         Proof verification should route to symbolic reasoner instead.
         
+        INDUSTRY STANDARD: Uses pre-compiled regex patterns for optimal performance.
+        Patterns are compiled once at module level, not on every invocation.
+        
         Args:
             query: The query string to check
             
@@ -2133,34 +2151,22 @@ Generate ONLY the corrected Python code (no markdown, no explanations):"""
             "verify", "check", "validate", "evaluate", "assess",
             "correct", "incorrect", "valid", "invalid",
             "flaw", "error", "mistake", "bug",
-            "step 1", "step 2", "step 3",  # Indicates structured proof
             "derivation", "argument",
         ]
         
         # Proof indicators
         proof_indicators = [
-            "proof:", "proof check", "verify proof", "check proof",
-            "is this proof", "this proof", "the proof",
-            "find the flaw", "find the error", "what's wrong",
-            "hidden flaw", "subtle error",
+            "proof:", "proof check", "this proof", "the proof",
+            "hidden flaw", "subtle error", "what's wrong",
         ]
         
         # Check for proof verification patterns
         has_proof_keyword = any(kw in query_lower for kw in proof_keywords)
         has_proof_indicator = any(ind in query_lower for ind in proof_indicators)
         
-        # Strong indicators: explicit proof verification request
-        strong_patterns = [
-            r"verify\s+(this\s+)?proof",
-            r"check\s+(this\s+)?proof",
-            r"proof\s+check",
-            r"find\s+the\s+flaw",
-            r"(is|are)\s+(this|the)\s+proof",
-            r"step\s+\d+:",  # Structured proof steps
-        ]
-        
+        # INDUSTRY STANDARD: Use pre-compiled patterns (module-level PROOF_VERIFICATION_PATTERNS)
         has_strong_pattern = any(
-            re.search(pattern, query_lower) for pattern in strong_patterns
+            pattern.search(query) for pattern in PROOF_VERIFICATION_PATTERNS
         )
         
         # Determine if this is proof verification

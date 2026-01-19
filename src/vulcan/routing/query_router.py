@@ -2463,11 +2463,10 @@ class QueryAnalyzer:
         Returns:
             reasoning_type string for AgentTask (e.g., "symbolic", "mathematical")
             
-        Example:
-            >>> _map_category_to_reasoning_type("LOGICAL")
-            "symbolic"
-            >>> _map_category_to_reasoning_type("MATHEMATICAL")
-            "mathematical"
+        Examples:
+            - category="LOGICAL" returns "symbolic"
+            - category="MATHEMATICAL" returns "mathematical"
+            - category="CAUSAL" returns "causal"
         """
         # Map QueryCategory enum values to ReasoningType values
         category_to_reasoning_type = {

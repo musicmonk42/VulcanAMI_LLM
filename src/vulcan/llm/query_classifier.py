@@ -2065,7 +2065,11 @@ class QueryClassifier:
         
         # ISSUE #2 FIX: Also check if query mentions both probability and causation
         # This is a strong indicator of causal inference (e.g., "P(X|+) with confounding")
-        has_prob_notation = "p(" in query_lower or "probability" in query_lower
+        # INDUSTRY STANDARD: Use word boundary regex for precise matching
+        has_prob_notation = (
+            re.search(r'\bp\s*\(', query_lower) is not None or  # P( with word boundary
+            re.search(r'\bprobability\b', query_lower) is not None  # Full word "probability"
+        )
         has_causal_intent = causal_count >= 1 or any(
             strong_causal in query_lower 
             for strong_causal in ["confound", "intervention", "do(", "pearl", "dag", "causal"]
