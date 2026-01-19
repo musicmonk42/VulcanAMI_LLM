@@ -29,8 +29,12 @@ from dotenv import load_dotenv  # <<< --- ADDED DOTENV --- >>>
 # - VULCAN_CI_MODE=1 (explicit VULCAN CI mode)
 # - VULCAN_FAST_FIXTURES=1 (use minimal fixtures)
 #
-CI_MODE = os.environ.get("CI") == "true" or os.environ.get("VULCAN_CI_MODE") == "1"
-FAST_FIXTURES = os.environ.get("VULCAN_FAST_FIXTURES") == "1"
+# Use flexible checks to handle variations like 'True', '1', 'yes', etc.
+CI_MODE = (
+    os.environ.get("CI", "").lower() in ("true", "1", "yes") or
+    os.environ.get("VULCAN_CI_MODE", "").lower() in ("1", "true", "yes")
+)
+FAST_FIXTURES = os.environ.get("VULCAN_FAST_FIXTURES", "").lower() in ("1", "true", "yes")
 
 if CI_MODE:
     # Reduce pytest timeouts in CI for faster failure detection
