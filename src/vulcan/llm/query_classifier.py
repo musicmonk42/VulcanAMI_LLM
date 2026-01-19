@@ -401,6 +401,12 @@ CAUSAL_KEYWORDS: FrozenSet[str] = frozenset([
 PROBABILITY_NOTATION_PATTERN = re.compile(r'\bp\s*\(', re.IGNORECASE)  # P( with word boundary
 PROBABILITY_WORD_PATTERN = re.compile(r'\bprobability\b', re.IGNORECASE)  # Full word only
 
+# Strong causal indicators for high-confidence detection
+# Subset of CAUSAL_KEYWORDS for queries that clearly indicate causal inference
+STRONG_CAUSAL_KEYWORDS: FrozenSet[str] = frozenset([
+    "confound", "intervention", "do(", "pearl", "dag", "causal"
+])
+
 # Mathematical indicators - complexity 0.4+, tools=['mathematical']
 MATHEMATICAL_KEYWORDS: FrozenSet[str] = frozenset([
     "calculate", "compute", "solve", "evaluate",
@@ -2075,9 +2081,9 @@ class QueryClassifier:
             PROBABILITY_NOTATION_PATTERN.search(query_lower) is not None or
             PROBABILITY_WORD_PATTERN.search(query_lower) is not None
         )
+        # Use STRONG_CAUSAL_KEYWORDS constant to avoid duplication
         has_causal_intent = causal_count >= 1 or any(
-            strong_causal in query_lower 
-            for strong_causal in ["confound", "intervention", "do(", "pearl", "dag", "causal"]
+            strong_causal in query_lower for strong_causal in STRONG_CAUSAL_KEYWORDS
         )
         
         # If query has both probability notation AND causal intent, route to CAUSAL

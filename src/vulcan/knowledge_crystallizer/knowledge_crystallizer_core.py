@@ -509,18 +509,22 @@ class KnowledgeCrystallizer:
             # ISSUE #6 FIX: Log detailed rejection reasons
             if not validation.is_valid:
                 rejection_reasons["invalid"] += 1
+                # INDUSTRY STANDARD: Use getattr with default for robust attribute access
+                principle_id = getattr(principle, 'id', 'unknown')
                 logger.info(
                     f"[KnowledgeCrystallizer] ISSUE #6 FIX: Principle rejected - "
                     f"INVALID validation (is_valid=False). "
-                    f"Principle: {principle.id if hasattr(principle, 'id') else 'unknown'}, "
+                    f"Principle: {principle_id}, "
                     f"Validation confidence: {validation.confidence:.2f}"
                 )
             elif validation.confidence < self.min_confidence_threshold:
                 rejection_reasons["low_confidence"] += 1
+                # INDUSTRY STANDARD: Use getattr with default for robust attribute access
+                principle_id = getattr(principle, 'id', 'unknown')
                 logger.info(
                     f"[KnowledgeCrystallizer] ISSUE #6 FIX: Principle rejected - "
                     f"LOW CONFIDENCE ({validation.confidence:.2f} < {self.min_confidence_threshold:.2f}). "
-                    f"Principle: {principle.id if hasattr(principle, 'id') else 'unknown'}"
+                    f"Principle: {principle_id}"
                 )
             else:
                 rejection_reasons["passed"] += 1

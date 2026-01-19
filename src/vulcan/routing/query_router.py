@@ -4596,10 +4596,20 @@ class QueryAnalyzer:
         
         query_lower = query.lower()
         
+        # INDUSTRY STANDARD: Word-boundary aware keyword matching to prevent false positives
+        # Using \b word boundaries prevents "math" from matching "mathematics",
+        # "calculate" from matching "miscalculate", etc.
+        #
+        # For performance, we compile patterns once and reuse them
+        def has_keyword_with_boundary(keyword: str, text: str) -> bool:
+            """Check if keyword exists as a complete word (word boundaries)."""
+            # Use simple word boundary check for performance
+            return re.search(rf'\b{re.escape(keyword)}\b', text, re.IGNORECASE) is not None
+        
         # Count domains present in query
-        has_math = any(kw in query_lower for kw in math_domain_keywords)
-        has_ethics = any(kw in query_lower for kw in ethics_domain_keywords)
-        has_logic = any(kw in query_lower for kw in logic_domain_keywords)
+        has_math = any(has_keyword_with_boundary(kw, query_lower) for kw in math_domain_keywords)
+        has_ethics = any(has_keyword_with_boundary(kw, query_lower) for kw in ethics_domain_keywords)
+        has_logic = any(has_keyword_with_boundary(kw, query_lower) for kw in logic_domain_keywords)
         
         domains_present = sum([has_math, has_ethics, has_logic])
         

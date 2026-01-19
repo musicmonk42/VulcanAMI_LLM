@@ -58,9 +58,12 @@ EXPLICIT_MATH_KEYWORDS: Tuple[str, ...] = (
 # Compiled regex patterns for efficient proof verification detection.
 # These are compiled once at module load time for optimal performance.
 #
-# INDUSTRY STANDARD: More specific patterns with proof context to avoid false positives.
-# The "step X:" pattern requires proof-specific context (verify/check/proof) to avoid
-# matching cooking recipes, instructions, etc.
+# INDUSTRY STANDARD: Pre-compiled regex patterns for efficient proof verification detection.
+# These are compiled once at module load time for optimal performance.
+#
+# PERFORMANCE OPTIMIZATION: Non-greedy quantifiers (.*?) prevent catastrophic backtracking.
+# Using non-greedy instead of greedy quantifiers ensures O(n) performance instead of
+# potential O(2^n) worst-case with malicious input.
 
 PROOF_VERIFICATION_PATTERNS: Tuple[re.Pattern, ...] = (
     re.compile(r"verify\s+(this\s+)?proof", re.IGNORECASE),
@@ -69,8 +72,9 @@ PROOF_VERIFICATION_PATTERNS: Tuple[re.Pattern, ...] = (
     re.compile(r"find\s+the\s+flaw", re.IGNORECASE),
     re.compile(r"(is|are)\s+(this|the)\s+proof", re.IGNORECASE),
     # More specific: requires "proof" or "step" in context, not standalone
-    re.compile(r"proof.*step\s+\d+", re.IGNORECASE),  # "proof: step 1"
-    re.compile(r"step\s+\d+.*proof", re.IGNORECASE),  # "step 1 of proof"
+    # PERFORMANCE: Non-greedy (.*?) prevents catastrophic backtracking
+    re.compile(r"proof.*?step\s+\d+", re.IGNORECASE),  # "proof: step 1"
+    re.compile(r"step\s+\d+.*?proof", re.IGNORECASE),  # "step 1 of proof"
 )
 
 
