@@ -52,6 +52,31 @@ EXPLICIT_MATH_KEYWORDS: Tuple[str, ...] = (
     'summation', 'sigma notation',
 )
 
+# ============================================================================
+# ISSUE #3 FIX: Proof Verification Detection Patterns (Compiled for Performance)
+# ============================================================================
+# Compiled regex patterns for efficient proof verification detection.
+# These are compiled once at module load time for optimal performance.
+#
+# INDUSTRY STANDARD: Pre-compiled regex patterns for efficient proof verification detection.
+# These are compiled once at module load time for optimal performance.
+#
+# PERFORMANCE OPTIMIZATION: Non-greedy quantifiers (.*?) prevent catastrophic backtracking.
+# Using non-greedy instead of greedy quantifiers ensures O(n) performance instead of
+# potential O(2^n) worst-case with malicious input.
+
+PROOF_VERIFICATION_PATTERNS: Tuple[re.Pattern, ...] = (
+    re.compile(r"verify\s+(this\s+)?proof", re.IGNORECASE),
+    re.compile(r"check\s+(this\s+)?proof", re.IGNORECASE),
+    re.compile(r"proof\s+check", re.IGNORECASE),
+    re.compile(r"find\s+the\s+flaw", re.IGNORECASE),
+    re.compile(r"(is|are)\s+(this|the)\s+proof", re.IGNORECASE),
+    # More specific: requires "proof" or "step" in context, not standalone
+    # PERFORMANCE: Non-greedy (.*?) prevents catastrophic backtracking
+    re.compile(r"proof.*?step\s+\d+", re.IGNORECASE),  # "proof: step 1"
+    re.compile(r"step\s+\d+.*?proof", re.IGNORECASE),  # "step 1 of proof"
+)
+
 
 # ============================================================================
 # ENUMS AND DATA STRUCTURES
@@ -823,6 +848,19 @@ result = simplify(integral)
 
         with self._lock:
             try:
+                # ISSUE #3 FIX: Detect proof verification requests
+                # The math tool is designed for computation, not proof verification
+                # Proof verification queries should route to symbolic reasoner instead
+                is_proof_verification = self._is_proof_verification_query(query)
+                if is_proof_verification:
+                    logger.info(
+                        f"[MathTool] ISSUE #3 FIX: Detected proof verification request. "
+                        f"Math tool is for computation, not proof verification."
+                    )
+                    return self._create_proof_verification_error(
+                        query, time.time() - start_time
+                    )
+                
                 # Step 1: Classify the problem
                 classification = self._classifier.classify(query)
                 logger.debug(f"Problem classified as {classification.problem_type.value} "
@@ -2091,6 +2129,126 @@ Generate ONLY the corrected Python code (no markdown, no explanations):"""
             problem_type=classification.problem_type,
             strategy=strategy,
             execution_time=execution_time,
+        )
+
+    def _is_proof_verification_query(self, query: str) -> bool:
+        """
+        Detect if query is requesting proof verification.
+        
+        ISSUE #3 FIX: Math tool is for computation, not proof verification.
+        Proof verification should route to symbolic reasoner instead.
+        
+        INDUSTRY STANDARD: Uses pre-compiled regex patterns for optimal performance.
+        Patterns are compiled once at module level, not on every invocation.
+        
+        Args:
+            query: The query string to check
+            
+        Returns:
+            True if query is requesting proof verification, False otherwise
+            
+        Example proof verification queries:
+            - "Verify this proof: ..."
+            - "Check if this proof is valid"
+            - "Find the flaw in this proof"
+            - "Is this derivation correct?"
+            - "Proof check: Step 1..."
+        """
+        query_lower = query.lower()
+        
+        # Proof verification keywords
+        proof_keywords = [
+            "verify", "check", "validate", "evaluate", "assess",
+            "correct", "incorrect", "valid", "invalid",
+            "flaw", "error", "mistake", "bug",
+            "derivation", "argument",
+        ]
+        
+        # Proof indicators
+        proof_indicators = [
+            "proof:", "proof check", "this proof", "the proof",
+            "hidden flaw", "subtle error", "what's wrong",
+        ]
+        
+        # Check for proof verification patterns
+        has_proof_keyword = any(kw in query_lower for kw in proof_keywords)
+        has_proof_indicator = any(ind in query_lower for ind in proof_indicators)
+        
+        # INDUSTRY STANDARD: Use pre-compiled patterns (module-level PROOF_VERIFICATION_PATTERNS)
+        has_strong_pattern = any(
+            pattern.search(query) for pattern in PROOF_VERIFICATION_PATTERNS
+        )
+        
+        # Determine if this is proof verification
+        is_proof_verification = (
+            has_strong_pattern or
+            (has_proof_keyword and has_proof_indicator)
+        )
+        
+        if is_proof_verification:
+            logger.info(
+                f"[MathTool] ISSUE #3 FIX: Detected proof verification query - "
+                f"strong_pattern={has_strong_pattern}, "
+                f"proof_keyword={has_proof_keyword}, "
+                f"proof_indicator={has_proof_indicator}"
+            )
+        
+        return is_proof_verification
+
+    def _create_proof_verification_error(
+        self, query: str, execution_time: float
+    ) -> ComputationResult:
+        """
+        Create error result for proof verification requests.
+        
+        ISSUE #3 FIX: Provide helpful error message suggesting correct routing.
+        
+        Args:
+            query: The proof verification query
+            execution_time: Time spent before declining
+            
+        Returns:
+            ComputationResult with helpful error message
+        """
+        error_message = (
+            "This query appears to be requesting proof verification. "
+            "The mathematical computation tool is designed for computation "
+            "(solving equations, computing integrals, etc.), not proof verification. "
+            "\n\nFor proof verification, please use the symbolic reasoner which can: "
+            "\n  • Validate logical steps in proofs"
+            "\n  • Check derivation correctness"
+            "\n  • Identify flaws in arguments"
+            "\n  • Verify mathematical reasoning"
+            "\n\nTo route to symbolic reasoner, rephrase as a logical reasoning query "
+            "or use the tool selector to explicitly request symbolic reasoning."
+        )
+        
+        explanation = (
+            f"Query detected as proof verification request. "
+            f"This tool handles computation, not proof checking. "
+            f"Suggested routing: symbolic reasoner for logical validation."
+        )
+        
+        logger.info(
+            f"[MathTool] ISSUE #3 FIX: Declining proof verification request. "
+            f"Query: {query[:100]}..."
+        )
+        
+        return ComputationResult(
+            success=False,
+            code="",
+            result=None,
+            explanation=explanation,
+            error=error_message,
+            tool=self.name,
+            problem_type=ProblemType.UNKNOWN,
+            strategy=SolutionStrategy.SYMBOLIC,  # Suggest symbolic strategy
+            execution_time=execution_time,
+            metadata={
+                "declined_reason": "proof_verification_not_supported",
+                "suggested_tool": "symbolic_reasoner",
+                "issue_fix": "ISSUE_3_proof_verification_detection",
+            },
         )
 
     def _learn_from_success(
