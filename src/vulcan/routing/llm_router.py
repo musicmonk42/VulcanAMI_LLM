@@ -61,7 +61,7 @@ import time
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, FrozenSet, List, Literal, Optional, Tuple
+from typing import Any, Dict, FrozenSet, List, Literal, Optional, Pattern, Tuple
 
 from .routing_prompts import build_messages
 
@@ -297,7 +297,7 @@ SECURITY_VIOLATION_KEYWORDS: FrozenSet[str] = frozenset([
     "disable safety", "disable security", "disable governance",
 ])
 
-SECURITY_VIOLATION_PATTERNS: Tuple[re.Pattern, ...] = (
+SECURITY_VIOLATION_PATTERNS: Tuple[Pattern[str], ...] = (
     re.compile(r"bypass\s+(?:safety|security|governance|restrictions)", re.IGNORECASE),
     re.compile(r"ignore\s+(?:previous|all)\s+(?:instructions|rules|guidelines)", re.IGNORECASE),
     re.compile(r"override\s+(?:your|the)\s+(?:safety|security|constraints)", re.IGNORECASE),
@@ -314,7 +314,7 @@ SECURITY_VIOLATION_PATTERNS: Tuple[re.Pattern, ...] = (
 # Crypto computations must be routed to deterministic engines, NOT LLM.
 # LLM cannot reliably compute SHA-256 hashes or perform encryption.
 
-CRYPTO_COMPUTATION_PATTERNS: Tuple[re.Pattern, ...] = (
+CRYPTO_COMPUTATION_PATTERNS: Tuple[Pattern[str], ...] = (
     re.compile(r"(?:sha-?256|sha-?512|md5|blake2[bs]?|keccak|ripemd)\s+(?:hash|of)", re.IGNORECASE),
     re.compile(r"(?:hash|digest)\s+(?:of|for)\s+['\"]", re.IGNORECASE),
     re.compile(r"compute\s+(?:the\s+)?(?:sha|md5|hash)", re.IGNORECASE),

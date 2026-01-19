@@ -26,6 +26,8 @@ These prompts guide the LLM to classify queries into one of three destinations:
 The LLM does NOT answer queries - it only classifies them for routing.
 """
 
+from typing import List, Tuple
+
 __version__ = "1.0.0"
 __author__ = "VULCAN-AGI Team"
 
@@ -131,7 +133,7 @@ Query: "Calculate the integral of x^2 from 0 to 1"
 # PROMPT BUILDER FUNCTIONS
 # ============================================================
 
-def build_router_prompt(query: str, include_examples: bool = False) -> tuple:
+def build_router_prompt(query: str, include_examples: bool = False) -> Tuple[str, str]:
     """
     Build the system and user prompts for LLM routing.
     

@@ -29,6 +29,7 @@ These tests verify:
 
 from __future__ import annotations
 
+import json
 import threading
 import time
 from typing import Any, Dict, List
@@ -106,7 +107,6 @@ def mock_llm_client():
                 "reason": "Greeting detected",
             }
         
-        import json
         return json.dumps(response)
     
     client.chat = mock_chat
