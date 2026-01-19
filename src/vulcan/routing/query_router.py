@@ -131,6 +131,34 @@ MATH_NOTATION_PATTERN: re.Pattern = re.compile(
     re.IGNORECASE
 )
 
+# =============================================================================
+# ISSUE 9 FIX: Pre-compiled Follow-Up Detection Patterns (Performance)
+# =============================================================================
+# Industry Standard: Pre-compile regex patterns at module level for O(1) matching
+# performance instead of compiling on every query.
+#
+# These patterns detect continuation phrases that indicate a follow-up query:
+# - "what is your answer?"
+# - "what do you think?"
+# - "can you explain more?"
+# =============================================================================
+FOLLOWUP_CONTINUATION_PATTERNS: Tuple[re.Pattern, ...] = tuple([
+    re.compile(r'\bwhat\s+is\s+your\s+answer\b', re.IGNORECASE),
+    re.compile(r'\bwhat\s+do\s+you\s+think\b', re.IGNORECASE),
+    re.compile(r'\b(?:can|could)\s+you\s+explain\s+(?:more|further)\b', re.IGNORECASE),
+    re.compile(r'\belaborate\s+on\s+that\b', re.IGNORECASE),
+    re.compile(r'\btell\s+me\s+more\b', re.IGNORECASE),
+    re.compile(r'\band\s+(?:about|regarding)\s+that\b', re.IGNORECASE),
+    re.compile(r'\bwhat\s+about\s+(?:your|that)\b', re.IGNORECASE),
+    re.compile(r'\byour\s+(?:answer|response|thoughts?)\b', re.IGNORECASE),
+    re.compile(r'\bmore\s+(?:detail|information|context)\b', re.IGNORECASE),
+    re.compile(r'\bexpand\s+on\s+that\b', re.IGNORECASE),
+])
+
+# Maximum word count for short query detection in follow-up context
+# Industry Standard: Named constants for magic numbers
+MAX_SHORT_QUERY_WORDS: int = 5
+
 
 def _has_unicode_math(query: str) -> bool:
     """
@@ -2361,6 +2389,12 @@ class QueryAnalyzer:
         self._safety_cache = BoundedLRUCache(maxsize=500, ttl_seconds=300.0)
         self._adversarial_cache = BoundedLRUCache(maxsize=500, ttl_seconds=300.0)
         self._complexity_cache = BoundedLRUCache(maxsize=1000, ttl_seconds=600.0)
+        
+        # ISSUE 9 FIX (Jan 2026): Session history for follow-up context tracking
+        # Stores last query category per session_id to detect follow-ups
+        # Bounded cache prevents memory leak (max 1000 sessions, 10 min TTL)
+        # Industry Standard: Use TTL-based cache for stateful session tracking
+        self._session_history = BoundedLRUCache(maxsize=1000, ttl_seconds=600.0)
 
         # Safety validator integration
         self._enable_safety_validation = enable_safety_validation
@@ -3298,6 +3332,77 @@ class QueryAnalyzer:
 
         return False
 
+    def _is_followup_query(self, query: str, session_id: Optional[str] = None) -> Tuple[bool, Optional[str]]:
+        """
+        Detect if query is a follow-up/continuation of previous query in the session.
+        
+        ISSUE 9 FIX (Jan 2026): Follow-up questions should inherit context from
+        previous philosophical/reasoning query instead of being routed to OpenAI.
+        
+        Follow-up indicators:
+        - "what is your answer?"
+        - "what do you think?"
+        - "can you explain more?"
+        - "elaborate on that"
+        - "tell me more"
+        - "and about that?"
+        
+        Industry Standard: Context-aware conversation management with bounded memory.
+        
+        Args:
+            query: The current query string
+            session_id: Optional session identifier for context lookup
+            
+        Returns:
+            Tuple of (is_followup, previous_category)
+            - is_followup: True if query appears to be a follow-up
+            - previous_category: Category of previous query if available, else None
+        """
+        if not query or not isinstance(query, str):
+            return False, None
+            
+        query_lower = query.lower().strip()
+        
+        # Check for explicit continuation phrases using pre-compiled patterns
+        # Industry Standard: Use module-level pre-compiled patterns for performance
+        is_continuation_phrase = False
+        for pattern in FOLLOWUP_CONTINUATION_PATTERNS:
+            if pattern.search(query_lower):
+                is_continuation_phrase = True
+                logger.debug(f"[QueryRouter] Follow-up phrase detected in query")
+                break
+        
+        # Get previous category from session history if available
+        previous_category = None
+        if session_id and self._session_history:
+            try:
+                session_data = self._session_history.get(session_id)
+                if session_data:
+                    previous_category = session_data.get('last_category')
+                    logger.debug(
+                        f"[QueryRouter] Session {session_id[:8]}: "
+                        f"Previous category: {previous_category}"
+                    )
+            except Exception as e:
+                logger.warning(f"[QueryRouter] Error accessing session history: {e}")
+        
+        # Determine if this is a follow-up
+        # A query is a follow-up if:
+        # 1. It contains a continuation phrase, OR
+        # 2. It's very short and there's previous context (user might be answering)
+        is_followup = is_continuation_phrase
+        
+        if not is_followup and previous_category and len(query_lower.split()) <= MAX_SHORT_QUERY_WORDS:
+            # Short query with previous context might be a follow-up
+            # e.g., "yes", "no", "I see", "interesting"
+            is_followup = True
+            logger.debug(
+                f"[QueryRouter] Short query with previous context ({previous_category}), "
+                "treating as potential follow-up"
+            )
+        
+        return is_followup, previous_category
+
     def _is_worldmodel_direct_query(self, query: str) -> Tuple[bool, str]:
         """
         Check if query should bypass ToolSelector and go directly to WorldModel.
@@ -4037,6 +4142,58 @@ class QueryAnalyzer:
                 f"category={classification.category}, complexity={classification.complexity:.2f}, "
                 f"skip_reasoning={classification.skip_reasoning}, tools={classification.suggested_tools}"
             )
+            
+            # =================================================================
+            # ISSUE 9 FIX (Jan 2026): Follow-Up Context Inheritance
+            # =================================================================
+            # Detect if query is a follow-up to previous query in session.
+            # Follow-ups should inherit category from previous philosophical/reasoning query
+            # instead of being reclassified as GENERAL and sent to OpenAI.
+            #
+            # Example scenario (BEFORE fix):
+            # 1. User: "would you choose self-awareness?" → PHILOSOPHICAL
+            # 2. User: "what is your answer?" → GENERAL → OpenAI (WRONG!)
+            #
+            # Example scenario (AFTER fix):
+            # 1. User: "would you choose self-awareness?" → PHILOSOPHICAL
+            # 2. User: "what is your answer?" → PHILOSOPHICAL (inherited) → Vulcan
+            # =================================================================
+            is_followup, previous_category = self._is_followup_query(query, session_id)
+            
+            if is_followup and previous_category:
+                logger.info(
+                    f"[QueryRouter] {query_id}: Follow-up detected, "
+                    f"inheriting category from previous: {previous_category}"
+                )
+                
+                # Override classification if previous was philosophical/reasoning
+                # Don't override if previous was simple (GREETING, CHITCHAT)
+                if previous_category in ['PHILOSOPHICAL', 'SELF_INTROSPECTION', 
+                                        'LOGICAL', 'MATHEMATICAL', 'CAUSAL', 
+                                        'PROBABILISTIC', 'ANALOGICAL']:
+                    classification = type(classification)(
+                        category=previous_category,
+                        complexity=max(0.4, classification.complexity),  # Maintain some complexity
+                        confidence=0.7,  # Medium confidence for inherited context
+                        skip_reasoning=False,  # Don't skip reasoning
+                        suggested_tools=classification.suggested_tools,
+                        source="followup_context_inheritance"
+                    )
+                    logger.info(
+                        f"[QueryRouter] {query_id}: Classification overridden to {previous_category} "
+                        "due to follow-up context"
+                    )
+            
+            # Store current classification in session history for future follow-ups
+            if session_id and self._session_history and classification.category != 'UNKNOWN':
+                try:
+                    self._session_history.put(session_id, {
+                        'last_category': classification.category,
+                        'timestamp': time.time(),
+                        'query': query[:100]  # Store truncated query for debugging
+                    })
+                except Exception as e:
+                    logger.warning(f"[QueryRouter] Error storing session history: {e}")
             
             # Note: Check for self-introspection FIRST (before philosophical override)
             # Self-introspection queries need multi-tool routing, not just philosophical
