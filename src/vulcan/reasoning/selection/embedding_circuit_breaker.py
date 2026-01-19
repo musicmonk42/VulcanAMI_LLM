@@ -263,7 +263,7 @@ class EmbeddingCircuitBreaker:
         Calculate current reset timeout with exponential backoff and jitter.
         
         CRITICAL FIX #3: Exponential Backoff Implementation
-        - Timeout = initial_timeout * (multiplier ^ consecutive_failures)
+        - Timeout = initial_timeout * (multiplier ^ (consecutive_failures - 1))
         - Capped at max_reset_timeout_s
         - Jitter added: +/- backoff_jitter percentage
         - Uses math.pow() for efficiency and numerical stability
@@ -276,8 +276,9 @@ class EmbeddingCircuitBreaker:
         capped_failures = min(self._consecutive_failures, 20)
         
         # Calculate exponential backoff using math.pow for efficiency
-        exponent = math.pow(self.backoff_multiplier, capped_failures)
-        timeout = self.reset_timeout_s * exponent
+        # Use (failures - 1) as exponent so first failure = base timeout
+        exponent = max(0, capped_failures - 1)
+        timeout = self.reset_timeout_s * math.pow(self.backoff_multiplier, exponent)
         
         # Cap at maximum
         timeout = min(timeout, self.max_reset_timeout_s)

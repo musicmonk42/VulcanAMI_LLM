@@ -261,6 +261,7 @@ class TestGraphixArena:
         assert "observability" in result
 
     @pytest.mark.asyncio
+    @pytest.mark.timeout(60)
     async def test_run_shadow_task(self, arena):
         """Test shadow task execution."""
         payload = {"graph_id": "test_graph", "data": "test"}

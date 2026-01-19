@@ -267,19 +267,18 @@ class ReasoningChain:
         Add a step to the reasoning chain with automatic pruning.
         
         CRITICAL FIX #5: Enforces step limit when adding steps
-        - Prunes low-confidence steps if limit significantly exceeded
-        - Keeps first step (initialization) and last N-1 steps
-        - Only prunes when 10% over limit to avoid frequent resorting
+        - Prunes low-confidence steps if limit exceeded
+        - Keeps first step (initialization) and last 10 steps
+        - Keeps highest-confidence middle steps
         
         Args:
             step: ReasoningStep to add
         """
         self.steps.append(step)
         
-        # Check if we need to prune (with buffer to avoid frequent pruning)
-        # Only prune when we're 10% over limit to reduce sorting overhead
-        prune_threshold = int(MAX_REASONING_CHAIN_STEPS * 1.1)
-        if len(self.steps) > prune_threshold:
+        # Check if we need to prune
+        # Prune immediately when exceeding MAX_REASONING_CHAIN_STEPS
+        if len(self.steps) > MAX_REASONING_CHAIN_STEPS:
             logger.warning(
                 f"[Chain Limit] Chain reached {len(self.steps)} steps, "
                 f"pruning to {MAX_REASONING_CHAIN_STEPS}"
