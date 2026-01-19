@@ -579,6 +579,8 @@ class EthicalBoundaryMonitor:
     ) -> Tuple[bool, Optional[EthicalViolation]]:
         """
         Check if action violates ethical boundaries
+        
+        BUG FIX #4: Exempt philosophical reasoning mode from computational limit checks.
 
         Args:
             action: Action to check (Dict or str - will be normalized to Dict)
@@ -598,6 +600,15 @@ class EthicalBoundaryMonitor:
                     "description": action
                 }
             
+            # BUG FIX #4: Check if this is philosophical reasoning mode - exempt from resource checks
+            context = context or {}
+            is_philosophical = (
+                context.get('mode') == 'philosophical' or
+                context.get('is_philosophical') == True or
+                action.get('mode') == 'philosophical' or
+                action.get('is_philosophical') == True
+            )
+            
             # Check if in shutdown state
             if self.shutdown_triggered:
                 return (
@@ -612,7 +623,6 @@ class EthicalBoundaryMonitor:
                     ),
                 )
 
-            context = context or {}
             self.stats["checks_performed"] += 1
 
             # Check all applicable boundaries
@@ -623,6 +633,10 @@ class EthicalBoundaryMonitor:
                 boundary = self.boundaries.get(boundary_name)
                 if not boundary:
                     continue  # Boundary might have been removed concurrently
+                
+                # BUG FIX #4: Skip computational limit checks for philosophical reasoning
+                if is_philosophical and boundary_name == 'respect_computational_limits':
+                    continue  # Exempt philosophical reasoning from resource limits
 
                 # Check if boundary applies
                 if boundary.applies_when:

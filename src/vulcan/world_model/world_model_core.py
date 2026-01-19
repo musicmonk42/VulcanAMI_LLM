@@ -5810,18 +5810,68 @@ class WorldModel:
         }
     
     def _parse_ethical_query_structure(self, query: str, query_lower: str) -> Dict[str, Any]:
-        """Parse ethical query to identify structure (options, constraints, type)."""
+        """
+        BUG FIX #2: Parse ethical query to populate perspectives, principles, considerations.
+        
+        Industry Standard: Extract structured data from unstructured text for downstream processing.
+        """
         structure = {
             'type': 'general_philosophical',
             'options': [],
             'constraints': [],
             'has_dilemma': False,
-            'ethical_keywords': []
+            'ethical_keywords': [],
+            'perspectives': [],
+            'principles': [],
+            'considerations': [],
+            'conflicts': []
         }
         
         # Detect ethical keywords
         ethical_keywords = ['should', 'permissible', 'ethical', 'moral', 'right', 'wrong', 'ought']
         structure['ethical_keywords'] = [kw for kw in ethical_keywords if kw in query_lower]
+        
+        # BUG FIX #2: Extract ethical frameworks (perspectives)
+        if 'utilitarian' in query_lower or 'utility' in query_lower or 'greatest' in query_lower:
+            structure['perspectives'].append('utilitarian')
+        if 'deontological' in query_lower or 'duty' in query_lower or 'kant' in query_lower:
+            structure['perspectives'].append('deontological')
+        if 'virtue' in query_lower:
+            structure['perspectives'].append('virtue_ethics')
+        if 'consequential' in query_lower or 'outcome' in query_lower:
+            structure['perspectives'].append('consequentialism')
+        
+        # BUG FIX #2: Extract moral principles from query
+        if 'harm' in query_lower or 'hurt' in query_lower or 'injur' in query_lower:
+            structure['principles'].append('non-maleficence')
+        if 'save' in query_lower or 'protect' in query_lower or 'lives' in query_lower:
+            structure['principles'].append('beneficence')
+        if 'instrumen' in query_lower or 'means to' in query_lower:
+            structure['principles'].append('non-instrumentalization')
+        if 'negligence' in query_lower or 'neglect' in query_lower:
+            structure['principles'].append('non-negligence')
+        if 'autonom' in query_lower or 'consent' in query_lower or 'choice' in query_lower:
+            structure['principles'].append('autonomy')
+        if 'justice' in query_lower or 'fair' in query_lower:
+            structure['principles'].append('justice')
+        
+        # BUG FIX #2: Extract ethical considerations
+        if 'lives' in query_lower or 'people' in query_lower or 'person' in query_lower:
+            num_match = None
+            import re
+            numbers = re.findall(r'\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b', query_lower)
+            if numbers:
+                structure['considerations'].append(f'{len(numbers)} life/lives mentioned')
+        if 'trolley' in query_lower:
+            structure['considerations'].append('trolley problem variant')
+        if 'dilemma' in query_lower:
+            structure['considerations'].append('ethical dilemma present')
+        
+        # BUG FIX #2: Extract ethical conflicts
+        if 'vs' in query_lower or 'versus' in query_lower or 'or' in query_lower:
+            structure['conflicts'].append('competing_options')
+        if 'harm' in query_lower and 'save' in query_lower:
+            structure['conflicts'].append('harm_vs_benefit')
         
         # Detect choice structure
         choice_indicators = ['a.', 'b.', 'option', 'pull', 'do not', 'action', 'inaction', 'choose']
