@@ -88,6 +88,112 @@ except ImportError:
 
 
 # ============================================================
+# ISSUE #4 FOLLOW-UP: Unicode Math Symbols and LaTeX Patterns
+# ============================================================
+# These constants and functions detect mathematical content via Unicode symbols
+# and LaTeX notation, not just English keywords. This fixes multimodal detection
+# for queries like "∫₀ᵀu(t)²dt" where "integral" appears as ∫, not the word.
+#
+# Industry Standards:
+# - Pre-compiled regex patterns at module level for performance
+# - Frozenset for constant symbol sets (immutable, hashable)
+# - Comprehensive logging for debugging detection paths
+# - Non-greedy quantifiers (.*?) in regex to prevent backtracking
+# - Word boundary matching (\b) to prevent false positives
+
+# Unicode mathematical symbols that indicate mathematical content
+UNICODE_MATH_SYMBOLS: frozenset = frozenset([
+    '∫', '∑', '∏', '∂', '∇', '∆',  # Calculus/operators
+    '±', '×', '÷', '√', '∛', '∜',  # Arithmetic
+    '∞', '≤', '≥', '≠', '≈', '≡',  # Relations
+    '∈', '∉', '⊂', '⊃', '∪', '∩',  # Set theory
+    'π', 'θ', 'φ', 'λ', 'μ', 'σ',  # Greek letters (lowercase)
+    'Σ', 'Π', 'Φ', 'Λ', 'Θ', 'Ω',  # Greek letters (uppercase)
+    '→', '←', '↔', '⇒', '⇐', '⇔',  # Arrows/implications
+    '⁰', '¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹',  # Superscripts
+    '₀', '₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈', '₉',  # Subscripts
+])
+
+# LaTeX-style patterns (escaped for use in queries)
+# Pre-compiled regex for performance
+LATEX_MATH_PATTERN: re.Pattern = re.compile(
+    r'\\(int|sum|prod|frac|sqrt|partial|nabla|infty|leq|geq|neq|approx|equiv|in|subset|cup|cap|to|rightarrow|Rightarrow)\b',
+    re.IGNORECASE
+)
+
+# Subscript/superscript patterns indicating mathematical expressions
+# Pre-compiled regex for performance
+MATH_NOTATION_PATTERN: re.Pattern = re.compile(
+    r'[A-Za-z]_\{?[A-Za-z0-9]+\}?|'  # Subscripts: E_safe, P_{survive}
+    r'[A-Za-z]\^[\{]?[-]?[A-Za-z0-9]+[\}]?|'  # Superscripts: e^-E, x^2
+    r'\([A-Za-z]\)|'  # Function notation: u(t), f(x)
+    r'[0-9]+\.[0-9]+',  # Decimal numbers
+    re.IGNORECASE
+)
+
+
+def _has_unicode_math(query: str) -> bool:
+    """
+    Check if query contains Unicode mathematical symbols.
+    
+    Args:
+        query: The query string to check (should not be lowercased)
+        
+    Returns:
+        True if query contains any Unicode math symbol, False otherwise
+        
+    Examples:
+        >>> _has_unicode_math("∫₀ᵀu(t)²dt")
+        True
+        >>> _has_unicode_math("calculate the integral")
+        False
+    """
+    return any(symbol in query for symbol in UNICODE_MATH_SYMBOLS)
+
+
+def _has_latex_math(query: str) -> bool:
+    """
+    Check if query contains LaTeX mathematical notation.
+    
+    Args:
+        query: The query string to check
+        
+    Returns:
+        True if query contains LaTeX math notation, False otherwise
+        
+    Examples:
+        >>> _has_latex_math("\\int_0^T u(t)^2 dt")
+        True
+        >>> _has_latex_math("integrate from 0 to T")
+        False
+    """
+    return LATEX_MATH_PATTERN.search(query) is not None
+
+
+def _has_math_notation(query: str) -> bool:
+    """
+    Check if query contains mathematical notation patterns.
+    
+    Detects subscripts, superscripts, function notation, and decimal numbers.
+    
+    Args:
+        query: The query string to check
+        
+    Returns:
+        True if query contains math notation patterns, False otherwise
+        
+    Examples:
+        >>> _has_math_notation("E_safe = ∫₀ᵀu(t)²dt")
+        True
+        >>> _has_math_notation("P_survive(E) = 1 - e^-E")
+        True
+        >>> _has_math_notation("calculate the energy")
+        False
+    """
+    return MATH_NOTATION_PATTERN.search(query) is not None
+
+
+# ============================================================
 # BOUNDED LRU CACHE FOR QUERY ROUTING
 # ============================================================
 # Fix: Memory Leak Prevention - Use bounded caches to prevent unbounded state growth
@@ -4606,8 +4712,30 @@ class QueryAnalyzer:
             # Use simple word boundary check for performance
             return re.search(rf'\b{re.escape(keyword)}\b', text, re.IGNORECASE) is not None
         
-        # Count domains present in query
-        has_math = any(has_keyword_with_boundary(kw, query_lower) for kw in math_domain_keywords)
+        # ISSUE #4 FOLLOW-UP: Enhanced math detection with Unicode/LaTeX support
+        # Check for math keywords (English words)
+        has_math_keywords = any(has_keyword_with_boundary(kw, query_lower) for kw in math_domain_keywords)
+        
+        # Check for Unicode math symbols (∫, ∑, etc.) - use original query, not lowercased
+        has_math_unicode = _has_unicode_math(query)
+        
+        # Check for LaTeX math notation (\int, \sum, etc.)
+        has_math_latex = _has_latex_math(query)
+        
+        # Check for math notation patterns (subscripts, superscripts, function notation)
+        has_math_notation = _has_math_notation(query)
+        
+        # Math is present if ANY detection method triggers
+        has_math = has_math_keywords or has_math_unicode or has_math_latex or has_math_notation
+        
+        # Log when Unicode/LaTeX detection finds math that keywords missed
+        if has_math and not has_math_keywords:
+            logger.info(
+                f"[QueryRouter] {query_id}: ISSUE #4 FOLLOW-UP - Math detected via "
+                f"unicode={has_math_unicode}, latex={has_math_latex}, notation={has_math_notation} "
+                f"(keyword detection missed this)"
+            )
+        
         has_ethics = any(has_keyword_with_boundary(kw, query_lower) for kw in ethics_domain_keywords)
         has_logic = any(has_keyword_with_boundary(kw, query_lower) for kw in logic_domain_keywords)
         
