@@ -54,19 +54,33 @@ def is_self_referential(query):
     if not IMPORTS_AVAILABLE or UnifiedReasoner is None:
         return False
     # Create a minimal reasoner instance for detection
-    # CRITICAL: Use short cleanup_interval to avoid test timeouts
+    # CRITICAL: Use configuration that disables background threads to avoid test timeouts
     reasoner = UnifiedReasoner(
         enable_learning=False,
         enable_safety=False,
         max_workers=1,
-        config={'skip_runtime': True, 'cache_config': {'cleanup_interval': 0.05}}
+        config={
+            'skip_runtime': True,
+            'cache_config': {
+                'cleanup_interval': 0.05,
+                'enable_warming': False,
+                'enable_disk_cache': False,
+            },
+            'tool_selector_config': {
+                'enable_background_updates': False,
+            },
+            'warm_pool_config': {
+                'enable_background_scaling': False,
+            },
+            'disable_governance_logging': True,
+        }
     )
     try:
         result = reasoner._is_self_referential_query(query)
         return result
     finally:
-        # Clean up the reasoner
-        reasoner.shutdown(timeout=1.0, skip_save=True)
+        # Clean up the reasoner with longer timeout
+        reasoner.shutdown(timeout=5.0, skip_save=True)
 
 
 class TestCacheValidation(unittest.TestCase):
@@ -76,10 +90,21 @@ class TestCacheValidation(unittest.TestCase):
         """Set up test fixtures."""
         if not IMPORTS_AVAILABLE:
             self.skipTest("Required modules not available")
-        # Create a reasoner with minimal config
+        # Create a reasoner with minimal config that disables background threads
         self.config = {
             'skip_runtime': True,
-            'cache_config': {'cleanup_interval': 0.05}
+            'cache_config': {
+                'cleanup_interval': 0.05,
+                'enable_warming': False,  # Disable cache warming threads
+                'enable_disk_cache': False,  # Disable disk cache threads
+            },
+            'tool_selector_config': {
+                'enable_background_updates': False,  # Disable background updates
+            },
+            'warm_pool_config': {
+                'enable_background_scaling': False,  # Disable scaling threads
+            },
+            'disable_governance_logging': True,  # Disable governance logging for tests
         }
         self.reasoner = UnifiedReasoner(
             enable_learning=False,
@@ -91,7 +116,10 @@ class TestCacheValidation(unittest.TestCase):
     def tearDown(self):
         """Clean up after tests."""
         if hasattr(self, 'reasoner'):
-            self.reasoner.shutdown(timeout=2.0, skip_save=True)
+            # Use longer timeout for proper cleanup
+            # The improved shutdown handling in UnifiedReasoner and governance loggers
+            # will ensure all background threads terminate properly
+            self.reasoner.shutdown(timeout=5.0, skip_save=True)
     
     def test_is_invalid_cache_entry_unknown_type(self):
         """Test that UNKNOWN type results are marked as invalid."""
@@ -309,7 +337,18 @@ class TestSelfReferentialQueryHandling(unittest.TestCase):
             self.skipTest("Required modules not available")
         self.config = {
             'skip_runtime': True,
-            'cache_config': {'cleanup_interval': 0.05}
+            'cache_config': {
+                'cleanup_interval': 0.05,
+                'enable_warming': False,
+                'enable_disk_cache': False,
+            },
+            'tool_selector_config': {
+                'enable_background_updates': False,
+            },
+            'warm_pool_config': {
+                'enable_background_scaling': False,
+            },
+            'disable_governance_logging': True,
         }
         self.reasoner = UnifiedReasoner(
             enable_learning=False,
@@ -321,7 +360,10 @@ class TestSelfReferentialQueryHandling(unittest.TestCase):
     def tearDown(self):
         """Clean up after tests."""
         if hasattr(self, 'reasoner'):
-            self.reasoner.shutdown(timeout=2.0, skip_save=True)
+            # Use longer timeout for proper cleanup
+            # The improved shutdown handling in UnifiedReasoner and governance loggers
+            # will ensure all background threads terminate properly
+            self.reasoner.shutdown(timeout=5.0, skip_save=True)
     
     def test_is_self_referential_query_method(self):
         """Test the _is_self_referential_query method."""
@@ -381,7 +423,18 @@ class TestCacheStorageLogic(unittest.TestCase):
             self.skipTest("Required modules not available")
         self.config = {
             'skip_runtime': True,
-            'cache_config': {'cleanup_interval': 0.05}
+            'cache_config': {
+                'cleanup_interval': 0.05,
+                'enable_warming': False,
+                'enable_disk_cache': False,
+            },
+            'tool_selector_config': {
+                'enable_background_updates': False,
+            },
+            'warm_pool_config': {
+                'enable_background_scaling': False,
+            },
+            'disable_governance_logging': True,
         }
         self.reasoner = UnifiedReasoner(
             enable_learning=False,
@@ -393,7 +446,10 @@ class TestCacheStorageLogic(unittest.TestCase):
     def tearDown(self):
         """Clean up after tests."""
         if hasattr(self, 'reasoner'):
-            self.reasoner.shutdown(timeout=2.0, skip_save=True)
+            # Use longer timeout for proper cleanup
+            # The improved shutdown handling in UnifiedReasoner and governance loggers
+            # will ensure all background threads terminate properly
+            self.reasoner.shutdown(timeout=5.0, skip_save=True)
     
     def test_cache_clear_invalid_entries_on_startup(self):
         """Test that invalid entries are cleared on startup."""

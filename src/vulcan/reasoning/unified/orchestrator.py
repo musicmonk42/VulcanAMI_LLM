@@ -5596,6 +5596,18 @@ class UnifiedReasoner:
                 except Exception as e:
                     logger.warning(f"Error shutting down {name}: {e}")
 
+        # Shutdown global governance loggers to stop background threads
+        try:
+            from vulcan.routing.governance_logger import (
+                shutdown_buffered_governance_logger,
+                shutdown_governance_logger,
+            )
+            shutdown_buffered_governance_logger()
+            shutdown_governance_logger()
+            logger.debug("Governance loggers shut down")
+        except Exception as e:
+            logger.warning(f"Error shutting down governance loggers: {e}")
+
         elapsed = time.time() - start_time
         logger.info(f"Shutdown complete in {elapsed:.2f}s")
 
