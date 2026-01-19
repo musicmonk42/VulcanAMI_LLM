@@ -7,11 +7,17 @@ Tests for:
 3. Cache validation rejects expired results
 4. Self-referential query detection
 5. Meta-reasoning integration for self-referential queries
+
+NOTE: These tests involve UnifiedReasoner initialization which creates background
+threads and may take longer than typical unit tests. The test classes are marked
+with appropriate timeout settings to accommodate this initialization overhead.
 """
 
 import time
 import unittest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 # Import the components we're testing
 IMPORTS_AVAILABLE = False
@@ -83,8 +89,14 @@ def is_self_referential(query):
         reasoner.shutdown(timeout=5.0, skip_save=True)
 
 
+@pytest.mark.timeout(180)  # Allow 3 minutes for tests involving UnifiedReasoner initialization
 class TestCacheValidation(unittest.TestCase):
-    """Test cache validation functionality."""
+    """
+    Test cache validation functionality.
+    
+    Note: Uses pytest.mark.timeout(180) because UnifiedReasoner initialization
+    creates background threads and may take significant time on slower CI runners.
+    """
     
     def setUp(self):
         """Set up test fixtures."""
@@ -271,8 +283,14 @@ class TestCacheValidation(unittest.TestCase):
         self.assertTrue(valid, f"Valid cached result should be accepted: {reason}")
 
 
+@pytest.mark.timeout(180)  # Allow 3 minutes for tests involving UnifiedReasoner initialization
 class TestSelfReferentialDetection(unittest.TestCase):
-    """Test self-referential query detection."""
+    """
+    Test self-referential query detection.
+    
+    Note: Uses pytest.mark.timeout(180) because is_self_referential() helper
+    creates UnifiedReasoner instances which may take time on slower CI runners.
+    """
     
     def setUp(self):
         """Set up test - skip if imports not available."""
@@ -328,8 +346,14 @@ class TestSelfReferentialDetection(unittest.TestCase):
         )
 
 
+@pytest.mark.timeout(180)  # Allow 3 minutes for tests involving UnifiedReasoner initialization
 class TestSelfReferentialQueryHandling(unittest.TestCase):
-    """Test self-referential query handling with meta-reasoning."""
+    """
+    Test self-referential query handling with meta-reasoning.
+    
+    Note: Uses pytest.mark.timeout(180) because UnifiedReasoner initialization
+    creates background threads and may take significant time on slower CI runners.
+    """
     
     def setUp(self):
         """Set up test fixtures."""
@@ -413,9 +437,14 @@ class TestSelfReferentialQueryHandling(unittest.TestCase):
     
 
 
-
+@pytest.mark.timeout(180)  # Allow 3 minutes for tests involving UnifiedReasoner initialization
 class TestCacheStorageLogic(unittest.TestCase):
-    """Test that failed results are not cached."""
+    """
+    Test that failed results are not cached.
+    
+    Note: Uses pytest.mark.timeout(180) because UnifiedReasoner initialization
+    creates background threads and may take significant time on slower CI runners.
+    """
     
     def setUp(self):
         """Set up test fixtures."""

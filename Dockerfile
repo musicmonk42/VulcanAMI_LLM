@@ -295,8 +295,11 @@ USER graphix
 # Uses PORT env var with default of 8000 if not set
 # CRITICAL: start-period must be long enough for ML model loading
 # The application loads BERT, spaCy en_core_web_lg (~300s worst case), and embedding models
-# start-period=300s allows up to 5 minutes for initial startup before health checks begin
-HEALTHCHECK --interval=30s --timeout=10s --start-period=300s --retries=3 \
+# start-period=600s allows up to 10 minutes for initial startup before health checks begin
+# interval=30s checks every 30 seconds after start-period
+# timeout=10s gives each check 10 seconds to respond
+# retries=3 allows 3 failures before marking unhealthy
+HEALTHCHECK --interval=30s --timeout=10s --start-period=600s --retries=3 \
     CMD curl -fsS http://localhost:${PORT:-8000}/health/live || exit 1
 
 # Entrypoint ensures runtime secrets are provided securely

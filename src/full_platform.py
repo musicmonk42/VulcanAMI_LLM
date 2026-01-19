@@ -15,6 +15,16 @@
 # - FIXED: Ghost process prevention for uvicorn --reload mode
 # ============================================================
 
+# =============================================================================
+# STARTUP TIMING (for Railway/production diagnostics)
+# =============================================================================
+# Print timestamp at very start of module loading to track cold start time.
+# This helps diagnose Railway healthcheck failures by showing when Python
+# actually starts loading this module vs when uvicorn becomes ready.
+import time as _startup_time_module
+_MODULE_LOAD_START = _startup_time_module.time()
+print(f"[STARTUP] full_platform.py loading started at {_MODULE_LOAD_START:.2f}")
+
 # NOTE: Subprocess management now uses subprocess.Popen instead of asyncio.create_subprocess_exec
 # This avoids issues with Windows event loop policy when using uvicorn --reload
 
@@ -125,6 +135,7 @@ else:
     print("❌ OPENAI_API_KEY not set - chat features will use fallback responses")
 
 # =============================================================================
+print(f"[STARTUP] Environment loaded in {_startup_time_module.time() - _MODULE_LOAD_START:.2f}s")
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Security, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -134,6 +145,8 @@ from fastapi.security.api_key import APIKeyHeader
 from fastapi.staticfiles import StaticFiles
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from starlette.middleware.wsgi import WSGIMiddleware
+
+print(f"[STARTUP] FastAPI imports complete in {_startup_time_module.time() - _MODULE_LOAD_START:.2f}s")
 
 # NOTE: Windows event loop policy is now set at the very top of the file (line 17)
 # before any imports that might trigger asyncio initialization.
@@ -176,6 +189,7 @@ except ImportError:
     print("⚠️  python-jose not available - JWT auth disabled")
 
 # =============================================================================
+print(f"[STARTUP] Optional dependencies loaded in {_startup_time_module.time() - _MODULE_LOAD_START:.2f}s")
 
 # Arena components (for integrated API endpoints)
 try:
@@ -2726,6 +2740,7 @@ async def lifespan(app: FastAPI):
     logger.info("=" * 70)
     logger.info(f"Starting Unified Platform (Worker {worker_id})")
     logger.info("=" * 70)
+    logger.info(f"🚀 Lifespan started at {_startup_time_module.time() - _MODULE_LOAD_START:.2f}s since module load")
     logger.info("🚀 Server accepting connections - scheduling background initialization...")
     
     # Schedule background services initialization (NON-BLOCKING)
@@ -2738,6 +2753,7 @@ async def lifespan(app: FastAPI):
         )
     
     try:
+        logger.info(f"✅ YIELDING NOW - /health/live will respond (total startup: {_startup_time_module.time() - _MODULE_LOAD_START:.2f}s)")
         yield  # Server is now accepting connections!
     except asyncio.CancelledError:
         logger.info(f"Unified Platform (Worker {worker_id}) received cancellation signal")
@@ -2824,6 +2840,7 @@ async def lifespan(app: FastAPI):
 # =============================================================================
 # FASTAPI APP CREATION
 # =============================================================================
+print(f"[STARTUP] Module loading complete in {_startup_time_module.time() - _MODULE_LOAD_START:.2f}s, creating FastAPI app...")
 
 app = FastAPI(
     title="Graphix Vulcan Unified Platform",
@@ -2834,6 +2851,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+print(f"[STARTUP] FastAPI app created in {_startup_time_module.time() - _MODULE_LOAD_START:.2f}s")
 
 # Request size limiting middleware (header-based)
 @app.middleware("http")
@@ -4810,3 +4828,10 @@ if __name__ == "__main__":
         reload=settings.reload,
         log_level=settings.log_level.lower(),
     )
+
+# =============================================================================
+# MODULE LOAD COMPLETE
+# =============================================================================
+# This print statement executes when the module is fully loaded (all routes,
+# middleware, and endpoints defined). uvicorn will then start the server.
+print(f"[STARTUP] full_platform.py module fully loaded in {_startup_time_module.time() - _MODULE_LOAD_START:.2f}s")

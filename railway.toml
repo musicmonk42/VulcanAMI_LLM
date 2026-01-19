@@ -67,10 +67,15 @@ buildArgs = ["REJECT_INSECURE_JWT=ack"]
 # startup phase when ML models (spaCy, BERT, embeddings) are being loaded.
 # For comprehensive health status, use the /health endpoint after startup.
 healthcheckPath = "/health/live"
-healthcheckTimeout = 300  # 5 minutes for initial startup (ML model loading)
+# CRITICAL: Set timeout high enough for Python/ML app startup
+# Python apps with heavy imports (PyTorch, transformers, etc.) can take 2-4 minutes
+# to start. Railway checks continuously during this window.
+# Max allowed: 3600 seconds (1 hour), default: 300 seconds (5 minutes)
+healthcheckTimeout = 600  # 10 minutes for ML model loading and cold start
 # Restart policy
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
 # Number of replicas (MUST be 1 to prevent split-brain/ghost process issues)
 # Multiple replicas would cause inconsistent state and duplicate background tasks
+# CRITICAL: Explicitly set to 1 - Railway may use different defaults
 numReplicas = 1
