@@ -2603,9 +2603,9 @@ class QueryClassifier:
 
 CATEGORIES (choose the MOST SPECIFIC match):
 
-- PROBABILISTIC: Bayesian inference, conditional probability, P(X|Y), Bayes' theorem,
-  sensitivity/specificity, base rates, posterior probability, likelihood ratios,
-  probability distributions, expected value, random variables.
+- PROBABILISTIC: Pure probability calculations, Bayesian inference, conditional probability, 
+  P(X|Y), Bayes' theorem, sensitivity/specificity, base rates, posterior probability, 
+  likelihood ratios, probability distributions, expected value, random variables.
   Examples: "What is P(disease|positive test)?", "Bayes with sensitivity 0.99",
   "Calculate the posterior probability"
   Tools: ["probabilistic"]
@@ -2619,9 +2619,9 @@ CATEGORIES (choose the MOST SPECIFIC match):
 
 - CAUSAL: Causal inference, confounding variables, interventions, do-calculus,
   causal graphs (DAGs), counterfactuals, Pearl's framework, cause and effect,
-  causal discovery, treatment effects.
+  causal discovery, treatment effects, randomization, backdoor/frontdoor criterion.
   Examples: "Does X cause Y or is it confounded?", "What is the causal effect?",
-  "Draw the causal DAG"
+  "Draw the causal DAG", "Effect of intervention do(X)"
   Tools: ["causal"]
 
 - MATHEMATICAL: Numerical computation, calculus (derivatives, integrals), algebra,
@@ -2650,10 +2650,21 @@ CATEGORIES (choose the MOST SPECIFIC match):
 - CREATIVE: Writing requests (write a poem, story)
   Tools: ["general"]
 
-CRITICAL DISTINCTIONS:
+CRITICAL DISTINCTION - Probabilistic vs Causal:
+- PROBABILISTIC: Pure probability calculations (Bayes rule, conditional probability, statistics)
+  Examples: "What is P(A|B)?", "Calculate the probability", "Bayesian inference"
+  
+- CAUSAL: Causal inference, interventions, confounding analysis (Pearl-style)
+  Examples: "Does X cause Y?", "confounding", "intervention", "randomize", "DAG", "do-calculus"
+  Keywords that indicate CAUSAL (NOT probabilistic): confound, intervention, randomize, 
+  causal effect, Pearl, DAG, backdoor, frontdoor, counterfactual, do(X)
+  
+If a query mentions BOTH probability notation (P(X|Y)) AND causal keywords (confounding, 
+intervention), classify as CAUSAL, not PROBABILISTIC.
+
+OTHER CRITICAL DISTINCTIONS:
 - "Bayes" or "P(X|Y)" or "sensitivity/specificity" → PROBABILISTIC (NOT MATHEMATICAL)
 - "→" or "∧" or "satisfiable" or "SAT" → LOGICAL (NOT MATHEMATICAL)
-- "cause" or "confound" or "intervention" → CAUSAL (NOT PROBABILISTIC)
 - Numbers with +/-/*/ operations only → MATHEMATICAL
 
 Query: "{sanitized_query}"
