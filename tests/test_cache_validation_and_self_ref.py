@@ -116,26 +116,9 @@ class TestCacheValidation(unittest.TestCase):
     def tearDown(self):
         """Clean up after tests."""
         if hasattr(self, 'reasoner'):
-            # Force all component shutdown events to be set
-            try:
-                # Signal cache shutdown event
-                if hasattr(self.reasoner, 'cache') and self.reasoner.cache:
-                    if hasattr(self.reasoner.cache, '_shutdown_event'):
-                        self.reasoner.cache._shutdown_event.set()
-                
-                # Signal tool selector shutdown
-                if hasattr(self.reasoner, 'tool_selector') and self.reasoner.tool_selector:
-                    if hasattr(self.reasoner.tool_selector, '_shutdown_event'):
-                        self.reasoner.tool_selector._shutdown_event.set()
-                
-                # Signal warm pool shutdown
-                if hasattr(self.reasoner, 'warm_pool') and self.reasoner.warm_pool:
-                    if hasattr(self.reasoner.warm_pool, '_shutdown_event'):
-                        self.reasoner.warm_pool._shutdown_event.set()
-            except Exception:
-                pass
-            
             # Use longer timeout for proper cleanup
+            # The improved shutdown handling in UnifiedReasoner and governance loggers
+            # will ensure all background threads terminate properly
             self.reasoner.shutdown(timeout=5.0, skip_save=True)
     
     def test_is_invalid_cache_entry_unknown_type(self):
@@ -377,19 +360,9 @@ class TestSelfReferentialQueryHandling(unittest.TestCase):
     def tearDown(self):
         """Clean up after tests."""
         if hasattr(self, 'reasoner'):
-            # Force all component shutdown events to be set
-            try:
-                if hasattr(self.reasoner, 'cache') and self.reasoner.cache:
-                    if hasattr(self.reasoner.cache, '_shutdown_event'):
-                        self.reasoner.cache._shutdown_event.set()
-                if hasattr(self.reasoner, 'tool_selector') and self.reasoner.tool_selector:
-                    if hasattr(self.reasoner.tool_selector, '_shutdown_event'):
-                        self.reasoner.tool_selector._shutdown_event.set()
-                if hasattr(self.reasoner, 'warm_pool') and self.reasoner.warm_pool:
-                    if hasattr(self.reasoner.warm_pool, '_shutdown_event'):
-                        self.reasoner.warm_pool._shutdown_event.set()
-            except Exception:
-                pass
+            # Use longer timeout for proper cleanup
+            # The improved shutdown handling in UnifiedReasoner and governance loggers
+            # will ensure all background threads terminate properly
             self.reasoner.shutdown(timeout=5.0, skip_save=True)
     
     def test_is_self_referential_query_method(self):
@@ -473,19 +446,9 @@ class TestCacheStorageLogic(unittest.TestCase):
     def tearDown(self):
         """Clean up after tests."""
         if hasattr(self, 'reasoner'):
-            # Force all component shutdown events to be set
-            try:
-                if hasattr(self.reasoner, 'cache') and self.reasoner.cache:
-                    if hasattr(self.reasoner.cache, '_shutdown_event'):
-                        self.reasoner.cache._shutdown_event.set()
-                if hasattr(self.reasoner, 'tool_selector') and self.reasoner.tool_selector:
-                    if hasattr(self.reasoner.tool_selector, '_shutdown_event'):
-                        self.reasoner.tool_selector._shutdown_event.set()
-                if hasattr(self.reasoner, 'warm_pool') and self.reasoner.warm_pool:
-                    if hasattr(self.reasoner.warm_pool, '_shutdown_event'):
-                        self.reasoner.warm_pool._shutdown_event.set()
-            except Exception:
-                pass
+            # Use longer timeout for proper cleanup
+            # The improved shutdown handling in UnifiedReasoner and governance loggers
+            # will ensure all background threads terminate properly
             self.reasoner.shutdown(timeout=5.0, skip_save=True)
     
     def test_cache_clear_invalid_entries_on_startup(self):

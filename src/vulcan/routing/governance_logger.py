@@ -474,8 +474,9 @@ class BufferedGovernanceLogger:
         try:
             # Perform final flush to persist remaining entries
             self._flush_to_disk()
-            # Shutdown executor
-            self._executor.shutdown(wait=False)
+            # Shutdown executor and wait for background thread to finish
+            # This ensures proper cleanup before returning
+            self._executor.shutdown(wait=True)
             logger.debug("BufferedGovernanceLogger shutdown complete")
         except Exception as e:
             logger.warning(f"Error during BufferedGovernanceLogger shutdown: {e}")
