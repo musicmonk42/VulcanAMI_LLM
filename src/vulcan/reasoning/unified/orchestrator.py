@@ -4328,7 +4328,8 @@ class UnifiedReasoner:
                         else:
                             problem['input'] = task.input_data
 
-                    raw_result = reasoner.reason(problem, None)
+                    # INDUSTRY STANDARD: Pass mode='philosophical' to engage ethical reasoning machinery
+                    raw_result = reasoner.reason(problem, mode='philosophical')
 
                     if isinstance(raw_result, ReasoningResult):
                         result = raw_result
