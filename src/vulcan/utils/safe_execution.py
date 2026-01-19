@@ -618,11 +618,17 @@ class SafeCodeExecutor:
             #
             # Industry Standard: SymPy symbols should be defined with appropriate
             # assumptions (positive, real, etc.) for correct simplification.
+            #
+            # NAMING CONFLICT RESOLUTION:
+            # - 'N' conflicts with sp.N (numerical evaluation function) - use 'N_sym'
+            # - 'I' conflicts with sp.I (imaginary unit) - use 'I_sym' 
+            # - 'E' conflicts with sp.E (Euler's number) - already defined above
+            # - 'i' could conflict with imaginary but sp.I is the standard - use 'idx'
             # =================================================================
             common_bound_symbols = {
                 # Common upper bound symbols (typically positive)
                 "T": sp.Symbol("T", positive=True, real=True),  # Time bound
-                "N": sp.Symbol("N", positive=True, integer=True),  # Count bound
+                "N_sym": sp.Symbol("N", positive=True, integer=True),  # Count bound (N_sym to avoid sp.N conflict)
                 "M": sp.Symbol("M", positive=True, real=True),  # Mass/magnitude
                 "L": sp.Symbol("L", positive=True, real=True),  # Length
                 "R": sp.Symbol("R", positive=True, real=True),  # Radius
@@ -635,7 +641,7 @@ class SafeCodeExecutor:
                 "n": sp.Symbol("n", integer=True),  # Index
                 "k": sp.Symbol("k", integer=True),  # Index
                 "m": sp.Symbol("m", integer=True),  # Index
-                "i": sp.Symbol("i", integer=True),  # Index (note: conflicts with imaginary)
+                "idx": sp.Symbol("idx", integer=True),  # Index (safer than 'i' which could be confused with imaginary)
                 "j": sp.Symbol("j", integer=True),  # Index
                 # Common function argument variables
                 "x": sp.Symbol("x", real=True),  # Primary variable

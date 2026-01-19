@@ -37,6 +37,26 @@ DEFAULT_OPENAI_MODEL = "gpt-3.5-turbo"
 # Maximum attributes to log when debugging unknown LLM interface
 DEBUG_LOG_MAX_ATTRS = 10
 
+# =============================================================================
+# Issue #4 FIX: Formatting characters to strip before parsing math expressions
+# =============================================================================
+# These characters can appear in HTML/text rendering of mathematical expressions
+# and cause parsing failures when captured by regex patterns.
+#
+# Characters included:
+# - \n (newline)
+# - \r (carriage return)
+# - \t (tab)
+# - \u200b (zero-width space)
+# - \u200c (zero-width non-joiner)
+# - \u200d (zero-width joiner)
+# - \ufeff (zero-width no-break space / BOM)
+# - \u2060 (word joiner)
+# - \u180e (Mongolian vowel separator)
+# =============================================================================
+FORMATTING_CHARS_TO_STRIP: str = '\n\r\t\u200b\u200c\u200d\ufeff\u2060\u180e'
+FORMATTING_CHARS_TABLE: dict = str.maketrans('', '', FORMATTING_CHARS_TO_STRIP)
+
 # ============================================================================
 # CONSTANTS - Explicit Mathematical Notation Detection (Issue #1 Fix)
 # ============================================================================
@@ -1109,14 +1129,11 @@ result = simplify(integral)
             #
             # Solution: Strip all formatting characters BEFORE regex matching
             # to ensure we only capture the actual mathematical content.
+            # Uses module-level constants FORMATTING_CHARS_TABLE for performance.
             # =================================================================
             
-            # Define formatting characters to strip
-            formatting_chars = '\n\r\t\u200b\u200c\u200d\ufeff\u2060\u180e'
-            formatting_table = str.maketrans('', '', formatting_chars)
-            
-            # Clean the query before parsing
-            cleaned_query = query.translate(formatting_table)
+            # Clean the query before parsing using module-level constant
+            cleaned_query = query.translate(FORMATTING_CHARS_TABLE)
             # Also normalize multiple spaces to single space
             cleaned_query = re.sub(r'\s+', ' ', cleaned_query)
             
