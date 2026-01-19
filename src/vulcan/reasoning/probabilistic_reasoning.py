@@ -32,6 +32,27 @@ logger = logging.getLogger(__name__)
 # Note: Default seed for deterministic behavior
 DEFAULT_RANDOM_SEED = 42
 
+# ISSUE #3 FIX: Keywords for detecting "show steps" requests
+# Industry Standard: Module-level constant for performance (avoid recreation)
+SHOW_STEPS_KEYWORDS = frozenset([
+    'show steps', 'show work', 'show the steps', 'show your work',
+    'step by step', 'step-by-step', 'stepwise', 'steps',
+    'explain', 'explanation', 'how did you', 'how do you',
+    'intermediate', 'intermediate steps', 'intermediate values',
+    'breakdown', 'break down', 'detailed', 'in detail'
+])
+
+# ISSUE #5 FIX: Keywords for rejecting linguistic/NLP queries
+# Industry Standard: Module-level frozenset for performance and immutability
+LINGUISTIC_KEYWORDS = frozenset([
+    'coreference', 'pronoun', 'parse', 'parsing', 'syntax',
+    'semantic parsing', 'quantifier scope', 'scope ambiguity',
+    'anaphora', 'cataphora', 'disambiguation', 'ambiguous',
+    'sentence structure', 'grammatical', 'linguistic',
+    'part of speech', 'pos tagging', 'dependency',
+    'constituency', 'phrase structure',
+])
+
 try:
     pass
 
@@ -2459,27 +2480,54 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
                 # P(Disease|Positive) = P(Positive|Disease) * P(Disease) / P(Positive)
                 posterior = (p_positive_given_disease * p_disease) / p_positive
             
-            # Build detailed explanation
+            # ISSUE #3 FIX: Detect if user requested step-by-step work
+            # ================================================================
+            # Industry Standard: Check for explicit requests to show intermediate steps
+            # Uses module-level constant SHOW_STEPS_KEYWORDS for performance
+            # ================================================================
+            query_lower = str(input_data).lower()
+            show_steps_requested = any(keyword in query_lower for keyword in SHOW_STEPS_KEYWORDS)
+            
+            # Build detailed explanation (always generated, but inclusion depends on request)
+            # ISSUE #3 FIX: Enhanced explanation with ALL intermediate steps
             explanation = (
                 f"Bayes' Theorem Calculation:\n"
-                f"Given:\n"
-                f"  - Sensitivity (P(+|Disease)) = {sensitivity}\n"
-                f"  - Specificity (P(-|No Disease)) = {specificity}\n"
-                f"  - Prevalence (P(Disease)) = {prevalence}\n"
+                f"{'='*60}\n"
                 f"\n"
-                f"Calculation:\n"
-                f"  P(+) = P(+|D)*P(D) + P(+|¬D)*P(¬D)\n"
+                f"Given Parameters:\n"
+                f"  - Sensitivity (P(+|Disease))     = {sensitivity} ({sensitivity*100:.1f}%)\n"
+                f"  - Specificity (P(-|No Disease))  = {specificity} ({specificity*100:.1f}%)\n"
+                f"  - Prevalence (P(Disease))        = {prevalence} ({prevalence*100:.1f}%)\n"
+                f"\n"
+                f"Step 1: Calculate P(+|¬Disease) [False Positive Rate]\n"
+                f"  P(+|¬D) = 1 - P(-|¬D)\n"
+                f"          = 1 - {specificity}\n"
+                f"          = {1-specificity:.6f}\n"
+                f"\n"
+                f"Step 2: Calculate P(¬Disease) [No Disease Probability]\n"
+                f"  P(¬D) = 1 - P(D)\n"
+                f"        = 1 - {prevalence}\n"
+                f"        = {1-prevalence:.6f}\n"
+                f"\n"
+                f"Step 3: Calculate P(+) [Total Probability of Positive Test]\n"
+                f"  Using Law of Total Probability:\n"
+                f"  P(+) = P(+|D)×P(D) + P(+|¬D)×P(¬D)\n"
                 f"       = {sensitivity} × {prevalence} + {1-specificity} × {1-prevalence}\n"
                 f"       = {p_positive_given_disease * p_disease:.6f} + {p_positive_given_no_disease * p_no_disease:.6f}\n"
                 f"       = {p_positive:.6f}\n"
                 f"\n"
-                f"  P(Disease|+) = P(+|D) × P(D) / P(+)\n"
-                f"               = {sensitivity} × {prevalence} / {p_positive:.6f}\n"
-                f"               = {posterior:.6f}\n"
+                f"Step 4: Apply Bayes' Theorem to Calculate P(Disease|+)\n"
+                f"  P(D|+) = P(+|D) × P(D) / P(+)\n"
+                f"         = {sensitivity} × {prevalence} / {p_positive:.6f}\n"
+                f"         = {p_positive_given_disease * p_disease:.6f} / {p_positive:.6f}\n"
+                f"         = {posterior:.6f}\n"
                 f"\n"
-                f"Result: P(Disease|Positive) ≈ {posterior:.3f} ({posterior*100:.1f}%)"
+                f"{'='*60}\n"
+                f"Final Result: P(Disease|Positive) ≈ {posterior:.3f} ({posterior*100:.1f}%)\n"
+                f"{'='*60}"
             )
             
+            # ISSUE #3 FIX: Include intermediate steps in conclusion when requested
             conclusion = {
                 "posterior_probability": posterior,
                 "result": f"{posterior:.6f}",
@@ -2491,9 +2539,49 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
                 },
                 "intermediate_values": {
                     "p_positive": p_positive,
+                    "p_positive_given_disease": p_positive_given_disease,
+                    "p_positive_given_no_disease": p_positive_given_no_disease,
+                    "p_disease": p_disease,
+                    "p_no_disease": p_no_disease,
                     "false_positive_rate": 1 - specificity,
-                }
+                    "numerator": p_positive_given_disease * p_disease,
+                },
+                "show_steps_requested": show_steps_requested,
             }
+            
+            # ISSUE #3 FIX: When steps are requested, include them prominently in result
+            if show_steps_requested:
+                conclusion["steps"] = [
+                    {
+                        "step": 1,
+                        "description": "Calculate False Positive Rate",
+                        "formula": "P(+|¬D) = 1 - P(-|¬D)",
+                        "calculation": f"1 - {specificity}",
+                        "result": f"{1-specificity:.6f}",
+                    },
+                    {
+                        "step": 2,
+                        "description": "Calculate No Disease Probability",
+                        "formula": "P(¬D) = 1 - P(D)",
+                        "calculation": f"1 - {prevalence}",
+                        "result": f"{1-prevalence:.6f}",
+                    },
+                    {
+                        "step": 3,
+                        "description": "Calculate Total Probability of Positive Test",
+                        "formula": "P(+) = P(+|D)×P(D) + P(+|¬D)×P(¬D)",
+                        "calculation": f"{sensitivity} × {prevalence} + {1-specificity} × {1-prevalence}",
+                        "result": f"{p_positive:.6f}",
+                    },
+                    {
+                        "step": 4,
+                        "description": "Apply Bayes' Theorem",
+                        "formula": "P(D|+) = P(+|D) × P(D) / P(+)",
+                        "calculation": f"{sensitivity} × {prevalence} / {p_positive:.6f}",
+                        "result": f"{posterior:.6f}",
+                    },
+                ]
+                logger.info(f"[ISSUE #3 FIX] Steps included in result (user requested step-by-step)")
             
             logger.info(f"Bayesian calculation: P(D|+) = {posterior:.6f}")
             
@@ -2578,6 +2666,50 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
         query_str = str(input_data) if not isinstance(input_data, str) else input_data
         
         # INDUSTRY-STANDARD: Skip gate check if LLM has high confidence
+        # ISSUE #5 FIX: Reject linguistic/NLP queries early
+        # =================================================================
+        # Problem: Queries about "coreference", "pronoun", "parsing", etc.
+        # were being routed to probabilistic reasoning, which then rejected them.
+        #
+        # Industry Standard Solution:
+        # - Explicit early rejection for wrong query types
+        # - Clear error messages directing to correct tool
+        # - Minimal wasted computation
+        # - Uses module-level constant LINGUISTIC_KEYWORDS for performance
+        #
+        # This prevents linguistic queries from reaching the probabilistic
+        # reasoning pipeline, which is designed for probability calculations.
+        # =================================================================
+        has_linguistic_keywords = any(kw in query_str.lower() for kw in LINGUISTIC_KEYWORDS)
+        
+        if has_linguistic_keywords:
+            logger.info(
+                f"[ProbabilisticReasoner] ISSUE #5 FIX: Linguistic query detected. "
+                f"Returning 'not applicable' - should route to language tool instead."
+            )
+            return ReasoningResult(
+                conclusion={
+                    "applicable": False,
+                    "reason": "Query involves linguistic/NLP concepts, not probability",
+                    "not_applicable": True,
+                    "recommended_tool": "language",
+                },
+                confidence=0.0,
+                reasoning_type=ReasoningType.PROBABILISTIC,
+                explanation=(
+                    "This query appears to involve linguistic or natural language processing concepts "
+                    "(parsing, coreference, pronouns, etc.) rather than probability or statistics. "
+                    "This should be handled by the language reasoning tool, which specializes in "
+                    "syntax, semantics, and discourse understanding."
+                ),
+                metadata={
+                    "gate_check": "passed",
+                    "linguistic_check": "failed",
+                    "reason": "Linguistic query, not probabilistic",
+                    "recommended_tool": "language",
+                },
+            )
+        
         if not skip_gate_check and not self._is_probability_query(query_str):
             logger.info(
                 f"[ProbabilisticReasoner] Gate check: Query does not contain probability keywords. "
