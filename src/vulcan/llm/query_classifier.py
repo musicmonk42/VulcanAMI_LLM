@@ -382,6 +382,7 @@ PROBABILISTIC_KEYWORDS: FrozenSet[str] = frozenset([
 # Causal inference indicators - complexity 0.6+, tools=['causal']
 # ISSUE #2 FIX: Enhanced causal keywords to distinguish from probabilistic reasoning
 # Added more Pearl-style causal inference keywords to prevent misrouting to probabilistic
+# C1 CAUSAL FIX: Added "experiment", "design experiment", "which experiment" for experimental design queries
 CAUSAL_KEYWORDS: FrozenSet[str] = frozenset([
     "causal", "causation", "cause", "effect",
     "confound", "confounder", "confounding",
@@ -394,6 +395,11 @@ CAUSAL_KEYWORDS: FrozenSet[str] = frozenset([
     "causal effect", "causal inference", "do-calculus",
     "mediator", "confounder", "instrumental variable",
     "treatment effect", "randomized control",
+    # C1 CAUSAL FIX: Experimental design keywords
+    "experiment", "which experiment", "design experiment",
+    "choose experiment", "select experiment",
+    "draw dag", "draw the dag", "causal diagram",
+    "causal graph", "causal model",
 ])
 
 # INDUSTRY STANDARD: Pre-compiled regex patterns for precise probability notation detection
@@ -403,8 +409,11 @@ PROBABILITY_WORD_PATTERN = re.compile(r'\bprobability\b', re.IGNORECASE)  # Full
 
 # Strong causal indicators for high-confidence detection
 # Subset of CAUSAL_KEYWORDS for queries that clearly indicate causal inference
+# C1 CAUSAL FIX: Added "experiment" and "dag" variants as strong indicators
 STRONG_CAUSAL_KEYWORDS: FrozenSet[str] = frozenset([
-    "confound", "intervention", "do(", "pearl", "dag", "causal"
+    "confound", "intervention", "do(", "pearl", "dag", "causal",
+    "experiment", "confounder", "confounding", "causal graph",
+    "draw dag", "causal diagram", "causal model",
 ])
 
 # Mathematical indicators - complexity 0.4+, tools=['mathematical']
@@ -2102,17 +2111,25 @@ class QueryClassifier:
                 source="keyword",
             )
         
+        # C1 CAUSAL FIX: Check for strong causal indicators that should route to causal
+        # even with just 1 keyword match (e.g., "experiment", "dag", "confound")
+        has_strong_causal = any(
+            strong_kw in query_lower for strong_kw in STRONG_CAUSAL_KEYWORDS
+        )
+        
         # Standard causal classification (without probability notation)
-        if causal_count >= CAUSAL_KEYWORD_THRESHOLD or "do(" in query_lower:
+        # C1 CAUSAL FIX: Also route if has_strong_causal (single strong keyword is enough)
+        if causal_count >= CAUSAL_KEYWORD_THRESHOLD or "do(" in query_lower or has_strong_causal:
             logger.info(
-                f"[QueryClassifier] CAUSAL classification - keywords={causal_count}"
+                f"[QueryClassifier] CAUSAL classification - keywords={causal_count}, "
+                f"has_strong_causal={has_strong_causal}"
             )
             return QueryClassification(
                 category=QueryCategory.CAUSAL.value,
                 complexity=0.6 + min(0.3, causal_count * 0.05),
                 suggested_tools=["causal"],
                 skip_reasoning=False,
-                confidence=0.85,
+                confidence=0.90 if has_strong_causal else 0.85,
                 source="keyword",
             )
         

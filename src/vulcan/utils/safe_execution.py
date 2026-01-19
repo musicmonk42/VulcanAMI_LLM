@@ -39,8 +39,11 @@ def _preprocess_math_code(code: str) -> str:
     
     Bug #2 FIX (Jan 9 2026): Added as safety net for implicit multiplication.
     Security FIX (Jan 11 2026): Added comprehensive Unicode normalization.
+    MM1 CRASH FIX (Jan 19 2026): Added zero-width character stripping to prevent
+    IndentationError when queries contain invisible Unicode characters.
     
     This handles cases where LLM-generated or template code contains:
+    - Zero-width characters: \u200b, \u200c, \u200d, \ufeff (cause IndentationError)
     - Implicit multiplication: 2k → 2*k, 3n → 3*n
     - Digit followed by parenthesis: 2(x+1) → 2*(x+1)
     - Unicode minus: − (U+2212) → - (U+002D ASCII)
@@ -58,6 +61,20 @@ def _preprocess_math_code(code: str) -> str:
     """
     if not code:
         return code
+    
+    # MM1 CRASH FIX: Strip zero-width characters that cause IndentationError
+    # These invisible characters appear in queries with Unicode math notation
+    # and cause Python compilation to fail with "IndentationError: '\u200b'"
+    # Zero-width characters to strip:
+    # - \u200b: Zero-width space
+    # - \u200c: Zero-width non-joiner
+    # - \u200d: Zero-width joiner
+    # - \ufeff: Zero-width no-break space (BOM)
+    # - \u2060: Word joiner
+    # - \u180e: Mongolian vowel separator
+    zero_width_chars = '\u200b\u200c\u200d\ufeff\u2060\u180e'
+    for char in zero_width_chars:
+        code = code.replace(char, '')
     
     # Comprehensive Unicode normalization for mathematical alphanumeric symbols
     # Unicode range: U+1D400–U+1D7FF (Mathematical Alphanumeric Symbols)
