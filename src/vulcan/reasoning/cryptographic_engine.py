@@ -896,24 +896,48 @@ class CryptographicEngine:
         return hashlib.sha256(data).hexdigest()
     
     def sha1(self, data: Union[str, bytes]) -> str:
-        """Compute SHA-1 hash.
+        """Compute SHA-1 hash (CRYPTOGRAPHICALLY BROKEN - DO NOT USE FOR SECURITY).
         
-        WARNING: SHA-1 is cryptographically broken and should NOT be used for:
-        - Password hashing
-        - Digital signatures
-        - Security certificates
+        ⚠️  SECURITY WARNING: SHA-1 is cryptographically broken (NIST deprecated since 2011)
+        
+        SHA-1 MUST NOT be used for:
+        - Password hashing (use Argon2id, bcrypt, or scrypt)
+        - Digital signatures (use RSA-PSS with SHA-256+, or Ed25519)
+        - Security certificates (use SHA-256 or SHA-384)
+        - HMAC authentication (use HMAC-SHA256 or HMAC-SHA512)
         - Any security-critical operations
         
-        Only use for:
-        - Non-security checksums
-        - Legacy system compatibility
-        - Git commit hashing (legacy)
+        SHA-1 may ONLY be used for:
+        - Non-cryptographic checksums (consider CRC32 for better performance)
+        - Legacy system compatibility (e.g., Git commit hashing)
+        - Cache keys for non-sensitive data
         
-        For security purposes, use SHA-256, SHA-3, or BLAKE2 instead.
+        Known attacks:
+        - Collision attacks demonstrated in 2017 (SHAttered attack)
+        - Practical collision attacks possible with moderate resources
+        
+        Recommended alternatives:
+        - General purpose: SHA-256, SHA3-256, or BLAKE2b
+        - Password hashing: Argon2id (OWASP recommended)
+        - Fast checksums: CRC32, xxHash
+        
+        References:
+        - NIST SP 800-131A: Deprecated SHA-1 for digital signatures (2011)
+        - RFC 6194: Security Considerations for SHA-0 and SHA-1
+        - SHAttered attack: https://shattered.io/
+        - OWASP: https://cheatsheetseries.owasp.org/cheatsheets/Cryptographic_Storage_Cheat_Sheet.html
+        
+        Args:
+            data: Input data (string or bytes). Strings are encoded as UTF-8.
+        
+        Returns:
+            Hexadecimal digest string (40 characters)
         """
         import warnings
         warnings.warn(
-            "SHA-1 is cryptographically broken. Use SHA-256 or SHA-3 for security purposes.",
+            "SHA-1 is cryptographically broken (collision attacks demonstrated 2017). "
+            "Use SHA-256, SHA-3, or BLAKE2 for security purposes. "
+            "Use CRC32 or xxHash for fast non-cryptographic checksums.",
             DeprecationWarning,
             stacklevel=2
         )
@@ -979,24 +1003,43 @@ class CryptographicEngine:
     
     # Legacy Hashes
     def md5(self, data: Union[str, bytes]) -> str:
-        """Compute MD5 hash.
+        """Compute MD5 hash (CRYPTOGRAPHICALLY BROKEN - DO NOT USE FOR SECURITY).
         
-        WARNING: MD5 is cryptographically broken and should NOT be used for:
-        - Password hashing
-        - Digital signatures
-        - Security certificates
+        ⚠️  SECURITY WARNING: MD5 is cryptographically broken (NIST deprecated since 2011)
+        
+        MD5 MUST NOT be used for:
+        - Password hashing (use Argon2id, bcrypt, or scrypt)
+        - Digital signatures (use RSA-PSS with SHA-256+, or Ed25519)
+        - Security certificates (use SHA-256 or SHA-384)
+        - HMAC authentication (use HMAC-SHA256 or HMAC-SHA512)
         - Any security-critical operations
         
-        Only use for:
-        - Non-security checksums
-        - Legacy system compatibility
-        - Cache keys (non-security)
+        MD5 may ONLY be used for:
+        - Non-cryptographic checksums (consider CRC32 for better performance)
+        - Legacy system compatibility (where security is not a concern)
+        - Cache keys for non-sensitive data
         
-        For security purposes, use SHA-256, SHA-3, or BLAKE2 instead.
+        Recommended alternatives:
+        - General purpose: SHA-256, SHA3-256, or BLAKE2b
+        - Password hashing: Argon2id (OWASP recommended)
+        - Fast checksums: CRC32, xxHash
+        
+        References:
+        - NIST SP 800-131A: Deprecated MD5 for all security applications
+        - RFC 6151: Updated Security Considerations for MD5
+        - OWASP: https://cheatsheetseries.owasp.org/cheatsheets/Cryptographic_Storage_Cheat_Sheet.html
+        
+        Args:
+            data: Input data (string or bytes). Strings are encoded as UTF-8.
+        
+        Returns:
+            Hexadecimal digest string (32 characters)
         """
         import warnings
         warnings.warn(
-            "MD5 is cryptographically broken. Use SHA-256 or SHA-3 for security purposes.",
+            "MD5 is cryptographically broken (NIST deprecated 2011). "
+            "Use SHA-256, SHA-3, or BLAKE2 for security purposes. "
+            "Use CRC32 or xxHash for fast non-cryptographic checksums.",
             DeprecationWarning,
             stacklevel=2
         )

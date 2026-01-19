@@ -645,8 +645,13 @@ class SafeExperimentExecutor:
                 intervention_str = str(intervention.get("variable", "")) + str(
                     intervention.get("value", "")
                 )
-                # Use CRC32 for deterministic hash (non-cryptographic use)
-                # Mask to ensure unsigned 32-bit value for cross-platform consistency
+                # SECURITY NOTE: Using CRC32 instead of MD5 for deterministic hashing
+                # CRC32 is appropriate here because:
+                # 1. This is NOT cryptographic use (just deterministic simulation)
+                # 2. No security properties required (collision resistance not needed)
+                # 3. Better performance than MD5 (4-8x faster)
+                # 4. Clearer intent (CRC32 is explicitly non-cryptographic)
+                # Mask with 0xffffffff to ensure unsigned 32-bit value for cross-platform consistency
                 intervention_hash = zlib.crc32(intervention_str.encode()) & 0xffffffff
 
                 # Deterministic causal strength based on intervention

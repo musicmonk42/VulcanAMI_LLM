@@ -4726,8 +4726,13 @@ class ToolSelector:
                 # Deterministic confidence based on tool name and config
                 import zlib
 
-                # Use CRC32 for deterministic hash (non-cryptographic use)
-                # Mask to ensure unsigned 32-bit value for cross-platform consistency
+                # SECURITY NOTE: Using CRC32 instead of MD5 for deterministic hashing
+                # CRC32 is appropriate here because:
+                # 1. This is NOT cryptographic use (just deterministic mock simulation)
+                # 2. No security properties required (collision resistance not needed)
+                # 3. Better performance than MD5 (4-8x faster)
+                # 4. Clearer intent (CRC32 is explicitly non-cryptographic)
+                # Mask with 0xffffffff to ensure unsigned 32-bit value for cross-platform consistency
                 tool_hash = zlib.crc32(f"{name}{str(config)}".encode()) & 0xffffffff
                 confidence = 0.5 + (tool_hash % 500) / 1000.0  # Range: 0.5 to 1.0
 
