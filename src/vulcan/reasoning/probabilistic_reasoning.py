@@ -32,6 +32,27 @@ logger = logging.getLogger(__name__)
 # Note: Default seed for deterministic behavior
 DEFAULT_RANDOM_SEED = 42
 
+# ISSUE #3 FIX: Keywords for detecting "show steps" requests
+# Industry Standard: Module-level constant for performance (avoid recreation)
+SHOW_STEPS_KEYWORDS = frozenset([
+    'show steps', 'show work', 'show the steps', 'show your work',
+    'step by step', 'step-by-step', 'stepwise', 'steps',
+    'explain', 'explanation', 'how did you', 'how do you',
+    'intermediate', 'intermediate steps', 'intermediate values',
+    'breakdown', 'break down', 'detailed', 'in detail'
+])
+
+# ISSUE #5 FIX: Keywords for rejecting linguistic/NLP queries
+# Industry Standard: Module-level frozenset for performance and immutability
+LINGUISTIC_KEYWORDS = frozenset([
+    'coreference', 'pronoun', 'parse', 'parsing', 'syntax',
+    'semantic parsing', 'quantifier scope', 'scope ambiguity',
+    'anaphora', 'cataphora', 'disambiguation', 'ambiguous',
+    'sentence structure', 'grammatical', 'linguistic',
+    'part of speech', 'pos tagging', 'dependency',
+    'constituency', 'phrase structure',
+])
+
 try:
     pass
 
@@ -2462,17 +2483,10 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
             # ISSUE #3 FIX: Detect if user requested step-by-step work
             # ================================================================
             # Industry Standard: Check for explicit requests to show intermediate steps
-            # Keywords: "show steps", "show work", "step by step", "explain", "how", etc.
+            # Uses module-level constant SHOW_STEPS_KEYWORDS for performance
             # ================================================================
-            show_steps_keywords = [
-                'show steps', 'show work', 'show the steps', 'show your work',
-                'step by step', 'step-by-step', 'stepwise', 'steps',
-                'explain', 'explanation', 'how did you', 'how do you',
-                'intermediate', 'intermediate steps', 'intermediate values',
-                'breakdown', 'break down', 'detailed', 'in detail'
-            ]
             query_lower = str(input_data).lower()
-            show_steps_requested = any(keyword in query_lower for keyword in show_steps_keywords)
+            show_steps_requested = any(keyword in query_lower for keyword in SHOW_STEPS_KEYWORDS)
             
             # Build detailed explanation (always generated, but inclusion depends on request)
             # ISSUE #3 FIX: Enhanced explanation with ALL intermediate steps
@@ -2661,19 +2675,11 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
         # - Explicit early rejection for wrong query types
         # - Clear error messages directing to correct tool
         # - Minimal wasted computation
+        # - Uses module-level constant LINGUISTIC_KEYWORDS for performance
         #
         # This prevents linguistic queries from reaching the probabilistic
         # reasoning pipeline, which is designed for probability calculations.
         # =================================================================
-        LINGUISTIC_KEYWORDS = frozenset([
-            'coreference', 'pronoun', 'parse', 'parsing', 'syntax',
-            'semantic parsing', 'quantifier scope', 'scope ambiguity',
-            'anaphora', 'cataphora', 'disambiguation', 'ambiguous',
-            'sentence structure', 'grammatical', 'linguistic',
-            'part of speech', 'pos tagging', 'dependency',
-            'constituency', 'phrase structure',
-        ])
-        
         has_linguistic_keywords = any(kw in query_str.lower() for kw in LINGUISTIC_KEYWORDS)
         
         if has_linguistic_keywords:

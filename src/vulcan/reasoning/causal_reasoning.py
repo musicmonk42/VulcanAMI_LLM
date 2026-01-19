@@ -2816,8 +2816,24 @@ class CausalReasoner(EnhancedCausalReasoning):
                                 f"NO - {var1} and {var2} are NOT d-separated {cond_str}. "
                                 f"There exists an active path between them in the causal graph."
                             )
+                    except KeyError as e:
+                        # Node not found in graph
+                        logger.warning(f"[CausalReasoner] Node not found in DAG during d-separation test: {e}")
+                        return (
+                            f"Unable to perform d-separation test: variable {e} not found in causal graph. "
+                            f"Available variables: {list(dag.nodes())}"
+                        )
+                    except nx.NetworkXError as e:
+                        # Invalid graph structure
+                        logger.warning(f"[CausalReasoner] Invalid graph structure for d-separation: {e}")
+                        return (
+                            f"Unable to perform d-separation test: invalid graph structure. "
+                            f"Error: {str(e)}"
+                        )
                     except Exception as e:
-                        logger.warning(f"d-separation test failed: {e}")
+                        # Unexpected error
+                        logger.error(f"[CausalReasoner] Unexpected error in d-separation test: {e}")
+                        return f"Unable to determine independence due to unexpected error: {str(e)}"
         
         # Default: Unable to determine YES/NO answer
         return "Unable to determine a clear YES/NO answer from the causal structure."
