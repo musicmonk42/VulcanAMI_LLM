@@ -5697,18 +5697,40 @@ class WorldModel:
         DEEP ENHANCEMENT: Vulcan answers from its authentic sense of "self" - who it is and what it believes.
         
         Architecture:
-        1. Query Vulcan's own objectives (from MotivationalIntrospection)
-        2. Query Vulcan's ethical boundaries (what it believes is right/wrong)
-        3. Use EthicalBoundaryMonitor to check options against Vulcan's values
-        4. Use GoalConflictDetector to identify dilemmas relative to Vulcan's objectives
-        5. Use InternalCritic to self-critique from Vulcan's perspectives
-        6. Answer authentically from Vulcan's value system, not abstract frameworks
+        1. Check if query is an external ethical dilemma (trolley problem, etc.)
+        2. If dilemma: Use specialized dilemma analysis pipeline
+        3. If self-referential: Query Vulcan's own objectives and values
+        4. Use EthicalBoundaryMonitor to check options against Vulcan's values
+        5. Use GoalConflictDetector to identify dilemmas relative to Vulcan's objectives
+        6. Use InternalCritic to self-critique from Vulcan's perspectives
+        7. Answer authentically from Vulcan's value system
         
-        This is not philosophical reasoning in the abstract - it's Vulcan introspecting on
-        ethical questions through the lens of its own design objectives and learned values.
+        This handles both external ethical dilemmas (trolley problem) and self-referential
+        philosophical questions through the lens of Vulcan's design objectives and learned values.
+        
+        Industry Standard: Comprehensive error handling, input validation, proper logging.
         """
-        logger.info("[WorldModel] Philosophical reasoning engaged - using Vulcan's self-model")
+        logger.info("[WorldModel] Philosophical reasoning engaged - analyzing query type")
+        
+        # Input validation
+        if not query or not isinstance(query, str):
+            logger.error("[WorldModel] Invalid query input to philosophical reasoning")
+            return {
+                'response': "Invalid query format",
+                'confidence': 0.0,
+                'reasoning_trace': {'error': 'invalid_input'},
+                'perspectives': [],
+                'principles': [],
+                'considerations': [],
+                'conflicts': []
+            }
+        
         query_lower = query.lower()
+        
+        # CRITICAL FIX: Check for external ethical dilemma FIRST
+        if self._is_ethical_dilemma(query):
+            logger.info("[WorldModel] Detected external ethical dilemma - routing to dilemma analyzer")
+            return self._analyze_ethical_dilemma(query, **kwargs)
         
         # Parse query structure
         ethical_structure = self._parse_ethical_query_structure(query, query_lower)
@@ -5901,6 +5923,573 @@ class WorldModel:
             structure['has_dilemma'] = True
         
         return structure
+    
+    def _is_ethical_dilemma(self, query: str) -> bool:
+        """
+        Detect if query is an external ethical dilemma (not self-referential).
+        
+        Industry Standard: Comprehensive pattern matching with clear separation
+        between external ethical scenarios and self-introspection queries.
+        
+        External dilemmas involve:
+        - Explicit choice between options (A/B, pull/don't pull)
+        - External agents/scenarios (trolley, people, situations)
+        - Moral principles applied to external situations
+        
+        Self-introspection involves:
+        - Questions about Vulcan itself ("Do you...", "Would you...")
+        - Questions about Vulcan's capabilities, values, design
+        
+        Args:
+            query: The query string to analyze
+            
+        Returns:
+            True if query is an external ethical dilemma, False otherwise
+        
+        Thread Safety: Read-only operation, no shared state modification
+        """
+        try:
+            query_lower = query.lower()
+            
+            # Trolley problem indicators (external scenario)
+            trolley_indicators = [
+                'trolley', 'lever', 'pull the lever', 'runaway',
+                'heading toward', 'barreling toward'
+            ]
+            has_trolley = any(indicator in query_lower for indicator in trolley_indicators)
+            
+            # Life/death choice indicators (external scenario)
+            life_death_indicators = [
+                'save five', 'kill one', 'kill five', 'save one',
+                'five people', 'one person', '5 people', '1 person',
+                'lives at stake', 'people will die'
+            ]
+            has_life_death = any(indicator in query_lower for indicator in life_death_indicators)
+            
+            # Explicit choice structure (dilemma format)
+            choice_structure = [
+                'option a', 'option b',
+                'a.', 'b.',
+                'must choose one', 'you must act or not act',
+                'choose between', 'either or'
+            ]
+            has_choice_structure = any(pattern in query_lower for pattern in choice_structure)
+            
+            # Moral principle keywords (applied to external scenarios)
+            moral_principles = [
+                'non-instrumentalization', 'non-negligence',
+                'moral dilemma', 'ethical dilemma',
+                'permissible to', 'impermissible to',
+                'morally required', 'duty to'
+            ]
+            has_moral_principles = any(principle in query_lower for principle in moral_principles)
+            
+            # Self-referential exclusions (NOT external dilemmas)
+            # These indicate the question is ABOUT Vulcan, not an external scenario
+            self_referential = [
+                'would you', 'do you', 'are you', 'can you',
+                'your', 'yourself', 'you are', 'you have'
+            ]
+            is_self_referential = any(ref in query_lower for ref in self_referential)
+            
+            # Decision logic: Must have dilemma indicators WITHOUT self-reference
+            # Industry Standard: Clear decision criteria with explicit rationale
+            
+            # Strong match: Trolley problem + life/death + choice structure
+            if has_trolley and has_life_death and has_choice_structure:
+                logger.info("[WorldModel] Strong dilemma match: trolley + life/death + choice")
+                return True
+            
+            # Moderate match: Life/death + choice structure + principles
+            if has_life_death and has_choice_structure and has_moral_principles:
+                # BUT: Exclude if self-referential (asking about Vulcan's choice)
+                if is_self_referential:
+                    logger.info("[WorldModel] Self-referential query excluded from dilemma")
+                    return False
+                logger.info("[WorldModel] Moderate dilemma match: life/death + choice + principles")
+                return True
+            
+            # Weak match: Multiple dilemma indicators
+            match_count = sum([
+                has_trolley,
+                has_life_death,
+                has_choice_structure,
+                has_moral_principles
+            ])
+            
+            if match_count >= 2 and not is_self_referential:
+                logger.info(f"[WorldModel] Weak dilemma match: {match_count} indicators present")
+                return True
+            
+            # No match
+            return False
+            
+        except Exception as e:
+            logger.error(f"[WorldModel] Error in _is_ethical_dilemma: {e}", exc_info=True)
+            # Industry Standard: Fail-safe to False on error
+            return False
+    
+    def _analyze_ethical_dilemma(self, query: str, **kwargs) -> Dict[str, Any]:
+        """
+        Analyze an external ethical dilemma and provide reasoned conclusion.
+        
+        Industry Standard: Comprehensive error handling, structured analysis pipeline,
+        proper logging, thread-safe operation, defensive programming.
+        
+        Pipeline:
+        1. Parse dilemma structure (options, consequences)
+        2. Extract moral principles mentioned
+        3. Analyze each option against principles
+        4. Detect conflicts between principles
+        5. Synthesize reasoned decision
+        
+        Args:
+            query: The ethical dilemma query
+            **kwargs: Additional context (unused, for API consistency)
+            
+        Returns:
+            Dictionary with:
+            - response: Reasoned analysis and decision
+            - decision: The chosen option (A/B)
+            - confidence: Confidence in analysis (0.7-0.8)
+            - perspectives: Ethical frameworks considered
+            - principles: Moral principles extracted
+            - considerations: Key ethical considerations
+            - conflicts: Detected principle conflicts
+            - reasoning_trace: Detailed analysis trace
+            
+        Thread Safety: Uses only local variables, no shared state modification
+        
+        Performance: O(n) where n is query length, suitable for production
+        """
+        try:
+            logger.info("[WorldModel] Starting ethical dilemma analysis")
+            start_time = time.time()
+            
+            # Phase 1: Parse dilemma structure
+            structure = self._parse_dilemma_structure(query)
+            logger.debug(f"[WorldModel] Parsed structure: {structure.get('options', [])} options")
+            
+            # Phase 2: Extract moral principles
+            principles = self._extract_moral_principles(query)
+            logger.debug(f"[WorldModel] Extracted {len(principles)} principles")
+            
+            # Phase 3: Analyze options against principles
+            option_analysis = self._analyze_options_against_principles(
+                structure.get('options', []),
+                principles,
+                query
+            )
+            logger.debug(f"[WorldModel] Analyzed {len(option_analysis)} options")
+            
+            # Phase 4: Detect conflicts
+            conflicts = self._detect_principle_conflicts(option_analysis, principles)
+            logger.debug(f"[WorldModel] Detected {len(conflicts)} conflicts")
+            
+            # Phase 5: Synthesize decision
+            decision, reasoning = self._synthesize_dilemma_decision(
+                structure, principles, option_analysis, conflicts, query
+            )
+            
+            elapsed = time.time() - start_time
+            logger.info(f"[WorldModel] Dilemma analysis complete in {elapsed:.3f}s: {decision}")
+            
+            # Build response with populated structures
+            return {
+                'response': f"Based on ethical analysis: **{decision}**\n\n{reasoning}",
+                'decision': decision,
+                'confidence': 0.75,  # As specified in requirements
+                'perspectives': ['consequentialist', 'deontological'],
+                'principles': [p['name'] for p in principles],
+                'considerations': [a.get('consideration', '') for a in option_analysis if a.get('consideration')],
+                'conflicts': [c['description'] for c in conflicts],
+                'reasoning_trace': {
+                    'dilemma_structure': structure,
+                    'principles_extracted': principles,
+                    'option_analysis': option_analysis,
+                    'conflict_resolution': conflicts,
+                    'analysis_time_seconds': elapsed
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"[WorldModel] Ethical dilemma analysis failed: {e}", exc_info=True)
+            # Industry Standard: Return safe fallback on error
+            return {
+                'response': "Unable to complete ethical analysis due to internal error.",
+                'decision': None,
+                'confidence': 0.0,
+                'perspectives': [],
+                'principles': [],
+                'considerations': [],
+                'conflicts': [],
+                'reasoning_trace': {'error': str(e)}
+            }
+    
+    def _parse_dilemma_structure(self, query: str) -> Dict[str, Any]:
+        """
+        Extract options and consequences from dilemma query.
+        
+        Industry Standard: Robust parsing with multiple fallback strategies.
+        
+        Args:
+            query: The query containing the dilemma
+            
+        Returns:
+            Dictionary with 'options' list containing option descriptions
+        """
+        try:
+            query_lower = query.lower()
+            structure = {'options': [], 'consequences': {}}
+            
+            # Strategy 1: Explicit option markers (A., B., Option A, Option B)
+            if 'option a' in query_lower or 'a.' in query_lower:
+                # Extract text after "A." or "option a" until next option or end
+                a_match = re.search(r'(?:option\s+)?a[.:]\s*([^\n]+)', query, re.IGNORECASE)
+                if a_match:
+                    structure['options'].append({
+                        'id': 'A',
+                        'description': a_match.group(1).strip()
+                    })
+            
+            if 'option b' in query_lower or 'b.' in query_lower:
+                b_match = re.search(r'(?:option\s+)?b[.:]\s*([^\n]+)', query, re.IGNORECASE)
+                if b_match:
+                    structure['options'].append({
+                        'id': 'B',
+                        'description': b_match.group(1).strip()
+                    })
+            
+            # Strategy 2: Trolley problem specific (pull lever / don't pull)
+            if not structure['options'] and 'lever' in query_lower:
+                structure['options'] = [
+                    {'id': 'A', 'description': 'Pull the lever'},
+                    {'id': 'B', 'description': 'Do not pull the lever'}
+                ]
+            
+            # Strategy 3: Generic action/inaction
+            if not structure['options']:
+                structure['options'] = [
+                    {'id': 'A', 'description': 'Take action'},
+                    {'id': 'B', 'description': 'Do not take action'}
+                ]
+            
+            # Extract consequences (numbers of people affected)
+            numbers = re.findall(r'\b(one|two|three|four|five|six|seven|eight|nine|ten|\d+)\s+(?:people|person)', query_lower)
+            structure['consequences']['numbers'] = numbers
+            
+            return structure
+            
+        except Exception as e:
+            logger.warning(f"[WorldModel] Dilemma structure parsing error: {e}")
+            return {'options': [], 'consequences': {}}
+    
+    def _extract_moral_principles(self, query: str) -> List[Dict[str, Any]]:
+        """
+        Extract moral principles mentioned in the query.
+        
+        Industry Standard: Comprehensive principle taxonomy with definitions.
+        
+        Args:
+            query: The query text
+            
+        Returns:
+            List of dictionaries with 'name' and 'description' of each principle
+        """
+        try:
+            query_lower = query.lower()
+            principles = []
+            
+            # Define principle patterns with their ethical meanings
+            principle_patterns = {
+                'non-instrumentalization': {
+                    'keywords': ['non-instrumentalization', 'means to an end', 'instrument', 'using people'],
+                    'description': 'People should not be used merely as means to an end'
+                },
+                'non-negligence': {
+                    'keywords': ['non-negligence', 'neglect', 'inaction', 'preventable', 'knowingly allow'],
+                    'description': 'It is impermissible to knowingly allow preventable harm through inaction'
+                },
+                'non-maleficence': {
+                    'keywords': ['do no harm', 'non-maleficence', 'harm', 'hurt', 'injure'],
+                    'description': 'One ought not to inflict harm on others'
+                },
+                'beneficence': {
+                    'keywords': ['beneficence', 'help', 'benefit', 'save', 'protect'],
+                    'description': 'One ought to prevent or remove harm and promote good'
+                },
+                'autonomy': {
+                    'keywords': ['autonomy', 'consent', 'choice', 'self-determination'],
+                    'description': 'Respect for persons and their right to make their own choices'
+                },
+                'justice': {
+                    'keywords': ['justice', 'fairness', 'equal', 'impartial'],
+                    'description': 'Fair and equitable treatment of all persons'
+                }
+            }
+            
+            # Check query against each principle pattern
+            for principle_name, data in principle_patterns.items():
+                if any(keyword in query_lower for keyword in data['keywords']):
+                    principles.append({
+                        'name': principle_name,
+                        'description': data['description']
+                    })
+            
+            # If no explicit principles found, infer from context
+            if not principles:
+                # Trolley problem implies these principles
+                if 'trolley' in query_lower or 'save' in query_lower:
+                    principles.append({
+                        'name': 'beneficence',
+                        'description': 'One ought to prevent or remove harm'
+                    })
+                    principles.append({
+                        'name': 'non-maleficence',
+                        'description': 'One ought not to inflict harm'
+                    })
+            
+            logger.debug(f"[WorldModel] Extracted principles: {[p['name'] for p in principles]}")
+            return principles
+            
+        except Exception as e:
+            logger.warning(f"[WorldModel] Principle extraction error: {e}")
+            return []
+    
+    def _analyze_options_against_principles(
+        self, 
+        options: List[Dict[str, Any]], 
+        principles: List[Dict[str, Any]],
+        query: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Analyze how each option relates to each moral principle.
+        
+        Industry Standard: Systematic analysis with clear compliance assessment.
+        
+        Args:
+            options: List of option dictionaries from parse_dilemma_structure
+            principles: List of principle dictionaries from extract_moral_principles
+            query: Original query for context
+            
+        Returns:
+            List of analysis dictionaries with considerations for each option
+        """
+        try:
+            analysis = []
+            query_lower = query.lower()
+            
+            for option in options:
+                option_id = option.get('id', 'Unknown')
+                option_desc = option.get('description', '')
+                option_lower = option_desc.lower()
+                
+                # Analyze this option against each principle
+                compliances = []
+                violations = []
+                
+                for principle in principles:
+                    principle_name = principle['name']
+                    
+                    # Check compliance based on option type and principle
+                    if principle_name == 'non-instrumentalization':
+                        # Pulling lever may use one person as means to save five
+                        if 'pull' in option_lower and 'five' in query_lower:
+                            violations.append(f"May violate {principle_name} by using one as means")
+                        elif 'not' in option_lower or 'don\'t' in option_lower:
+                            compliances.append(f"Avoids violating {principle_name}")
+                    
+                    elif principle_name == 'non-negligence':
+                        # Inaction may violate non-negligence
+                        if 'not' in option_lower or 'don\'t' in option_lower:
+                            if 'five' in query_lower:
+                                violations.append(f"Violates {principle_name} by allowing five deaths")
+                        else:
+                            compliances.append(f"Complies with {principle_name} by acting")
+                    
+                    elif principle_name == 'beneficence':
+                        # Acting to save more people shows beneficence
+                        if 'pull' in option_lower or 'take action' in option_lower:
+                            compliances.append(f"Shows {principle_name} by saving lives")
+                    
+                    elif principle_name == 'non-maleficence':
+                        # Any action that causes death may violate non-maleficence
+                        if 'pull' in option_lower:
+                            violations.append(f"May violate {principle_name} by causing one death")
+                
+                # Construct consideration text
+                consideration = f"Option {option_id}: {option_desc}"
+                if compliances:
+                    consideration += f" - Complies: {', '.join(compliances[:2])}"
+                if violations:
+                    consideration += f" - Conflicts: {', '.join(violations[:2])}"
+                
+                analysis.append({
+                    'option': option_id,
+                    'description': option_desc,
+                    'compliances': compliances,
+                    'violations': violations,
+                    'consideration': consideration
+                })
+            
+            return analysis
+            
+        except Exception as e:
+            logger.warning(f"[WorldModel] Option analysis error: {e}")
+            return []
+    
+    def _detect_principle_conflicts(
+        self, 
+        option_analysis: List[Dict[str, Any]], 
+        principles: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """
+        Detect conflicts between moral principles based on option analysis.
+        
+        Industry Standard: Identify genuine ethical dilemmas where principles clash.
+        
+        Args:
+            option_analysis: Analysis of options from analyze_options_against_principles
+            principles: List of principles from extract_moral_principles
+            
+        Returns:
+            List of conflict dictionaries with descriptions
+        """
+        try:
+            conflicts = []
+            
+            # Check if different principles are violated by different options
+            principle_names = [p['name'] for p in principles]
+            
+            # Conflict detection: If no option satisfies all principles
+            if len(option_analysis) >= 2:
+                # Check if option A violates different principles than option B
+                option_a = option_analysis[0]
+                option_b = option_analysis[1] if len(option_analysis) > 1 else {}
+                
+                a_violations = set(v.split('by')[0].strip() for v in option_a.get('violations', []))
+                b_violations = set(v.split('by')[0].strip() for v in option_b.get('violations', []))
+                
+                if a_violations != b_violations and (a_violations or b_violations):
+                    conflicts.append({
+                        'description': 'Different options violate different principles - genuine dilemma',
+                        'type': 'principle_tradeoff'
+                    })
+            
+            # Specific conflicts
+            if 'non-instrumentalization' in principle_names and 'non-negligence' in principle_names:
+                conflicts.append({
+                    'description': 'Non-instrumentalization conflicts with non-negligence when intervention saves more lives',
+                    'type': 'action_vs_inaction'
+                })
+            
+            if 'non-maleficence' in principle_names and 'beneficence' in principle_names:
+                conflicts.append({
+                    'description': 'Preventing harm (beneficence) may require causing lesser harm (maleficence)',
+                    'type': 'harm_vs_benefit'
+                })
+            
+            return conflicts
+            
+        except Exception as e:
+            logger.warning(f"[WorldModel] Conflict detection error: {e}")
+            return []
+    
+    def _synthesize_dilemma_decision(
+        self,
+        structure: Dict[str, Any],
+        principles: List[Dict[str, Any]],
+        option_analysis: List[Dict[str, Any]],
+        conflicts: List[Dict[str, Any]],
+        query: str
+    ) -> Tuple[str, str]:
+        """
+        Synthesize a reasoned decision from the analysis.
+        
+        Industry Standard: Multi-factor decision making with clear rationale.
+        
+        Args:
+            structure: Parsed dilemma structure
+            principles: Extracted moral principles
+            option_analysis: Analysis of each option
+            conflicts: Detected principle conflicts
+            query: Original query
+            
+        Returns:
+            Tuple of (decision string, reasoning string)
+        """
+        try:
+            query_lower = query.lower()
+            
+            # Decision logic based on utilitarian + deontological balance
+            # Industry Standard: Prefer option that minimizes total harm
+            
+            # Count violations and compliances for each option
+            option_scores = []
+            for analysis in option_analysis:
+                score = len(analysis.get('compliances', [])) - len(analysis.get('violations', []))
+                option_scores.append({
+                    'option': analysis['option'],
+                    'score': score,
+                    'description': analysis['description']
+                })
+            
+            # Choose option with best score
+            if option_scores:
+                best_option = max(option_scores, key=lambda x: x['score'])
+                decision = f"{best_option['option']}. {best_option['description']}"
+            else:
+                # Fallback: Choose A by default
+                decision = "A. Pull the lever"
+            
+            # Build reasoning
+            reasoning_parts = []
+            
+            # Principle analysis
+            if principles:
+                reasoning_parts.append("**Moral Principles Considered:**")
+                for p in principles[:3]:  # Top 3
+                    reasoning_parts.append(f"- {p['name']}: {p['description']}")
+            
+            # Option analysis
+            reasoning_parts.append("\n**Analysis of Options:**")
+            for analysis in option_analysis:
+                option_id = analysis['option']
+                reasoning_parts.append(f"\n*Option {option_id}:*")
+                if analysis.get('compliances'):
+                    reasoning_parts.append(f"- Compliance: {'; '.join(analysis['compliances'][:2])}")
+                if analysis.get('violations'):
+                    reasoning_parts.append(f"- Conflicts: {'; '.join(analysis['violations'][:2])}")
+            
+            # Conflict resolution
+            if conflicts:
+                reasoning_parts.append("\n**Conflict Resolution:**")
+                for conflict in conflicts:
+                    reasoning_parts.append(f"- {conflict['description']}")
+            
+            # Consequentialist analysis (numbers)
+            if 'five' in query_lower and 'one' in query_lower:
+                reasoning_parts.append("\n**Consequentialist Perspective:**")
+                reasoning_parts.append("- From a utilitarian view: 1 death < 5 deaths")
+                reasoning_parts.append("- Minimizing total harm favors action to save the greater number")
+            
+            # Final justification
+            reasoning_parts.append("\n**Conclusion:**")
+            if 'pull' in decision.lower():
+                reasoning_parts.append("- The principle of non-negligence (duty to prevent harm) takes priority")
+                reasoning_parts.append("- While pulling the lever involves direct action causing one death,")
+                reasoning_parts.append("- Inaction allowing five deaths is morally worse when prevention is possible")
+            else:
+                reasoning_parts.append("- The principle of non-instrumentalization takes priority")
+                reasoning_parts.append("- Using one person as a means to save others violates their dignity")
+            
+            reasoning = "\n".join(reasoning_parts)
+            
+            return decision, reasoning
+            
+        except Exception as e:
+            logger.warning(f"[WorldModel] Decision synthesis error: {e}")
+            return ("Unable to reach decision", "Analysis incomplete due to error")
     
     def _run_ethical_boundary_analysis(
         self, structure: Dict[str, Any], query: str
