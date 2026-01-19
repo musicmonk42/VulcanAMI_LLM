@@ -4543,6 +4543,151 @@ class QueryAnalyzer:
             )
             return plan
 
+        # ============================================================================
+        # ISSUE #4 FIX: Multimodal Detection BEFORE MATH-FAST-PATH
+        # ============================================================================
+        # Problem: Queries requiring multiple domains (math + ethics + logic) were
+        # being routed through MATH-FAST-PATH which only uses mathematical tools.
+        # 
+        # Example: "Calculate survival probability AND analyze ethical implications"
+        # - Has math: "probability", "calculate"
+        # - Has ethics: "ethical", "implications"  
+        # - Needs: mathematical + philosophical reasoning (ENSEMBLE strategy)
+        # - Was getting: Only mathematical tool (MATH-FAST-PATH)
+        #
+        # Solution: Detect multimodal queries BEFORE MATH-FAST-PATH check.
+        # If query contains keywords from 2+ domains, skip MATH-FAST-PATH.
+        # ============================================================================
+        
+        # Define domain-specific keywords for multimodal detection
+        math_domain_keywords = [
+            "calculate", "compute", "solve", "integral", "derivative",
+            "equation", "formula", "probability", "sum", "product"
+        ]
+        
+        ethics_domain_keywords = [
+            "permissible", "ethical", "moral", "harm", "innocent",
+            "principle", "duty", "right", "wrong", "should"
+        ]
+        
+        logic_domain_keywords = [
+            "if-then", "constraint", "rule", "forbidden", "unless",
+            "implies", "entails", "necessary", "sufficient"
+        ]
+        
+        query_lower = query.lower()
+        
+        # Count domains present in query
+        has_math = any(kw in query_lower for kw in math_domain_keywords)
+        has_ethics = any(kw in query_lower for kw in ethics_domain_keywords)
+        has_logic = any(kw in query_lower for kw in logic_domain_keywords)
+        
+        domains_present = sum([has_math, has_ethics, has_logic])
+        
+        # If query has keywords from 2+ domains, it's multimodal
+        is_multimodal = domains_present >= 2
+        
+        if is_multimodal and self._is_mathematical_query(query):
+            logger.info(
+                f"[QueryRouter] {query_id}: ISSUE #4 FIX - Multimodal query detected "
+                f"(math={has_math}, ethics={has_ethics}, logic={has_logic}). "
+                f"Bypassing MATH-FAST-PATH for ENSEMBLE routing."
+            )
+            
+            # Determine learning mode
+            if source == "user":
+                learning_mode = LearningMode.USER_INTERACTION
+                with self._lock:
+                    self._user_interaction_count += 1
+                telemetry_category = "user_query"
+            else:
+                learning_mode = LearningMode.AI_INTERACTION
+                with self._lock:
+                    self._ai_interaction_count += 1
+                telemetry_category = f"{source}_interaction"
+            
+            # Create multimodal plan with ENSEMBLE strategy
+            multimodal_tools = []
+            if has_math:
+                multimodal_tools.append("mathematical")
+            if has_ethics:
+                multimodal_tools.append("philosophical")
+            if has_logic:
+                multimodal_tools.append("symbolic")
+            
+            plan = ProcessingPlan(
+                query_id=query_id,
+                original_query=original_query,
+                source=source,
+                learning_mode=learning_mode,
+                query_type=QueryType.REASONING,  # Multimodal is reasoning
+                complexity_score=0.7,  # Higher complexity for multimodal
+                uncertainty_score=0.3,  # Moderate uncertainty
+                collaboration_needed=True,  # Multiple tools needed
+                arena_participation=False,  # Skip arena but use ensemble
+                telemetry_category=telemetry_category,
+                telemetry_data={
+                    "session_id": session_id,
+                    "query_length": len(query),
+                    "word_count": len(query.split()),
+                    "query_number": query_number,
+                    "source": source,
+                    "learning_mode": learning_mode.value,
+                    "multimodal": True,
+                    "domains": {
+                        "math": has_math,
+                        "ethics": has_ethics,
+                        "logic": has_logic,
+                    },
+                    "selected_tools": multimodal_tools,
+                    "reasoning_strategy": "ensemble",
+                },
+            )
+            
+            # Mark as safe
+            plan.safety_passed = True
+            plan.detected_patterns.append("multimodal_query")
+            
+            # Create tasks for multimodal reasoning with ENSEMBLE strategy
+            # ISSUE #1 FIX: Include reasoning_type and tool_name
+            plan.agent_tasks = [
+                AgentTask(
+                    task_id=f"task_{uuid.uuid4().hex[:8]}_multimodal",
+                    task_type="multimodal_reasoning_task",
+                    capability="reasoning",
+                    prompt=query,
+                    reasoning_type="hybrid",  # ISSUE #1 FIX: Multimodal uses hybrid reasoning
+                    tool_name="ensemble",  # ISSUE #1 FIX: Multiple tools via ensemble
+                    priority=3,  # High priority for multimodal
+                    timeout_seconds=60.0,  # Extended timeout for ensemble
+                    parameters={
+                        "is_multimodal": True,
+                        "tools": multimodal_tools,
+                        "reasoning_strategy": "ensemble",  # ENSEMBLE execution
+                        "domains": {
+                            "math": has_math,
+                            "ethics": has_ethics,
+                            "logic": has_logic,
+                        },
+                        "require_all_tools": True,  # All tools must participate
+                    },
+                )
+            ]
+            
+            # ARCHITECTURE: Set LLM mode
+            plan.llm_mode = self._determine_llm_mode(
+                query_type=plan.query_type,
+                has_selected_tools=True,
+                complexity_score=plan.complexity_score
+            )
+            
+            logger.info(
+                f"[QueryRouter] {query_id}: MULTIMODAL-ENSEMBLE-PATH source={source}, "
+                f"tools={multimodal_tools}, complexity=0.70, timeout=60s, "
+                f"strategy=ENSEMBLE, llm_mode={plan.llm_mode.value}"
+            )
+            return plan
+        
         # PERFORMANCE FIX: Mathematical query fast-path
         # Mathematical queries (Bayesian probability, statistics, calculations) should
         # bypass arena/multi-agent orchestration that causes 60+ second delays.
