@@ -179,8 +179,8 @@ class ConsensusEngine:
         # Audit trail
         self.audit_log: List[Dict] = []
 
-        # Cleanup
-        self.shutdown_flag = False
+        # Cleanup - use threading.Event for fast shutdown response
+        self._shutdown_event = threading.Event()
         self._start_cleanup_thread()
 
         self.logger.info(
@@ -883,10 +883,11 @@ class ConsensusEngine:
         """Start periodic cleanup."""
 
         def cleanup_loop():
-            while not self.shutdown_flag:
-                time.sleep(CLEANUP_INTERVAL)
-                if not self.shutdown_flag:
-                    self._cleanup_expired_proposals()
+            while not self._shutdown_event.is_set():
+                # Use Event.wait() with timeout for fast shutdown response
+                if self._shutdown_event.wait(timeout=CLEANUP_INTERVAL):
+                    break  # Shutdown signaled
+                self._cleanup_expired_proposals()
 
         thread = threading.Thread(
             target=cleanup_loop, daemon=True, name="ConsensusCleanup"
@@ -952,7 +953,7 @@ class ConsensusEngine:
     def shutdown(self):
         """Shutdown consensus engine."""
         self.logger.info("Shutting down consensus engine...")
-        self.shutdown_flag = True
+        self._shutdown_event.set()
         self.logger.info("Consensus engine shutdown complete")
 
 
