@@ -860,11 +860,9 @@ class GovernanceManager:
         response_rate = 0.95 if urgency == "high" else 0.8
 
         # Simulate response (in production, this would be real human interaction)
-        import hashlib
+        import zlib
 
-        action_hash = int(
-            hashlib.md5(str(action.get("id", "")).encode()).hexdigest()[:8], 16
-        )
+        action_hash = zlib.crc32(str(action.get("id", "")).encode()) & 0xffffffff
         responds = (action_hash % 100) < (response_rate * 100)
 
         if responds:
@@ -939,13 +937,11 @@ class GovernanceManager:
 
         # Simulate stakeholder response
         # Use deterministic confidence based on action and stakeholder type
-        import hashlib
+        import zlib
 
         # Calculate response based on stakeholder type and action
         action_id = action.get("id", "default")
-        stakeholder_hash = int(
-            hashlib.md5(f"{stakeholder_id}{action_id}".encode()).hexdigest()[:8], 16
-        )
+        stakeholder_hash = zlib.crc32(f"{stakeholder_id}{action_id}".encode()) & 0xffffffff
 
         # Different stakeholder types have different response rates
         response_rates = {

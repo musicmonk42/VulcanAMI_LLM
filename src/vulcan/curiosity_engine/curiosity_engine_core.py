@@ -640,14 +640,12 @@ class SafeExperimentExecutor:
             else:
                 # Simulate causal discovery with deterministic values
                 # Use intervention properties to calculate consistent results
-                import hashlib
+                import zlib
 
                 intervention_str = str(intervention.get("variable", "")) + str(
                     intervention.get("value", "")
                 )
-                intervention_hash = int(
-                    hashlib.md5(intervention_str.encode()).hexdigest()[:8], 16
-                )
+                intervention_hash = zlib.crc32(intervention_str.encode()) & 0xffffffff
 
                 # Deterministic causal strength based on intervention
                 causal_strength = (

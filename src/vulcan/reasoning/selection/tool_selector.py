@@ -4724,11 +4724,9 @@ class ToolSelector:
                 time.sleep(0.1)  # Simulate work
 
                 # Deterministic confidence based on tool name and config
-                import hashlib
+                import zlib
 
-                tool_hash = int(
-                    hashlib.md5(f"{name}{str(config)}".encode()).hexdigest()[:8], 16
-                )
+                tool_hash = zlib.crc32(f"{name}{str(config)}".encode()) & 0xffffffff
                 confidence = 0.5 + (tool_hash % 500) / 1000.0  # Range: 0.5 to 1.0
 
                 return {

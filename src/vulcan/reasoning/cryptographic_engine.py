@@ -760,7 +760,7 @@ class CryptographicEngine:
             return hashlib.sha256(input_bytes).hexdigest()
         
         elif operation == CryptoOperation.SHA1:
-            return hashlib.sha1(input_bytes).hexdigest()
+            return hashlib.sha1(input_bytes, usedforsecurity=False).hexdigest()
         
         elif operation == CryptoOperation.SHA512:
             return hashlib.sha512(input_bytes).hexdigest()
@@ -799,7 +799,7 @@ class CryptographicEngine:
         # Legacy Hash Operations
         # =====================================================================
         elif operation == CryptoOperation.MD5:
-            return hashlib.md5(input_bytes).hexdigest()
+            return hashlib.md5(input_bytes, usedforsecurity=False).hexdigest()
         
         elif operation == CryptoOperation.RIPEMD160:
             # RIPEMD-160 may not be available in all Python installations
@@ -896,10 +896,30 @@ class CryptographicEngine:
         return hashlib.sha256(data).hexdigest()
     
     def sha1(self, data: Union[str, bytes]) -> str:
-        """Compute SHA-1 hash."""
+        """Compute SHA-1 hash.
+        
+        WARNING: SHA-1 is cryptographically broken and should NOT be used for:
+        - Password hashing
+        - Digital signatures
+        - Security certificates
+        - Any security-critical operations
+        
+        Only use for:
+        - Non-security checksums
+        - Legacy system compatibility
+        - Git commit hashing (legacy)
+        
+        For security purposes, use SHA-256, SHA-3, or BLAKE2 instead.
+        """
+        import warnings
+        warnings.warn(
+            "SHA-1 is cryptographically broken. Use SHA-256 or SHA-3 for security purposes.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         if isinstance(data, str):
             data = data.encode('utf-8')
-        return hashlib.sha1(data).hexdigest()
+        return hashlib.sha1(data, usedforsecurity=False).hexdigest()
     
     def sha512(self, data: Union[str, bytes]) -> str:
         """Compute SHA-512 hash."""
@@ -959,10 +979,30 @@ class CryptographicEngine:
     
     # Legacy Hashes
     def md5(self, data: Union[str, bytes]) -> str:
-        """Compute MD5 hash."""
+        """Compute MD5 hash.
+        
+        WARNING: MD5 is cryptographically broken and should NOT be used for:
+        - Password hashing
+        - Digital signatures
+        - Security certificates
+        - Any security-critical operations
+        
+        Only use for:
+        - Non-security checksums
+        - Legacy system compatibility
+        - Cache keys (non-security)
+        
+        For security purposes, use SHA-256, SHA-3, or BLAKE2 instead.
+        """
+        import warnings
+        warnings.warn(
+            "MD5 is cryptographically broken. Use SHA-256 or SHA-3 for security purposes.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         if isinstance(data, str):
             data = data.encode('utf-8')
-        return hashlib.md5(data).hexdigest()
+        return hashlib.md5(data, usedforsecurity=False).hexdigest()
     
     def ripemd160(self, data: Union[str, bytes]) -> str:
         """Compute RIPEMD-160 hash."""
