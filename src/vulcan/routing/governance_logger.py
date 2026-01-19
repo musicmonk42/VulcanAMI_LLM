@@ -456,6 +456,30 @@ class BufferedGovernanceLogger:
         """
         self._flush_to_disk()
 
+    def shutdown(self) -> None:
+        """
+        Shutdown the logger, stopping background flush thread.
+        
+        This method sets the shutdown flag to signal the background thread
+        to stop, performs a final flush to persist any remaining buffered
+        entries, and shuts down the executor.
+        
+        This method should be called when the logger is no longer needed
+        to ensure proper cleanup of background threads.
+        """
+        if self._shutdown:
+            return  # Already shut down
+            
+        self._shutdown = True
+        try:
+            # Perform final flush to persist remaining entries
+            self._flush_to_disk()
+            # Shutdown executor
+            self._executor.shutdown(wait=False)
+            logger.debug("BufferedGovernanceLogger shutdown complete")
+        except Exception as e:
+            logger.warning(f"Error during BufferedGovernanceLogger shutdown: {e}")
+
 
 # ============================================================
 # BUFFERED LOGGER SINGLETON
@@ -494,6 +518,23 @@ def get_buffered_governance_logger(
                 logger.debug("Global BufferedGovernanceLogger instance created")
 
     return _buffered_logger
+
+
+def shutdown_buffered_governance_logger() -> None:
+    """
+    Shutdown the global buffered governance logger if it exists.
+    
+    This function should be called during application shutdown to ensure
+    proper cleanup of the background flush thread.
+    """
+    global _buffered_logger
+    
+    if _buffered_logger is not None:
+        with _buffered_logger_lock:
+            if _buffered_logger is not None:
+                _buffered_logger.shutdown()
+                _buffered_logger = None
+                logger.debug("Global BufferedGovernanceLogger instance shut down")
 
 
 def log_routing_result(query_id: str, routing_result: Dict[str, Any]) -> None:
@@ -1341,6 +1382,25 @@ def get_governance_logger() -> GovernanceLogger:
                 logger.debug("Global GovernanceLogger instance created")
 
     return _global_logger
+
+
+def shutdown_governance_logger() -> None:
+    """
+    Shutdown the global governance logger if it exists.
+    
+    This function resets the global logger singleton. The GovernanceLogger
+    itself doesn't have background threads, but this allows proper cleanup
+    of the singleton reference.
+    """
+    global _global_logger
+    
+    if _global_logger is not None:
+        with _logger_lock:
+            if _global_logger is not None:
+                # GovernanceLogger doesn't have background threads,
+                # but we reset the singleton for proper cleanup
+                _global_logger = None
+                logger.debug("Global GovernanceLogger instance reset")
 
 
 # ============================================================
