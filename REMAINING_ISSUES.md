@@ -1,10 +1,10 @@
 # Detailed Explanation of Remaining Issues
 
-This document provides an in-depth analysis of the issues that were **NOT fully implemented** in this PR, along with the reasons why and recommendations for future work.
+This document provides an in-depth analysis of the issues and their implementation status.
 
 ---
 
-## Issue #2: Math Tool Syntax Errors in Code Generation [P0 - Partially Complete]
+## Issue #2: Math Tool Syntax Errors in Code Generation [P0 - ✅ COMPLETE]
 
 ### Original Problem Statement
 **Symptom:** Medical device ethics query produced invalid Python code:
@@ -14,40 +14,47 @@ f = 0*Tu(t)2  # SyntaxError: invalid syntax
 
 The integral notation `∫₀ᵀ u(t)² dt` was being parsed incorrectly, producing malformed Python code that would crash when executed.
 
-### What Was Already Done (Before This PR)
-Looking at `mathematical_computation.py` lines 935-967, there is **already a robust retry mechanism** in place:
+### Implementation Status: ✅ FULLY IMPLEMENTED
 
+**What was implemented:**
+
+1. **AST-Based Pre-Validation** (`validate_code_syntax()` function)
+   - Location: `src/vulcan/reasoning/mathematical_computation.py` lines 102-163
+   - Uses Python's `ast` module to validate generated code BEFORE execution
+   - Catches syntax errors early with clearer error messages
+   - Provides line and column information for debugging
+
+2. **Integration with Retry Loop**
+   - AST validation is now called before each execution attempt
+   - If syntax is invalid, goes directly to correction without attempting execution
+   - Clearer error messages enable better LLM corrections
+
+**Code Example:**
 ```python
-# FIX Issue #2: Implement retry loop with error feedback
-MAX_RETRIES = 3
-for attempt in range(MAX_RETRIES):
-    execution_result = execute_math_code(code)
+def validate_code_syntax(code: str) -> Tuple[bool, Optional[str]]:
+    """
+    Validate Python code syntax using AST parsing.
     
-    if execution_result["success"]:
-        break  # Success
+    Returns:
+        (is_valid, error_message)
+    """
+    if not code or not code.strip():
+        return False, "Empty code string"
     
-    # Execution failed - try to correct
-    error_msg = execution_result["error"]
-    logger.info(f"Code execution failed (attempt {attempt + 1}/{MAX_RETRIES}): {error_msg}")
-    
-    if attempt < MAX_RETRIES - 1 and llm is not None:
-        corrected_code = self._request_code_correction(
-            query, code, error_msg, llm
-        )
-        if corrected_code and corrected_code != code:
-            code = corrected_code
-            logger.info(f"Retry with corrected code:\n{code}")
-        else:
-            break  # No improvement possible
+    try:
+        ast.parse(code)
+        return True, None
+    except SyntaxError as e:
+        line_info = f" at line {e.lineno}" if e.lineno else ""
+        col_info = f", column {e.offset}" if e.offset else ""
+        error_text = e.msg if e.msg else "invalid syntax"
+        return False, f"Syntax error{line_info}{col_info}: {error_text}"
 ```
 
-**Key Features:**
-- 3 retry attempts
-- Uses LLM to correct syntax errors
-- Provides error feedback to guide corrections
+**Previous Implementation (Still Active):**
+- 3 retry attempts with LLM correction
+- Unicode character normalization
 - Graceful fallback if correction fails
-
-### What This PR Did
 **Issue #1 fix indirectly helps Issue #2:**
 - Improved Unicode character normalization (lines 1607-1609)
 - Better expression parsing reduces malformed expressions
@@ -158,7 +165,7 @@ class EnhancedMathParser:
 
 ---
 
-## Issue #4: SAT Solver Doesn't Provide Contradiction Proof [P2 - Not Implemented]
+## Issue #4: SAT Solver Doesn't Provide Contradiction Proof [P2 - ✅ COMPLETE]
 
 ### Original Problem Statement
 **Symptom:** SAT solver correctly answered "NO" (UNSAT) for:
@@ -181,96 +188,60 @@ Expected:
 8. Contradiction! ¬A and ¬B contradict A∨B
 ```
 
-### Why This Wasn't Implemented
+### Implementation Status: ✅ FULLY IMPLEMENTED
 
-#### 1. Architectural Complexity
-The current prover architecture doesn't track **derivation chains**.
+**What was implemented:**
 
-**Current implementation** (ResolutionProver, line 745):
-```python
-if resolvent.is_empty():
-    # Empty clause derived - proof found!
-    proof = ProofNode(
-        conclusion=f"Goal proven: {goal}",
-        premises=[],  # ⚠️ NO PREMISES TRACKED
-        rule_used="resolution",
-        confidence=0.94,
-        depth=iteration,
-    )
-    return True, proof, 0.94
-```
+1. **AnnotatedClause Dataclass** 
+   - Location: `src/vulcan/reasoning/symbolic/core.py` lines 228-293
+   - Tracks derivation history for each clause
+   - Records: parent clauses, rule used, iteration, resolved literal
 
-**Problem:** The `premises=[]` means we don't track WHICH clauses were resolved to get the empty clause.
+2. **build_proof_tree_from_annotated() Function**
+   - Location: `src/vulcan/reasoning/symbolic/core.py` lines 295-347
+   - Recursively builds complete ProofNode tree from derivation history
+   - Traces back from empty clause to original premises
 
-#### 2. What Would Be Required
+3. **format_contradiction_proof() Function**
+   - Location: `src/vulcan/reasoning/symbolic/core.py` lines 350-437
+   - Converts proof tree to human-readable step-by-step explanation
+   - Industry-standard format (similar to Prover9, Vampire output)
 
-**Step 1: Track Resolution History**
+4. **Updated ResolutionProver.prove() Method**
+   - Location: `src/vulcan/reasoning/symbolic/provers.py` lines 704-932
+   - Now tracks derivation history using AnnotatedClause
+   - Builds complete proof tree when contradiction is found
+   - Includes contradiction_proof in metadata
+
+5. **_resolve_with_tracking() Method**
+   - Location: `src/vulcan/reasoning/symbolic/provers.py` lines 878-932
+   - Returns resolved literal name for proof tracking
+   - Enables detailed derivation chain construction
+
+**Code Example:**
 ```python
 @dataclass
 class AnnotatedClause:
-    """Clause with derivation history"""
+    """Clause with derivation history for contradiction proof tracking."""
     clause: Clause
-    derived_from: List[AnnotatedClause]  # Parent clauses
-    rule_used: str  # e.g., "resolution", "premise"
-    iteration: int
-
-# During resolution
-for clause1 in clause_list:
-    for clause2 in clause_list:
-        resolvents = self._resolve(clause1, clause2)
-        for resolvent in resolvents:
-            annotated = AnnotatedClause(
-                clause=resolvent,
-                derived_from=[clause1, clause2],
-                rule_used="resolution",
-                iteration=iteration
-            )
+    derived_from: List["AnnotatedClause"] = field(default_factory=list)
+    rule_used: str = "premise"
+    iteration: int = 0
+    resolvent_literal: Optional[str] = None
 ```
 
-**Step 2: Build Proof Tree When Empty Clause Found**
-```python
-def _build_proof_tree(self, empty_clause: AnnotatedClause) -> ProofNode:
-    """
-    Recursively build proof tree from empty clause back to premises.
-    
-    Returns tree like:
-    ├─ ⊥ (empty clause)
-       ├─ ¬A ∨ ¬B (resolution of clauses below)
-          ├─ ¬A (derived from...)
-          ├─ ¬B (derived from...)
-       ├─ A ∨ B (premise)
-    """
-    if empty_clause.rule_used == "premise":
-        return ProofNode(
-            conclusion=str(empty_clause.clause),
-            premises=[],
-            rule_used="premise",
-            confidence=1.0
-        )
-    
-    # Recursive case
-    premise_proofs = [
-        self._build_proof_tree(parent) 
-        for parent in empty_clause.derived_from
-    ]
-    
-    return ProofNode(
-        conclusion=str(empty_clause.clause),
-        premises=premise_proofs,
-        rule_used=empty_clause.rule_used,
-        confidence=0.95
-    )
+**Output Format:**
 ```
+Contradiction Proof:
+============================================================
 
-**Step 3: Format Human-Readable Proof**
-```python
-def format_contradiction_proof(proof_tree: ProofNode) -> str:
-    """
-    Convert proof tree to human-readable contradiction explanation.
-    
-    Output:
-    Step 1: A→B (premise)
-    Step 2: B→C (premise)
+Step 1: A (premise)
+Step 2: ¬A (negated_goal)
+Step 3: ⊥ (contradiction) (from steps 1, 2 via resolution on A)
+
+============================================================
+CONCLUSION: The formula is UNSATISFIABLE (contradiction derived)
+```
     Step 3: A→C (transitivity of →, from steps 1-2)
     Step 4: ¬C (premise)
     Step 5: ¬A (modus tollens on steps 3-4)
@@ -365,7 +336,7 @@ for resolvent in resolvents:
 
 ---
 
-## Issue #7: Analogical Reasoning Incomplete Mapping [P3 - Not Implemented]
+## Issue #7: Analogical Reasoning Incomplete Mapping [P3 - ✅ COMPLETE]
 
 ### Original Problem Statement
 **Symptom:** User asked to map 5 concepts from distributed systems to cellular biology:
@@ -377,106 +348,71 @@ for resolvent in resolvents:
 
 **Response:** Only mapped 1 concept (leader election → nucleus), ignored the other 4.
 
-### Why This Wasn't Implemented
+### Implementation Status: ✅ FULLY IMPLEMENTED
 
-#### 1. Low Priority
-- Classified as P3 (low priority) in problem statement
-- Partial success (1/5 mappings) is better than complete failure
-- Less critical than wrong answers (Issues #1, #5) or missing answers (Issues #3, #6)
+**What was implemented:**
 
-#### 2. Requires Deep Analogical Reasoning Investigation
+1. **extract_mapping_targets() Function**
+   - Location: `src/vulcan/reasoning/analogical/base_reasoner.py` lines 860-938
+   - Parses ALL concepts from various query formats:
+     - Comma-separated: "Map A, B, C to domain"
+     - Numbered lists: "1. A\n2. B\n3. C"
+     - Arrow notation: "A → ?\nB → ?"
+     - Bullet points: "• A\n• B"
+     - And/or combinations: "Map A, B and C"
 
-The fix requires understanding the analogical reasoning engine's structure mapping algorithm:
+2. **map_all_concepts() Function**
+   - Location: `src/vulcan/reasoning/analogical/base_reasoner.py` lines 940-1020
+   - Maps EACH concept individually to ensure no concepts are missed
+   - Returns complete results for all concepts (found or not)
 
-**From earlier exploration:**
-```
-Files in src/vulcan/reasoning/analogical/:
-- structure_mapping.py - Core SME (Structure Mapping Engine)
-- base_reasoner.py - AnalogicalReasoner integration
-- semantic_enricher.py - Concept understanding
-- engine.py - Completeness validation
-```
+3. **check_mapping_completeness() Function**
+   - Location: `src/vulcan/reasoning/analogical/base_reasoner.py` lines 1022-1068
+   - Validates that all requested concepts were mapped
+   - Reports unmapped concepts and completeness ratio
 
-**Current behavior** (from logs):
+4. **format_mapping_response() Function**
+   - Location: `src/vulcan/reasoning/analogical/base_reasoner.py` lines 1070-1147
+   - Creates human-readable output showing ALL mappings
+   - Includes summary statistics and notes on unmapped concepts
+
+5. **reason_with_complete_mapping() Function**
+   - Location: `src/vulcan/reasoning/analogical/base_reasoner.py` lines 1149-1235
+   - Main entry point for batch analogical reasoning
+   - Orchestrates extraction, mapping, validation, and formatting
+
+**Code Example:**
 ```python
-# Likely what's happening:
-def map_analogy(source_concepts, target_domain):
-    # Maps FIRST matching concept
-    for concept in source_concepts:
-        mapping = find_best_mapping(concept, target_domain)
-        if mapping:
-            return mapping  # ⚠️ Returns early after first match
-    
-    return None
-```
-
-**What should happen:**
-```python
-def map_analogy(source_concepts, target_domain):
-    # Maps ALL concepts
-    mappings = {}
-    for concept in source_concepts:
-        mapping = find_best_mapping(concept, target_domain)
-        if mapping:
-            mappings[concept] = mapping
-        else:
-            mappings[concept] = None  # Track unmapped concepts
-    
-    return mappings  # ⚠️ Returns complete mapping set
-```
-
-#### 3. What Would Be Required
-
-**Step 1: Parse All Requested Mappings**
-```python
-def extract_mapping_targets(query: str) -> List[str]:
-    """
-    Extract all concepts user wants mapped.
-    
-    Example:
-    "Map leader election, quorum, fencing token to biology"
-    → ["leader election", "quorum", "fencing token"]
-    """
-    # Pattern 1: Comma-separated list
-    pattern1 = r'map\s+(.+?)\s+to\s+'
-    match = re.search(pattern1, query, re.IGNORECASE)
+def extract_mapping_targets(self, query: str) -> List[str]:
+    """Extract ALL concepts user wants mapped."""
+    # Pattern 1: "Map X, Y, Z to domain"
+    map_pattern = r'map\s+(.+?)\s+(?:to|in|into|onto)\s+\w+'
+    match = re.search(map_pattern, query_lower, re.IGNORECASE)
     if match:
         concepts_str = match.group(1)
-        concepts = [c.strip() for c in concepts_str.split(',')]
-        return concepts
-    
-    # Pattern 2: Numbered list
-    pattern2 = r'\d+\.\s*(.+?)(?=\n\d+\.|$)'
-    matches = re.findall(pattern2, query)
-    if matches:
-        return [m.strip() for m in matches]
-    
-    return []
+        parts = re.split(r'[,;]|\s+and\s+', concepts_str)
+        return [p.strip() for p in parts if p.strip()]
+    # ... additional patterns for numbered lists, bullets, etc.
 ```
 
-**Step 2: Generate Mapping for Each Concept**
-```python
-def map_all_concepts(
-    source_concepts: List[str],
-    target_domain: str
-) -> Dict[str, Optional[AnalogicalMapping]]:
-    """
-    Map each source concept to target domain.
-    
-    Returns:
-        Dict mapping concept → AnalogicalMapping or None
-    """
-    results = {}
-    
-    for concept in source_concepts:
-        try:
-            mapping = self.structure_mapper.map(
-                source=concept,
-                target_domain=target_domain
-            )
-            
-            if mapping and mapping.confidence > 0.3:
-                results[concept] = mapping
+**Output Format:**
+```
+Analogical Mappings: distributed_systems → biology
+============================================================
+
+1. leader election → nucleus (confidence: 0.85)
+   Rationale: Both serve as central coordinators
+2. quorum → cell signaling (confidence: 0.70)
+3. fencing token → (no mapping found)
+4. split brain → cell division (confidence: 0.65)
+5. write divergence → genetic drift (confidence: 0.60)
+
+============================================================
+Summary: 4/5 concepts successfully mapped (80.0%)
+Average confidence: 0.70
+
+Note: Could not find mappings for: fencing token
+```
             else:
                 results[concept] = None
                 logger.warning(

@@ -41,6 +41,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Optional, Set, Tuple
 
 from .core import (
+    AnnotatedClause,
     Clause,
     Constant,
     Function,
@@ -49,6 +50,8 @@ from .core import (
     Term,
     Unifier,
     Variable,
+    build_proof_tree_from_annotated,
+    format_contradiction_proof,
 )
 
 logger = logging.getLogger(__name__)
@@ -702,7 +705,10 @@ class ResolutionProver(BaseProver):
         self, goal: Clause, kb: List[Clause], timeout: float
     ) -> Tuple[bool, Optional[ProofNode], float]:
         """
-        Prove goal using resolution.
+        Prove goal using resolution with full derivation tracking.
+
+        ISSUE #4 FIX: Now tracks derivation history using AnnotatedClause
+        to build complete contradiction proofs when empty clause is derived.
 
         Args:
             goal: Goal clause to prove
@@ -711,15 +717,42 @@ class ResolutionProver(BaseProver):
 
         Returns:
             Tuple of (proven, proof_tree, confidence)
+            - proof_tree now includes complete derivation chain for contradictions
         """
         start_time = time.time()
 
-        # FIXED: Negate goal properly and add to clause set
+        # ISSUE #4 FIX: Use AnnotatedClause to track derivation history
+        # Convert KB clauses to annotated clauses marked as premises
+        annotated_clauses: Dict[int, AnnotatedClause] = {}
+        
+        for i, clause in enumerate(kb):
+            annotated = AnnotatedClause(
+                clause=clause,
+                derived_from=[],
+                rule_used="premise",
+                iteration=0,
+                resolvent_literal=None
+            )
+            annotated_clauses[hash(clause)] = annotated
+
+        # FIXED: Negate goal properly and add to clause set as premises
         negated_goals = self._negate_clause_to_cnf(goal)
+        for clause in negated_goals:
+            annotated = AnnotatedClause(
+                clause=clause,
+                derived_from=[],
+                rule_used="negated_goal",
+                iteration=0,
+                resolvent_literal=None
+            )
+            annotated_clauses[hash(clause)] = annotated
+
+        # Working set of clauses (just the Clause objects for efficiency)
         clauses = set(kb + negated_goals)
 
         # Keep track of new clauses
-        new_clauses = set()
+        new_clauses: Set[Clause] = set()
+        new_annotated: Dict[int, AnnotatedClause] = {}
 
         iteration = 0
         while iteration < self.max_iterations:
@@ -732,26 +765,53 @@ class ResolutionProver(BaseProver):
             pairs_generated = False
 
             for i, clause1 in enumerate(clause_list):
-                for clause2 in clause_list[i + 1 :]:
+                for clause2 in clause_list[i + 1:]:
                     if time.time() - start_time >= timeout:
                         # FIX Issue #1: Return meaningful confidence on timeout
                         return False, None, 0.40  # Unknown due to timeout
 
-                    # Try to resolve
-                    resolvents = self._resolve(clause1, clause2)
+                    # Try to resolve - now returns (resolvent, resolved_literal) pairs
+                    resolution_results = self._resolve_with_tracking(clause1, clause2)
 
-                    for resolvent in resolvents:
+                    for resolvent, resolved_literal in resolution_results:
+                        # ISSUE #4 FIX: Create annotated clause with derivation history
+                        parent1 = annotated_clauses.get(hash(clause1))
+                        parent2 = annotated_clauses.get(hash(clause2))
+                        
+                        derived_from = []
+                        if parent1:
+                            derived_from.append(parent1)
+                        if parent2:
+                            derived_from.append(parent2)
+                        
+                        annotated_resolvent = AnnotatedClause(
+                            clause=resolvent,
+                            derived_from=derived_from,
+                            rule_used="resolution",
+                            iteration=iteration + 1,
+                            resolvent_literal=resolved_literal
+                        )
+
                         # Check if empty clause derived
                         if resolvent.is_empty():
+                            # ISSUE #4 FIX: Build complete proof tree with derivation chain
+                            proof_tree = build_proof_tree_from_annotated(annotated_resolvent)
+                            
+                            # Format human-readable explanation
+                            contradiction_explanation = format_contradiction_proof(proof_tree)
+                            
+                            # Create ProofNode with full derivation information
                             proof = ProofNode(
                                 conclusion=f"Goal proven: {goal}",
-                                premises=[],
-                                rule_used="resolution",
+                                premises=[proof_tree],  # Include full derivation tree
+                                rule_used="resolution_refutation",
                                 confidence=0.94,
                                 depth=iteration,
                                 metadata={
                                     "method": "resolution",
                                     "iterations": iteration,
+                                    "contradiction_proof": contradiction_explanation,
+                                    "resolved_on": resolved_literal,
                                 },
                             )
                             return True, proof, 0.94
@@ -763,22 +823,130 @@ class ResolutionProver(BaseProver):
                                 and resolvent not in new_clauses
                             ):
                                 new_clauses.add(resolvent)
+                                new_annotated[hash(resolvent)] = annotated_resolvent
                                 pairs_generated = True
 
             # If no new clauses, we cannot prove it
             if not pairs_generated:
                 # FIX Issue #1: High confidence that formula is NOT provable
-                return False, None, 0.95  # Exhausted search space
+                # ISSUE #4 ENHANCEMENT: Provide explanation for UNSAT
+                proof = ProofNode(
+                    conclusion=f"Goal not provable: {goal}",
+                    premises=[],
+                    rule_used="exhausted_search",
+                    confidence=0.95,
+                    depth=iteration,
+                    metadata={
+                        "method": "resolution",
+                        "iterations": iteration,
+                        "total_clauses": len(clauses),
+                        "explanation": (
+                            f"Resolution search exhausted after {iteration} iterations "
+                            f"with {len(clauses)} clauses. No contradiction found."
+                        ),
+                    },
+                )
+                return False, proof, 0.95  # Exhausted search space
 
             # Add new clauses to clause set
             clauses.update(new_clauses)
+            annotated_clauses.update(new_annotated)
             new_clauses.clear()
+            new_annotated.clear()
 
             iteration += 1
 
         # Max iterations reached
         # FIX Issue #1: Return meaningful confidence for max iterations
-        return False, None, 0.40  # Unknown due to iteration limit
+        proof = ProofNode(
+            conclusion=f"Goal unknown: {goal}",
+            premises=[],
+            rule_used="max_iterations",
+            confidence=0.40,
+            depth=iteration,
+            metadata={
+                "method": "resolution",
+                "iterations": iteration,
+                "total_clauses": len(clauses),
+                "explanation": (
+                    f"Maximum iterations ({self.max_iterations}) reached. "
+                    f"Result is inconclusive."
+                ),
+            },
+        )
+        return False, proof, 0.40  # Unknown due to iteration limit
+
+    def _resolve_with_tracking(
+        self, clause1: Clause, clause2: Clause
+    ) -> List[Tuple[Clause, str]]:
+        """
+        Apply binary resolution with literal tracking for proof construction.
+
+        ISSUE #4 FIX: Returns resolved literal for proof tree construction.
+
+        Args:
+            clause1: First clause
+            clause2: Second clause
+
+        Returns:
+            List of (resolvent, resolved_literal_name) tuples
+        """
+        results = []
+
+        # Try to find complementary literals
+        for i, lit1 in enumerate(clause1.literals):
+            for j, lit2 in enumerate(clause2.literals):
+                # Check if literals are complementary
+                if lit1.predicate != lit2.predicate:
+                    continue
+
+                if lit1.negated == lit2.negated:
+                    continue
+
+                # Try to unify
+                if len(lit1.terms) != len(lit2.terms):
+                    continue
+
+                subst = {}
+                unified = True
+                for t1, t2 in zip(lit1.terms, lit2.terms):
+                    subst = self.unifier.unify(t1, t2, subst)
+                    if subst is None:
+                        unified = False
+                        break
+
+                if not unified:
+                    continue
+
+                # Create resolvent: all literals except the resolved ones
+                new_literals = []
+
+                # Add literals from clause1 except lit1
+                for k, lit in enumerate(clause1.literals):
+                    if k != i:
+                        new_lit = self.unifier.apply_to_literal(lit, subst)
+                        if new_lit not in new_literals:
+                            new_literals.append(new_lit)
+
+                # Add literals from clause2 except lit2
+                for k, lit in enumerate(clause2.literals):
+                    if k != j:
+                        new_lit = self.unifier.apply_to_literal(lit, subst)
+                        if new_lit not in new_literals:
+                            new_literals.append(new_lit)
+
+                # Create new clause
+                resolvent = Clause(
+                    literals=new_literals,
+                    confidence=min(clause1.confidence, clause2.confidence),
+                )
+
+                # Track which literal was resolved (use predicate name for clarity)
+                # The resolved literal is the one that was eliminated via resolution
+                resolved_literal = lit1.predicate
+                results.append((resolvent, resolved_literal))
+
+        return results
 
     def _negate_clause_to_cnf(self, clause: Clause) -> List[Clause]:
         """

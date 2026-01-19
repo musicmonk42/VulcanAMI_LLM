@@ -14,6 +14,7 @@ This tool GENERATES solutions, unlike MathematicalVerificationEngine which only 
 
 from __future__ import annotations
 
+import ast
 import logging
 import re
 import threading
@@ -96,6 +97,74 @@ PROOF_VERIFICATION_PATTERNS: Tuple[re.Pattern, ...] = (
     re.compile(r"proof.*?step\s+\d+", re.IGNORECASE),  # "proof: step 1"
     re.compile(r"step\s+\d+.*?proof", re.IGNORECASE),  # "step 1 of proof"
 )
+
+
+# ============================================================================
+# ISSUE #2 FIX: AST-Based Code Pre-Validation
+# ============================================================================
+# Industry-standard practice: Validate generated code syntax BEFORE execution
+# using Python's built-in ast module. This catches syntax errors early,
+# provides clearer error messages for LLM correction, and prevents the
+# overhead of attempting to execute invalid code.
+# ============================================================================
+
+
+def validate_code_syntax(code: str) -> Tuple[bool, Optional[str]]:
+    """
+    Validate Python code syntax using AST parsing.
+    
+    This function performs static analysis of generated Python code to detect
+    syntax errors before execution. This is an industry-standard best practice
+    that provides:
+    
+    1. Early error detection - Catches syntax errors before execution attempt
+    2. Clearer error messages - AST errors are more descriptive than exec() errors
+    3. Performance optimization - Avoids overhead of failed execution attempts
+    4. Security benefit - Validates code structure without running it
+    
+    Args:
+        code: Python code string to validate
+        
+    Returns:
+        Tuple of (is_valid, error_message):
+            - is_valid: True if code has valid Python syntax, False otherwise
+            - error_message: None if valid, descriptive error message if invalid
+            
+    Examples:
+        >>> is_valid, error = validate_code_syntax("x = 2 + 2")
+        >>> assert is_valid and error is None
+        
+        >>> is_valid, error = validate_code_syntax("f = 0*Tu(t)2")  # Invalid
+        >>> assert not is_valid and "Syntax error" in error
+        
+        >>> is_valid, error = validate_code_syntax("from sympy import *\\nresult = sum(k**2, (k, 1, 10))")
+        >>> assert is_valid
+    
+    Note:
+        This function only validates syntax, not semantics. Code that passes
+        validation may still raise runtime errors (e.g., NameError, TypeError).
+    """
+    if not code or not code.strip():
+        return False, "Empty code string"
+    
+    try:
+        ast.parse(code)
+        return True, None
+    except SyntaxError as e:
+        # Build descriptive error message with line info if available
+        line_info = f" at line {e.lineno}" if e.lineno else ""
+        col_info = f", column {e.offset}" if e.offset else ""
+        error_text = e.msg if e.msg else "invalid syntax"
+        
+        # Include the problematic text if available
+        if e.text:
+            text_snippet = e.text.strip()[:50]  # Limit snippet length
+            return False, f"Syntax error{line_info}{col_info}: {error_text} near '{text_snippet}'"
+        
+        return False, f"Syntax error{line_info}{col_info}: {error_text}"
+    except Exception as e:
+        # Catch any unexpected parsing errors
+        return False, f"Code validation error: {type(e).__name__}: {str(e)}"
 
 
 # ============================================================================
@@ -932,15 +1001,56 @@ result = simplify(integral)
 
                 # FIX Issue #2: Implement retry loop with error feedback
                 # When code generation fails with syntax errors, retry with error feedback
+                # ENHANCEMENT: Add AST-based pre-validation before execution
                 MAX_RETRIES = 3
                 for attempt in range(MAX_RETRIES):
+                    # ISSUE #2 FIX: Validate code syntax BEFORE execution
+                    # This catches syntax errors early with clearer error messages
+                    is_valid, syntax_error = validate_code_syntax(code)
+                    
+                    if not is_valid:
+                        # Syntax error detected - skip execution and go directly to correction
+                        error_msg = syntax_error
+                        logger.info(
+                            f"AST validation failed (attempt {attempt + 1}/{MAX_RETRIES}): {error_msg}"
+                        )
+                        
+                        # If not the last attempt and LLM is available, try to correct the code
+                        if attempt < MAX_RETRIES - 1 and llm is not None:
+                            corrected_code = self._request_code_correction(
+                                query, code, error_msg, llm
+                            )
+                            if corrected_code and corrected_code != code:
+                                logger.info(
+                                    f"Attempting retry with corrected code "
+                                    f"(attempt {attempt + 2}/{MAX_RETRIES})"
+                                )
+                                code = corrected_code
+                                continue
+                        
+                        # Last attempt or LLM not available - try fallback strategy
+                        if attempt == MAX_RETRIES - 1:
+                            logger.info("All retry attempts exhausted, trying fallback strategy")
+                            fallback_result = self._try_fallback(
+                                query, classification, strategy, llm, error_msg
+                            )
+                            if fallback_result and fallback_result.success:
+                                return fallback_result
+                            
+                            return self._create_error_result(
+                                query, code, error_msg,
+                                classification, strategy, time.time() - start_time
+                            )
+                        continue  # Try next attempt
+                    
+                    # Syntax is valid - proceed with execution
                     execution_result = execute_math_code(code)
                     
                     if execution_result["success"]:
                         # Success - break out of retry loop
                         break
                     
-                    # Execution failed
+                    # Execution failed (runtime error, not syntax)
                     error_msg = execution_result["error"]
                     logger.info(f"Code execution failed (attempt {attempt + 1}/{MAX_RETRIES}): {error_msg}")
                     
