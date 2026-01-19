@@ -2982,6 +2982,31 @@ class WorldModelToolWrapper:
             return 'creative', self._generate_creative_content(query_lower)
         
         # =================================================================
+        # CRITICAL FIX (Jan 19 2026): Check for ETHICAL DILEMMAS FIRST
+        # =================================================================
+        # Trolley problem and similar external ethical dilemmas should be
+        # routed to world_model's _philosophical_reasoning which includes
+        # the new ethical dilemma analysis pipeline.
+        # 
+        # Detection criteria (from world_model._is_ethical_dilemma):
+        # - Trolley problem indicators (trolley, lever, runaway, etc.)
+        # - Life/death scenarios (save five, kill one, etc.)
+        # - Explicit choice structure (option A/B, must choose, etc.)
+        # - Moral principles (non-instrumentalization, non-negligence, etc.)
+        ethical_dilemma_indicators = [
+            'trolley', 'lever', 'runaway', 'heading toward',
+            'save five', 'kill one', 'save one', 'kill five',
+            'option a', 'option b', 'must choose', 'you must act',
+            'non-instrumentalization', 'non-negligence',
+            'moral dilemma', 'ethical dilemma', 'permissible'
+        ]
+        has_ethical_dilemma = sum(1 for indicator in ethical_dilemma_indicators if indicator in query_lower) >= 2
+        
+        if has_ethical_dilemma:
+            self.logger.info(f"[WorldModelToolWrapper] Detected ethical dilemma - routing to world model")
+            return 'philosophical', self._apply_philosophical_reasoning_from_world_model(query_lower)
+        
+        # =================================================================
         # Bug #3 FIX: Check for PHILOSOPHICAL self-reflection queries
         # =================================================================
         # Queries like "would you become self aware if you could?" should be
@@ -2995,7 +3020,7 @@ class WorldModelToolWrapper:
         has_hypothetical = any(phrase in query_lower for phrase in hypothetical_phrases)
         
         if has_philosophical and has_hypothetical:
-            return 'philosophical', self._apply_philosophical_reasoning(query_lower)
+            return 'philosophical', self._apply_philosophical_reasoning_from_world_model(query_lower)
         
         # Check for learning-related queries (user-facing - NOT exposing CSIU internals)
         # CSIU is a LATENT internal protocol and should NOT be exposed to users
@@ -3446,6 +3471,88 @@ In the end, perhaps the answer matters less than the questioning. The fact that 
             "frameworks_applied": ["functionalism", "phenomenology", "computational_theory_of_mind"],
             "source": "world_model.philosophical_reasoning",
         }
+    
+    def _apply_philosophical_reasoning_from_world_model(self, query_lower: str) -> Dict[str, Any]:
+        """
+        Apply philosophical reasoning by calling the actual World Model's _philosophical_reasoning method.
+        
+        CRITICAL FIX (Jan 19 2026): This ensures Vulcan answers authentically from its actual 
+        self-model and meta-reasoning components, NOT from templates.
+        
+        The WorldModel's _philosophical_reasoning includes:
+        - Ethical dilemma detection and analysis (trolley problem, etc.)
+        - Consultation of Vulcan's actual values and objectives via MotivationalIntrospection
+        - Use of EthicalBoundaryMonitor, GoalConflictDetector, InternalCritic
+        - Counterfactual reasoning for option analysis
+        - Genuine synthesis from Vulcan's authentic perspective
+        
+        Industry Standard: Delegate to the authoritative component, no templates.
+        
+        Args:
+            query_lower: Lowercased query string
+            
+        Returns:
+            Dict with philosophical analysis from Vulcan's actual self-model
+        """
+        self.logger.info(f"[WorldModelToolWrapper] Delegating to WorldModel._philosophical_reasoning (authentic self-expression)")
+        
+        try:
+            # CRITICAL: Call the ACTUAL world model's philosophical reasoning
+            # This gives us Vulcan's genuine perspective, not a template
+            if self.world_model and hasattr(self.world_model, '_philosophical_reasoning'):
+                result = self.world_model._philosophical_reasoning(query_lower)
+                
+                # Extract response and metadata from authentic world model analysis
+                response_text = result.get('response', '')
+                confidence = result.get('confidence', 0.75)
+                
+                # Industry Standard: Preserve ALL analysis structures from world model
+                # These reflect Vulcan's actual reasoning process
+                return {
+                    "response": response_text,
+                    "confidence": confidence,
+                    "reasoning_trace": result.get('reasoning_trace', {}),
+                    "perspectives": result.get('perspectives', []),
+                    "principles": result.get('principles', []),
+                    "considerations": result.get('considerations', []),
+                    "conflicts": result.get('conflicts', []),
+                    "decision": result.get('decision'),
+                    "reasoning_type": "philosophical",
+                    "source": "world_model._philosophical_reasoning",
+                    "mode": result.get('mode', 'philosophical'),
+                    "components_used": result.get('components_used', []),
+                }
+            else:
+                # Error: world model MUST be available for authentic reasoning
+                self.logger.error(
+                    "[WorldModelToolWrapper] World model not available - "
+                    "cannot provide authentic philosophical reasoning"
+                )
+                return {
+                    "response": "World model unavailable for authentic reasoning.",
+                    "confidence": 0.0,
+                    "error": "world_model_unavailable",
+                    "perspectives": [],
+                    "principles": [],
+                    "considerations": [],
+                    "conflicts": [],
+                }
+                
+        except Exception as e:
+            self.logger.error(
+                f"[WorldModelToolWrapper] Error calling world model philosophical reasoning: {e}",
+                exc_info=True
+            )
+            # Industry Standard: Return error state, don't fallback to templates
+            return {
+                "response": f"Error in philosophical reasoning: {str(e)}",
+                "confidence": 0.0,
+                "error": str(e),
+                "perspectives": [],
+                "principles": [],
+                "considerations": [],
+                "conflicts": [],
+            }
     
     def _get_philosophical_analysis(self, question_type: str, query: str) -> Dict[str, Any]:
         """Generate philosophical analysis based on question type."""
