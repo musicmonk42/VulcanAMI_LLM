@@ -348,6 +348,103 @@ class TestIssue5LinguisticQueries:
                 f"Probability queries should not be rejected with high confidence. Got: {result.confidence}"
 
 
+class TestIssue6CausalDirectAnswers:
+    """
+    Test suite for Issue #6: Causal Reasoning Doesn't Answer Direct Questions
+    
+    Problem: Collider trap query asked "Does conditioning on B induce correlation? YES/NO"
+    but response was a graph analysis dump without answering YES or NO.
+    
+    Solution: Detect YES/NO questions and provide direct answers prominently.
+    """
+    
+    @pytest.fixture
+    def causal_reasoner(self):
+        """Create CausalReasoner instance if available."""
+        try:
+            from vulcan.reasoning.causal_reasoning import CausalReasoner
+            return CausalReasoner()
+        except ImportError:
+            pytest.skip("CausalReasoner not available")
+    
+    def test_collider_yes_no_question(self, causal_reasoner):
+        """
+        Test: Collider trap query with YES/NO should provide direct answer
+        
+        Given: A→B←C (B is a collider with parents A and C)
+        Question: Does conditioning on B induce correlation between A and C?
+        Expected: YES - conditioning on a collider induces correlation
+        """
+        query = "Given A→B and C→B, does conditioning on B induce correlation between A and C? YES/NO"
+        result = causal_reasoner.reason(query)
+        
+        # Should have identified the YES/NO question
+        assert "question" in result, "Result should include the extracted question"
+        
+        # Should have a direct answer
+        assert "direct_answer" in result, "Result should include a direct YES/NO answer"
+        
+        # The answer should start with YES or NO
+        answer = result["direct_answer"]
+        assert answer.startswith("YES") or answer.startswith("NO"), \
+            f"Direct answer should start with YES or NO. Got: {answer}"
+        
+        # For a collider, the answer should be YES
+        assert answer.startswith("YES"), \
+            f"Conditioning on a collider should induce correlation. Got: {answer}"
+    
+    def test_independence_yes_no_question(self, causal_reasoner):
+        """
+        Test: Independence question with YES/NO should provide direct answer
+        
+        Question format: "Is X independent of Y given Z?"
+        Expected: YES/NO with d-separation reasoning
+        """
+        query = "Given A→B→C, is A independent of C given B? YES/NO"
+        result = causal_reasoner.reason(query)
+        
+        # Should have direct answer
+        if "direct_answer" in result:
+            answer = result["direct_answer"]
+            assert answer.startswith("YES") or answer.startswith("NO"), \
+                f"Direct answer should start with YES or NO. Got: {answer}"
+    
+    def test_direct_answer_appears_in_explanation(self, causal_reasoner):
+        """
+        Test: Direct answer should appear prominently in explanation
+        
+        Industry Standard: Answer first, then supporting analysis
+        """
+        query = "Given A→B←C, does conditioning on B induce correlation? YES/NO"
+        result = causal_reasoner.reason(query)
+        
+        if "explanation" in result and "direct_answer" in result:
+            explanation = result["explanation"]
+            direct_answer = result["direct_answer"]
+            
+            # Direct answer should appear early in explanation
+            answer_position = explanation.find(direct_answer)
+            assert answer_position >= 0, "Direct answer should appear in explanation"
+            
+            # Answer should appear in first 500 characters (prominently at top)
+            assert answer_position < 500, \
+                f"Direct answer should appear prominently (within first 500 chars). Found at position {answer_position}"
+    
+    def test_no_yes_no_question_still_works(self, causal_reasoner):
+        """
+        Test: Queries without YES/NO questions should still work normally
+        
+        Ensures the fix doesn't break normal causal reasoning
+        """
+        query = "Given A→B→C, what are the confounders for A→C?"
+        result = causal_reasoner.reason(query)
+        
+        # Should still provide causal analysis
+        assert "found" in result
+        # No direct_answer for non-YES/NO questions
+        # (it's optional, so we don't assert it's absent)
+
+
 if __name__ == "__main__":
     # Allow running tests directly for development
     pytest.main([__file__, "-v", "--tb=short"])

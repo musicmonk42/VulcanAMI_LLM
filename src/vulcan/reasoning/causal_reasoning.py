@@ -1993,6 +1993,9 @@ class CausalReasoner(EnhancedCausalReasoning):
         ROOT CAUSE FIX: Confidence is now calibrated based on analysis quality
         instead of hardcoded 0.85/0.60 values.
         
+        ISSUE #6 FIX: Detects YES/NO questions and provides direct answers
+        prominently in the response.
+        
         Args:
             query_text: Natural language query about causation
             context: Additional context (experiments, etc.)
@@ -2001,6 +2004,13 @@ class CausalReasoner(EnhancedCausalReasoning):
             Dict with causal analysis including confounders and experiment recommendation
         """
         import re
+        
+        # ISSUE #6 FIX: Detect YES/NO questions early
+        # ================================================================
+        # Industry Standard: Extract the specific question being asked
+        # before doing expensive causal analysis.
+        # ================================================================
+        yes_no_question = self._extract_yes_no_question(query_text)
         
         # Step 1: Parse the query to build a causal DAG
         self._query_dag = self._parse_query_to_dag(query_text)
@@ -2011,7 +2021,7 @@ class CausalReasoner(EnhancedCausalReasoning):
                 "[CausalReasoner] Could not build DAG from query - "
                 "no causal relationships extracted"
             )
-            return {
+            result = {
                 "found": False,
                 "reason": "Could not extract causal relationships from query",
                 "confidence": 0.15,
@@ -2019,6 +2029,10 @@ class CausalReasoner(EnhancedCausalReasoning):
                 "query_text": query_text[:100] + "..." if len(query_text) > 100 else query_text,
                 "reasoning_type": "causal",
             }
+            # ISSUE #6 FIX: Include question even if analysis failed
+            if yes_no_question:
+                result["question"] = yes_no_question
+            return result
         
         # Step 2: Extract treatment and outcome variables
         treatment, outcome = self._extract_treatment_outcome(query_text)
@@ -2029,7 +2043,7 @@ class CausalReasoner(EnhancedCausalReasoning):
                 f"[CausalReasoner] Treatment '{treatment}' or outcome '{outcome}' "
                 f"not found in DAG nodes: {list(self._query_dag.nodes())}"
             )
-            return {
+            result = {
                 "found": False,
                 "reason": f"Treatment '{treatment}' or outcome '{outcome}' not found in causal graph",
                 "confidence": 0.20,
@@ -2037,6 +2051,10 @@ class CausalReasoner(EnhancedCausalReasoning):
                 "variables_found": list(self._query_dag.nodes()),
                 "reasoning_type": "causal",
             }
+            # ISSUE #6 FIX: Include question
+            if yes_no_question:
+                result["question"] = yes_no_question
+            return result
         
         # Step 3: Find confounders using the DAG
         confounders = self._find_confounders_from_dag(treatment, outcome)
@@ -2052,9 +2070,17 @@ class CausalReasoner(EnhancedCausalReasoning):
         # Step 6: Build the causal graph string
         graph_str = self._dag_to_string()
         
-        # Step 7: Generate explanation
+        # ISSUE #6 FIX: Answer YES/NO question if present
+        direct_answer = None
+        if yes_no_question:
+            direct_answer = self._answer_yes_no_question(
+                yes_no_question, query_text, self._query_dag, treatment, outcome, confounders
+            )
+        
+        # Step 7: Generate explanation (enhanced with direct answer if applicable)
         explanation = self._generate_causal_explanation(
-            treatment, outcome, confounders, best_experiment, experiment_reason
+            treatment, outcome, confounders, best_experiment, experiment_reason,
+            yes_no_question=yes_no_question, direct_answer=direct_answer
         )
         
         # Step 8: Determine if causal effect is identifiable
@@ -2065,7 +2091,7 @@ class CausalReasoner(EnhancedCausalReasoning):
             self._query_dag, treatment, outcome, confounders, experiments
         )
         
-        return {
+        result = {
             "found": True,
             "causal_graph": graph_str,
             "treatment": treatment,
@@ -2079,6 +2105,18 @@ class CausalReasoner(EnhancedCausalReasoning):
             "confidence": confidence,
             "reasoning_type": "causal",
         }
+        
+        # ISSUE #6 FIX: Include YES/NO question and answer prominently
+        if yes_no_question:
+            result["question"] = yes_no_question
+        if direct_answer:
+            result["direct_answer"] = direct_answer
+            logger.info(
+                f"[CausalReasoner] ISSUE #6 FIX: YES/NO question answered. "
+                f"Question: {yes_no_question}, Answer: {direct_answer}"
+            )
+        
+        return result
     
     def _compute_causal_confidence(
         self,
@@ -2651,6 +2689,138 @@ class CausalReasoner(EnhancedCausalReasoning):
         
         edge_strs = [f"{u}→{v}" for u, v in edges]
         return f"DAG: {', '.join(edge_strs)}"
+    
+    def _extract_yes_no_question(self, query_text: str) -> Optional[str]:
+        """
+        ISSUE #6 FIX: Extract YES/NO questions from causal queries.
+        
+        Industry Standard Pattern Matching:
+        - Identifies questions that expect binary YES/NO answers
+        - Handles multiple question formats
+        - Returns the complete question text for clarity
+        
+        Args:
+            query_text: The query to analyze
+            
+        Returns:
+            The YES/NO question string if found, None otherwise
+            
+        Examples:
+            "Does conditioning on B induce correlation? YES/NO" → "Does conditioning on B induce correlation?"
+            "Is A independent of C given B?" → "Is A independent of C given B?"
+        """
+        import re
+        
+        # Pattern 1: Questions ending with "YES/NO" or "Yes/No"
+        match = re.search(r'((?:Does|Is|Are|Will|Can|Would)\s+.+?)\?\s*(?:YES/NO|Yes/No|yes/no)', 
+                         query_text, re.IGNORECASE)
+        if match:
+            return match.group(1) + "?"
+        
+        # Pattern 2: YES/NO questions (Does/Is/Are...) even without explicit "YES/NO"
+        match = re.search(r'((?:Does|Is|Are|Will|Can|Would)\s+.+?\?)', query_text, re.IGNORECASE)
+        if match:
+            return match.group(1)
+        
+        return None
+    
+    def _answer_yes_no_question(
+        self,
+        question: str,
+        query_text: str,
+        dag: "nx.DiGraph",
+        treatment: str,
+        outcome: str,
+        confounders: Set[str]
+    ) -> str:
+        """
+        ISSUE #6 FIX: Answer YES/NO questions about causal relationships.
+        
+        Industry Standard Approach:
+        - Uses d-separation test for independence questions
+        - Detects collider patterns for correlation questions
+        - Provides clear, direct YES/NO answer
+        - Includes brief justification
+        
+        Args:
+            question: The YES/NO question extracted from query
+            query_text: Original query text for context
+            dag: The causal DAG
+            treatment: Treatment variable
+            outcome: Outcome variable
+            confounders: Set of confounding variables
+            
+        Returns:
+            Direct answer string (e.g., "YES - conditioning on B induces correlation...")
+        """
+        import re
+        
+        question_lower = question.lower()
+        query_lower = query_text.lower()
+        
+        # Pattern 1: "Does conditioning on X induce correlation/association"
+        if any(phrase in question_lower for phrase in ['induce correlation', 'induce association', 'creates correlation']):
+            # Check if the query mentions "conditioning on" a specific variable
+            condition_match = re.search(r'conditioning on\s+([A-Z])\b', query_text, re.IGNORECASE)
+            if condition_match:
+                conditioned_var = condition_match.group(1)
+                
+                # Check if conditioned_var is a collider
+                # A collider is a node with multiple parents (incoming edges)
+                in_degree = dag.in_degree(conditioned_var) if conditioned_var in dag.nodes() else 0
+                is_collider = in_degree >= 2
+                
+                if is_collider:
+                    # Find the parents (causes) of the collider
+                    parents = list(dag.predecessors(conditioned_var))
+                    return (
+                        f"YES - Conditioning on {conditioned_var} induces correlation between "
+                        f"its causes {parents}. This is the collider effect: conditioning on a "
+                        f"common effect creates spurious association between its causes, even if "
+                        f"they are originally independent (d-separated)."
+                    )
+                else:
+                    return (
+                        f"NO - {conditioned_var} is not a collider in this graph "
+                        f"(in-degree = {in_degree}). Conditioning on a non-collider does not "
+                        f"induce spurious correlations."
+                    )
+        
+        # Pattern 2: "Is X independent of Y (given Z)?"
+        if 'independent' in question_lower:
+            # Try to extract the variables
+            indep_match = re.search(r'is\s+([A-Z])\s+independent\s+(?:of|from)\s+([A-Z])', query_text, re.IGNORECASE)
+            if indep_match:
+                var1, var2 = indep_match.group(1), indep_match.group(2)
+                
+                # Check for conditioning set
+                given_match = re.search(r'given\s+([A-Z,\s]+)', query_text, re.IGNORECASE)
+                conditioning_set = set()
+                if given_match:
+                    cond_vars = given_match.group(1).replace(',', ' ').split()
+                    conditioning_set = {v.strip() for v in cond_vars if v.strip() and v.isupper()}
+                
+                # Use d-separation test
+                if var1 in dag.nodes() and var2 in dag.nodes():
+                    try:
+                        is_separated = nx.d_separated(dag, {var1}, {var2}, conditioning_set)
+                        if is_separated:
+                            cond_str = f"given {conditioning_set}" if conditioning_set else "unconditionally"
+                            return (
+                                f"YES - {var1} and {var2} are d-separated {cond_str}. "
+                                f"There is no active path between them in the causal graph."
+                            )
+                        else:
+                            cond_str = f"given {conditioning_set}" if conditioning_set else "unconditionally"
+                            return (
+                                f"NO - {var1} and {var2} are NOT d-separated {cond_str}. "
+                                f"There exists an active path between them in the causal graph."
+                            )
+                    except Exception as e:
+                        logger.warning(f"d-separation test failed: {e}")
+        
+        # Default: Unable to determine YES/NO answer
+        return "Unable to determine a clear YES/NO answer from the causal structure."
 
     def _generate_causal_explanation(
         self,
@@ -2658,12 +2828,30 @@ class CausalReasoner(EnhancedCausalReasoning):
         outcome: str,
         confounders: Set[str],
         best_experiment: int,
-        experiment_reason: str
+        experiment_reason: str,
+        yes_no_question: Optional[str] = None,
+        direct_answer: Optional[str] = None
     ) -> str:
-        """Generate a detailed causal explanation."""
+        """
+        Generate a detailed causal explanation.
+        
+        ISSUE #6 FIX: If a YES/NO question was asked, the direct answer
+        is presented prominently at the top of the explanation.
+        
+        Industry Standard: Put the answer to the user's question first,
+        then provide supporting analysis.
+        """
         explanation = []
         
-        explanation.append(f"Causal Question: Does {treatment} cause {outcome}?")
+        # ISSUE #6 FIX: Direct answer first if YES/NO question was asked
+        if yes_no_question and direct_answer:
+            explanation.append(f"Question: {yes_no_question}")
+            explanation.append(f"Answer: {direct_answer}")
+            explanation.append(f"\n{'='*60}")
+            explanation.append("Detailed Analysis:")
+            explanation.append('='*60)
+        
+        explanation.append(f"\nCausal Question: Does {treatment} cause {outcome}?")
         explanation.append(f"\nCausal Graph: {self._dag_to_string()}")
         
         if confounders:
