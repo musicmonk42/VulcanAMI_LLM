@@ -2047,15 +2047,30 @@ class CuriosityEngine:
             # This ensures subprocesses know about resolutions from previous cycles
             try:
                 if _persistent_is_gap_resolved(key, ttl_seconds=self.GAP_RESOLUTION_TTL_SECONDS):
-                    logger.debug(f"[CuriosityEngine] Gap {key} is resolved in persistent storage, skipping")
+                    logger.info(
+                        f"[CuriosityEngine] ISSUE #5 FIX: Gap {key} is resolved in persistent storage "
+                        f"(TTL={self.GAP_RESOLUTION_TTL_SECONDS}s), skipping to prevent phantom resolution"
+                    )
                     continue
-            except Exception:
-                pass  # Fall through to in-memory check
+            except Exception as e:
+                logger.warning(
+                    f"[CuriosityEngine] ISSUE #5: Failed to check persistent storage for gap {key}: {e}. "
+                    f"Falling through to in-memory check."
+                )
+                # Fall through to in-memory check
             
             # FIX Bug #1: Check for phantom resolution pattern from persistent storage
             try:
                 recent_resolution_count = _persistent_get_recent_resolutions_count(key)
-            except Exception:
+                if recent_resolution_count > 0:
+                    logger.debug(
+                        f"[CuriosityEngine] Gap {key} has {recent_resolution_count} recent resolutions "
+                        f"in persistent storage (threshold={self.PHANTOM_RESOLUTION_THRESHOLD})"
+                    )
+            except Exception as e:
+                logger.debug(
+                    f"[CuriosityEngine] ISSUE #5: Failed to check persistent resolution count for gap {key}: {e}"
+                )
                 recent_resolution_count = self._count_recent_resolutions(gap_type, domain, minutes=60)
             
             if recent_resolution_count >= self.PHANTOM_RESOLUTION_THRESHOLD:

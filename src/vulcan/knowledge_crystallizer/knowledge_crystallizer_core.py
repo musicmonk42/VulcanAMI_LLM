@@ -494,15 +494,36 @@ class KnowledgeCrystallizer:
         # Validate principles
         validation_results = []
         valid_principles = []
+        
+        # ISSUE #6 FIX: Track rejection reasons for debugging
+        rejection_reasons = {
+            "invalid": 0,
+            "low_confidence": 0,
+            "passed": 0,
+        }
 
         for principle in principles:
             validation = self.validator.validate(principle)
             validation_results.append(validation)
 
-            if (
-                validation.is_valid
-                and validation.confidence >= self.min_confidence_threshold
-            ):
+            # ISSUE #6 FIX: Log detailed rejection reasons
+            if not validation.is_valid:
+                rejection_reasons["invalid"] += 1
+                logger.info(
+                    f"[KnowledgeCrystallizer] ISSUE #6 FIX: Principle rejected - "
+                    f"INVALID validation (is_valid=False). "
+                    f"Principle: {principle.id if hasattr(principle, 'id') else 'unknown'}, "
+                    f"Validation confidence: {validation.confidence:.2f}"
+                )
+            elif validation.confidence < self.min_confidence_threshold:
+                rejection_reasons["low_confidence"] += 1
+                logger.info(
+                    f"[KnowledgeCrystallizer] ISSUE #6 FIX: Principle rejected - "
+                    f"LOW CONFIDENCE ({validation.confidence:.2f} < {self.min_confidence_threshold:.2f}). "
+                    f"Principle: {principle.id if hasattr(principle, 'id') else 'unknown'}"
+                )
+            else:
+                rejection_reasons["passed"] += 1
                 valid_principles.append(principle)
 
         # Check for contraindications
@@ -553,10 +574,17 @@ class KnowledgeCrystallizer:
         )
 
         logger.info(
-            "Crystallized %d principles from trace %s (confidence: %.2f)",
+            "Crystallized %d principles from trace %s (confidence: %.2f). "
+            "ISSUE #6 FIX - Rejection summary: %d extracted, %d passed validation, "
+            "%d rejected (invalid=%d, low_confidence=%d)",
             len(valid_principles),
             execution_trace.trace_id,
             avg_confidence,
+            len(principles),
+            rejection_reasons["passed"],
+            rejection_reasons["invalid"] + rejection_reasons["low_confidence"],
+            rejection_reasons["invalid"],
+            rejection_reasons["low_confidence"],
         )
 
         return result
