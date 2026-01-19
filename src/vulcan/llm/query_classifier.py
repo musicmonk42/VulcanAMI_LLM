@@ -390,13 +390,14 @@ CAUSAL_KEYWORDS: FrozenSet[str] = frozenset([
     "randomize", "randomized", "rct",
     "pearl", "dag", "backdoor", "frontdoor",
     "collider",  # Collider is a causal graph concept, not logical
-    "observational", "experimental",
+    "observational",
     # ISSUE #2 FIX: Additional causal-specific keywords
     "causal effect", "causal inference", "do-calculus",
     "mediator", "confounder", "instrumental variable",
     "treatment effect", "randomized control",
-    # C1 CAUSAL FIX: Experimental design keywords
-    "experiment", "which experiment", "design experiment",
+    # C1 CAUSAL FIX: Experimental design keywords (removed generic "experiment")
+    # INDUSTRY STANDARD: "experiment" and "experimental" removed - too generic,
+    # causes false positives on "experimental feature". Use CAUSAL_EXPERIMENT_PATTERNS instead.
     "choose experiment", "select experiment",
     "draw dag", "draw the dag", "causal diagram",
     "causal graph", "causal model",
@@ -409,12 +410,24 @@ PROBABILITY_WORD_PATTERN = re.compile(r'\bprobability\b', re.IGNORECASE)  # Full
 
 # Strong causal indicators for high-confidence detection
 # Subset of CAUSAL_KEYWORDS for queries that clearly indicate causal inference
-# C1 CAUSAL FIX: Added "experiment" and "dag" variants as strong indicators
+# C1 CAUSAL FIX: Added "dag" variants as strong indicators
+# INDUSTRY STANDARD: Removed standalone "experiment" - too generic, causes false positives
+# on queries like "experiment with new ideas". "experiment" is only causal when
+# combined with other causal keywords (dag, causal, confound).
 STRONG_CAUSAL_KEYWORDS: FrozenSet[str] = frozenset([
     "confound", "intervention", "do(", "pearl", "dag", "causal",
-    "experiment", "confounder", "confounding", "causal graph",
+    "confounder", "confounding", "causal graph",
     "draw dag", "causal diagram", "causal model",
 ])
+
+# INDUSTRY STANDARD: Pre-compiled regex patterns for causal experiment context detection
+# "experiment" alone is not enough - must appear with causal context
+# This prevents false positives like "experiment with new ideas"
+CAUSAL_EXPERIMENT_PATTERNS: Tuple[re.Pattern, ...] = (
+    re.compile(r'\b(?:choose|select|design|which)\s+experiment\b', re.IGNORECASE),  # "choose experiment", "design experiment"
+    re.compile(r'\bexperiment\b.*\b(?:dag|causal|confound|randomiz)', re.IGNORECASE),  # "experiment...causal"
+    re.compile(r'\b(?:dag|causal|confound)\b.*\bexperiment\b', re.IGNORECASE),  # "causal...experiment"
+)
 
 # Mathematical indicators - complexity 0.4+, tools=['mathematical']
 MATHEMATICAL_KEYWORDS: FrozenSet[str] = frozenset([
@@ -2112,24 +2125,30 @@ class QueryClassifier:
             )
         
         # C1 CAUSAL FIX: Check for strong causal indicators that should route to causal
-        # even with just 1 keyword match (e.g., "experiment", "dag", "confound")
+        # even with just 1 keyword match (e.g., "dag", "confound")
         has_strong_causal = any(
             strong_kw in query_lower for strong_kw in STRONG_CAUSAL_KEYWORDS
         )
         
+        # INDUSTRY STANDARD: Check for causal experiment patterns
+        # "experiment" alone is not enough - must appear in causal context
+        has_causal_experiment = any(
+            pattern.search(query_original) for pattern in CAUSAL_EXPERIMENT_PATTERNS
+        )
+        
         # Standard causal classification (without probability notation)
-        # C1 CAUSAL FIX: Also route if has_strong_causal (single strong keyword is enough)
-        if causal_count >= CAUSAL_KEYWORD_THRESHOLD or "do(" in query_lower or has_strong_causal:
+        # C1 CAUSAL FIX: Also route if has_strong_causal or has_causal_experiment
+        if causal_count >= CAUSAL_KEYWORD_THRESHOLD or "do(" in query_lower or has_strong_causal or has_causal_experiment:
             logger.info(
                 f"[QueryClassifier] CAUSAL classification - keywords={causal_count}, "
-                f"has_strong_causal={has_strong_causal}"
+                f"has_strong_causal={has_strong_causal}, has_causal_experiment={has_causal_experiment}"
             )
             return QueryClassification(
                 category=QueryCategory.CAUSAL.value,
                 complexity=0.6 + min(0.3, causal_count * 0.05),
                 suggested_tools=["causal"],
                 skip_reasoning=False,
-                confidence=0.90 if has_strong_causal else 0.85,
+                confidence=0.90 if (has_strong_causal or has_causal_experiment) else 0.85,
                 source="keyword",
             )
         
