@@ -527,7 +527,7 @@ jobs:
           # Prune Docker aggressively
           echo "Pruning Docker system..."
           sudo docker system prune -af --volumes || true
-          sudo docker builder prune -af --force || true
+          sudo docker builder prune -af || true
           
           echo "=== Disk usage after cleanup ===" && df -h || true
           echo "=== Available space on root ===" 
