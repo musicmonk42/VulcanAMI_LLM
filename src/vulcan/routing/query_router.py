@@ -4195,10 +4195,14 @@ class QueryAnalyzer:
             routing_decision = router.route(query)
             classification = ClassificationResult.from_routing_decision(routing_decision)
             
-            # Log the classification result
+            # DIAGNOSTIC LOGGING: Log the classification result
             logger.info(
-                f"[QueryRouter] {query_id}: LLM Router: "
+                f"[QueryRouter] query_id={query_id}: Input query: {query[:100]}..."
+            )
+            logger.info(
+                f"[QueryRouter] query_id={query_id}: LLM classification result: "
                 f"category={classification.category}, complexity={classification.complexity:.2f}, "
+                f"confidence={classification.confidence:.2f}, "
                 f"skip_reasoning={classification.skip_reasoning}, tools={classification.suggested_tools}"
             )
             
@@ -4254,9 +4258,18 @@ class QueryAnalyzer:
                 except Exception as e:
                     logger.warning(f"[QueryRouter] Error storing session history: {e}")
             
+            # DIAGNOSTIC LOGGING: Check override conditions
+            is_self_introspection = self._is_self_introspection_query(query)
+            is_math = self._is_mathematical_query(query)
+            # Note: is_ethical check is implicit in the code (checks for philosophical patterns)
+            # We log what we detect
+            logger.info(
+                f"[QueryRouter] query_id={query_id}: Override checks: "
+                f"is_self_introspection={is_self_introspection}, is_math={is_math}"
+            )
+            
             # Note: Check for self-introspection FIRST (before philosophical override)
             # Self-introspection queries need multi-tool routing, not just philosophical
-            is_self_introspection = self._is_self_introspection_query(query)
             if is_self_introspection:
                 logger.info(
                     f"[QueryRouter] {query_id}: Self-introspection detected, "
@@ -5895,6 +5908,22 @@ class QueryAnalyzer:
             complexity_score=plan.complexity_score
         )
 
+        # DIAGNOSTIC LOGGING: Final routing decision summary
+        selected_tools = plan.telemetry_data.get("selected_tools", [])
+        reasoning_strategy = plan.telemetry_data.get("reasoning_strategy", "unknown")
+        skip_reasoning = plan.telemetry_data.get("skip_reasoning", False)
+        
+        logger.info(
+            f"[QueryRouter] query_id={query_id}: Final routing decision: "
+            f"type={query_type.value}, tools={selected_tools}, "
+            f"skip_reasoning={skip_reasoning}, strategy={reasoning_strategy}"
+        )
+        logger.info(
+            f"[QueryRouter] query_id={query_id}: Routing reason: "
+            f"complexity={complexity_score:.2f}, uncertainty={uncertainty_score:.2f}, "
+            f"collaboration_needed={collaboration_needed}, fast_path={plan.telemetry_data.get('fast_path', False)}"
+        )
+        
         logger.info(
             f"[QueryRouter] {query_id}: source={source}, mode={learning_mode.value}, "
             f"type={query_type.value}, tasks={len(plan.agent_tasks)}, "

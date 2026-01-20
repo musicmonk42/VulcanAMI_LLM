@@ -736,9 +736,23 @@ def get_world_model(config: Optional[dict] = None) -> Optional[Any]:
     """
     global _world_model
     
+    # DIAGNOSTIC LOGGING: Log singleton access
+    logger.info("[WorldModel] Singleton access requested")
+    
     if _world_model is not None:
         logger.debug("[Singletons] Returning cached WorldModel")
+        logger.info(
+            f"[WorldModel] Singleton status: initialized=True, available=True"
+        )
+        # Log loaded components if possible
+        if hasattr(_world_model, '__dict__'):
+            loaded_components = [k for k in _world_model.__dict__.keys() if not k.startswith('_')]
+            logger.info(f"[WorldModel] Components loaded: {loaded_components[:10]}")  # Limit to first 10
         return _world_model
+    
+    logger.info(
+        f"[WorldModel] Singleton status: initialized=False, available=False"
+    )
     
     with _world_model_lock:
         if _world_model is not None:
@@ -749,6 +763,13 @@ def get_world_model(config: Optional[dict] = None) -> Optional[Any]:
             from vulcan.world_model.world_model_core import WorldModel
             _world_model = WorldModel(config=config)
             logger.info("[Singletons] ✓ WorldModel created and cached")
+            logger.info(
+                f"[WorldModel] Singleton status: initialized=True, available=True"
+            )
+            # Log loaded components
+            if hasattr(_world_model, '__dict__'):
+                loaded_components = [k for k in _world_model.__dict__.keys() if not k.startswith('_')]
+                logger.info(f"[WorldModel] Components loaded: {loaded_components[:10]}")
             return _world_model
         except ImportError as e:
             logger.warning(f"[Singletons] WorldModel import failed: {e}")

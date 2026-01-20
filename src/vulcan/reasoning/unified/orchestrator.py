@@ -1239,27 +1239,49 @@ class UnifiedReasoner:
             # Defensive: Don't let pattern matching errors break the system
             logger.warning(f"[SelfRef] Error during ethical dilemma check: {e}")
         
+        # DIAGNOSTIC LOGGING: Start of self-referential detection
+        logger.info(f"[SelfRefDetection] Query: {query_str[:100]}...")
+        
         # ============================================================================
         # Check against self-referential patterns (AFTER ethical dilemma check)
         # ============================================================================
         # Patterns are pre-compiled in config for performance
+        matched_patterns = []
         try:
             for pattern in SELF_REFERENTIAL_PATTERNS:
                 if pattern.search(query_str):
+                    pattern_str = pattern.pattern[:50] + "..." if len(pattern.pattern) > 50 else pattern.pattern
+                    matched_patterns.append(pattern_str)
                     logger.debug(
-                        f"[SelfRef] Detected self-referential query via pattern: "
-                        f"{pattern.pattern[:50]}..."
+                        f"[SelfRefDetection] Matched pattern: {pattern_str}"
                     )
-                    return True
+            
+            if matched_patterns:
+                logger.info(
+                    f"[SelfRefDetection] Matched patterns: {matched_patterns}"
+                )
+                logger.info(
+                    f"[SelfRefDetection] is_self_referential=True, reason=patterns_matched"
+                )
+                return True
         except Exception as e:
             # Defensive: regex errors shouldn't crash the system
             logger.warning(
-                f"[SelfRef] Error during pattern matching: {e}. "
+                f"[SelfRefDetection] Error during pattern matching: {e}. "
                 "Treating query as non-self-referential."
+            )
+            logger.info(
+                f"[SelfRefDetection] is_self_referential=False, reason=pattern_matching_error"
             )
             return False
         
         # No patterns matched
+        logger.info(
+            f"[SelfRefDetection] Matched patterns: []"
+        )
+        logger.info(
+            f"[SelfRefDetection] is_self_referential=False, reason=no_patterns_matched"
+        )
         return False
 
     def _handle_self_referential_query(
@@ -1487,21 +1509,30 @@ class UnifiedReasoner:
             # SELF_INTROSPECTION_PATTERNS in query_classifier.py for consistency
             is_self_awareness = any(pattern.search(query_lower) for pattern in FALLBACK_SELF_AWARENESS_PATTERNS)
         
+        # DIAGNOSTIC LOGGING: Log decision points
+        logger.info(f"[SelfRefConclusion] is_binary_choice={is_binary_choice}")
+        logger.info(f"[SelfRefConclusion] is_self_awareness={is_self_awareness}")
+        logger.info(f"[SelfRefConclusion] query_category={query_category}")
+        
         # Only retrieve rich philosophical analysis for self-awareness queries
         # For general queries, we use a brief template response
         philosophical_analysis = None
         if is_self_awareness:
             philosophical_analysis = self._get_world_model_philosophical_analysis(query_str)
         
+        # DIAGNOSTIC LOGGING: Log which path is taken
         if is_self_awareness and is_binary_choice:
+            logger.info(f"[SelfRefConclusion] Taking path: self_awareness_decision")
             return self._generate_self_awareness_decision(
                 query_str, objectives, conflicts, ethical_check, counterfactual
             )
         elif is_self_awareness:
+            logger.info(f"[SelfRefConclusion] Taking path: self_awareness_reflection")
             return self._generate_self_awareness_reflection(
                 query_str, objectives, ethical_check, philosophical_analysis
             )
         else:
+            logger.info(f"[SelfRefConclusion] Taking path: general_self_referential_response")
             return self._generate_general_self_referential_response(
                 query_str, objectives, philosophical_analysis
             )

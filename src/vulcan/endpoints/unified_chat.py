@@ -1840,6 +1840,17 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                             }
                             reasoning_type_enum = type_map.get(query_type, ReasoningType.HYBRID)
                             
+                            # DIAGNOSTIC LOGGING: Log dispatch to reasoning engine
+                            # Industry Standard: Log after all variables are defined
+                            query_id = getattr(request, 'query_id', 'unknown')
+                            logger.info(
+                                f"[Dispatch] query_id={query_id}: Routed to engine: unified_reasoner"
+                            )
+                            logger.info(
+                                f"[Dispatch] query_id={query_id}: Engine type: {query_type}, "
+                                f"reasoning_type: {reasoning_type_enum}"
+                            )
+                            
                             # Execute reasoning synchronously
                             reasoning_result = await loop.run_in_executor(
                                 None,
@@ -1851,6 +1862,16 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                             )
                             
                             if reasoning_result:
+                                # DIAGNOSTIC LOGGING: Log engine result
+                                result_type = str(getattr(reasoning_result, "reasoning_type", "hybrid"))
+                                result_confidence = getattr(reasoning_result, "confidence", 0.5)
+                                logger.info(
+                                    f"[Dispatch] query_id={query_id}: Engine result type: {result_type}"
+                                )
+                                logger.info(
+                                    f"[Dispatch] query_id={query_id}: Engine confidence: {result_confidence:.2f}"
+                                )
+                                
                                 # Extract reasoning output (same format as GraphixArena)
                                 direct_reasoning_output = {
                                     "conclusion": getattr(reasoning_result, "conclusion", None),
