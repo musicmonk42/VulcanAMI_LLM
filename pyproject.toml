@@ -74,6 +74,7 @@ perf-lite = [
     "pandas>=2.0.0",
     "PyYAML>=6.0",
     "Whoosh>=2.7.4",
+    "python-dotenv>=1.0.0",
 ]
 # Full perf: All reasoning/ML dependencies (heavy, use for nightly/extended tests)
 # Use: pip install -e ".[perf-full]"
