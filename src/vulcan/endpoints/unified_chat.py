@@ -1815,16 +1815,6 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                         )
                     else:
                         # No world_model result - proceed with unified reasoner
-                        # DIAGNOSTIC LOGGING: Log dispatch to reasoning engine
-                        query_id = getattr(request, 'query_id', 'unknown')
-                        logger.info(
-                            f"[Dispatch] query_id={query_id}: Routed to engine: unified_reasoner"
-                        )
-                        logger.info(
-                            f"[Dispatch] query_id={query_id}: Engine type: {query_type}, "
-                            f"reasoning_type: {reasoning_type_enum if 'reasoning_type_enum' in locals() else 'not_set'}"
-                        )
-                        
                         # Invoke actual reasoning engine
                         reasoner = create_unified_reasoner(
                             enable_learning=True,
@@ -1849,6 +1839,17 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                                 "mathematical": ReasoningType.MATHEMATICAL,
                             }
                             reasoning_type_enum = type_map.get(query_type, ReasoningType.HYBRID)
+                            
+                            # DIAGNOSTIC LOGGING: Log dispatch to reasoning engine
+                            # Industry Standard: Log after all variables are defined
+                            query_id = getattr(request, 'query_id', 'unknown')
+                            logger.info(
+                                f"[Dispatch] query_id={query_id}: Routed to engine: unified_reasoner"
+                            )
+                            logger.info(
+                                f"[Dispatch] query_id={query_id}: Engine type: {query_type}, "
+                                f"reasoning_type: {reasoning_type_enum}"
+                            )
                             
                             # Execute reasoning synchronously
                             reasoning_result = await loop.run_in_executor(

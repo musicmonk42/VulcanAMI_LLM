@@ -5289,8 +5289,18 @@ class ToolSelector:
             features = self._extract_features(request)
             request.features = features
             
-            # DIAGNOSTIC LOGGING: Log extracted features
-            logger.info(f"[ToolSelector] Query features: {features[:5] if isinstance(features, (list, np.ndarray)) and len(features) > 5 else features}")
+            # DIAGNOSTIC LOGGING: Log extracted features (first 5 elements for arrays)
+            try:
+                # Industry Standard: Simple type checking with early exit
+                if hasattr(features, '__len__') and len(features) > 5:
+                    features_preview = str(features[:5]) + '...'
+                else:
+                    features_preview = str(features)
+                logger.info(f"[ToolSelector] Query features: {features_preview}")
+            except Exception:
+                # Defensive: Don't let logging errors break the flow
+                logger.info(f"[ToolSelector] Query features: <unavailable>")
+            
             logger.info(f"[ToolSelector] Available tools: {self.tool_names}")
 
             # Step 4: Safety pre-check
