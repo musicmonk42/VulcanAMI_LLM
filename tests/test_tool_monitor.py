@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 import numpy as np
 import pytest
-from tool_monitor import (
+from src.strategies.tool_monitor import (
     Alert,
     AlertSeverity,
     AnomalyDetector,
