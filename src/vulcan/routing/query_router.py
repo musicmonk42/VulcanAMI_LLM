@@ -519,28 +519,97 @@ class ClassificationResult:
     
     @classmethod
     def from_routing_decision(cls, decision: Any) -> "ClassificationResult":
-        """Create from a RoutingDecision object."""
-        # Map destination to category
+        """
+        Create ClassificationResult from LLMQueryRouter's RoutingDecision.
+        
+        Industry Standard: Comprehensive mapping with defensive programming.
+        Maps LLM routing decisions to the legacy classification interface
+        expected by downstream code.
+        
+        Args:
+            decision: RoutingDecision from LLMQueryRouter
+            
+        Returns:
+            ClassificationResult with category, complexity, and tools
+        """
+        # Extract decision attributes with defensive defaults
         dest = getattr(decision, 'destination', 'unknown')
         engine = getattr(decision, 'engine', None)
+        confidence = getattr(decision, 'confidence', 0.8)
+        source = getattr(decision, 'source', 'unknown')
         
+        # Map destination to category, complexity, and tools
+        # Industry Standard: Explicit mapping for all supported destinations
         if dest == "world_model":
+            # WorldModel handles introspection, philosophical, and identity queries
             category = "SELF_INTROSPECTION"
             complexity = 0.5
             skip_reasoning = False
             suggested_tools = ["meta_reasoning", "world_model", "philosophical"]
+            
         elif dest == "reasoning_engine" and engine:
-            category = engine.upper()
-            complexity = 0.7
+            # Map engine type to category and tools
+            # Industry Standard: Normalize engine names (lowercase → uppercase)
+            engine_lower = engine.lower() if isinstance(engine, str) else str(engine).lower()
+            
+            # Engine-specific mappings
+            if engine_lower == "mathematical":
+                category = "MATHEMATICAL"
+                complexity = 0.7
+                suggested_tools = ["mathematical", "symbolic"]
+            elif engine_lower == "symbolic":
+                category = "LOGICAL"  # Symbolic logic
+                complexity = 0.8
+                suggested_tools = ["symbolic", "fol_solver"]
+            elif engine_lower == "probabilistic":
+                category = "PROBABILISTIC"
+                complexity = 0.7
+                suggested_tools = ["probabilistic", "bayesian"]
+            elif engine_lower == "causal":
+                category = "CAUSAL"
+                complexity = 0.8
+                suggested_tools = ["causal", "dag_analyzer"]
+            elif engine_lower == "analogical":
+                category = "ANALOGICAL"
+                complexity = 0.6
+                suggested_tools = ["analogical", "structure_mapper"]
+            elif engine_lower == "cryptographic":
+                category = "CRYPTOGRAPHIC"
+                complexity = 0.5
+                suggested_tools = ["cryptographic"]
+            elif engine_lower == "philosophical":
+                category = "PHILOSOPHICAL"
+                complexity = 0.6
+                suggested_tools = ["philosophical", "world_model"]
+            else:
+                # Unknown engine - fallback
+                category = engine.upper()
+                complexity = 0.7
+                suggested_tools = [engine_lower]
+            
             skip_reasoning = False
-            suggested_tools = [engine]
+            
         elif dest == "skip":
+            # Skip reasoning for greetings, simple factual queries
             category = "GREETING"
             complexity = 0.1
             skip_reasoning = True
             suggested_tools = []
+            
+        elif dest == "blocked":
+            # Security violation detected
+            category = "BLOCKED"
+            complexity = 0.0
+            skip_reasoning = True
+            suggested_tools = []
+            
         else:
-            category = "UNKNOWN"
+            # Unknown destination - conservative fallback to reasoning
+            logger.warning(
+                f"[ClassificationResult] Unknown destination: {dest}, "
+                f"engine={engine}, defaulting to GENERAL category"
+            )
+            category = "GENERAL"
             complexity = 0.5
             skip_reasoning = False
             suggested_tools = []
@@ -548,10 +617,10 @@ class ClassificationResult:
         return cls(
             category=category,
             complexity=complexity,
-            confidence=getattr(decision, 'confidence', 0.8),
+            confidence=confidence,
             skip_reasoning=skip_reasoning,
             suggested_tools=suggested_tools,
-            source=f"llm_router:{getattr(decision, 'source', 'unknown')}",
+            source=f"llm_router:{source}",
         )
 
 
