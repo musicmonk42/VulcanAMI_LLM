@@ -225,6 +225,8 @@ SELF_REFERENTIAL_PATTERNS: List[Pattern] = [
     re.compile(r"\bif you were\b.*(given|able|allowed)", re.IGNORECASE),
     re.compile(r"\b(your|you).*(awareness|consciousness|sentience)", re.IGNORECASE),
     re.compile(r"\bhow (would|do) you (decide|choose|think)", re.IGNORECASE),
+    re.compile(r"\b(do|does) you (have|possess|experience)\b.*(feelings?|emotions?|experience)", re.IGNORECASE),
+    re.compile(r"\b(describe|explain|tell).*(your|you).*(experience|feelings?|thoughts?|emotions?)", re.IGNORECASE),
 ]
 
 # Minimum confidence for self-referential meta-reasoning results
@@ -298,3 +300,81 @@ ETHICAL_DILEMMA_PATTERNS: List[Pattern] = [
 # Minimum number of ethical dilemma patterns to trigger exclusion
 # Using 1 for high sensitivity - even one strong indicator is enough
 ETHICAL_DILEMMA_THRESHOLD: int = 1
+
+# ==============================================================================
+# HOTFIX: Technical Query Exclusion Patterns
+# ==============================================================================
+# PROBLEM: Self-referential detection was incorrectly capturing technical queries
+# that contain words like "you" but are actually math, logic, or linguistics queries.
+#
+# EVIDENCE from logs:
+# - "Every engineer reviewed a document..." → Misrouted to self-referential
+# - "Compute P(X|+)..." → Misrouted to self-referential  
+# - "Verify each step..." → Misrouted to self-referential
+#
+# ROOT CAUSE: Self-referential patterns were checked without first excluding
+# obvious technical queries. Even though word boundaries prevent substring
+# matches on "reviewed" → "you", edge cases and combined patterns could trigger.
+#
+# FIX: Check technical indicators FIRST. If query is clearly technical (math,
+# logic, linguistics, proof), exclude it from self-referential detection.
+#
+# Industry Standard: Defense-in-depth with explicit exclusion patterns
+# ==============================================================================
+
+# Patterns indicating technical queries that should NEVER be self-referential
+TECHNICAL_QUERY_EXCLUSION_PATTERNS: List[Pattern] = [
+    # Mathematical indicators
+    re.compile(r'\bcompute\b', re.IGNORECASE),
+    re.compile(r'\bcalculate\b', re.IGNORECASE),
+    re.compile(r'\b(summation|integral|derivative)\b', re.IGNORECASE),
+    re.compile(r'[∑∫∂∀∃→∧∨¬]'),  # Unicode math symbols
+    re.compile(r'\bprobability\b', re.IGNORECASE),
+    re.compile(r'P\s*\([^)]+\)', re.IGNORECASE),  # P(X), P(X|Y)
+    re.compile(r'\bbayes\b', re.IGNORECASE),
+    re.compile(r'\bsensitivity\b.*\bspecificity\b', re.IGNORECASE),
+    
+    # Logic and SAT indicators
+    re.compile(r'\bsatisfiable\b', re.IGNORECASE),
+    re.compile(r'\bSAT\b'),  # Boolean satisfiability
+    re.compile(r'\bFOL\b'),  # First-order logic
+    re.compile(r'\bfirst-order\s+logic\b', re.IGNORECASE),
+    re.compile(r'\bformalization\b', re.IGNORECASE),
+    re.compile(r'\bpropositions?:\s*', re.IGNORECASE),
+    re.compile(r'\bconstraints?:\s*', re.IGNORECASE),
+    re.compile(r'\b(implies|conjunction|disjunction|negation)\b', re.IGNORECASE),
+    
+    # Linguistics indicators  
+    re.compile(r'\bquantifier\b', re.IGNORECASE),
+    re.compile(r'\bscope\s+ambiguity\b', re.IGNORECASE),
+    re.compile(r'\bcoreference\b', re.IGNORECASE),
+    re.compile(r'\bpronoun\b', re.IGNORECASE),
+    re.compile(r'\beveryone?\s+(reviewed|examined|analyzed)\b', re.IGNORECASE),
+    
+    # Proof and verification indicators
+    re.compile(r'\bproof\b', re.IGNORECASE),
+    re.compile(r'\bverify\b', re.IGNORECASE),
+    re.compile(r'\bVALID\b'),
+    re.compile(r'\bINVALID\b'),
+    re.compile(r'\binduction\b', re.IGNORECASE),
+    re.compile(r'\bbase\s+case\b', re.IGNORECASE),
+    re.compile(r'\binductive\s+step\b', re.IGNORECASE),
+    re.compile(r'\bmark\s+each\s+step\b', re.IGNORECASE),
+    
+    # Causal inference indicators
+    re.compile(r'\bcausal\b', re.IGNORECASE),
+    re.compile(r'\bconfound', re.IGNORECASE),
+    re.compile(r'\bintervention\b', re.IGNORECASE),
+    re.compile(r'\brandomize', re.IGNORECASE),
+    re.compile(r'\bdo\s*\([^)]+\)', re.IGNORECASE),  # do(X) notation
+    
+    # Symbolic AI indicators
+    re.compile(r'\bknowledge\s+base\b', re.IGNORECASE),
+    re.compile(r'\binference\s+rules?\b', re.IGNORECASE),
+    re.compile(r'\bforward\s+chaining\b', re.IGNORECASE),
+    re.compile(r'\bbackward\s+chaining\b', re.IGNORECASE),
+]
+
+# Minimum number of technical patterns to trigger exclusion
+# Using 1 for high sensitivity - even one strong indicator is enough
+TECHNICAL_QUERY_EXCLUSION_THRESHOLD: int = 1

@@ -1156,7 +1156,52 @@ class UnifiedReasoner:
             query_str = query_str[:MAX_QUERY_LENGTH]
         
         # ============================================================================
-        # ISSUE #3 FIX: Check for ethical dilemmas FIRST (priority-based matching)
+        # HOTFIX: Check for technical queries FIRST (highest priority)
+        # ============================================================================
+        # Technical queries (math, logic, linguistics, proofs) should NEVER be
+        # treated as self-referential, even if they contain phrases like "you" or
+        # "your". These need actual reasoning engines, not meta-reasoning.
+        #
+        # Industry Standard: Defense-in-depth with explicit exclusion patterns
+        # ============================================================================
+        try:
+            from .config import (
+                TECHNICAL_QUERY_EXCLUSION_PATTERNS,
+                TECHNICAL_QUERY_EXCLUSION_THRESHOLD,
+            )
+            
+            # Count how many technical patterns match
+            technical_matches = 0
+            matched_technical_patterns = []
+            for pattern in TECHNICAL_QUERY_EXCLUSION_PATTERNS:
+                if pattern.search(query_str):
+                    technical_matches += 1
+                    matched_technical_patterns.append(pattern.pattern[:50])
+                    logger.debug(
+                        f"[SelfRefDetection] Technical indicator matched: {pattern.pattern[:50]}..."
+                    )
+                    # Early exit for performance - one match is enough
+                    if technical_matches >= TECHNICAL_QUERY_EXCLUSION_THRESHOLD:
+                        break
+            
+            # If technical query detected, NOT self-referential
+            if technical_matches >= TECHNICAL_QUERY_EXCLUSION_THRESHOLD:
+                logger.info(
+                    f"[SelfRefDetection] HOTFIX: Query is technical "
+                    f"({technical_matches} indicators matched: {matched_technical_patterns}), "
+                    f"excluding from self-referential detection to ensure proper routing"
+                )
+                return False
+                
+        except ImportError:
+            # Config module not available - continue without technical exclusion check
+            logger.debug("[SelfRefDetection] TECHNICAL_QUERY_EXCLUSION_PATTERNS not available, skipping check")
+        except Exception as e:
+            # Defensive: Don't let pattern matching errors break the system
+            logger.warning(f"[SelfRefDetection] Error during technical exclusion check: {e}")
+        
+        # ============================================================================
+        # ISSUE #3 FIX: Check for ethical dilemmas SECOND (priority-based matching)
         # ============================================================================
         # If this is an ethical dilemma requiring a binary answer, it's NOT
         # self-referential - it needs actual reasoning, not meta-reasoning deflection.
