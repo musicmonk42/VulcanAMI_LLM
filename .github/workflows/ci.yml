@@ -297,10 +297,13 @@ jobs:
           # thinking the process is stalled due to buffered output
           export PYTHONUNBUFFERED=1
           
+          # Set pytest timeout for worker initialization
+          export PYTEST_TIMEOUT=300
+          
           EXIT_CODE=0
-          # Removed file redirect - let output go directly to GitHub Actions console
-          # Added --dist=loadfile to reduce worker overhead by grouping tests from same file
-          # Using -n 4 instead of -n auto to reduce worker initialization overhead
+          # Reduced to -n 2 to minimize worker initialization overhead
+          # Added --max-worker-restart=2 to restart hung workers
+          # Added -o timeout_func_only=true to only timeout test functions, not fixtures
           timeout 75m pytest --cov=src -q \
             --cov-report=xml \
             --cov-report=html \
@@ -308,15 +311,16 @@ jobs:
             --junitxml=results/junit.xml \
             --timeout=300 \
             --timeout-method=thread \
-            -n 4 \
+            -n 2 \
             --dist=loadfile \
+            --max-worker-restart=2 \
+            -o timeout_func_only=true \
             --continue-on-collection-errors \
             -m "not slow and not load_test and not benchmark" \
             -v \
             2>&1 || EXIT_CODE=$?
           
           # Force cleanup of any background processes
-          # Use PID-based killing to find and terminate pytest processes
           for pid in $(pgrep -f "pytest"); do
             kill -9 "$pid" 2>/dev/null || true
           done

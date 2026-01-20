@@ -291,6 +291,7 @@ setup(
     license="MIT",
     # Package discovery - CRITICAL for 'import src' to work
     packages=find_packages(include=["src", "src.*", "scripts"]),
+    package_dir={"": "."},  # Map packages to project root
     # Include root-level modules
     py_modules=["graph_compiler", "load_test", "app", "graphix_vulcan_llm"],
     # Package data
