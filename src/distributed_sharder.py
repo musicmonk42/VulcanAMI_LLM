@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
-from security_fixes import safe_pickle_load
+from src.strategies.security_fixes import safe_pickle_load
 
 # Optional compression
 try:

@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 import numpy as np
 import pytest
-from feature_extraction import (
+from src.strategies.feature_extraction import (
     ExtractionResult,
     FeatureExtractor,
     FeatureTier,

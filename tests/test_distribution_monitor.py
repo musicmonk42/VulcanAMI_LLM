@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 import numpy as np
 import pytest
-from distribution_monitor import (
+from src.strategies.distribution_monitor import (
     DetectionMethod,
     DistributionMonitor,
     DistributionSnapshot,

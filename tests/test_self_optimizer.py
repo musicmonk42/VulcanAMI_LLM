@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, Mock, PropertyMock, patch
 
 import numpy as np
 import pytest
-from self_optimizer import OptimizationStrategy, PerformanceMetrics, SelfOptimizer
+from src.evolve.self_optimizer import OptimizationStrategy, PerformanceMetrics, SelfOptimizer
 
 
 @pytest.fixture

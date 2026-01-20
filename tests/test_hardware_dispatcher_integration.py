@@ -8,7 +8,7 @@ import tempfile
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 # Import the module to test
-import hardware_dispatcher_integration as hdi
+from src.unified_runtime import hardware_dispatcher_integration as hdi
 import numpy as np
 import pytest
 

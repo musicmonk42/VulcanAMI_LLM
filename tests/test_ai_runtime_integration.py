@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, Mock, patch
 # Assuming the file is in the same directory or accessible via path
 # If it's part of a package, adjust the import accordingly.
 # For example: from src.unified_runtime import ai_runtime_integration as ai
-import ai_runtime_integration as ai
+from src.unified_runtime import ai_runtime_integration as ai
 import pytest
 
 
