@@ -289,7 +289,7 @@ jobs:
             --timeout=300 \
             --timeout-method=thread \
             -n auto \
-            --maxfail=10 \
+            --continue-on-collection-errors \
             -m "not slow and not load_test and not benchmark" \
             -v > $GITHUB_WORKSPACE/logs/pytest-output.log 2>&1 || EXIT_CODE=$?
           
@@ -445,7 +445,7 @@ jobs:
           if [ -d "tests/integration" ]; then
             # Run pytest and capture output to file without using pipe/tee
             # This prevents buffering issues that can cause hanging
-            pytest tests/integration/ -v --timeout=300 --maxfail=5 --junitxml=results/integration-junit.xml > $GITHUB_WORKSPACE/logs/integration-test-output.log 2>&1 || exit_code=$?
+            pytest tests/integration/ -v --timeout=300 --continue-on-collection-errors --junitxml=results/integration-junit.xml > $GITHUB_WORKSPACE/logs/integration-test-output.log 2>&1 || exit_code=$?
             
             # Display the log content to GitHub Actions console
             cat $GITHUB_WORKSPACE/logs/integration-test-output.log

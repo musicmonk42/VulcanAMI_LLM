@@ -22,7 +22,7 @@ except ImportError:
     NUMPY_AVAILABLE = False
 
 # Import the module to test
-import runtime_extensions as re
+from src.unified_runtime import runtime_extensions as re
 
 
 class TestLearningMode:

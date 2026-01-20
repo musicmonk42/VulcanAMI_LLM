@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, Mock
 
 import numpy as np
 import pytest
-from value_of_information import (
+from src.strategies.value_of_information import (
     CostEstimator,
     DecisionState,
     InformationCost,

@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
-from registry_api import (
+from src.governance.registry_api import (
     DEFAULT_GRAMMAR_VERSION,
     AbstractBackend,
     AbstractKMS,

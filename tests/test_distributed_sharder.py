@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from distributed_sharder import (
+from src.distributed_sharder import (
     MAX_SHARD_SIZE_MB,
     CompressionType,
     DistributedSharder,
