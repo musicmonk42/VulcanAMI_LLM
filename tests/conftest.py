@@ -220,6 +220,22 @@ def _safe_alias(simple_name: str, dotted: str):
 
 
 def _alias_all_src_modules():
+    """
+    Alias all source modules for short imports in tests.
+    
+    IMPORTANT: This is skipped in CI mode to avoid slow test collection.
+    The module aliasing imports 627+ modules, each triggering initialization
+    code that can cause pytest to hang during collection with -n auto.
+    
+    In CI mode, tests should use full import paths (e.g., 'from src.vulcan.xxx import yyy')
+    instead of short imports (e.g., 'from xxx import yyy').
+    """
+    # Skip module aliasing in CI mode to prevent slow collection and worker initialization
+    # This is critical for pytest-xdist (-n auto) where each worker imports conftest
+    if CI_MODE:
+        print("[conftest] Skipping module aliasing in CI mode for faster test collection")
+        return
+    
     for path in SRC.rglob("*.py"):
         if not _is_python_file(path):
             continue
