@@ -325,6 +325,51 @@ CRYPTO_COMPUTATION_PATTERNS: Tuple[Pattern[str], ...] = (
 
 
 # ============================================================
+# HEADER STRIPPING PATTERNS (Query Preprocessing)
+# ============================================================
+# Test queries often include headers/labels that confuse routing.
+# These patterns strip headers BEFORE classification.
+
+HEADER_STRIP_PATTERNS: Tuple[re.Pattern, ...] = (
+    re.compile(
+        r'^(?:Analogical|Causal|Mathematical|Probabilistic|Philosophical|Symbolic)\s+Reasoning\s*'
+        r'(?:[A-Z][0-9]+\s*)?[—\-:]*\s*',
+        re.MULTILINE | re.IGNORECASE
+    ),
+    re.compile(r'^[A-Z][0-9]+\s*[—\-]\s*', re.MULTILINE),
+    re.compile(r'^(?:Task|Claim|Query|Problem):\s*', re.MULTILINE | re.IGNORECASE),
+    re.compile(r'\s*\((?:forces?\s+)?clean\s+reasoning\)\s*', re.IGNORECASE),
+    re.compile(r'^[^(\n]*variant\s*', re.MULTILINE | re.IGNORECASE),
+    re.compile(
+        r'^(?:Numeric|Rule|Quantifier|Causal|Analogical|Self[- ]?Description)\s+'
+        r'(?:Verification|Chaining|Scope|Reasoning|Queries?)\s*'
+        r'(?:\([^)∑∏∫√π∂∇]*\)\s*)?[:\-—]*\s*',
+        re.MULTILINE | re.IGNORECASE
+    ),
+)
+
+
+def strip_query_headers(query: str) -> str:
+    """
+    Strip test headers and labels from queries that confuse classification.
+    
+    Args:
+        query: Raw query string with potential headers
+        
+    Returns:
+        Query string with headers stripped
+    """
+    if not query or not isinstance(query, str):
+        return query
+    
+    cleaned = query.strip()
+    for pattern in HEADER_STRIP_PATTERNS:
+        cleaned = pattern.sub('', cleaned).strip()
+    
+    return cleaned
+
+
+# ============================================================
 # MINIMAL FALLBACK PATTERNS (Emergency Only)
 # ============================================================
 # Used ONLY when LLM is unavailable. Much simpler than 1500 lines of patterns.
@@ -783,6 +828,21 @@ def get_llm_router(
     return _llm_router_instance
 
 
+def route_query(query: str) -> RoutingDecision:
+    """
+    Route a query using the global LLMQueryRouter.
+    
+    Convenience function for simple routing without needing to get the router first.
+    
+    Args:
+        query: The query to route
+        
+    Returns:
+        RoutingDecision with destination, engine, and confidence
+    """
+    return get_llm_router().route(query)
+
+
 # ============================================================
 # MODULE EXPORTS
 # ============================================================
@@ -795,6 +855,10 @@ __all__ = [
     # Enums
     "RoutingDestination",
     "ReasoningEngine",
-    # Singleton
+    # Functions
     "get_llm_router",
+    "route_query",
+    "strip_query_headers",
+    # Constants
+    "HEADER_STRIP_PATTERNS",
 ]

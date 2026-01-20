@@ -483,17 +483,77 @@ except ImportError:
 # Solution: Strip headers at the BEGINNING of route_query(), BEFORE
 # any classification or fast-path checks:
 #   1. strip_query_headers(raw_query) → strips headers
-#   2. classify_query(preprocessed_query) → correct classification
+#   2. route_query() → LLM-based routing decision
 #   3. route_to_engine() → correct engine
 
 try:
-    from vulcan.llm.query_classifier import strip_query_headers
+    from vulcan.routing.llm_router import strip_query_headers
 
     HEADER_STRIPPING_AVAILABLE = True
 except ImportError:
     strip_query_headers = None
     HEADER_STRIPPING_AVAILABLE = False
     logger.warning("strip_query_headers not available - header stripping disabled")
+
+
+# ============================================================
+# ROUTING DECISION ADAPTER
+# ============================================================
+# Adapts RoutingDecision from llm_router to the format expected
+# by QueryAnalyzer's classification handling code.
+
+@dataclass
+class ClassificationResult:
+    """
+    Classification result adapted from RoutingDecision.
+    
+    This provides the interface expected by QueryAnalyzer while
+    using the new LLMQueryRouter for actual classification.
+    """
+    category: str
+    complexity: float
+    confidence: float
+    skip_reasoning: bool
+    suggested_tools: List[str]
+    source: str
+    
+    @classmethod
+    def from_routing_decision(cls, decision: Any) -> "ClassificationResult":
+        """Create from a RoutingDecision object."""
+        # Map destination to category
+        dest = getattr(decision, 'destination', 'unknown')
+        engine = getattr(decision, 'engine', None)
+        
+        if dest == "world_model":
+            category = "SELF_INTROSPECTION"
+            complexity = 0.5
+            skip_reasoning = False
+            suggested_tools = ["meta_reasoning", "world_model", "philosophical"]
+        elif dest == "reasoning_engine" and engine:
+            category = engine.upper()
+            complexity = 0.7
+            skip_reasoning = False
+            suggested_tools = [engine]
+        elif dest == "skip":
+            category = "GREETING"
+            complexity = 0.1
+            skip_reasoning = True
+            suggested_tools = []
+        else:
+            category = "UNKNOWN"
+            complexity = 0.5
+            skip_reasoning = False
+            suggested_tools = []
+        
+        return cls(
+            category=category,
+            complexity=complexity,
+            confidence=getattr(decision, 'confidence', 0.8),
+            skip_reasoning=skip_reasoning,
+            suggested_tools=suggested_tools,
+            source=f"llm_router:{getattr(decision, 'source', 'unknown')}",
+        )
+
 
 # ============================================================
 # CONSTANTS - Query Classification Keywords
@@ -4120,25 +4180,24 @@ class QueryAnalyzer:
                 # Fall through to normal routing if crypto computation failed
 
         # =================================================================
-        # LLM-BASED QUERY CLASSIFICATION
+        # LLM-BASED QUERY ROUTING
         # =================================================================
-        # This fixes the fundamental issue where "hello" got complexity=0.50
-        # (same as complex SAT problems) because the old heuristic-based
-        # complexity calculation didn't understand query meaning.
-        #
-        # The QueryClassifier uses:
-        # 1. Fast keyword matching for obvious cases (greetings, factual, etc.)
-        # 2. LLM-based classification for ambiguous queries
-        # 3. Caching to avoid repeated classifications
+        # Uses LLMQueryRouter for semantic classification instead of
+        # keyword pattern matching. The router provides:
+        # 1. Deterministic guards (security, crypto)
+        # 2. LLM-based semantic understanding
+        # 3. Aggressive caching for performance
         # =================================================================
         try:
-            from vulcan.llm.query_classifier import classify_query, QueryCategory
+            from vulcan.routing.llm_router import get_llm_router
             
-            classification = classify_query(query)
+            router = get_llm_router()
+            routing_decision = router.route(query)
+            classification = ClassificationResult.from_routing_decision(routing_decision)
             
             # Log the classification result
             logger.info(
-                f"[QueryRouter] {query_id}: LLM Classification: "
+                f"[QueryRouter] {query_id}: LLM Router: "
                 f"category={classification.category}, complexity={classification.complexity:.2f}, "
                 f"skip_reasoning={classification.skip_reasoning}, tools={classification.suggested_tools}"
             )
@@ -4530,9 +4589,9 @@ class QueryAnalyzer:
                 return plan
                 
         except ImportError:
-            logger.debug("[QueryRouter] QueryClassifier not available, using heuristic fallback")
+            logger.debug("[QueryRouter] LLMQueryRouter not available, using heuristic fallback")
         except Exception as e:
-            logger.warning(f"[QueryRouter] QueryClassifier failed: {e}, using heuristic fallback")
+            logger.warning(f"[QueryRouter] LLMQueryRouter failed: {e}, using heuristic fallback")
 
         # Note: Fast-path for trivial queries to avoid latency
         if query and self._is_trivial_query(query):

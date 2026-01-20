@@ -273,31 +273,7 @@ except ImportError as e:
     clear_embedding_cache = None
     clear_and_rebuild_embedding_cache = None
 
-# Query Classifier
-# MOVED to vulcan.llm.query_classifier for better module organization
-try:
-    from vulcan.llm.query_classifier import (
-        QueryClassifier,
-        QueryCategory,
-        QueryClassification,
-        get_query_classifier,
-        classify_query,
-        _LLMClientWrapper,
-    )
-    
-    QUERY_CLASSIFIER_AVAILABLE = True
-except ImportError as e:
-    logger.warning(f"Query classifier module not available: {e}")
-    QUERY_CLASSIFIER_AVAILABLE = False
-    QueryClassifier = None
-    QueryCategory = None
-    QueryClassification = None
-    get_query_classifier = None
-    classify_query = None
-    _LLMClientWrapper = None
-
-# LLM Query Router
-# New LLM-based routing (replaces keyword pattern matching)
+# LLM Query Router - Primary routing system
 try:
     from .llm_router import (
         LLMQueryRouter,
@@ -306,6 +282,9 @@ try:
         RoutingDestination,
         ReasoningEngine,
         get_llm_router,
+        route_query,
+        strip_query_headers,
+        HEADER_STRIP_PATTERNS,
     )
     from .routing_prompts import (
         LLM_ROUTER_SYSTEM_PROMPT,
@@ -325,6 +304,9 @@ except ImportError as e:
     RoutingDestination = None
     ReasoningEngine = None
     get_llm_router = None
+    route_query = None
+    strip_query_headers = None
+    HEADER_STRIP_PATTERNS = None
     LLM_ROUTER_SYSTEM_PROMPT = None
     LLM_ROUTER_USER_PROMPT = None
     LLM_ROUTER_EXAMPLES = None

@@ -1383,33 +1383,34 @@ class SemanticToolMatcher:
             available_tools = list(TOOL_DESCRIPTIONS.keys())
 
         # ==============================================================================
-        # NEW: Try LLM classification first
+        # NEW: Try LLM Router first
         # ==============================================================================
         if use_llm_classification:
             try:
-                from vulcan.llm.query_classifier import classify_query
-                classification = classify_query(query)
+                from vulcan.routing.llm_router import get_llm_router
+                router = get_llm_router()
+                decision = router.route(query)
                 
-                if classification.confidence >= 0.8 and classification.suggested_tools:
+                if decision.confidence >= 0.8 and decision.engine:
                     # Convert to SemanticMatch format
                     matches = {}
-                    for i, tool in enumerate(classification.suggested_tools):
-                        if tool in available_tools:
-                            matches[tool] = SemanticMatch(
-                                tool_name=tool,
-                                similarity_score=classification.confidence - (i * 0.05),
-                                keyword_matches=[],
-                                keyword_boost=0.0,
-                                combined_score=classification.confidence - (i * 0.05),
-                            )
+                    tool = decision.engine
+                    if tool in available_tools:
+                        matches[tool] = SemanticMatch(
+                            tool_name=tool,
+                            similarity_score=decision.confidence,
+                            keyword_matches=[],
+                            keyword_boost=0.0,
+                            combined_score=decision.confidence,
+                        )
                     if matches:
                         logger.debug(
-                            f"[SemanticToolMatcher] Using LLM classification: "
-                            f"{list(matches.keys())} (confidence={classification.confidence:.2f})"
+                            f"[SemanticToolMatcher] Using LLM Router: "
+                            f"{list(matches.keys())} (confidence={decision.confidence:.2f})"
                         )
                         return matches
             except Exception as e:
-                logger.debug(f"[SemanticToolMatcher] LLM classification failed, using embeddings: {e}")
+                logger.debug(f"[SemanticToolMatcher] LLM Router failed, using embeddings: {e}")
         
         # ==============================================================================
         # Fallback: Use embedding-based matching (original implementation)

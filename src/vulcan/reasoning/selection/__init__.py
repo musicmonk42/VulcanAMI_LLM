@@ -70,16 +70,19 @@ try:
 except ImportError:
     MATH_VERIFICATION_AVAILABLE = False
 
-# QueryClassifier availability for LLM-based tool selection
+# LLM Router for tool selection
 try:
-    from vulcan.llm.query_classifier import (
-        classify_query,
-        QueryClassification,
-        QueryClassifier,
+    from vulcan.routing.llm_router import (
+        get_llm_router,
+        route_query,
+        RoutingDecision,
     )
-    QUERY_CLASSIFIER_AVAILABLE = True
+    LLM_ROUTER_AVAILABLE = True
 except ImportError:
-    QUERY_CLASSIFIER_AVAILABLE = False
+    LLM_ROUTER_AVAILABLE = False
+    get_llm_router = None
+    route_query = None
+    RoutingDecision = None
 
 
 __all__ = [
