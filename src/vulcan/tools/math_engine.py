@@ -483,7 +483,7 @@ Returns: Exact symbolic result with step-by-step computation."""
         # Try to parse with sympify
         try:
             return sympy.sympify(expr)
-        except:
+        except Exception:
             # If that fails, try parsing just the first mathematical part
             import re
             # Look for patterns like x**2, sin(x), etc.

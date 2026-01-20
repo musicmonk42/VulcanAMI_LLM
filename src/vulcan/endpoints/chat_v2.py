@@ -49,6 +49,15 @@ router = APIRouter(tags=["chat-v2"])
 
 
 # =============================================================================
+# CONSTANTS
+# =============================================================================
+
+# Default LLM model for chat completions
+# Can be overridden via environment variable or request parameter
+DEFAULT_MODEL = "gpt-4-turbo-preview"
+
+
+# =============================================================================
 # REQUEST/RESPONSE MODELS
 # =============================================================================
 
@@ -358,7 +367,7 @@ async def _chat_with_tools(
         try:
             if tools:
                 response = llm.chat.completions.create(
-                    model="gpt-4-turbo-preview",  # Or configured model
+                    model=DEFAULT_MODEL,
                     messages=messages,
                     tools=tools,
                     tool_choice="auto",
@@ -367,7 +376,7 @@ async def _chat_with_tools(
                 )
             else:
                 response = llm.chat.completions.create(
-                    model="gpt-4-turbo-preview",
+                    model=DEFAULT_MODEL,
                     messages=messages,
                     max_tokens=max_tokens,
                     temperature=temperature,
@@ -445,7 +454,7 @@ async def _chat_with_tools(
     logger.warning(f"[{request_id}] Max tool iterations reached, getting final response")
     
     response = llm.chat.completions.create(
-        model="gpt-4-turbo-preview",
+        model=DEFAULT_MODEL,
         messages=messages,
         max_tokens=max_tokens,
         temperature=temperature,

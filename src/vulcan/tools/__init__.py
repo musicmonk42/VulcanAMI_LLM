@@ -159,8 +159,6 @@ def get_tool_by_name(name: str) -> Optional[Tool]:
 
 
 # Pre-instantiated tool registry for convenience
-# Lazy property that returns tools
-@property
 def VULCAN_TOOLS() -> List[Tool]:
     """All available VULCAN tools."""
     return get_all_tools()
