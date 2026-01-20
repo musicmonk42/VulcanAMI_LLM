@@ -297,9 +297,6 @@ jobs:
           # thinking the process is stalled due to buffered output
           export PYTHONUNBUFFERED=1
           
-          # Set pytest timeout for worker initialization
-          export PYTEST_TIMEOUT=300
-          
           EXIT_CODE=0
           # Reduced to -n 2 to minimize worker initialization overhead
           # Added --max-worker-restart=2 to restart hung workers
