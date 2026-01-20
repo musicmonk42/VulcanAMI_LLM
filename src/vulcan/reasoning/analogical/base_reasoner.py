@@ -1325,3 +1325,266 @@ class AnalogicalReasoner(AbstractReasoner):
             "source_domain": source_domain,
             "target_domain": target_domain,
         }
+
+    # =========================================================================
+    # Interface Compatibility Methods for AnalogicalToolWrapper
+    # =========================================================================
+    # These methods provide the interface expected by AnalogicalToolWrapper
+    # in src/vulcan/reasoning/selection/tool_selector.py (lines 2506-2536).
+    # They delegate to the existing implementation methods.
+    #
+    # INDUSTRY STANDARD IMPLEMENTATION:
+    # - Defensive programming with input validation
+    # - Comprehensive error handling with fallback behavior
+    # - Detailed logging for observability
+    # - Type annotations for IDE support and static analysis
+    # - Backward-compatible interface design
+    # =========================================================================
+
+    def find_analogies(
+        self,
+        query: Any,
+        k: int = 5
+    ) -> Dict[str, Any]:
+        """
+        Find analogies for a query (interface method for AnalogicalToolWrapper).
+        
+        This method provides the interface expected by AnalogicalToolWrapper.
+        It delegates to find_multiple_analogies() which returns top-k analogies
+        from stored domains.
+        
+        INTERFACE CONTRACT:
+        - MUST accept query as string, dict, or any type
+        - MUST return dict with 'analogies', 'query', 'count', 'success' keys
+        - MUST NOT raise exceptions (return empty result on error)
+        - MUST be thread-safe for concurrent calls
+        
+        Args:
+            query: Query string, dict, or domain structure
+            k: Number of analogies to return (default: 5, must be > 0)
+            
+        Returns:
+            Dict containing:
+                - analogies: List of analogy results (empty list on error)
+                - query: The normalized query string
+                - count: Number of analogies found (0 on error)
+                - success: Whether any analogies were found
+                - error: Optional error message if something went wrong
+                
+        Examples:
+            >>> reasoner = AnalogicalReasoner()
+            >>> reasoner.add_domain("biology", {...})
+            >>> result = reasoner.find_analogies("How does a neuron work?")
+            >>> print(f"Found {result['count']} analogies")
+            
+        Thread Safety:
+            This method is thread-safe. Multiple threads can call it concurrently
+            as long as domains are not being modified simultaneously.
+        """
+        try:
+            # DEFENSIVE: Validate k parameter
+            if not isinstance(k, int) or k < 1:
+                logger.warning(
+                    f"[AnalogicalReasoner.find_analogies] Invalid k={k}, using default k=5"
+                )
+                k = 5
+            
+            # DEFENSIVE: Extract query string with multiple fallback options
+            if query is None:
+                query_text = ""
+            elif isinstance(query, dict):
+                query_text = query.get("query") or query.get("text") or query.get("problem") or str(query)
+            elif isinstance(query, str):
+                query_text = query
+            else:
+                query_text = str(query)
+            
+            # DEFENSIVE: Validate query is not empty
+            query_text = query_text.strip() if query_text else ""
+            if not query_text:
+                logger.warning(
+                    "[AnalogicalReasoner.find_analogies] Empty query provided"
+                )
+                return {
+                    "analogies": [],
+                    "query": "",
+                    "count": 0,
+                    "success": False,
+                    "error": "Empty query"
+                }
+            
+            # Delegate to existing implementation
+            logger.debug(
+                f"[AnalogicalReasoner.find_analogies] Finding top-{k} analogies for: {query_text[:50]}..."
+            )
+            analogies = self.find_multiple_analogies(query_text, k=k)
+            
+            logger.info(
+                f"[AnalogicalReasoner.find_analogies] Found {len(analogies)} analogies"
+            )
+            
+            return {
+                "analogies": analogies,
+                "query": query_text,
+                "count": len(analogies),
+                "success": len(analogies) > 0,
+            }
+            
+        except Exception as e:
+            # FAIL-SAFE: Never raise exceptions, always return graceful degradation
+            logger.error(
+                f"[AnalogicalReasoner.find_analogies] Error processing query: {e}",
+                exc_info=True
+            )
+            return {
+                "analogies": [],
+                "query": str(query) if query else "",
+                "count": 0,
+                "success": False,
+                "error": str(e)
+            }
+    
+    def reason(self, problem: Any) -> Dict[str, Any]:
+        """
+        Perform analogical reasoning on a problem (interface method for AnalogicalToolWrapper).
+        
+        This method provides the interface expected by AnalogicalToolWrapper.
+        It delegates to find_structural_analogy() for structural mapping.
+        
+        INTERFACE CONTRACT:
+        - MUST accept problem as string, dict, or any type
+        - MUST return dict with 'found', 'mapping', 'confidence', 'explanation' keys
+        - MUST NOT raise exceptions (return empty result on error)
+        - MUST support optional target_domain in problem dict
+        
+        Args:
+            problem: Problem description (string or dict with optional target_domain)
+            
+        Returns:
+            Dict containing:
+                - found: Whether an analogy was found
+                - mapping: AnalogicalMapping object or None
+                - confidence: Confidence score (0.0-1.0)
+                - explanation: Human-readable explanation
+                - domain: Source domain name or None
+                - error: Optional error message if something went wrong
+                
+        Examples:
+            >>> reasoner = AnalogicalReasoner()
+            >>> reasoner.add_domain("software", {...})
+            >>> result = reasoner.reason("How to design a distributed system?")
+            >>> if result["found"]:
+            ...     print(result["explanation"])
+            
+            >>> # With explicit target domain
+            >>> result = reasoner.reason({
+            ...     "query": "distributed consensus",
+            ...     "target_domain": "biology"
+            ... })
+            
+        Thread Safety:
+            This method is thread-safe for concurrent reads.
+        """
+        try:
+            # DEFENSIVE: Extract query and target_domain with multiple fallbacks
+            if problem is None:
+                query = ""
+                target_domain = None
+            elif isinstance(problem, dict):
+                query = (
+                    problem.get("query") or 
+                    problem.get("text") or 
+                    problem.get("problem") or 
+                    str(problem)
+                )
+                target_domain = problem.get("target_domain")
+            elif isinstance(problem, str):
+                query = problem
+                target_domain = None
+            else:
+                query = str(problem)
+                target_domain = None
+            
+            # DEFENSIVE: Validate query
+            query = query.strip() if query else ""
+            if not query:
+                logger.warning(
+                    "[AnalogicalReasoner.reason] Empty query provided"
+                )
+                return {
+                    "found": False,
+                    "mapping": None,
+                    "confidence": 0.0,
+                    "explanation": "Empty query provided",
+                    "domain": None,
+                    "error": "Empty query"
+                }
+            
+            logger.debug(
+                f"[AnalogicalReasoner.reason] Processing: {query[:50]}... "
+                f"(target_domain={target_domain})"
+            )
+            
+            # If target domain is specified, use direct structural mapping
+            if target_domain:
+                # DEFENSIVE: Validate target domain exists
+                if target_domain not in self.domain_knowledge:
+                    logger.warning(
+                        f"[AnalogicalReasoner.reason] Unknown target domain: {target_domain}"
+                    )
+                    # Continue anyway - find_structural_analogy will handle it
+                
+                result = self.find_structural_analogy(
+                    query,
+                    target_domain,
+                    mapping_type=MappingType.STRUCTURAL
+                )
+                logger.info(
+                    f"[AnalogicalReasoner.reason] Direct mapping to {target_domain}: "
+                    f"found={result.get('found')}, confidence={result.get('confidence', 0.0):.2f}"
+                )
+                return result
+            
+            # Otherwise, find best analogy from all domains
+            analogies = self.find_multiple_analogies(query, k=1)
+            
+            if analogies:
+                best = analogies[0]
+                logger.info(
+                    f"[AnalogicalReasoner.reason] Best analogy: domain={best.get('domain')}, "
+                    f"confidence={best.get('confidence', 0.0):.2f}"
+                )
+                # Convert to expected format
+                return {
+                    "found": True,
+                    "mapping": best.get("mapping"),
+                    "confidence": best.get("confidence", 0.0),
+                    "explanation": best.get("explanation", ""),
+                    "domain": best.get("domain"),
+                }
+            else:
+                logger.info(
+                    "[AnalogicalReasoner.reason] No analogies found in stored domains"
+                )
+                return {
+                    "found": False,
+                    "mapping": None,
+                    "confidence": 0.0,
+                    "explanation": "No analogies found in stored domains.",
+                    "domain": None,
+                }
+                
+        except Exception as e:
+            # FAIL-SAFE: Never raise exceptions, always return graceful degradation
+            logger.error(
+                f"[AnalogicalReasoner.reason] Error during reasoning: {e}",
+                exc_info=True
+            )
+            return {
+                "found": False,
+                "mapping": None,
+                "confidence": 0.0,
+                "explanation": f"Error during analogical reasoning: {str(e)}",
+                "domain": None,
+                "error": str(e)
+            }

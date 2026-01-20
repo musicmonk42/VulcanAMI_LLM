@@ -140,6 +140,11 @@ def require_deployment(request: Optional[Request] = None) -> "ProductionDeployme
         )
         raise HTTPException(
             status_code=503,
-            detail="System initializing - deployment not ready. Please retry in a few seconds."
+            detail=(
+                "The VULCAN deployment has not been initialized yet. "
+                "Please try again in 10-30 seconds. "
+                "The system may be loading models and initializing services. "
+                "Check /health/ready for initialization status."
+            )
         )
     return deployment
