@@ -1325,3 +1325,117 @@ class AnalogicalReasoner(AbstractReasoner):
             "source_domain": source_domain,
             "target_domain": target_domain,
         }
+
+    # =========================================================================
+    # Interface Compatibility Methods for AnalogicalToolWrapper
+    # =========================================================================
+    # These methods provide the interface expected by AnalogicalToolWrapper
+    # in src/vulcan/reasoning/selection/tool_selector.py (lines 2506-2536).
+    # They delegate to the existing implementation methods.
+    # =========================================================================
+
+    def find_analogies(
+        self,
+        query: Any,
+        k: int = 5
+    ) -> Dict[str, Any]:
+        """
+        Find analogies for a query (interface method for AnalogicalToolWrapper).
+        
+        This method provides the interface expected by AnalogicalToolWrapper.
+        It delegates to find_multiple_analogies() which returns top-k analogies
+        from stored domains.
+        
+        Args:
+            query: Query string, dict, or domain structure
+            k: Number of analogies to return (default: 5)
+            
+        Returns:
+            Dict containing:
+                - analogies: List of analogy results
+                - query: The original query
+                - count: Number of analogies found
+                -
+        Examples:
+            >>> reasoner = AnalogicalReasoner()
+            >>> reasoner.add_domain("biology", {...})
+            >>> result = reasoner.find_analogies("How does a neuron work?")
+            >>> print(f"Found {result['count']} analogies")
+        """
+        # Extract query string if needed
+        if isinstance(query, dict):
+            query_text = query.get("query") or query.get("text") or str(query)
+        else:
+            query_text = str(query)
+        
+        # Use find_multiple_analogies to get top-k analogies from all domains
+        analogies = self.find_multiple_analogies(query_text, k=k)
+        
+        return {
+            "analogies": analogies,
+            "query": query_text,
+            "count": len(analogies),
+            "success": len(analogies) > 0,
+        }
+    
+    def reason(self, problem: Any) -> Dict[str, Any]:
+        """
+        Perform analogical reasoning on a problem (interface method for AnalogicalToolWrapper).
+        
+        This method provides the interface expected by AnalogicalToolWrapper.
+        It delegates to find_structural_analogy() for structural mapping.
+        
+        Args:
+            problem: Problem description (string or dict)
+            
+        Returns:
+            Dict containing:
+                - found: Whether an analogy was found
+                - mapping: AnalogicalMapping object
+                - confidence: Confidence score
+                - explanation: Human-readable explanation
+                
+        Examples:
+            >>> reasoner = AnalogicalReasoner()
+            >>> reasoner.add_domain("software", {...})
+            >>> result = reasoner.reason("How to design a distributed system?")
+            >>> if result["found"]:
+            ...     print(result["explanation"])
+        """
+        # Extract query from problem
+        if isinstance(problem, dict):
+            query = problem.get("query") or problem.get("text") or str(problem)
+            target_domain = problem.get("target_domain")
+        else:
+            query = str(problem)
+            target_domain = None
+        
+        # If target domain is specified, use it
+        if target_domain:
+            return self.find_structural_analogy(
+                query,
+                target_domain,
+                mapping_type=MappingType.STRUCTURAL
+            )
+        
+        # Otherwise, find analogies from all domains and return the best one
+        analogies = self.find_multiple_analogies(query, k=1)
+        
+        if analogies:
+            best = analogies[0]
+            # Convert to expected format
+            return {
+                "found": True,
+                "mapping": best.get("mapping"),
+                "confidence": best.get("confidence", 0.0),
+                "explanation": best.get("explanation", ""),
+                "domain": best.get("domain"),
+            }
+        else:
+            return {
+                "found": False,
+                "mapping": None,
+                "confidence": 0.0,
+                "explanation": "No analogies found in stored domains.",
+                "domain": None,
+            }

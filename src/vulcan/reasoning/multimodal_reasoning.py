@@ -2534,11 +2534,114 @@ class MultiModalReasoningEngine:
 
 
 class MultimodalReasoner:
+    """
+    Multimodal reasoning engine for processing inputs across multiple modalities.
+    
+    This is a placeholder implementation that will be expanded with actual
+    multimodal fusion capabilities. For now, it provides the interface
+    expected by MultimodalToolWrapper.
+    """
+    
     def __init__(self):
         self.fusion_engine = None  # Placeholder
 
     def reason_multimodal(self, inputs):
+        """
+        Process multimodal inputs and fuse them into a unified output.
+        
+        Args:
+            inputs: Multimodal inputs (can be dict, list, or any format)
+            
+        Returns:
+            Dict with fused result
+        """
         return {"result": "fused_output"}  # Placeholder logic
+    
+    # =========================================================================
+    # Interface Compatibility Methods for MultimodalToolWrapper
+    # =========================================================================
+    # These methods provide the interface expected by MultimodalToolWrapper
+    # in src/vulcan/reasoning/selection/tool_selector.py (lines 2588-2612).
+    # They delegate to the existing reason_multimodal() implementation.
+    # =========================================================================
+    
+    def process(self, inputs):
+        """
+        Process multimodal inputs (interface method for MultimodalToolWrapper).
+        
+        This method provides the interface expected by MultimodalToolWrapper.
+        It delegates to reason_multimodal() for actual processing.
+        
+        Args:
+            inputs: Multimodal inputs to process
+            
+        Returns:
+            Dict containing:
+                - result: The fused output
+                - success: Whether processing succeeded
+                - confidence: Confidence score (placeholder)
+        """
+        result = self.reason_multimodal(inputs)
+        
+        # Wrap result in expected format
+        return {
+            "result": result.get("result", result),
+            "success": True,
+            "confidence": 0.7,  # Placeholder confidence
+            "modalities_processed": self._detect_modalities(inputs),
+        }
+    
+    def reason(self, problem):
+        """
+        Perform multimodal reasoning on a problem (interface method for MultimodalToolWrapper).
+        
+        This method provides the interface expected by MultimodalToolWrapper.
+        It delegates to reason_multimodal() for actual reasoning.
+        
+        Args:
+            problem: Problem description with multimodal components
+            
+        Returns:
+            Dict containing reasoning result
+        """
+        # Extract inputs from problem if it's a dict
+        if isinstance(problem, dict):
+            inputs = problem.get("inputs") or problem.get("data") or problem
+        else:
+            inputs = problem
+        
+        # Process using process() method
+        return self.process(inputs)
+    
+    def _detect_modalities(self, inputs):
+        """
+        Detect which modalities are present in the input.
+        
+        Args:
+            inputs: Input data
+            
+        Returns:
+            List of detected modality names
+        """
+        modalities = []
+        
+        if isinstance(inputs, dict):
+            if "text" in inputs or "query" in inputs:
+                modalities.append("text")
+            if "image" in inputs or "img" in inputs:
+                modalities.append("image")
+            if "audio" in inputs:
+                modalities.append("audio")
+            if "video" in inputs:
+                modalities.append("video")
+        elif isinstance(inputs, str):
+            modalities.append("text")
+        
+        # Default to text if no modalities detected
+        if not modalities:
+            modalities.append("text")
+        
+        return modalities
 
 
 class CrossModalReasoner:
