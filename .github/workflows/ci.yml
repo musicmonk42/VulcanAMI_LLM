@@ -135,7 +135,7 @@ jobs:
           POSTGRES_PASSWORD: test_password
           POSTGRES_DB: test_db
         options: >-
-          --health-cmd "pg_isready -U test_user"
+          --health-cmd "pg_isready -U test_user -d test_db"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
