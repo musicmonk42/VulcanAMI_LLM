@@ -531,7 +531,7 @@ jobs:
           
           echo "=== Disk usage after cleanup ===" && df -h || true
           echo "=== Available space on root ===" 
-          df -h / | tail -1 | awk '{print "Available: " $4 " (" $5 " used)"}'
+          df -h / | tail -1 | awk '{print "Available: " $4 " (" $5 " used)"}' || echo "Could not parse disk usage"
 
       - name: Ensure cert directory readable
         if: always()
