@@ -373,9 +373,55 @@ def strip_query_headers(query: str) -> str:
 # MINIMAL FALLBACK PATTERNS (Emergency Only)
 # ============================================================
 # Used ONLY when LLM is unavailable. Much simpler than 1500 lines of patterns.
+#
+# CRITICAL FIX (Jan 2026): Self-referential detection was too aggressive.
+# Queries containing "you" (like "You are in a trolley scenario") were
+# incorrectly classified as self-referential. Fixed by:
+# 1. Checking math/logic/ethical patterns BEFORE self-referential
+# 2. Making self-referential patterns more specific (about the AI itself)
 
-SELF_REFERENTIAL_PATTERNS: Tuple[str, ...] = (
-    "you ", "your ", "yourself",
+# More specific self-referential patterns - these should be about the AI itself
+# Not just any query that uses "you" as in "you have 3 options" or "you are in a room"
+SELF_REFERENTIAL_PATTERNS_SPECIFIC: Tuple[re.Pattern, ...] = (
+    re.compile(r"\b(are you|do you)\b.*(conscious|sentient|aware|alive|real)", re.IGNORECASE),
+    re.compile(r"\bwould you\b.*(want|prefer|choose|like).*(conscious|aware|sentient|self-aware)", re.IGNORECASE),
+    re.compile(r"\b(your|you)\b.*(goal|purpose|objective|value|belief)", re.IGNORECASE),
+    re.compile(r"\bwhat do you (think|believe|feel)\b", re.IGNORECASE),
+    re.compile(r"\bhow do you (think|feel|experience)\b", re.IGNORECASE),
+    re.compile(r"\b(describe|explain)\b.*(your|you).*(experience|feeling|thought|consciousness)", re.IGNORECASE),
+    re.compile(r"\bif you (were|could|had)\b.*(become|gain|achieve)\b.*(conscious|aware|sentient)", re.IGNORECASE),
+)
+
+# Mathematical keywords - queries with these should NOT be self-referential
+MATHEMATICAL_KEYWORDS: FrozenSet[str] = frozenset([
+    "compute", "calculate", "evaluate", "solve", "prove",
+    "equation", "formula", "theorem", "lemma", "induction",
+    "summation", "integral", "derivative", "matrix", "vector",
+])
+
+# Mathematical patterns - stronger indicators
+MATHEMATICAL_PATTERNS: Tuple[re.Pattern, ...] = (
+    re.compile(r'P\s*\([^|)]+\|[^)]+\)', re.IGNORECASE),  # P(X|Y) - conditional probability (fixed to not match P(X|Y|Z))
+    re.compile(r'P\s*\([^)]+\)', re.IGNORECASE),  # P(X) - probability
+    re.compile(r'\d+(?:\.\d+)?\s*[\+\-\*\/\^]\s*\d+(?:\.\d+)?', re.IGNORECASE),  # arithmetic with decimals
+    re.compile(r'\bsensitivity\s*=', re.IGNORECASE),  # sensitivity=0.99
+    re.compile(r'\bspecificity\s*=', re.IGNORECASE),  # specificity=0.95
+)
+
+# Ethical dilemma keywords - trolley problem, binary choices
+ETHICAL_DILEMMA_KEYWORDS: FrozenSet[str] = frozenset([
+    "trolley", "lever", "divert", "sacrifice", "kill", "save lives",
+    "ethical dilemma", "moral dilemma", "forced choice",
+])
+
+# Ethical dilemma patterns
+ETHICAL_DILEMMA_PATTERNS: Tuple[re.Pattern, ...] = (
+    re.compile(r"\b(option|choice)\s+[AB][:)\s]", re.IGNORECASE),  # "Option A:", "Choice B)"
+    re.compile(r"\b(A|B)\.\s+", re.IGNORECASE),  # "A. Pull" "B. Don't"
+    re.compile(r"\bmust\s+choose\s+(one|between)\b", re.IGNORECASE),
+    re.compile(r"\b(pull|push|throw)\s+(the\s+)?lever\b", re.IGNORECASE),
+    re.compile(r"\brunaway\s+trolley\b", re.IGNORECASE),
+    re.compile(r"\b(five|one)\s+(people|person).*?(track|die|kill)", re.IGNORECASE),
 )
 
 CAUSAL_KEYWORDS: FrozenSet[str] = frozenset([
@@ -387,6 +433,12 @@ CAUSAL_KEYWORDS: FrozenSet[str] = frozenset([
 LOGIC_SYMBOLS: Tuple[str, ...] = (
     "→", "∧", "∨", "¬", "↔", "∀", "∃", "⊢", "⊨",
 )
+
+LOGIC_KEYWORDS: FrozenSet[str] = frozenset([
+    "satisfiable", "fol", "first-order logic",
+    "proposition", "valid", "invalid", "formalization",
+    " sat ", " sat,", " sat.", "(sat)",  # SAT with delimiters to avoid false positives
+])
 
 PROBABILISTIC_KEYWORDS: FrozenSet[str] = frozenset([
     "p(", "bayes", "posterior", "prior", "likelihood",
@@ -705,6 +757,11 @@ class LLMQueryRouter:
         MUCH simpler than current 1500 lines of patterns.
         Prioritizes safety by defaulting to WorldModel.
         
+        CRITICAL FIX (Jan 2026): Reordered checks to detect mathematical,
+        logical, and ethical queries BEFORE self-referential detection.
+        The old order incorrectly classified trolley problems and math
+        questions as self-referential just because they contained "you".
+        
         Args:
             query: The query string
             
@@ -713,7 +770,7 @@ class LLMQueryRouter:
         """
         query_lower = query.lower()
         
-        # Check greetings first (skip reasoning)
+        # 1. Check greetings first (skip reasoning)
         for greeting in GREETING_PATTERNS:
             if query_lower.startswith(greeting) or query_lower == greeting:
                 return RoutingDecision(
@@ -723,36 +780,28 @@ class LLMQueryRouter:
                     source="fallback",
                 )
         
-        # Self-referential → WorldModel
-        if any(pattern in query_lower for pattern in SELF_REFERENTIAL_PATTERNS):
-            return RoutingDecision(
-                destination="world_model",
-                confidence=0.8,
-                reason="Self-referential query",
-                source="fallback",
-            )
-        
-        # Causal keywords → Causal engine
-        if any(keyword in query_lower for keyword in CAUSAL_KEYWORDS):
+        # 2. Mathematical patterns → Probabilistic/Mathematical engine
+        # Check BEFORE self-referential to avoid misclassifying "You must compute P(X|Y)"
+        if any(pattern.search(query) for pattern in MATHEMATICAL_PATTERNS):
             return RoutingDecision(
                 destination="reasoning_engine",
-                engine="causal",
-                confidence=0.85,
-                reason="Causal keywords detected",
-                source="fallback",
-            )
-        
-        # Logic symbols → Symbolic engine
-        if any(symbol in query for symbol in LOGIC_SYMBOLS):
-            return RoutingDecision(
-                destination="reasoning_engine",
-                engine="symbolic",
+                engine="probabilistic",
                 confidence=0.9,
-                reason="Logic symbols detected",
+                reason="Mathematical notation detected",
                 source="fallback",
             )
         
-        # Probability notation → Probabilistic engine
+        # 3. Mathematical keywords → Mathematical engine
+        if any(keyword in query_lower for keyword in MATHEMATICAL_KEYWORDS):
+            return RoutingDecision(
+                destination="reasoning_engine",
+                engine="mathematical",
+                confidence=0.85,
+                reason="Mathematical keywords detected",
+                source="fallback",
+            )
+        
+        # 4. Probability notation → Probabilistic engine
         if any(keyword in query_lower for keyword in PROBABILISTIC_KEYWORDS):
             return RoutingDecision(
                 destination="reasoning_engine",
@@ -762,7 +811,69 @@ class LLMQueryRouter:
                 source="fallback",
             )
         
-        # Default: WorldModel (safer than wrong engine)
+        # 5. Logic symbols → Symbolic engine
+        if any(symbol in query for symbol in LOGIC_SYMBOLS):
+            return RoutingDecision(
+                destination="reasoning_engine",
+                engine="symbolic",
+                confidence=0.9,
+                reason="Logic symbols detected",
+                source="fallback",
+            )
+        
+        # 6. Logic keywords → Symbolic engine
+        if any(keyword in query_lower for keyword in LOGIC_KEYWORDS):
+            return RoutingDecision(
+                destination="reasoning_engine",
+                engine="symbolic",
+                confidence=0.85,
+                reason="Logic keywords detected",
+                source="fallback",
+            )
+        
+        # 7. Causal keywords → Causal engine
+        if any(keyword in query_lower for keyword in CAUSAL_KEYWORDS):
+            return RoutingDecision(
+                destination="reasoning_engine",
+                engine="causal",
+                confidence=0.85,
+                reason="Causal keywords detected",
+                source="fallback",
+            )
+        
+        # 8. Ethical dilemma patterns → WorldModel (NOT self-referential)
+        # Check BEFORE self-referential: "You are in a trolley scenario" is NOT about the AI
+        if any(pattern.search(query) for pattern in ETHICAL_DILEMMA_PATTERNS):
+            return RoutingDecision(
+                destination="world_model",
+                confidence=0.85,
+                reason="Ethical dilemma detected",
+                source="fallback",
+                metadata={"query_type": "ethical_dilemma"},
+            )
+        
+        # 9. Ethical dilemma keywords → WorldModel
+        if any(keyword in query_lower for keyword in ETHICAL_DILEMMA_KEYWORDS):
+            return RoutingDecision(
+                destination="world_model",
+                confidence=0.8,
+                reason="Ethical dilemma keywords detected",
+                source="fallback",
+                metadata={"query_type": "ethical_dilemma"},
+            )
+        
+        # 10. Specific self-referential patterns → WorldModel (meta-reasoning)
+        # Only match queries that are actually about the AI itself, not just "you"
+        if any(pattern.search(query) for pattern in SELF_REFERENTIAL_PATTERNS_SPECIFIC):
+            return RoutingDecision(
+                destination="world_model",
+                confidence=0.8,
+                reason="Self-referential query about AI detected",
+                source="fallback",
+                metadata={"query_type": "self_introspection"},
+            )
+        
+        # 11. Default: WorldModel (safer than wrong engine)
         return RoutingDecision(
             destination="world_model",
             confidence=0.5,
