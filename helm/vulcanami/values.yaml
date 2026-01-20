@@ -175,14 +175,14 @@ llm:
     baseDelay: 1.0
     # Maximum delay cap in seconds to prevent excessive waits
     maxDelay: 60.0
-  # Tool Selector LLM Classification Integration (NEW FEATURE)
-  # Configuration for integrating QueryClassifier into ToolSelector
+  # Tool Selector LLM Router Integration
+  # Configuration for integrating LLMQueryRouter into ToolSelector
   toolSelector:
-    # Enable LLM classification in ToolSelector candidate generation
-    # When true: Uses QueryClassifier as primary tool selection method
+    # Enable LLM routing in ToolSelector candidate generation
+    # When true: Uses LLMQueryRouter as primary tool selection method
     # When false: Uses SemanticToolMatcher + BayesianMemoryPrior only
     useLlmClassification: true
-    # Minimum confidence threshold for using LLM classification results
+    # Minimum confidence threshold for using LLM routing results
     # If LLM confidence < threshold, falls back to semantic matching
     # Range: 0.0-1.0, Default: 0.8 (high confidence required)
     llmConfidenceThreshold: 0.8
