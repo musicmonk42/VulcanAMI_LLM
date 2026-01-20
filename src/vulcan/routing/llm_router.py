@@ -401,9 +401,9 @@ MATHEMATICAL_KEYWORDS: FrozenSet[str] = frozenset([
 
 # Mathematical patterns - stronger indicators
 MATHEMATICAL_PATTERNS: Tuple[re.Pattern, ...] = (
-    re.compile(r'P\s*\([^)]+\|[^)]+\)', re.IGNORECASE),  # P(X|Y) - conditional probability
+    re.compile(r'P\s*\([^|)]+\|[^)]+\)', re.IGNORECASE),  # P(X|Y) - conditional probability (fixed to not match P(X|Y|Z))
     re.compile(r'P\s*\([^)]+\)', re.IGNORECASE),  # P(X) - probability
-    re.compile(r'\b\d+\s*[\+\-\*\/\^]\s*\d+', re.IGNORECASE),  # arithmetic expressions
+    re.compile(r'\d+(?:\.\d+)?\s*[\+\-\*\/\^]\s*\d+(?:\.\d+)?', re.IGNORECASE),  # arithmetic with decimals
     re.compile(r'\bsensitivity\s*=', re.IGNORECASE),  # sensitivity=0.99
     re.compile(r'\bspecificity\s*=', re.IGNORECASE),  # specificity=0.95
 )
@@ -435,8 +435,9 @@ LOGIC_SYMBOLS: Tuple[str, ...] = (
 )
 
 LOGIC_KEYWORDS: FrozenSet[str] = frozenset([
-    "satisfiable", "sat ", "fol", "first-order logic",
+    "satisfiable", "fol", "first-order logic",
     "proposition", "valid", "invalid", "formalization",
+    " sat ", " sat,", " sat.", "(sat)",  # SAT with delimiters to avoid false positives
 ])
 
 PROBABILISTIC_KEYWORDS: FrozenSet[str] = frozenset([
