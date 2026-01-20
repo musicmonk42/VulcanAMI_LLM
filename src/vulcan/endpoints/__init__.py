@@ -3,6 +3,9 @@ Vulcan API Endpoints Module
 
 This module contains all FastAPI endpoint handlers extracted from main.py.
 Each endpoint category is in its own file for better organization.
+
+Note: unified_chat has been replaced by chat_v2 which uses LLM function calling
+instead of regex-based routing.
 """
 
 from vulcan.endpoints.agents import router as agents_router
@@ -18,7 +21,7 @@ from vulcan.endpoints.reasoning import router as reasoning_router
 from vulcan.endpoints.safety import router as safety_router
 from vulcan.endpoints.self_improvement import router as self_improvement_router
 from vulcan.endpoints.status import router as status_router
-from vulcan.endpoints.unified_chat import router as unified_chat_router
+from vulcan.endpoints.chat_v2 import router as chat_v2_router
 from vulcan.endpoints.world_model import router as world_model_router
 
 __all__ = [
@@ -35,6 +38,6 @@ __all__ = [
     "safety_router",
     "self_improvement_router",
     "status_router",
-    "unified_chat_router",
+    "chat_v2_router",
     "world_model_router",
 ]

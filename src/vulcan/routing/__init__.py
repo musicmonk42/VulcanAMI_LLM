@@ -1,60 +1,50 @@
 # ============================================================
-# VULCAN-AGI Query Routing and Dual-Mode Learning Integration Layer
+# VULCAN-AGI Routing Module - Simplified Architecture
 # ============================================================
-# Enterprise-grade query routing with dual-mode learning support:
-# - MODE 1: User Interactions (human queries, feedback, real-world problems)
-# - MODE 2: AI-to-AI Interactions (agent collaboration, tournaments, debates)
+# This module has been simplified as part of the tool-based architecture.
+# Complex regex routing has been replaced by LLM function calling.
 #
-# PRODUCTION-READY: Thread-safe, graceful degradation, comprehensive logging
-# FULLY TESTED: All components validated against platform standards
+# KEPT COMPONENTS:
+# - TelemetryRecorder: Dual-mode telemetry for meta-learning
+# - GovernanceLogger: Audit.db integration
+# - ExperimentTrigger: Meta-learning experiment generation
+# - SystemHealthMonitor: System health monitoring
+#
+# REMOVED COMPONENTS (replaced by LLM function calling):
+# - QueryRouter: Regex classification (now LLM decides)
+# - LLMRouter: Redundant LLM call for routing
+# - EmbeddingCache: Routing similarity (LLM has embeddings)
+# - AgentCollaboration: Multi-agent orchestration
+# - RoutingPrompts: Classification prompts
 # ============================================================
 
 """
-VULCAN Query Routing and Dual-Mode Learning Integration Layer
+VULCAN Routing Module - Simplified Architecture
 
-This module provides intelligent query routing to VULCAN's cognitive systems
-with support for dual-mode learning:
+The complex regex-based routing has been replaced by LLM function calling.
+The LLM now decides which tools to use based on natural language understanding.
 
-MODE 1: User Interactions
-    - Human queries and feedback
-    - Real-world problem solving
-    - Production telemetry
-    - Utility memory population
-
-MODE 2: AI-to-AI Interactions
-    - Agent-to-agent collaboration
-    - Arena tournaments (competitive learning)
-    - Inter-agent debates and deliberation
-    - Multi-agent problem solving
-    - Success/risk memory population
-
-Components:
-    - QueryRouter: Dual-mode detection and task decomposition
-    - AgentCollaborationManager: Multi-agent problem solving
-    - TelemetryRecorder: Dual-mode telemetry for meta-learning
-    - GovernanceLogger: Audit.db integration
-    - ExperimentTrigger: Meta-learning experiment generation
+Remaining Components:
+    - TelemetryRecorder: Production telemetry and metrics
+    - GovernanceLogger: Audit logging for compliance
+    - ExperimentTrigger: Meta-learning experiments
+    - SystemHealthMonitor: System health monitoring
 
 Usage:
-    from vulcan.routing import route_query, trigger_agent_collaboration
-
-    # Route a user query
-    plan = route_query("Analyze this pattern", source="user")
-
-    # Route an agent-to-agent query
-    plan = route_query("Collaborate on solution", source="agent")
-
-    # Trigger multi-agent collaboration
-    session = trigger_agent_collaboration(query, ["perception", "reasoning"])
+    from vulcan.routing import record_telemetry, log_to_governance
+    
+    # Record telemetry
+    record_telemetry(query="...", response="...", tools_used=["hash_compute"])
+    
+    # Log governance event
+    log_to_governance(action="query_processed", data={...})
 """
 
 from __future__ import annotations
 
 import logging
 import threading
-from typing import TYPE_CHECKING
 
-# Initialize logger immediately after imports
 logger = logging.getLogger(__name__)
 
 # ============================================================
@@ -64,107 +54,32 @@ _ROUTING_SINGLETON_LOCK = threading.RLock()
 _ROUTING_COMPONENTS_INITIALIZED = False
 
 # ============================================================
-# LAZY IMPORTS WITH GRACEFUL DEGRADATION
+# REMOVED COMPONENTS - Now handled by LLM function calling
 # ============================================================
+# Query Router - REMOVED (LLM decides via function calling)
+QUERY_ROUTER_AVAILABLE = False
+QueryAnalyzer = None
+QueryPlan = None
+route_query = None
+route_query_async = None
 
-# Query Router
-try:
-    from .query_router import (
-        QueryAnalyzer,
-        QueryPlan,
-        AgentTask,
-        QueryType,
-        LearningMode,
-        ProcessingPlan,
-        GovernanceSensitivity,
-        analyze_query,
-        decompose_to_agent_tasks,
-        route_query,
-        route_query_async,
-        get_query_analyzer,
-        shutdown_blocking_executor,
-        # Query Router Timeout constant
-        QUERY_ROUTING_TIMEOUT_SECONDS,
-        # Complex Physics Detection constants
-        COMPLEX_PHYSICS_KEYWORDS,
-        FORCE_FULL_MATH_PATTERNS,
-        COMPLEX_PHYSICS_TIMEOUT_SECONDS,
-        COMPLEX_PHYSICS_MIN_COMPLEXITY,
-        # Query Intent Classification constants
-        PHILOSOPHICAL_KEYWORDS,
-        PHILOSOPHICAL_PATTERNS,
-        IDENTITY_KEYWORDS,
-        IDENTITY_PATTERNS,
-        CONVERSATIONAL_KEYWORDS,
-        CONVERSATIONAL_PATTERNS,
-        FACTUAL_KEYWORDS,
-        FACTUAL_PATTERNS,
-        PHILOSOPHICAL_TIMEOUT_SECONDS,
-        IDENTITY_TIMEOUT_SECONDS,
-        CONVERSATIONAL_TIMEOUT_SECONDS,
-        FACTUAL_TIMEOUT_SECONDS,
-    )
+# Agent Collaboration - REMOVED (simplified architecture)
+COLLABORATION_AVAILABLE = False
+AgentCollaborationManager = None
+trigger_agent_collaboration = None
 
-    QUERY_ROUTER_AVAILABLE = True
-except ImportError as e:
-    logger.warning(f"Query router module not available: {e}")
-    QUERY_ROUTER_AVAILABLE = False
-    QueryAnalyzer = None
-    QueryPlan = None
-    AgentTask = None
-    QueryType = None
-    LearningMode = None
-    ProcessingPlan = None
-    GovernanceSensitivity = None
-    analyze_query = None
-    decompose_to_agent_tasks = None
-    route_query = None
-    route_query_async = None
-    get_query_analyzer = None
-    shutdown_blocking_executor = None
-    QUERY_ROUTING_TIMEOUT_SECONDS = 5.0  # Default fallback
-    # Complex physics defaults
-    COMPLEX_PHYSICS_KEYWORDS = ()
-    FORCE_FULL_MATH_PATTERNS = ()
-    COMPLEX_PHYSICS_TIMEOUT_SECONDS = 120.0
-    COMPLEX_PHYSICS_MIN_COMPLEXITY = 0.80
-    # Query intent classification defaults
-    PHILOSOPHICAL_KEYWORDS = ()
-    PHILOSOPHICAL_PATTERNS = ()
-    IDENTITY_KEYWORDS = ()
-    IDENTITY_PATTERNS = ()
-    CONVERSATIONAL_KEYWORDS = ()
-    CONVERSATIONAL_PATTERNS = ()
-    FACTUAL_KEYWORDS = ()
-    FACTUAL_PATTERNS = ()
-    PHILOSOPHICAL_TIMEOUT_SECONDS = 3.0
-    IDENTITY_TIMEOUT_SECONDS = 2.0
-    CONVERSATIONAL_TIMEOUT_SECONDS = 2.0
-    FACTUAL_TIMEOUT_SECONDS = 5.0
+# Embedding Cache - REMOVED (LLM has native embeddings)
+EMBEDDING_CACHE_AVAILABLE = False
+get_embedding_cached = None
+is_simple_query = None
 
-# Agent Collaboration
-try:
-    from .agent_collaboration import (
-        AgentMessage,
-        AgentCollaborationManager,
-        CollaborationSession,
-        MessageType,
-        CollaborationStatus,
-        trigger_agent_collaboration,
-        get_collaboration_manager,
-    )
+# LLM Router - REMOVED (redundant)
+LLM_ROUTER_AVAILABLE = False
+LLMQueryRouter = None
 
-    COLLABORATION_AVAILABLE = True
-except ImportError as e:
-    logger.warning(f"Agent collaboration module not available: {e}")
-    COLLABORATION_AVAILABLE = False
-    AgentMessage = None
-    AgentCollaborationManager = None
-    CollaborationSession = None
-    MessageType = None
-    CollaborationStatus = None
-    trigger_agent_collaboration = None
-    get_collaboration_manager = None
+# ============================================================
+# KEPT COMPONENTS
+# ============================================================
 
 # Telemetry Recorder
 try:
@@ -178,7 +93,6 @@ try:
         record_ai_interaction,
         get_telemetry_recorder,
     )
-
     TELEMETRY_AVAILABLE = True
 except ImportError as e:
     logger.warning(f"Telemetry recorder module not available: {e}")
@@ -204,13 +118,11 @@ try:
         log_to_governance_fire_and_forget,
         get_governance_logger,
         shutdown_governance_logger,
-        # Non-blocking buffered logging
         BufferedGovernanceLogger,
         get_buffered_governance_logger,
         shutdown_buffered_governance_logger,
         log_routing_result,
     )
-
     GOVERNANCE_AVAILABLE = True
 except ImportError as e:
     logger.warning(f"Governance logger module not available: {e}")
@@ -239,7 +151,6 @@ try:
         get_experiment_trigger,
         generate_experiments_from_interactions,
     )
-
     EXPERIMENT_AVAILABLE = True
 except ImportError as e:
     logger.warning(f"Experiment trigger module not available: {e}")
@@ -251,95 +162,48 @@ except ImportError as e:
     get_experiment_trigger = None
     generate_experiments_from_interactions = None
 
-# Embedding Cache (Performance Fix for Slow Query Routing)
+# System Health Monitor
 try:
-    from .embedding_cache import (
-        get_embedding_cached,
-        get_embeddings_batch_cached,
-        is_simple_query,
-        get_cache_stats as get_embedding_cache_stats,
-        clear_cache as clear_embedding_cache,
-        clear_and_rebuild_cache as clear_and_rebuild_embedding_cache,
+    from .system_health_monitor import (
+        SystemHealthMonitor,
+        HealthStatus,
+        get_system_health,
+        check_system_health,
     )
-
-    EMBEDDING_CACHE_AVAILABLE = True
+    HEALTH_MONITOR_AVAILABLE = True
 except ImportError as e:
-    logger.warning(f"Embedding cache module not available: {e}")
-    EMBEDDING_CACHE_AVAILABLE = False
-    get_embedding_cached = None
-    get_embeddings_batch_cached = None
-    is_simple_query = None
-    get_embedding_cache_stats = None
-    clear_embedding_cache = None
-    clear_and_rebuild_embedding_cache = None
-
-# LLM Query Router - Primary routing system
-try:
-    from .llm_router import (
-        LLMQueryRouter,
-        RoutingDecision,
-        RoutingCache,
-        RoutingDestination,
-        ReasoningEngine,
-        get_llm_router,
-        route_query,
-        strip_query_headers,
-        HEADER_STRIP_PATTERNS,
-    )
-    from .routing_prompts import (
-        LLM_ROUTER_SYSTEM_PROMPT,
-        LLM_ROUTER_USER_PROMPT,
-        LLM_ROUTER_EXAMPLES,
-        build_router_prompt,
-        build_messages,
-    )
-    
-    LLM_ROUTER_AVAILABLE = True
-except ImportError as e:
-    logger.warning(f"LLM router module not available: {e}")
-    LLM_ROUTER_AVAILABLE = False
-    LLMQueryRouter = None
-    RoutingDecision = None
-    RoutingCache = None
-    RoutingDestination = None
-    ReasoningEngine = None
-    get_llm_router = None
-    route_query = None
-    strip_query_headers = None
-    HEADER_STRIP_PATTERNS = None
-    LLM_ROUTER_SYSTEM_PROMPT = None
-    LLM_ROUTER_USER_PROMPT = None
-    LLM_ROUTER_EXAMPLES = None
-    build_router_prompt = None
-    build_messages = None
+    logger.warning(f"System health monitor module not available: {e}")
+    HEALTH_MONITOR_AVAILABLE = False
+    SystemHealthMonitor = None
+    HealthStatus = None
+    get_system_health = None
+    check_system_health = None
 
 
 # ============================================================
 # MODULE INITIALIZATION
 # ============================================================
 
-
 def initialize_routing_components() -> dict:
     """
     Initialize all routing components with proper error handling.
-
+    
     Returns:
         dict: Status of each component initialization
     """
     global _ROUTING_COMPONENTS_INITIALIZED
-
+    
     with _ROUTING_SINGLETON_LOCK:
         if _ROUTING_COMPONENTS_INITIALIZED:
             return get_routing_status()
-
+        
         status = {
-            "query_router": QUERY_ROUTER_AVAILABLE,
-            "collaboration": COLLABORATION_AVAILABLE,
             "telemetry": TELEMETRY_AVAILABLE,
             "governance": GOVERNANCE_AVAILABLE,
             "experiment": EXPERIMENT_AVAILABLE,
+            "health_monitor": HEALTH_MONITOR_AVAILABLE,
         }
-
+        
         # Initialize components that need explicit initialization
         if TELEMETRY_AVAILABLE:
             try:
@@ -348,7 +212,7 @@ def initialize_routing_components() -> dict:
             except Exception as e:
                 logger.error(f"✗ Telemetry recorder initialization failed: {e}")
                 status["telemetry"] = False
-
+        
         if GOVERNANCE_AVAILABLE:
             try:
                 get_governance_logger()
@@ -356,87 +220,39 @@ def initialize_routing_components() -> dict:
             except Exception as e:
                 logger.error(f"✗ Governance logger initialization failed: {e}")
                 status["governance"] = False
-
+        
         _ROUTING_COMPONENTS_INITIALIZED = True
-
+        
         available_count = sum(1 for v in status.values() if v)
-        logger.info(
-            f"Routing components initialized: {available_count}/{len(status)} available"
-        )
-
+        logger.info(f"Routing components initialized: {available_count}/{len(status)} available")
+        
         return status
 
 
 def get_routing_status() -> dict:
     """
     Get the current status of all routing components.
-
+    
     Returns:
         dict: Component availability and statistics
     """
-    status = {
+    return {
         "initialized": _ROUTING_COMPONENTS_INITIALIZED,
         "components": {
-            "query_router": {
-                "available": QUERY_ROUTER_AVAILABLE,
-                "stats": None,
-            },
-            "collaboration": {
-                "available": COLLABORATION_AVAILABLE,
-                "stats": None,
-            },
-            "telemetry": {
-                "available": TELEMETRY_AVAILABLE,
-                "stats": None,
-            },
-            "governance": {
-                "available": GOVERNANCE_AVAILABLE,
-                "stats": None,
-            },
-            "experiment": {
-                "available": EXPERIMENT_AVAILABLE,
-                "stats": None,
-            },
+            "telemetry": {"available": TELEMETRY_AVAILABLE},
+            "governance": {"available": GOVERNANCE_AVAILABLE},
+            "experiment": {"available": EXPERIMENT_AVAILABLE},
+            "health_monitor": {"available": HEALTH_MONITOR_AVAILABLE},
         },
+        "removed_components": [
+            "query_router",
+            "llm_router", 
+            "embedding_cache",
+            "agent_collaboration",
+            "routing_prompts",
+        ],
+        "architecture": "tool_based_llm_function_calling",
     }
-
-    # Get stats from available components
-    if QUERY_ROUTER_AVAILABLE and get_query_analyzer:
-        try:
-            analyzer = get_query_analyzer()
-            status["components"]["query_router"]["stats"] = analyzer.get_stats()
-        except Exception:
-            pass
-
-    if COLLABORATION_AVAILABLE and get_collaboration_manager:
-        try:
-            manager = get_collaboration_manager()
-            status["components"]["collaboration"]["stats"] = manager.get_stats()
-        except Exception:
-            pass
-
-    if TELEMETRY_AVAILABLE and get_telemetry_recorder:
-        try:
-            recorder = get_telemetry_recorder()
-            status["components"]["telemetry"]["stats"] = recorder.get_stats()
-        except Exception:
-            pass
-
-    if GOVERNANCE_AVAILABLE and get_governance_logger:
-        try:
-            gov_logger = get_governance_logger()
-            status["components"]["governance"]["stats"] = gov_logger.get_stats()
-        except Exception:
-            pass
-
-    if EXPERIMENT_AVAILABLE and get_experiment_trigger:
-        try:
-            trigger = get_experiment_trigger()
-            status["components"]["experiment"]["stats"] = trigger.get_stats()
-        except Exception:
-            pass
-
-    return status
 
 
 # ============================================================
@@ -444,47 +260,6 @@ def get_routing_status() -> dict:
 # ============================================================
 
 __all__ = [
-    # Query Router
-    "QueryAnalyzer",
-    "QueryPlan",
-    "AgentTask",
-    "QueryType",
-    "LearningMode",
-    "ProcessingPlan",
-    "GovernanceSensitivity",
-    "analyze_query",
-    "decompose_to_agent_tasks",
-    "route_query",
-    "route_query_async",
-    "get_query_analyzer",
-    "shutdown_blocking_executor",
-    "QUERY_ROUTING_TIMEOUT_SECONDS",  # Query Router Timeout constant
-    # Complex Physics Detection constants
-    "COMPLEX_PHYSICS_KEYWORDS",
-    "FORCE_FULL_MATH_PATTERNS",
-    "COMPLEX_PHYSICS_TIMEOUT_SECONDS",
-    "COMPLEX_PHYSICS_MIN_COMPLEXITY",
-    # Query Intent Classification constants
-    "PHILOSOPHICAL_KEYWORDS",
-    "PHILOSOPHICAL_PATTERNS",
-    "IDENTITY_KEYWORDS",
-    "IDENTITY_PATTERNS",
-    "CONVERSATIONAL_KEYWORDS",
-    "CONVERSATIONAL_PATTERNS",
-    "FACTUAL_KEYWORDS",
-    "FACTUAL_PATTERNS",
-    "PHILOSOPHICAL_TIMEOUT_SECONDS",
-    "IDENTITY_TIMEOUT_SECONDS",
-    "CONVERSATIONAL_TIMEOUT_SECONDS",
-    "FACTUAL_TIMEOUT_SECONDS",
-    # Agent Collaboration
-    "AgentMessage",
-    "AgentCollaborationManager",
-    "CollaborationSession",
-    "MessageType",
-    "CollaborationStatus",
-    "trigger_agent_collaboration",
-    "get_collaboration_manager",
     # Telemetry
     "TelemetryRecorder",
     "TelemetryEntry",
@@ -494,6 +269,7 @@ __all__ = [
     "record_interaction",
     "record_ai_interaction",
     "get_telemetry_recorder",
+    "TELEMETRY_AVAILABLE",
     # Governance
     "GovernanceLogger",
     "ActionType",
@@ -504,11 +280,11 @@ __all__ = [
     "log_to_governance_fire_and_forget",
     "get_governance_logger",
     "shutdown_governance_logger",
-    # Non-blocking buffered logging
     "BufferedGovernanceLogger",
     "get_buffered_governance_logger",
     "shutdown_buffered_governance_logger",
     "log_routing_result",
+    "GOVERNANCE_AVAILABLE",
     # Experiments
     "ExperimentTrigger",
     "ExperimentProposal",
@@ -516,42 +292,19 @@ __all__ = [
     "should_run_experiment",
     "get_experiment_trigger",
     "generate_experiments_from_interactions",
-    # Embedding Cache (Performance Fix)
-    "get_embedding_cached",
-    "get_embeddings_batch_cached",
-    "is_simple_query",
-    "get_embedding_cache_stats",
-    "clear_embedding_cache",
-    "clear_and_rebuild_embedding_cache",  # FIX: Cache corruption recovery
-    "EMBEDDING_CACHE_AVAILABLE",
-    # Query Classifier
-    "QueryClassifier",
-    "QueryCategory",
-    "QueryClassification",
-    "get_query_classifier",
-    "classify_query",
-    "_LLMClientWrapper",
-    "QUERY_CLASSIFIER_AVAILABLE",
-    # LLM Query Router
-    "LLMQueryRouter",
-    "RoutingDecision",
-    "RoutingCache",
-    "RoutingDestination",
-    "ReasoningEngine",
-    "get_llm_router",
-    "LLM_ROUTER_SYSTEM_PROMPT",
-    "LLM_ROUTER_USER_PROMPT",
-    "LLM_ROUTER_EXAMPLES",
-    "build_router_prompt",
-    "build_messages",
-    "LLM_ROUTER_AVAILABLE",
+    "EXPERIMENT_AVAILABLE",
+    # Health Monitor
+    "SystemHealthMonitor",
+    "HealthStatus",
+    "get_system_health",
+    "check_system_health",
+    "HEALTH_MONITOR_AVAILABLE",
     # Module functions
     "initialize_routing_components",
     "get_routing_status",
-    # Availability flags
+    # Removed component flags (for backward compatibility)
     "QUERY_ROUTER_AVAILABLE",
     "COLLABORATION_AVAILABLE",
-    "TELEMETRY_AVAILABLE",
-    "GOVERNANCE_AVAILABLE",
-    "EXPERIMENT_AVAILABLE",
+    "EMBEDDING_CACHE_AVAILABLE",
+    "LLM_ROUTER_AVAILABLE",
 ]
