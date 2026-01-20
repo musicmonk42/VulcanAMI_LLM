@@ -118,7 +118,7 @@ __all__ = [
     "SEMANTIC_MATCHER_AVAILABLE",
     "CIRCUIT_BREAKER_AVAILABLE",
     "MATH_VERIFICATION_AVAILABLE",
-    "QUERY_CLASSIFIER_AVAILABLE",
+    "LLM_ROUTER_AVAILABLE",
 ]
 
 # Add optional components to __all__ if they were imported successfully
@@ -136,5 +136,5 @@ if CIRCUIT_BREAKER_AVAILABLE:
         "reset_embedding_circuit_breaker",
     ])
 
-if QUERY_CLASSIFIER_AVAILABLE:
-    __all__.extend(["classify_query", "QueryClassification", "QueryClassifier"])
+if LLM_ROUTER_AVAILABLE:
+    __all__.extend(["get_llm_router", "route_query", "RoutingDecision"])
