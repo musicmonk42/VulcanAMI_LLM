@@ -14,6 +14,10 @@ collides with the existing routing system, and archives the relevant code sectio
 | `QueryCategory` enum | `src/vulcan/llm/query_classifier.py` | 42-60 | Category definitions | **Destination mapping** |
 | `route_query()` integration | `src/vulcan/routing/query_router.py` | 4134-4200 | Uses QueryClassifier | **Integration point** |
 | Keyword patterns | `src/vulcan/llm/query_classifier.py` | 133-1200 | 50+ pattern definitions | **Replaced by LLM** |
+| **`ToolSelector`** | `src/vulcan/reasoning/selection/tool_selector.py` | ~6959 | Tool selection orchestrator | **Downstream consumer** |
+| **`_get_llm_classification()`** | `src/vulcan/reasoning/selection/tool_selector.py` | 5723-5782 | Calls `classify_query()` | **Integration point** |
+| **`_generate_candidates()`** | `src/vulcan/reasoning/selection/tool_selector.py` | 5784-5876 | Uses LLM classification | **Fallback chain** |
+| **`SemanticToolMatcher`** | `src/vulcan/reasoning/selection/semantic_tool_matcher.py` | N/A | Embedding-based matching | **Alternative path** |
 
 ---
 
@@ -237,7 +241,114 @@ def route_query(self, query: str, ...) -> ProcessingPlan:
 
 ---
 
-## 6. Configuration Collision
+## 6. Reasoning/Selection System Collision
+
+### Overview
+The `ToolSelector` in `src/vulcan/reasoning/selection/tool_selector.py` (~6959 lines) is a **downstream consumer** of `QueryClassifier`. It uses LLM-based classification to select which reasoning engine to invoke.
+
+### Location
+`src/vulcan/reasoning/selection/tool_selector.py`
+
+### Current Integration with QueryClassifier
+```python
+# Lines 147-155: Import QueryClassifier
+try:
+    from vulcan.llm.query_classifier import classify_query, QueryClassification
+    QUERY_CLASSIFIER_AVAILABLE = True
+    logger.info("QueryClassifier imported for LLM-based tool selection")
+except ImportError as e:
+    logger.warning(f"QueryClassifier not available: {e}")
+    QUERY_CLASSIFIER_AVAILABLE = False
+    classify_query = None
+
+# Lines 5723-5782: _get_llm_classification() method
+def _get_llm_classification(self, query_text: str, safe_tools: List[str]) -> Optional[List[str]]:
+    """Get tool candidates from LLM-based QueryClassifier."""
+    if not LLM_CLASSIFICATION_ENABLED or not QUERY_CLASSIFIER_AVAILABLE:
+        return None
+    
+    classification = classify_query(query_text)  # <-- Calls QueryClassifier
+    
+    if classification.confidence < LLM_CLASSIFICATION_CONFIDENCE_THRESHOLD:
+        return None  # Falls back to SemanticToolMatcher
+    
+    # Filter to safe tools and return candidates
+    candidates = [tool for tool in classification.suggested_tools if tool in safe_tools]
+    return candidates
+
+# Lines 5784-5876: _generate_candidates() method
+def _generate_candidates(self, request, features, safe_tools, prior_dist):
+    """Generate tool candidates - LLM first, then fallback."""
+    
+    # PHASE 1: Try LLM classification first (PRIMARY PATH)
+    llm_candidates = self._get_llm_classification(query_text, safe_tools)
+    
+    if llm_candidates:
+        # Use LLM-suggested tools as primary candidates
+        for tool_name in llm_candidates:
+            candidates.append({"tool_name": tool_name, "source": "llm_classification"})
+    
+    # PHASE 2: Fallback to SemanticToolMatcher + BayesianMemoryPrior
+    # ... semantic matching logic ...
+```
+
+### Collision Analysis
+| Aspect | Current State | Impact of LLMQueryRouter |
+|--------|--------------|--------------------------|
+| Import | `from vulcan.llm.query_classifier import classify_query` | Must update to `from vulcan.routing.llm_router import get_llm_router` |
+| API | `classification = classify_query(query)` | `decision = get_llm_router().route(query)` |
+| Return Type | `QueryClassification.suggested_tools` | `RoutingDecision.engine` (single engine, not list) |
+| Confidence | `classification.confidence` | `decision.confidence` |
+| Category | `classification.category` (17 categories) | `decision.destination` (4 destinations) |
+
+### Migration Options
+
+#### Option A: Update ToolSelector to use LLMQueryRouter
+```python
+# Replace lines 5738-5782 with:
+def _get_llm_classification(self, query_text: str, safe_tools: List[str]) -> Optional[List[str]]:
+    """Get tool candidates from LLMQueryRouter."""
+    if not settings.use_llm_router:
+        return None
+    
+    from vulcan.routing.llm_router import get_llm_router
+    router = get_llm_router()
+    decision = router.route(query_text)
+    
+    if decision.confidence < LLM_CLASSIFICATION_CONFIDENCE_THRESHOLD:
+        return None
+    
+    # Map engine to tool name
+    if decision.engine and decision.engine in safe_tools:
+        return [decision.engine]
+    
+    return None
+```
+
+#### Option B: Keep Both Systems (Recommended for Transition)
+- `QueryClassifier` continues working in `ToolSelector`
+- `LLMQueryRouter` works at higher level in `query_router.py`
+- Both use same underlying LLM but at different levels:
+  - `LLMQueryRouter`: Decides **destination** (world_model vs reasoning_engine vs skip)
+  - `ToolSelector`: Decides **which tool** within reasoning_engine
+
+### Related Components in Selection Package
+| File | Lines | Purpose | Collision Risk |
+|------|-------|---------|----------------|
+| `semantic_tool_matcher.py` | N/A | Embedding-based tool matching | Low - alternative path |
+| `selection_cache.py` | N/A | Caches selection decisions | Low - reusable |
+| `memory_prior.py` | N/A | Bayesian priors for tools | Low - complementary |
+| `safety_governor.py` | N/A | Safety checks for tools | None - independent |
+
+### Recommended Migration Path
+1. **Phase 1 (Current)**: `LLMQueryRouter` operates at routing level only
+2. **Phase 2**: Update `ToolSelector._get_llm_classification()` to optionally use `LLMQueryRouter`
+3. **Phase 3**: Deprecate direct `classify_query()` usage in `ToolSelector`
+4. **Phase 4**: Simplify `ToolSelector` to receive engine decision from upstream
+
+---
+
+## 7. Configuration Collision
 
 ### Existing Settings
 `src/vulcan/settings.py`:
@@ -267,7 +378,7 @@ llm_router_include_examples: bool = Field(default=False, env="LLM_ROUTER_INCLUDE
 
 ---
 
-## 7. Migration Checklist
+## 8. Migration Checklist
 
 ### Phase 1: Parallel Operation (Current)
 - [x] `LLMQueryRouter` created in `src/vulcan/routing/llm_router.py`
@@ -294,7 +405,7 @@ llm_router_include_examples: bool = Field(default=False, env="LLM_ROUTER_INCLUDE
 
 ---
 
-## 8. Files to Archive (Not Delete)
+## 9. Files to Archive (Not Delete)
 
 When transitioning to `LLMQueryRouter`, these components should be archived:
 
@@ -306,7 +417,7 @@ When transitioning to `LLMQueryRouter`, these components should be archived:
 
 ---
 
-## 9. Summary
+## 10. Summary
 
 The new `LLMQueryRouter` is designed as a **drop-in replacement** for the keyword-based 
 `QueryClassifier`. The collision points are:
@@ -316,5 +427,36 @@ The new `LLMQueryRouter` is designed as a **drop-in replacement** for the keywor
 3. **Return Type**: `QueryClassification` → `RoutingDecision`
 4. **Category System**: `QueryCategory` (17 categories) → `RoutingDestination` (4 destinations + engine)
 5. **Configuration**: `LLM_FIRST_CLASSIFICATION` → `USE_LLM_ROUTER`
+6. **Reasoning/Selection**: `ToolSelector._get_llm_classification()` depends on `classify_query()`
 
 The feature flag `USE_LLM_ROUTER` allows both systems to coexist during the transition period.
+
+### Architecture Levels
+```
+┌──────────────────────────────────────────────────────────────┐
+│  Level 1: ROUTING (LLMQueryRouter - NEW)                     │
+│  Decides: world_model vs reasoning_engine vs skip            │
+│  Location: src/vulcan/routing/llm_router.py                  │
+└──────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌──────────────────────────────────────────────────────────────┐
+│  Level 2: TOOL SELECTION (ToolSelector - EXISTING)           │
+│  Decides: which specific tool within reasoning_engine        │
+│  Location: src/vulcan/reasoning/selection/tool_selector.py   │
+│  Currently uses: classify_query() for LLM-based selection    │
+└──────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌──────────────────────────────────────────────────────────────┐
+│  Level 3: EXECUTION (Reasoning Engines)                      │
+│  Engines: symbolic, probabilistic, causal, mathematical, etc │
+│  Location: src/vulcan/reasoning/                             │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### Recommended Transition Strategy
+1. `LLMQueryRouter` handles Level 1 routing decisions
+2. `ToolSelector` can receive engine hint from `LLMQueryRouter` 
+3. Gradually reduce `ToolSelector`'s dependency on `classify_query()`
+4. Eventually, `ToolSelector` only handles tool-specific selection within the chosen engine
