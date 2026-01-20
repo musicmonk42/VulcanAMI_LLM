@@ -273,28 +273,45 @@ except ImportError as e:
     clear_embedding_cache = None
     clear_and_rebuild_embedding_cache = None
 
-# Query Classifier
-# MOVED to vulcan.llm.query_classifier for better module organization
+# LLM Query Router - Primary routing system
 try:
-    from vulcan.llm.query_classifier import (
-        QueryClassifier,
-        QueryCategory,
-        QueryClassification,
-        get_query_classifier,
-        classify_query,
-        _LLMClientWrapper,
+    from .llm_router import (
+        LLMQueryRouter,
+        RoutingDecision,
+        RoutingCache,
+        RoutingDestination,
+        ReasoningEngine,
+        get_llm_router,
+        route_query,
+        strip_query_headers,
+        HEADER_STRIP_PATTERNS,
+    )
+    from .routing_prompts import (
+        LLM_ROUTER_SYSTEM_PROMPT,
+        LLM_ROUTER_USER_PROMPT,
+        LLM_ROUTER_EXAMPLES,
+        build_router_prompt,
+        build_messages,
     )
     
-    QUERY_CLASSIFIER_AVAILABLE = True
+    LLM_ROUTER_AVAILABLE = True
 except ImportError as e:
-    logger.warning(f"Query classifier module not available: {e}")
-    QUERY_CLASSIFIER_AVAILABLE = False
-    QueryClassifier = None
-    QueryCategory = None
-    QueryClassification = None
-    get_query_classifier = None
-    classify_query = None
-    _LLMClientWrapper = None
+    logger.warning(f"LLM router module not available: {e}")
+    LLM_ROUTER_AVAILABLE = False
+    LLMQueryRouter = None
+    RoutingDecision = None
+    RoutingCache = None
+    RoutingDestination = None
+    ReasoningEngine = None
+    get_llm_router = None
+    route_query = None
+    strip_query_headers = None
+    HEADER_STRIP_PATTERNS = None
+    LLM_ROUTER_SYSTEM_PROMPT = None
+    LLM_ROUTER_USER_PROMPT = None
+    LLM_ROUTER_EXAMPLES = None
+    build_router_prompt = None
+    build_messages = None
 
 
 # ============================================================
@@ -515,6 +532,19 @@ __all__ = [
     "classify_query",
     "_LLMClientWrapper",
     "QUERY_CLASSIFIER_AVAILABLE",
+    # LLM Query Router
+    "LLMQueryRouter",
+    "RoutingDecision",
+    "RoutingCache",
+    "RoutingDestination",
+    "ReasoningEngine",
+    "get_llm_router",
+    "LLM_ROUTER_SYSTEM_PROMPT",
+    "LLM_ROUTER_USER_PROMPT",
+    "LLM_ROUTER_EXAMPLES",
+    "build_router_prompt",
+    "build_messages",
+    "LLM_ROUTER_AVAILABLE",
     # Module functions
     "initialize_routing_components",
     "get_routing_status",

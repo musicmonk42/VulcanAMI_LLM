@@ -827,24 +827,24 @@ class StartupManager:
             except Exception as e:
                 logger.debug(f"Could not enumerate reasoning engines: {e}")
             
-            # Register query classifier
+            # Register LLM Query Router
             try:
-                from vulcan.routing import get_query_classifier, QUERY_CLASSIFIER_AVAILABLE
-                if QUERY_CLASSIFIER_AVAILABLE:
-                    classifier = get_query_classifier()
+                from vulcan.routing import get_llm_router, LLM_ROUTER_AVAILABLE
+                if LLM_ROUTER_AVAILABLE:
+                    router = get_llm_router()
                     self.trace.log_classifier_init(
-                        "query_classifier",
+                        "llm_query_router",
                         status="registered",
-                        details={"type": "QueryClassifier", "singleton": True}
+                        details={"type": "LLMQueryRouter", "singleton": True}
                     )
                 else:
                     self.trace.log_classifier_init(
-                        "query_classifier",
+                        "llm_query_router",
                         status="failed",
-                        error="Query classifier not available"
+                        error="LLM Query Router not available"
                     )
             except Exception as e:
-                logger.debug(f"Query classifier init logging failed: {e}")
+                logger.debug(f"LLM Query Router init logging failed: {e}")
             
             # Register query analyzer/router
             try:

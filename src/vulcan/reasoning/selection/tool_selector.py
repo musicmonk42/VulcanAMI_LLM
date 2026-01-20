@@ -144,16 +144,16 @@ except ImportError:
         logger.debug("Outcome bridge not available - implicit feedback disabled")
 
 
-# Import QueryClassifier for LLM-based tool classification
+# Import LLM Router for tool classification
 try:
-    from vulcan.llm.query_classifier import classify_query, QueryClassification
-    QUERY_CLASSIFIER_AVAILABLE = True
-    logger.info("QueryClassifier imported for LLM-based tool selection")
+    from vulcan.routing.llm_router import get_llm_router, RoutingDecision
+    LLM_ROUTER_AVAILABLE = True
+    logger.info("LLMQueryRouter imported for LLM-based tool selection")
 except ImportError as e:
-    logger.warning(f"QueryClassifier not available: {e}")
-    QUERY_CLASSIFIER_AVAILABLE = False
-    classify_query = None
-    QueryClassification = None
+    logger.warning(f"LLMQueryRouter not available: {e}")
+    LLM_ROUTER_AVAILABLE = False
+    get_llm_router = None
+    RoutingDecision = None
 
 
 # Import mathematical verification for accuracy feedback
@@ -5726,7 +5726,7 @@ class ToolSelector:
         safe_tools: List[str]
     ) -> Optional[List[str]]:
         """
-        Get tool candidates from LLM-based QueryClassifier.
+        Get tool candidates from LLM Router.
         
         Args:
             query_text: The query to classify
@@ -5735,31 +5735,30 @@ class ToolSelector:
         Returns:
             List of candidate tool names, or None if classification failed/low confidence
         """
-        if not LLM_CLASSIFICATION_ENABLED or not QUERY_CLASSIFIER_AVAILABLE:
+        if not LLM_CLASSIFICATION_ENABLED or not LLM_ROUTER_AVAILABLE:
             return None
         
         try:
-            classification = classify_query(query_text)
+            router = get_llm_router()
+            decision = router.route(query_text)
             
             logger.debug(
-                f"[ToolSelector] LLM classification: category={classification.category}, "
-                f"confidence={classification.confidence:.2f}, "
-                f"suggested_tools={classification.suggested_tools}"
+                f"[ToolSelector] LLM Router: destination={decision.destination}, "
+                f"engine={decision.engine}, confidence={decision.confidence:.2f}"
             )
             
             # Check confidence threshold
-            if classification.confidence < LLM_CLASSIFICATION_CONFIDENCE_THRESHOLD:
+            if decision.confidence < LLM_CLASSIFICATION_CONFIDENCE_THRESHOLD:
                 logger.debug(
-                    f"[ToolSelector] LLM confidence {classification.confidence:.2f} "
+                    f"[ToolSelector] LLM confidence {decision.confidence:.2f} "
                     f"below threshold {LLM_CLASSIFICATION_CONFIDENCE_THRESHOLD}, using fallback"
                 )
                 return None
             
-            # Filter to safe tools only
-            candidates = [
-                tool for tool in classification.suggested_tools 
-                if tool in safe_tools
-            ]
+            # Map engine to tool candidate
+            candidates = []
+            if decision.engine and decision.engine in safe_tools:
+                candidates.append(decision.engine)
             
             if not candidates:
                 logger.debug(
@@ -5771,14 +5770,14 @@ class ToolSelector:
             candidates = candidates[:CANDIDATE_MAX_COUNT]
             
             logger.info(
-                f"[ToolSelector] Using LLM classification: {candidates} "
-                f"(category={classification.category}, confidence={classification.confidence:.2f})"
+                f"[ToolSelector] Using LLM Router: {candidates} "
+                f"(destination={decision.destination}, confidence={decision.confidence:.2f})"
             )
             
             return candidates
             
         except Exception as e:
-            logger.warning(f"[ToolSelector] LLM classification failed: {e}, using fallback")
+            logger.warning(f"[ToolSelector] LLM Router failed: {e}, using fallback")
             return None
     
     def _generate_candidates(
