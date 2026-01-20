@@ -221,6 +221,14 @@ def get_extras_require() -> dict:
             "psutil>=5.9.0",
             "httpx>=0.24.0",
         ],
+        "perf-lite": [
+            # Minimal dependencies for performance testing
+            "pytest>=7.0.0",
+            "pytest-timeout>=2.2.0",
+            "pytest-benchmark>=4.0.0",
+            "psutil>=5.9.0",
+            "numpy>=1.24.0",
+        ],
         "docs": [
             "sphinx>=6.0.0",
             "sphinx-rtd-theme>=1.2.0",

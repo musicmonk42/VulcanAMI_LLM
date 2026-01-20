@@ -447,7 +447,10 @@ def main() -> int:
         if args.verify_only:
             # In verify-only mode, aggressively clean up and exit immediately
             # Don't wait for threads - just exit after logging shutdown
-            time.sleep(0.5)  # Brief pause for logging to flush
+            # Increased sleep from 0.5s to 1s to ensure logs are properly flushed
+            logger.info("Flushing logs before forced exit...")
+            time.sleep(1.0)  # Increased pause for logging to flush
+            logger.info("Executing forced exit via os._exit()")
             os._exit(exit_code)
         
         return exit_code

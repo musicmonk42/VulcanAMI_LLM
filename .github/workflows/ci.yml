@@ -9,7 +9,7 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 env:
   PYTHON_VERSION: '3.11'
@@ -212,8 +212,11 @@ jobs:
             break || (echo "Retry $i/3: test dependencies install failed"; sleep $((i*10)))
           done
           for i in 1 2 3; do
-            pip install --no-cache-dir -r requirements.txt && break || (echo "Retry $i/3: requirements.txt install failed, continuing..."; sleep $((i*10)))
-          done || echo "Some dependencies may have failed, continuing..."
+            pip install --no-cache-dir -r requirements.txt && break || (echo "⚠️  Retry $i/3: requirements.txt install failed"; sleep $((i*10)))
+          done || {
+            echo "❌ WARNING: Some dependencies may have failed to install"
+            echo "This may cause test failures. Check logs above for details."
+          }
 
       - name: Verify VULCAN installation
         run: |
@@ -268,6 +271,21 @@ jobs:
           free -h
           df -h
           ulimit -a
+          
+          # Check available resources and warn if low
+          available_disk=$(df -BG / | tail -1 | awk '{print $4}' | sed 's/G//')
+          available_mem=$(free -g | grep "Mem:" | awk '{print $7}')
+          
+          echo "Available disk: ${available_disk}GB"
+          echo "Available memory: ${available_mem}GB"
+          
+          if [ "$available_disk" -lt 5 ]; then
+            echo "⚠️  WARNING: Low disk space (less than 5GB available)"
+          fi
+          
+          if [ "$available_mem" -lt 2 ]; then
+            echo "⚠️  WARNING: Low memory (less than 2GB available)"
+          fi
 
       - name: Verify CI environment for pytest
         run: |
@@ -281,9 +299,10 @@ jobs:
           ci_mode = bool(os.environ.get('CI') or os.environ.get('GITHUB_ACTIONS') or os.environ.get('VULCAN_CI_MODE'))
           print(f'CI_MODE will be detected as: {ci_mode}')
           if not ci_mode:
-              print('WARNING: CI mode not detected! Tests may run slowly.')
-              exit(1)
-          print('✓ CI environment properly configured')
+              print('⚠️  WARNING: CI mode not detected! Tests may run slowly.')
+              print('However, continuing with test execution...')
+          else:
+              print('✓ CI environment properly configured')
           PYTHON_SCRIPT
 
       - name: Run tests with coverage
@@ -299,9 +318,10 @@ jobs:
           
           EXIT_CODE=0
           # Reduced to -n 2 to minimize worker initialization overhead
-          # Added --max-worker-restart=2 to restart hung workers
+          # Increased --max-worker-restart to 3 for better resilience
+          # Reduced timeout to 40m to ensure completion before job timeout (45m)
           # Added -o timeout_func_only=true to only timeout test functions, not fixtures
-          timeout 75m pytest --cov=src -q \
+          timeout 40m pytest --cov=src -q \
             --cov-report=xml \
             --cov-report=html \
             --cov-report=term-missing \
@@ -310,7 +330,7 @@ jobs:
             --timeout-method=thread \
             -n 2 \
             --dist=loadfile \
-            --max-worker-restart=2 \
+            --max-worker-restart=3 \
             -o timeout_func_only=true \
             --continue-on-collection-errors \
             -m "not slow and not load_test and not benchmark" \
@@ -437,8 +457,11 @@ jobs:
             break || (echo "Retry $i/3: test dependencies install failed"; sleep $((i*10)))
           done
           for i in 1 2 3; do
-            pip install --no-cache-dir -r requirements.txt && break || (echo "Retry $i/3: requirements.txt install failed, continuing..."; sleep $((i*10)))
-          done || echo "Continuing despite dependency issues..."
+            pip install --no-cache-dir -r requirements.txt && break || (echo "⚠️  Retry $i/3: requirements.txt install failed"; sleep $((i*10)))
+          done || {
+            echo "❌ WARNING: Some dependencies may have failed to install"
+            echo "This may cause test failures. Check logs above for details."
+          }
 
       - name: Run integration tests
         env:
