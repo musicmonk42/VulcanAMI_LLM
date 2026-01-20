@@ -179,16 +179,24 @@ except Exception as e:
     SYMBOLIC_AVAILABLE = False
 
 # ============================================================================
-# Analogical Reasoning - REMOVED: Redundant with LLM capabilities
+# Analogical Reasoning - Core component (refactored into subpackage)
 # ============================================================================
-# Analogical reasoning has been removed as LLMs handle analogy natively.
-# The analogical/ subpackage was deleted as part of architecture simplification.
-ANALOGICAL_AVAILABLE = False
-AnalogicalReasoningEngine = None
-AnalogicalReasoner = None
-Entity = None
-Relation = None
-logger.info("Analogical reasoning: Removed (LLM handles analogy natively)")
+try:
+    from .analogical import (
+        AnalogicalReasoner,
+        AnalogicalReasoningEngine,
+        Entity,
+        Relation,
+    )
+
+    ANALOGICAL_AVAILABLE = True
+except ImportError as e:
+    logger.error(f"Analogical reasoning import failed: {e}")
+    AnalogicalReasoningEngine = None
+    AnalogicalReasoner = None
+    Entity = None
+    Relation = None
+    ANALOGICAL_AVAILABLE = False
 
 # ============================================================================
 # Multimodal Reasoning - Core component
