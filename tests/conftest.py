@@ -29,11 +29,12 @@ from dotenv import load_dotenv  # <<< --- ADDED DOTENV --- >>>
 # - VULCAN_CI_MODE=1 (explicit VULCAN CI mode)
 # - VULCAN_FAST_FIXTURES=1 (use minimal fixtures)
 #
-# Use flexible checks to handle variations like 'True', '1', 'yes', etc.
-# Only treat specific truthy values as True, everything else as False
-CI_MODE = (
-    os.environ.get("CI", "").lower() in ("true", "1", "yes") or
-    os.environ.get("VULCAN_CI_MODE", "").lower() in ("1", "true", "yes")
+# More robust CI detection that handles edge cases in subprocesses and pytest-xdist workers
+# Check for any CI environment indicator being set (truthy check, not value check)
+CI_MODE = bool(
+    os.environ.get("CI") or 
+    os.environ.get("GITHUB_ACTIONS") or 
+    os.environ.get("VULCAN_CI_MODE")
 )
 FAST_FIXTURES = os.environ.get("VULCAN_FAST_FIXTURES", "").lower() in ("1", "true", "yes")
 
