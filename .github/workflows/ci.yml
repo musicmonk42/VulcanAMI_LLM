@@ -269,6 +269,23 @@ jobs:
           df -h
           ulimit -a
 
+      - name: Verify CI environment for pytest
+        run: |
+          echo "=== CI Environment Verification ==="
+          echo "CI=$CI"
+          echo "GITHUB_ACTIONS=$GITHUB_ACTIONS"
+          echo "VULCAN_CI_MODE=$VULCAN_CI_MODE"
+          echo "PYTHONUNBUFFERED will be set to: 1"
+          python3 << 'PYTHON_SCRIPT'
+          import os
+          ci_mode = bool(os.environ.get('CI') or os.environ.get('GITHUB_ACTIONS') or os.environ.get('VULCAN_CI_MODE'))
+          print(f'CI_MODE will be detected as: {ci_mode}')
+          if not ci_mode:
+              print('WARNING: CI mode not detected! Tests may run slowly.')
+              exit(1)
+          print('✓ CI environment properly configured')
+          PYTHON_SCRIPT
+
       - name: Run tests with coverage
         run: |
           set -x
@@ -276,11 +293,14 @@ jobs:
           mkdir -p $GITHUB_WORKSPACE/logs
           ulimit -Sn 10240 || true
           
-          # Run pytest without tee to prevent buffering/hanging issues
-          # Capture output directly to file
-          # Increased timeout from 40m to 75m to accommodate legitimate test duration
-          # Tests include resource-intensive operations (ZK-SNARK, neural networks, hardware emulation)
+          # CRITICAL: Set Python to unbuffered mode to prevent GitHub Actions from
+          # thinking the process is stalled due to buffered output
+          export PYTHONUNBUFFERED=1
+          
           EXIT_CODE=0
+          # Removed file redirect - let output go directly to GitHub Actions console
+          # Added --dist=loadfile to reduce worker overhead by grouping tests from same file
+          # Using -n 4 instead of -n auto to reduce worker initialization overhead
           timeout 75m pytest --cov=src -q \
             --cov-report=xml \
             --cov-report=html \
@@ -288,20 +308,22 @@ jobs:
             --junitxml=results/junit.xml \
             --timeout=300 \
             --timeout-method=thread \
-            -n auto \
+            -n 4 \
+            --dist=loadfile \
             --continue-on-collection-errors \
             -m "not slow and not load_test and not benchmark" \
-            -v > $GITHUB_WORKSPACE/logs/pytest-output.log 2>&1 || EXIT_CODE=$?
-          
-          # Display the captured output
-          cat $GITHUB_WORKSPACE/logs/pytest-output.log
+            -v \
+            2>&1 || EXIT_CODE=$?
           
           # Force cleanup of any background processes
-          # Kill any pytest worker processes that may be hanging
-          pkill -9 -f "pytest" || true
-          pkill -9 -f "python.*test" || true
+          # Use PID-based killing to find and terminate pytest processes
+          for pid in $(pgrep -f "pytest"); do
+            kill -9 "$pid" 2>/dev/null || true
+          done
+          for pid in $(pgrep -f "python.*test"); do
+            kill -9 "$pid" 2>/dev/null || true
+          done
           
-          # Exit with the captured code
           exit $EXIT_CODE
 
       - name: Upload coverage to Codecov
