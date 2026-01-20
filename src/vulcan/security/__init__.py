@@ -2,6 +2,7 @@
 VULCAN Security Module
 
 Provides security components for the VULCAN system including:
+- Pre-LLM security filtering (prompt injection, jailbreak detection)
 - Zero-knowledge proof integration
 - Security auditing
 - Access control
@@ -10,6 +11,18 @@ Provides security components for the VULCAN system including:
 import logging
 
 logger = logging.getLogger(__name__)
+
+# Import security filter
+try:
+    from .filter import SecurityFilter, SecurityResult, RiskLevel, ThreatCategory
+    SECURITY_FILTER_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"Security filter not available: {e}")
+    SECURITY_FILTER_AVAILABLE = False
+    SecurityFilter = None
+    SecurityResult = None
+    RiskLevel = None
+    ThreatCategory = None
 
 # Try to import ZK integration
 try:
@@ -21,6 +34,13 @@ except ImportError as e:
     create_verifier = None
 
 __all__ = [
+    # Security filter
+    "SecurityFilter",
+    "SecurityResult",
+    "RiskLevel",
+    "ThreatCategory",
+    "SECURITY_FILTER_AVAILABLE",
+    # ZK integration
     "ZKVerifier",
     "ZK_AVAILABLE",
     "create_verifier",
