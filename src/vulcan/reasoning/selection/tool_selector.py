@@ -5288,6 +5288,10 @@ class ToolSelector:
             # Step 3: Feature extraction
             features = self._extract_features(request)
             request.features = features
+            
+            # DIAGNOSTIC LOGGING: Log extracted features
+            logger.info(f"[ToolSelector] Query features: {features[:5] if isinstance(features, (list, np.ndarray)) and len(features) > 5 else features}")
+            logger.info(f"[ToolSelector] Available tools: {self.tool_names}")
 
             # Step 4: Safety pre-check
             safety_context = self._create_safety_context(request)
@@ -6208,6 +6212,16 @@ class ToolSelector:
                     )
 
             execution_time = (time.time() - start_time) * 1000
+            
+            # DIAGNOSTIC LOGGING: Log final tool selection
+            logger.info(
+                f"[ToolSelector] Selected tools: {execution_result.tools_used if execution_result else [primary_tool]}, "
+                f"confidence={confidence:.2f}"
+            )
+            logger.info(
+                f"[ToolSelector] Selection reason: primary_tool={primary_tool}, "
+                f"execution_time={execution_time:.2f}ms, calibrated_confidence={calibrated_confidence:.2f}"
+            )
 
             return SelectionResult(
                 selected_tool=primary_tool,
