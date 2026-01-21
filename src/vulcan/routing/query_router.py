@@ -1895,6 +1895,93 @@ class QueryAnalyzer:
         
         return reasoning_type
 
+    def _is_followup_query(self, query: str, session_id: Optional[str] = None) -> Tuple[bool, Optional[str]]:
+        """
+        Detect if query is a follow-up/continuation of previous query in the session.
+        
+        Follow-up indicators: "what is your answer?", "what do you think?", "elaborate on that"
+        
+        Args:
+            query: The current query string
+            session_id: Optional session identifier for context lookup
+            
+        Returns:
+            Tuple of (is_followup, previous_category)
+        """
+        if not query or not isinstance(query, str):
+            return False, None
+            
+        query_lower = query.lower().strip()
+        
+        # Check for explicit continuation phrases
+        followup_phrases = [
+            "what is your answer", "what do you think", "can you explain more",
+            "elaborate on that", "tell me more", "and about that", "what about",
+            "how about", "what if", "continue", "go on"
+        ]
+        
+        is_continuation_phrase = any(phrase in query_lower for phrase in followup_phrases)
+        
+        # Get previous category from session history if available
+        previous_category = None
+        if session_id and hasattr(self, '_session_history') and self._session_history:
+            try:
+                session_data = self._session_history.get(session_id)
+                if session_data:
+                    previous_category = session_data.get('last_category')
+            except Exception as e:
+                logger.warning(f"[QueryRouter] Error accessing session history: {e}")
+        
+        # Short query (<=5 words) with previous context might be a follow-up
+        is_followup = is_continuation_phrase
+        if not is_followup and previous_category and len(query_lower.split()) <= 5:
+            is_followup = True
+        
+        return is_followup, previous_category
+
+    def _is_worldmodel_direct_query(self, query: str) -> Tuple[bool, str]:
+        """
+        Check if query should bypass ToolSelector and go directly to WorldModel.
+        
+        WorldModel handles Vulcan's "self" - identity, ethics, introspection, values.
+        
+        Categories: self_referential, introspection, ethical, values
+        
+        Returns:
+            Tuple of (is_direct, category) where category is one of the above or '' if not direct.
+        """
+        query_lower = query.lower()
+        
+        # Exclusion: Reasoning domain queries should NOT bypass ToolSelector
+        reasoning_domain_indicators = [
+            'satisfiable', 'unsatisfiable', 'sat', 'unsat',
+            '→', '∧', '∨', '¬', '∀', '∃', '->', '<->',
+            'P(', 'probability', 'bayes', 'bayesian',
+            'confound', 'causal effect', 'intervention',
+        ]
+        
+        if any(ind in query or ind.lower() in query_lower for ind in reasoning_domain_indicators):
+            return (False, '')
+        
+        # Check patterns: Self-referential → Introspection → Ethical → Values
+        for pattern in SELF_REFERENTIAL_PATTERNS:
+            if pattern.search(query_lower):
+                return (True, 'self_referential')
+        
+        for pattern in INTROSPECTION_PATTERNS:
+            if pattern.search(query_lower):
+                return (True, 'introspection')
+        
+        for pattern in ETHICAL_PATTERNS:
+            if pattern.search(query_lower):
+                return (True, 'ethical')
+        
+        for pattern in VALUES_PATTERNS:
+            if pattern.search(query_lower):
+                return (True, 'values')
+        
+        return (False, '')
+
     def _is_self_introspection_query(self, query: str) -> bool:
         """
         FIX: Detect self-introspection queries that should bypass safety governor.
