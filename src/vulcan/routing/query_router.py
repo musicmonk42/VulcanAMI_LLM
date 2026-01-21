@@ -4543,13 +4543,42 @@ class QueryAnalyzer:
                 )
                 return plan
                 
-        except ImportError:
-            logger.debug("[QueryRouter] LLMQueryRouter not available, using heuristic fallback")
+        except ImportError as e:
+            logger.error(
+                f"[QueryRouter] CRITICAL: LLM router unavailable: {e}. "
+                "LLM router is required for semantic query classification."
+            )
+            raise RuntimeError(
+                "LLM router is required for query routing. "
+                "Ensure vulcan.routing.llm_router is properly installed."
+            ) from e
+            
         except Exception as e:
-            logger.warning(f"[QueryRouter] LLMQueryRouter failed: {e}, using heuristic fallback")
-
-        # Note: Fast-path for trivial queries to avoid latency
-        if query and self._is_trivial_query(query):
+            logger.error(f"[QueryRouter] LLM routing failed: {e}")
+            # Re-raise - don't silently degrade to regex fallback
+            # LLM router is the single source of truth for classification
+            raise RuntimeError(
+                f"LLM routing failed: {e}. "
+                "Cannot fall back to regex classification (removed for reliability)."
+            ) from e
+        
+        # =================================================================
+        # CONTINUE WITH LLM CLASSIFICATION RESULT
+        # =================================================================
+        # At this point, we have a valid classification from the LLM router.
+        # All fallback heuristic fast-paths have been removed.
+        # The LLM router is the single source of truth for classification.
+        # =================================================================
+        
+        # Continue to main processing path with LLM classification
+        # (Main processing starts around line 5700 in original)
+        logger.info(
+            f"[QueryRouter] {query_id}: Using LLM classification: "
+            f"category={classification.category}, "
+            f"skip_reasoning={classification.skip_reasoning}"
+        )
+        
+        # Determine learning mode based on source
             logger.debug(f"[QueryRouter] {query_id}: Fast-path for trivial query")
 
             # Determine learning mode
