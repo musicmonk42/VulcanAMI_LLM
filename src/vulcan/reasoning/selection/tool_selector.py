@@ -4180,29 +4180,10 @@ class ToolSelector:
     Main tool selector orchestrating all components
     """
     
-    # Class-level compiled regex patterns for keyword matching (cached for performance)
-    # These are compiled once when the class is loaded, not on every method call
-    _MATH_PATTERN = re.compile(
-        r'p\(a\|b\)|p\(a\∣b\)|p\(a and b\)|bayesian|bayes theorem|bayes rule|'
-        r'calculate probability|compute probability|prior probability|'
-        r'posterior probability|likelihood ratio|conditional probability|'
-        r'sensitivity|specificity|prevalence|'
-        r'p\([^)]*\|[^)]*\)|p\([^)]*\∣[^)]*\)',  # Match P(X|Y) or P(X∣Y) with Unicode
-        re.IGNORECASE
-    )
-    _SAT_PATTERN = re.compile(
-        r'satisfiable|sat solver|cnf formula|first-order logic|'
-        r'predicate logic|forall|exists|∀|∃|'
-        r'proposition|constraint.*satisf|'
-        r'logical.*satisf|cnf|dnf',
-        re.IGNORECASE
-    )
-    _CAUSAL_PATTERN = re.compile(
-        r'causal graph|causal model|do-calculus|confounding variable|'
-        r'intervention do\(|backdoor criterion|frontdoor criterion|'
-        r'causal.*infer|causal.*effect|confounder|confounding',
-        re.IGNORECASE
-    )
+    # REMOVED (Jan 21 2026): Regex patterns for keyword-based routing
+    # These patterns were bypassing LLM classification and causing misrouting.
+    # Evidence: SAT queries routed to probabilistic engine, causal queries to symbolic.
+    # The LLM router provides accurate semantic classification - trust it.
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         """
@@ -4982,53 +4963,24 @@ class ToolSelector:
                     )
 
             # ================================================================
-            # FIX: Add keyword-based routing for OBVIOUS query types
+            # REMOVED (Jan 21 2026): Keyword override logic
             # ================================================================
-            # While the LLM classifier is the primary tool selection method,
-            # it's currently broken and always returns 'analogical'.
-            # Add conservative keyword detection for very obvious cases using
-            # optimized regex patterns for better performance.
+            # Previously, regex patterns (_MATH_PATTERN, _SAT_PATTERN, _CAUSAL_PATTERN)
+            # bypassed LLM classification with keyword matching. This caused misrouting:
+            # - SAT queries → probabilistic engine (wrong!)
+            # - Causal queries → symbolic engine (wrong!)
+            # - Multimodal queries → probabilistic engine (wrong!)
+            #
+            # The problem: Pattern matching cannot distinguish semantic context.
+            # Example: "S→T" could be analogical mapping OR symbolic proof.
+            #
+            # Solution: Trust the LLM router's semantic classification.
+            # The query_router.py sets 'selected_tools' based on LLM understanding.
+            # We map 'selected_tools' → 'classifier_suggested_tools' below.
             # ================================================================
-            keyword_override_tool = None
-            if not delegation_active:
-                problem_text = str(request.problem).lower()
-                
-                # Use class-level compiled regex patterns (cached for performance)
-                # No need to import re or recompile - patterns are class attributes
-                
-                if self._MATH_PATTERN.search(problem_text):
-                    keyword_override_tool = 'probabilistic'
-                    logger.info(
-                        f"[ToolSelector] KEYWORD OVERRIDE: Detected Bayesian probability query -> 'probabilistic'"
-                    )
-                elif self._SAT_PATTERN.search(problem_text):
-                    keyword_override_tool = 'symbolic'
-                    logger.info(
-                        f"[ToolSelector] KEYWORD OVERRIDE: Detected SAT/FOL query -> 'symbolic'"
-                    )
-                elif self._CAUSAL_PATTERN.search(problem_text):
-                    keyword_override_tool = 'causal'
-                    logger.info(
-                        f"[ToolSelector] KEYWORD OVERRIDE: Detected causal inference query -> 'causal'"
-                    )
-                
-                # If keyword override found, use it and skip classifier
-                if keyword_override_tool:
-                    candidates = [{'tool': keyword_override_tool, 'utility': 1.0, 'source': 'keyword_override'}]
-                    features = self._extract_features(request)
-                    
-                    result = self._execute_with_selected_tools(
-                        request=request,
-                        candidates=candidates,
-                        features=features,
-                        start_time=start_time
-                    )
-                    return result
 
             # ================================================================
             # Note: REMOVED formal logic pattern override (Jan 9 2026)
-            # ================================================================
-            # The previous code here bypassed the LLM classifier when "formal logic"
             # patterns were detected, routing everything to symbolic engine.
             # 
             # This was WRONG because pattern matching CANNOT distinguish between:
@@ -5084,6 +5036,29 @@ class ToolSelector:
             # ================================================================
             # NOTE: The _detect_math_symbols() method still exists for other uses
             # but it no longer bypasses the LLM classifier here.
+
+            # ================================================================
+            # FIX (Jan 21 2026): Map selected_tools to classifier_suggested_tools
+            # ================================================================
+            # The query_router.py sets 'selected_tools' in telemetry_data based on
+            # LLM classification. However, the code below checks for 
+            # 'classifier_suggested_tools'. This mismatch caused the LLM's routing
+            # decision to be ignored, falling through to regex patterns.
+            #
+            # Solution: Map 'selected_tools' → 'classifier_suggested_tools' so the
+            # existing classifier path (lines 5067-5173) works correctly.
+            # ================================================================
+            if hasattr(request, 'context') and isinstance(request.context, dict):
+                # Check if selected_tools was set by query_router
+                selected_tools = request.context.get('selected_tools')
+                
+                # If selected_tools exists but classifier_suggested_tools doesn't, map it
+                if selected_tools and not request.context.get('classifier_suggested_tools'):
+                    request.context['classifier_suggested_tools'] = selected_tools
+                    logger.info(
+                        f"[ToolSelector] Mapped selected_tools={selected_tools} to "
+                        f"classifier_suggested_tools (from query_router)"
+                    )
 
             # ================================================================
             # Note: Check if QueryClassifier already suggested tools
