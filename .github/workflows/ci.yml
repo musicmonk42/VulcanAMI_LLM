@@ -330,13 +330,16 @@ jobs:
           
           EXIT_CODE=0
           
+          # Common marker expression for excluding slow tests
+          EXCLUDE_MARKERS="not slow and not load_test and not benchmark and not integration"
+          
           # Determine pytest command based on matrix test-part
           if [ "${{ matrix.test-part }}" = "unit" ]; then
             echo "Running unit tests from tests/ directory"
-            PYTEST_ARGS="tests/ -m \"not slow and not load_test and not benchmark and not integration\""
+            PYTEST_ARGS="tests/ -m \"$EXCLUDE_MARKERS\""
           elif [ "${{ matrix.test-part }}" = "vulcan" ]; then
             echo "Running tests from src/vulcan/tests/ directory"
-            PYTEST_ARGS="src/vulcan/tests/ -m \"not slow and not load_test and not benchmark and not integration\""
+            PYTEST_ARGS="src/vulcan/tests/ -m \"$EXCLUDE_MARKERS\""
           elif [ "${{ matrix.test-part }}" = "integration" ]; then
             echo "Running slow/integration tests from both directories"
             PYTEST_ARGS="tests/ src/vulcan/tests/ -m \"slow or integration\""
@@ -346,12 +349,13 @@ jobs:
           fi
           
           # Increased --max-worker-restart to 3 for better resilience
-          # Reduced timeout to 40m to ensure completion before job timeout
+          # Timeout set to 35m to ensure completion before job timeout (40m)
           # Added per-test timeout (--timeout=300) to prevent individual test hangs
           # Use -n 2 workers for better parallelism
           # Changed to verbose mode (-vv) for better visibility into test execution
           # Added -o timeout_func_only=true to only timeout test functions, not fixtures
-          timeout 35m pytest --cov=src -vv \
+          TIMEOUT_MINUTES=35
+          timeout ${TIMEOUT_MINUTES}m pytest --cov=src -vv \
             --tb=short \
             --cov-report=xml \
             --cov-report=html \
@@ -372,7 +376,7 @@ jobs:
           if [ $EXIT_CODE -ne 0 ]; then
             echo "❌ Tests failed with exit code: $EXIT_CODE"
             if [ $EXIT_CODE -eq 124 ]; then
-              echo "⏱️  TIMEOUT: Test suite exceeded 35 minute limit"
+              echo "⏱️  TIMEOUT: Test suite exceeded ${TIMEOUT_MINUTES} minute limit"
               echo "Check verbose output above to identify hanging test"
             fi
           fi
