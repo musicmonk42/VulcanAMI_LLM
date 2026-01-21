@@ -1639,6 +1639,25 @@ class QueryAnalyzer:
         "how are you",
     )
 
+    # LLM classification category to default tools mapping (class constant)
+    # Used when LLM classification doesn't provide suggested_tools
+    # This ensures routing works even if the LLM only provides a category
+    CATEGORY_TO_DEFAULT_TOOLS = {
+        "PROBABILISTIC": ["probabilistic"],
+        "LOGICAL": ["symbolic"],
+        "CAUSAL": ["causal"],
+        "MATHEMATICAL": ["mathematical"],
+        "ANALOGICAL": ["analogical"],
+        "PHILOSOPHICAL": ["world_model", "philosophical"],
+        "SELF_INTROSPECTION": ["world_model"],
+        "IDENTITY": ["world_model"],
+        "MULTIMODAL": ["multimodal"],
+        "CRYPTOGRAPHIC": ["cryptographic"],
+        "GREETING": ["general"],
+        "CHITCHAT": ["general"],
+        "FACTUAL": ["general"],
+    }
+
     def __init__(self, enable_safety_validation: bool = True):
         """Initialize the query analyzer with compiled patterns and optional safety validation.
 
@@ -3215,21 +3234,10 @@ class QueryAnalyzer:
         
         # Use LLM classification that was already obtained above
         # Map classification to tools for telemetry and downstream use
-        selected_tools = classification.suggested_tools or []
-        if not selected_tools:
-            # Map category to default tool if no suggestions
-            category_to_tool = {
-                "PROBABILISTIC": ["probabilistic"],
-                "LOGICAL": ["symbolic"],
-                "CAUSAL": ["causal"],
-                "MATHEMATICAL": ["mathematical"],
-                "ANALOGICAL": ["analogical"],
-                "PHILOSOPHICAL": ["world_model", "philosophical"],
-                "SELF_INTROSPECTION": ["world_model"],
-                "IDENTITY": ["world_model"],
-                "MULTIMODAL": ["multimodal"],
-            }
-            selected_tools = category_to_tool.get(classification.category, ["general"])
+        # Use class constant CATEGORY_TO_DEFAULT_TOOLS for maintainability
+        selected_tools = classification.suggested_tools or self.CATEGORY_TO_DEFAULT_TOOLS.get(
+            classification.category, ["general"]
+        )
         
         plan.telemetry_data["selected_tools"] = selected_tools
         plan.telemetry_data["reasoning_strategy"] = f"llm_classification_{classification.category.lower()}"
