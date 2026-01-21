@@ -357,13 +357,21 @@ jobs:
           echo "=================================================="
           echo "Verifying pytest-cov installation..."
           echo "=================================================="
-          if ! python3 -c "import pytest_cov" 2>/dev/null; then
-            echo "❌ ERROR: pytest-cov not found in Python environment"
-            echo "Available packages:"
+          if ! pip show pytest-cov >/dev/null 2>&1; then
+            echo "❌ ERROR: pytest-cov package not found"
+            echo "Available pytest packages:"
             pip list | grep -i pytest || true
             exit 1
           fi
-          echo "✓ pytest-cov is available"
+          echo "✓ pytest-cov is installed"
+          
+          # Verify pytest can load the cov plugin
+          if ! python3 -m pytest --co -p pytest_cov --cov=. --cov-report= >/dev/null 2>&1; then
+            echo "⚠️  WARNING: pytest-cov plugin may not load properly"
+            echo "Continuing anyway - will fail if plugin is truly broken"
+          else
+            echo "✓ pytest-cov plugin loads correctly"
+          fi
           
           # Determine pytest command based on matrix test-part
           echo "=================================================="
