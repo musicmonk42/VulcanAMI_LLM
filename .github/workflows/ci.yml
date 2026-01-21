@@ -331,7 +331,7 @@ jobs:
           # Increased --max-worker-restart to 3 for better resilience
           # Reduced timeout to 40m to ensure completion before job timeout (45m)
           # Added per-test timeout (--timeout=300) to prevent individual test hangs
-          # Reduced workers to -n 1 temporarily to isolate hanging test issues
+          # Use -n 2 workers for better parallelism with tests/ and src/vulcan/tests/
           # Changed to verbose mode (-vv) for better visibility into test execution
           # Added -o timeout_func_only=true to only timeout test functions, not fixtures
           timeout 40m pytest --cov=src -vv \
@@ -342,13 +342,13 @@ jobs:
             --junitxml=results/junit.xml \
             --timeout=300 \
             --timeout-method=thread \
-            -n 1 \
+            -n 2 \
             --dist=loadfile \
             --max-worker-restart=3 \
             -o timeout_func_only=true \
             --continue-on-collection-errors \
             -m "not slow and not load_test and not benchmark" \
-            tests/ || EXIT_CODE=$?
+            tests/ src/vulcan/tests/ || EXIT_CODE=$?
           
           # Stop monitor
           kill $MONITOR_PID 2>/dev/null || true
