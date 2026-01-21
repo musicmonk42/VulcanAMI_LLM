@@ -367,13 +367,13 @@ jobs:
           
           EXIT_CODE=0
           
-          # Marker expression for fast tests (excludes slow/integration tests)
-          FAST_TEST_MARKERS="not slow and not load_test and not benchmark and not integration"
-          
           # Store matrix test-part in a shell variable to avoid interpolation issues
           TEST_PART="${{ matrix.test-part }}"
           
-          # Determine pytest command based on matrix test-part
+          # Determine test path and marker expression based on matrix test-part
+          # IMPORTANT: Keep TEST_PATH and MARKER_EXPR as separate variables
+          # Do NOT combine them into a single string - shell word splitting will break
+          # the marker expression when it contains spaces
           echo "=================================================="
           echo "DEBUG: Determining test configuration"
           echo "  Matrix test-part raw: '${{ matrix.test-part }}'"
@@ -386,15 +386,18 @@ jobs:
           case "${TEST_PART}" in
             unit)
               echo "✓ Matched: Running unit tests from tests/ directory"
-              PYTEST_ARGS="tests/ -m \"$FAST_TEST_MARKERS\""
+              TEST_PATH="tests/"
+              MARKER_EXPR="not slow and not load_test and not benchmark and not integration"
               ;;
             vulcan)
               echo "✓ Matched: Running tests from src/vulcan/tests/ directory"
-              PYTEST_ARGS="src/vulcan/tests/ -m \"$FAST_TEST_MARKERS\""
+              TEST_PATH="src/vulcan/tests/"
+              MARKER_EXPR="not slow and not load_test and not benchmark and not integration"
               ;;
             integration)
               echo "✓ Matched: Running slow/integration tests from both directories"
-              PYTEST_ARGS="tests/ src/vulcan/tests/ -m \"slow or integration\""
+              TEST_PATH="tests/ src/vulcan/tests/"
+              MARKER_EXPR="slow or integration"
               ;;
             *)
               echo "❌ ERROR: Unknown test-part value: '${TEST_PART}'"
@@ -407,6 +410,10 @@ jobs:
               ;;
           esac
           
+          echo "  TEST_PATH: '${TEST_PATH}'"
+          echo "  MARKER_EXPR: '${MARKER_EXPR}'"
+          echo "=================================================="
+          
           # Increased --max-worker-restart to 3 for better resilience
           # Timeout set to 35m to ensure completion before job timeout (40m)
           # Added per-test timeout (--timeout=300) to prevent individual test hangs
@@ -414,6 +421,9 @@ jobs:
           # Changed to verbose mode (-vv) for better visibility into test execution
           # Added -o timeout_func_only=true to only timeout test functions, not fixtures
           # Added --cov-config to use .coveragerc for proper parallel coverage
+          #
+          # CRITICAL FIX: Pass -m with properly quoted MARKER_EXPR directly
+          # Do NOT store "-m ..." in a variable - shell word splitting breaks it
           TIMEOUT_MINUTES=35
           timeout ${TIMEOUT_MINUTES}m pytest \
             --cov=src \
@@ -431,7 +441,7 @@ jobs:
             --max-worker-restart=3 \
             -o timeout_func_only=true \
             --continue-on-collection-errors \
-            $PYTEST_ARGS || EXIT_CODE=$?
+            ${TEST_PATH} -m "${MARKER_EXPR}" || EXIT_CODE=$?
           
           # Stop monitor
           kill $MONITOR_PID 2>/dev/null || true
