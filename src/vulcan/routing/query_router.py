@@ -3202,6 +3202,7 @@ class QueryAnalyzer:
         # This wires the ToolSelector and reasoning strategies into the flow
         # ================================================================
         reasoning_result = None
+        tool_hints = {}  # Initialize to avoid UnboundLocalError
         try:
             # ARCHITECTURE CONSOLIDATION: Import from unified compatibility layer
             from vulcan.reasoning import apply_reasoning
@@ -3224,6 +3225,11 @@ class QueryAnalyzer:
             )
             plan.telemetry_data["selected_tools"] = reasoning_result.selected_tools
             plan.telemetry_data["reasoning_confidence"] = reasoning_result.confidence
+            
+            # Populate tool_hints from reasoning result for downstream use
+            if reasoning_result.selected_tools:
+                tool_hints = {tool: 1.0 for tool in reasoning_result.selected_tools}
+            plan.telemetry_data["tool_hints"] = tool_hints
 
         except ImportError:
             logger.debug("[QueryRouter] Reasoning integration not available - using fallback")
