@@ -334,7 +334,12 @@ jobs:
           FAST_TEST_MARKERS="not slow and not load_test and not benchmark and not integration"
           
           # Determine pytest command based on matrix test-part
-          case "${{ matrix.test-part }}" in
+          # Store and sanitize the test-part value to handle any interpolation issues
+          TEST_PART="${{ matrix.test-part }}"
+          TEST_PART=$(echo "$TEST_PART" | tr -d '[:space:]')
+          echo "DEBUG: test-part value is: '$TEST_PART'"
+          
+          case "$TEST_PART" in
             unit)
               echo "Running unit tests from tests/ directory"
               PYTEST_ARGS="tests/ -m \"$FAST_TEST_MARKERS\""
@@ -348,7 +353,8 @@ jobs:
               PYTEST_ARGS="tests/ src/vulcan/tests/ -m \"slow or integration\""
               ;;
             *)
-              echo "Unknown test-part: ${{ matrix.test-part }}"
+              echo "Unknown test-part: '$TEST_PART' (raw: '${{ matrix.test-part }}')"
+              echo "Valid options are: unit, vulcan, integration"
               exit 1
               ;;
           esac
