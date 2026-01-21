@@ -4327,154 +4327,27 @@ class QueryAnalyzer:
                 except Exception as e:
                     logger.warning(f"[QueryRouter] Error storing session history: {e}")
             
-            # DIAGNOSTIC LOGGING: Check override conditions
-            is_self_introspection = self._is_self_introspection_query(query)
-            is_math = self._is_mathematical_query(query)
-            # Note: is_ethical check is implicit in the code (checks for philosophical patterns)
-            # We log what we detect
-            logger.info(
-                f"[QueryRouter] query_id={query_id}: Override checks: "
-                f"is_self_introspection={is_self_introspection}, is_math={is_math}"
-            )
-            
-            # Note: Check for self-introspection FIRST (before philosophical override)
-            # Self-introspection queries need multi-tool routing, not just philosophical
-            if is_self_introspection:
-                logger.info(
-                    f"[QueryRouter] {query_id}: Self-introspection detected, "
-                    f"NOT overriding to PHILOSOPHICAL (will use multi-tool routing later)"
-                )
-                # Don't override - let the self-introspection fast-path handle it
-                classification = type(classification)(
-                    category="SELF_INTROSPECTION",
-                    complexity=max(0.5, classification.complexity),  # Higher complexity
-                    confidence=classification.confidence,
-                    skip_reasoning=False,  # Don't skip reasoning
-                    suggested_tools=["meta_reasoning", "world_model", "philosophical"],
-                    source="bug16_self_introspection_override"
-                )
-                
-                # =================================================================
-                # SELF-INTROSPECTION FAST-PATH (FIX: Safety Governor Bypass)
-                # =================================================================
-                # Self-introspection queries should go DIRECTLY to world_model.
-                # This bypasses the safety governor that was blocking self-awareness
-                # responses. The safety governor's check_output method will also
-                # whitelist these queries, but routing directly to world_model
-                # ensures minimal latency and maximum expressiveness.
-                # =================================================================
-                
-                # Determine learning mode
-                if source == "user":
-                    learning_mode = LearningMode.USER_INTERACTION
-                    with self._lock:
-                        self._user_interaction_count += 1
-                    telemetry_category = "user_query"
-                else:
-                    learning_mode = LearningMode.AI_INTERACTION
-                    with self._lock:
-                        self._ai_interaction_count += 1
-                    telemetry_category = f"{source}_interaction"
-                
-                plan = ProcessingPlan(
-                    query_id=query_id,
-                    original_query=original_query,
-                    source=source,
-                    learning_mode=learning_mode,
-                    query_type=QueryType.PHILOSOPHICAL,  # Philosophical task type
-                    complexity_score=0.35,  # Medium-low - world model handles directly
-                    uncertainty_score=0.1,
-                    collaboration_needed=False,  # Single tool - world_model
-                    arena_participation=False,  # No tournament needed
-                    telemetry_category=telemetry_category,
-                    telemetry_data={
-                        "session_id": session_id,
-                        "query_length": len(query),
-                        "word_count": len(query.split()),
-                        "query_number": query_number,
-                        "source": source,
-                        "learning_mode": learning_mode.value,
-                        "fast_path": True,
-                        "self_introspection_fast_path": True,
-                        "classification_category": "SELF_INTROSPECTION",
-                        "classification_source": "query_classifier",
-                        "selected_tools": ["world_model"],
-                        "reasoning_strategy": "self_introspection_direct",
-                        "safety_bypass": "self_introspection_whitelist",
-                    },
-                )
-                
-                # Mark as safe - self-introspection is always allowed
-                plan.safety_passed = True
-                plan.detected_patterns.append("self_introspection_fast_path")
-                plan.detected_patterns.append("safety_governor_bypass")
-                
-                # Create task for world_model introspection
-                # ISSUE #1 FIX: Add reasoning_type and tool_name for command pattern
-                plan.agent_tasks = [
-                    AgentTask(
-                        task_id=f"task_{uuid.uuid4().hex[:8]}_self_intro",
-                        task_type="self_introspection_task",
-                        capability="reasoning",
-                        prompt=query,
-                        reasoning_type="philosophical",  # ISSUE #1 FIX: Self-introspection uses philosophical reasoning
-                        tool_name="world_model",  # ISSUE #1 FIX: MANDATORY routing instruction
-                        priority=3,  # High priority
-                        timeout_seconds=3.0,  # Fast response
-                        parameters={
-                            "is_self_introspection": True,
-                            "query_type": "self_introspection",
-                            "tools": ["world_model"],
-                            # Safety bypass is conditional - safety_governor.check_output()
-                            # will perform its own validation using regex patterns
-                            # This flag signals intent but doesn't override safety checks
-                            "bypass_safety_governor": True,
-                            "aspect": "self_awareness",
-                            # Additional validation metadata for audit trail
-                            "validation": {
-                                "detected_by": "query_router._is_self_introspection_query",
-                                "requires_world_model_validation": True,
-                                "query_length": len(query),
-                            }
-                        },
-                    )
-                ]
-                
-                # ARCHITECTURE: Set LLM mode based on query characteristics
-                plan.llm_mode = self._determine_llm_mode(
-                    query_type=plan.query_type,
-                    has_selected_tools=bool(plan.telemetry_data.get("selected_tools")),
-                    complexity_score=plan.complexity_score
-                )
-                
-                logger.info(
-                    f"[QueryRouter] {query_id}: SELF-INTROSPECTION-FAST-PATH "
-                    f"source={source}, tools=['world_model'], safety_bypass=True, "
-                    f"llm_mode={plan.llm_mode.value}"
-                )
-                return plan
-                
-            # Note: Check if query is actually philosophical BEFORE taking skip_reasoning fast-path
-            # The classifier may mark self-awareness questions like "Do you want to be conscious?"
-            # as CONVERSATIONAL with skip_reasoning=True, but these should route to philosophical reasoning
-            # NOTE: Self-introspection check comes first, so this only triggers for non-self-introspection queries
+            # =================================================================
+            # INDUSTRY STANDARD: Trust LLM Classification
+            # =================================================================
+            # LLM router provides semantic classification. We trust its decision
+            # instead of overriding with regex pattern matching.
             # 
-            # FIX: Also check if query is CREATIVE FIRST - creative queries should NOT be
-            # overridden to philosophical even if they contain self-awareness keywords.
-            # Example: "write a poem and self awareness for an ai" is CREATIVE, not PHILOSOPHICAL
-            elif self._is_philosophical_query(query) and not self._is_creative_query(query):
-                logger.info(
-                    f"[QueryRouter] {query_id}: Overriding classifier ({classification.category}) "
-                    f"to PHILOSOPHICAL due to self-awareness/ethical keywords"
-                )
-                classification = type(classification)(
-                    category="PHILOSOPHICAL",
-                    complexity=max(0.3, classification.complexity),
-                    confidence=classification.confidence,
-                    skip_reasoning=False,  # Don't skip reasoning for philosophical queries
-                    suggested_tools=["philosophical", "symbolic", "causal"],
-                    source="keyword_override"
-                )
+            # Architecture:
+            #   LLM classifies (language interface - what it's good at)
+            #   → Reasoning engines compute (verifiable computation with traces)
+            #   → LLM formats output (natural language generation)
+            #
+            # The LLM is NOT doing reasoning - it's classifying and formatting.
+            # The reasoning engines do the actual verifiable work.
+            # =================================================================
+            
+            # REMOVED: Regex override checks (lines 4331-4477 in original)
+            # - _is_self_introspection_query() override → Trust LLM
+            # - _is_philosophical_query() override → Trust LLM  
+            # - _is_creative_query() override → Trust LLM
+            #
+            # LLM router already provides correct classification.
             
             # =================================================================
             # Note: Safety net for CRYPTOGRAPHIC queries misclassified as FACTUAL
