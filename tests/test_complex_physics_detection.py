@@ -1,10 +1,11 @@
 """
-Tests for complex physics detection in query_router.py.
+Tests for LLM-based physics query routing.
 
 This test suite validates that PhD-level physics/control theory problems like
-triple-inverted pendulum Lagrangian mechanics are correctly detected and routed
-with appropriate complexity scores and timeouts, rather than being incorrectly
-sent to the MATH-FAST-PATH.
+triple-inverted pendulum Lagrangian mechanics are correctly routed to appropriate
+reasoning engines using LLM semantic classification.
+
+Updated to work with LLM-based routing (removed regex constants).
 
 Run with:
     pytest tests/test_complex_physics_detection.py -v
@@ -13,71 +14,81 @@ Run with:
 import pytest
 
 
-def matches_any_pattern(query: str, patterns) -> bool:
-    """Helper function to check if query matches any pattern in the tuple.
+class TestComplexPhysicsRouting:
+    """Tests for LLM-based complex physics query routing."""
+
+    @pytest.mark.skip(reason="COMPLEX_PHYSICS_KEYWORDS removed - now using LLM classification")
+    def test_complex_physics_keywords_removed(self):
+        """Test acknowledges that COMPLEX_PHYSICS_KEYWORDS was intentionally removed."""
+        # This test is kept for documentation purposes
+        # The constant was removed as part of the LLM routing refactoring
+        pass
+
+    def test_lagrangian_mechanics_routes_to_mathematical(self):
+        """Test that Lagrangian mechanics query routes to mathematical engine."""
+        from vulcan.routing.llm_router import get_llm_router
+        
+        router = get_llm_router()
+        query = "Derive Euler-Lagrange equations for triple inverted pendulum"
+        
+        decision = router.route(query)
+        assert decision.destination == "reasoning_engine", (
+            f"Physics query should route to reasoning_engine. Got: {decision.destination}"
+        )
+        assert decision.engine in ["mathematical", "symbolic"], (
+            f"Lagrangian query should use mathematical/symbolic engine. Got: {decision.engine}"
+        )
+
+    def test_control_theory_routes_correctly(self):
+        """Test that control theory query routes to appropriate engine."""
+        from vulcan.routing.llm_router import get_llm_router
+        
+        router = get_llm_router()
+        query = "Analyze controllability matrix for state space system"
+        
+        decision = router.route(query)
+        assert decision.destination == "reasoning_engine", (
+            f"Control theory query should route to reasoning_engine. Got: {decision.destination}"
+        )
+        # Control theory could be mathematical or symbolic
+        assert decision.engine in ["mathematical", "symbolic", "causal"], (
+            f"Control theory should use mathematical/symbolic/causal engine. Got: {decision.engine}"
+        )
+
+    def test_pendulum_dynamics_routes_to_mathematical(self):
+        """Test that pendulum dynamics query routes to mathematical engine."""
+        from vulcan.routing.llm_router import get_llm_router
+        
+        router = get_llm_router()
+        query = "What are the equations of motion for a double pendulum system?"
+        
+        decision = router.route(query)
+        assert decision.destination == "reasoning_engine", (
+            f"Pendulum query should route to reasoning_engine. Got: {decision.destination}"
+        )
+        assert decision.engine in ["mathematical", "symbolic"], (
+            f"Pendulum dynamics should use mathematical/symbolic engine. Got: {decision.engine}"
+        )
+
+
+class TestLLMPhysicsClassification:
+    """Test that LLM correctly classifies physics queries without regex keywords."""
     
-    Args:
-        query: The query string to test
-        patterns: Tuple of compiled regex patterns
+    def test_complex_physics_not_simple_math(self):
+        """Complex physics should not be treated as simple math."""
+        from vulcan.routing.llm_router import get_llm_router
         
-    Returns:
-        True if any pattern matches the query
-    """
-    return any(pattern.search(query) for pattern in patterns)
-
-
-class TestComplexPhysicsKeywords:
-    """Tests for COMPLEX_PHYSICS_KEYWORDS constant."""
-
-    def test_complex_physics_keywords_exists(self):
-        """Test that COMPLEX_PHYSICS_KEYWORDS is defined."""
-        from vulcan.routing.query_router import COMPLEX_PHYSICS_KEYWORDS
+        router = get_llm_router()
+        query = "Derive Lagrangian for coupled oscillators with generalized coordinates"
         
-        assert COMPLEX_PHYSICS_KEYWORDS is not None
-        assert isinstance(COMPLEX_PHYSICS_KEYWORDS, tuple)
-        assert len(COMPLEX_PHYSICS_KEYWORDS) > 0
-
-    def test_control_theory_keywords_present(self):
-        """Test that control theory keywords are present."""
-        from vulcan.routing.query_router import COMPLEX_PHYSICS_KEYWORDS
-        
-        control_terms = {
-            "controllability", "observability", "state space", "linearize",
-            "lyapunov", "stability analysis"
-        }
-        present_terms = {kw for kw in COMPLEX_PHYSICS_KEYWORDS if kw in control_terms}
-        
-        assert len(present_terms) >= 3, (
-            f"Expected at least 3 control theory terms, found: {present_terms}"
+        decision = router.route(query)
+        # Should route to reasoning engine, not skip
+        assert decision.destination == "reasoning_engine", (
+            "Complex physics should require reasoning engines"
         )
-
-    def test_pendulum_keywords_present(self):
-        """Test that pendulum system keywords are present."""
-        from vulcan.routing.query_router import COMPLEX_PHYSICS_KEYWORDS
-        
-        pendulum_terms = {
-            "inverted pendulum", "double pendulum", "triple pendulum",
-            "coupled pendulum", "cart-pole"
-        }
-        present_terms = {kw for kw in COMPLEX_PHYSICS_KEYWORDS if kw in pendulum_terms}
-        
-        assert len(present_terms) >= 3, (
-            f"Expected at least 3 pendulum terms, found: {present_terms}"
+        assert decision.confidence > 0.5, (
+            f"LLM should be confident in physics classification. Got: {decision.confidence}"
         )
-
-    def test_lagrangian_mechanics_keywords_present(self):
-        """Test that Lagrangian mechanics keywords are present."""
-        from vulcan.routing.query_router import COMPLEX_PHYSICS_KEYWORDS
-        
-        lagrangian_terms = {
-            "euler-lagrange", "euler lagrange", "hamilton's equations",
-            "hamiltonian mechanics", "lagrangian mechanics", "generalized coordinates",
-            "canonical transformation", "action principle"
-        }
-        present_terms = {kw for kw in COMPLEX_PHYSICS_KEYWORDS if kw in lagrangian_terms}
-        
-        assert len(present_terms) >= 3, (
-            f"Expected at least 3 Lagrangian mechanics terms, found: {present_terms}"
         )
 
     def test_all_keywords_are_lowercase(self):

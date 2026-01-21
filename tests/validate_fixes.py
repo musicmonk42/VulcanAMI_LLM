@@ -78,26 +78,44 @@ def test_mathematical_retry():
 
 
 def test_natural_language_logic_routing():
-    """Test Issue #3: Natural language logic routing."""
+    """Test Issue #3: Natural language logic routing with LLM."""
     try:
-        from src.vulcan.routing.query_router import QueryAnalyzer
-        from src.vulcan.routing.query_router import ProcessingPlan, QueryType
+        from src.vulcan.routing.llm_router import get_llm_router
         
-        analyzer = QueryAnalyzer()
+        router = get_llm_router()
         
         # Create a test query
         query = "Birds fly. Penguins are birds. Do penguins fly?"
-        plan = analyzer.route_query(query, source="user")
-        
-        # Check if routing logic exists
-        import inspect
-        source = inspect.getsource(analyzer._select_reasoning_tools)
+        decision = router.route(query)
         
         tests = [
-            ("FIX Issue #3" in source, "Issue #3 fix marker present in code"),
-            ("Natural language logic" in source, "Natural language logic detection mentioned"),
-            ("world_model" in source, "world_model routing present"),
-            ("logic_relationship_keywords" in source, "Logic relationship keywords defined"),
+            (decision is not None, "LLM router returns decision"),
+            (hasattr(decision, 'destination'), "Decision has destination attribute"),
+            (hasattr(decision, 'engine'), "Decision has engine attribute"),
+            (hasattr(decision, 'confidence'), "Decision has confidence attribute"),
+            (decision.destination in ["world_model", "reasoning_engine"], 
+             f"Natural language logic routes to world_model or reasoning_engine (got: {decision.destination})"),
+        ]
+        
+        passed = 0
+        failed = 0
+        for condition, description in tests:
+            status = "✓" if condition else "✗"
+            if condition:
+                passed += 1
+            else:
+                failed += 1
+            print(f"  {status} {description}")
+        
+        print(f"\nIssue #3 Results: {passed}/{len(tests)} tests passed")
+        print(f"  Routing decision: destination={decision.destination}, engine={decision.engine}, confidence={decision.confidence:.2f}")
+        return failed == 0
+        
+    except Exception as e:
+        print(f"Error testing natural language logic routing: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
         ]
         
         passed = 0
