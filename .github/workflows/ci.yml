@@ -109,13 +109,14 @@ jobs:
           retention-days: 30
 
   test:
-    name: Test Python ${{ matrix.python-version }}
+    name: Test Python ${{ matrix.python-version }} - ${{ matrix.test-part }}
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
         python-version: ['3.11']
+        test-part: ['unit', 'vulcan', 'integration']
 
     services:
       redis:
@@ -328,13 +329,29 @@ jobs:
           MONITOR_PID=$!
           
           EXIT_CODE=0
+          
+          # Determine pytest command based on matrix test-part
+          if [ "${{ matrix.test-part }}" = "unit" ]; then
+            echo "Running unit tests from tests/ directory"
+            PYTEST_ARGS="tests/ -m \"not slow and not load_test and not benchmark and not integration\""
+          elif [ "${{ matrix.test-part }}" = "vulcan" ]; then
+            echo "Running tests from src/vulcan/tests/ directory"
+            PYTEST_ARGS="src/vulcan/tests/ -m \"not slow and not load_test and not benchmark and not integration\""
+          elif [ "${{ matrix.test-part }}" = "integration" ]; then
+            echo "Running slow/integration tests from both directories"
+            PYTEST_ARGS="tests/ src/vulcan/tests/ -m \"slow or integration\""
+          else
+            echo "Unknown test-part: ${{ matrix.test-part }}"
+            exit 1
+          fi
+          
           # Increased --max-worker-restart to 3 for better resilience
-          # Reduced timeout to 40m to ensure completion before job timeout (45m)
+          # Reduced timeout to 40m to ensure completion before job timeout
           # Added per-test timeout (--timeout=300) to prevent individual test hangs
-          # Use -n 2 workers for better parallelism with tests/ and src/vulcan/tests/
+          # Use -n 2 workers for better parallelism
           # Changed to verbose mode (-vv) for better visibility into test execution
           # Added -o timeout_func_only=true to only timeout test functions, not fixtures
-          timeout 40m pytest --cov=src -vv \
+          timeout 35m pytest --cov=src -vv \
             --tb=short \
             --cov-report=xml \
             --cov-report=html \
@@ -347,8 +364,7 @@ jobs:
             --max-worker-restart=3 \
             -o timeout_func_only=true \
             --continue-on-collection-errors \
-            -m "not slow and not load_test and not benchmark" \
-            tests/ src/vulcan/tests/ || EXIT_CODE=$?
+            $PYTEST_ARGS || EXIT_CODE=$?
           
           # Stop monitor
           kill $MONITOR_PID 2>/dev/null || true
@@ -356,7 +372,7 @@ jobs:
           if [ $EXIT_CODE -ne 0 ]; then
             echo "❌ Tests failed with exit code: $EXIT_CODE"
             if [ $EXIT_CODE -eq 124 ]; then
-              echo "⏱️  TIMEOUT: Test suite exceeded 40 minute limit"
+              echo "⏱️  TIMEOUT: Test suite exceeded 35 minute limit"
               echo "Check verbose output above to identify hanging test"
             fi
           fi
@@ -386,7 +402,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-results-${{ matrix.python-version }}
+          name: test-results-${{ matrix.python-version }}-${{ matrix.test-part }}
           path: |
             results/
             htmlcov/
