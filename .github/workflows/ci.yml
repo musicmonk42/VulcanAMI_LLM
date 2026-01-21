@@ -387,7 +387,8 @@ jobs:
             unit)
               echo "✓ Matched: Running unit tests from tests/ directory"
               TEST_PATH="tests/"
-              MARKER_EXPR="not slow and not load_test and not benchmark and not integration"
+              # Exclude perf/boundedness tests - they run in dedicated perf-smoke job
+              MARKER_EXPR="not slow and not load_test and not benchmark and not integration and not perf and not boundedness"
               ;;
             vulcan)
               echo "✓ Matched: Running tests from src/vulcan/tests/ directory"
