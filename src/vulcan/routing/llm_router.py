@@ -426,8 +426,10 @@ ETHICAL_DILEMMA_PATTERNS: Tuple[re.Pattern, ...] = (
 
 CAUSAL_KEYWORDS: FrozenSet[str] = frozenset([
     "confound", "confounding", "confounder",
+    "conditioning", "conditioned", "condition on",
     "intervention", "do(", "dag", "causal",
     "randomize", "randomized", "rct",
+    "collider", "d-separation",
 ])
 
 LOGIC_SYMBOLS: Tuple[str, ...] = (
@@ -780,28 +782,18 @@ class LLMQueryRouter:
                     source="fallback",
                 )
         
-        # 2. Mathematical patterns → Probabilistic/Mathematical engine
-        # Check BEFORE self-referential to avoid misclassifying "You must compute P(X|Y)"
-        if any(pattern.search(query) for pattern in MATHEMATICAL_PATTERNS):
+        # 2. Causal keywords → Causal engine (CHECK BEFORE MATH!)
+        # Priority: confounding, intervention, dag, etc. must route to causal, not mathematical
+        if any(keyword in query_lower for keyword in CAUSAL_KEYWORDS):
             return RoutingDecision(
                 destination="reasoning_engine",
-                engine="probabilistic",
-                confidence=0.9,
-                reason="Mathematical notation detected",
-                source="fallback",
-            )
-        
-        # 3. Mathematical keywords → Mathematical engine
-        if any(keyword in query_lower for keyword in MATHEMATICAL_KEYWORDS):
-            return RoutingDecision(
-                destination="reasoning_engine",
-                engine="mathematical",
+                engine="causal",
                 confidence=0.85,
-                reason="Mathematical keywords detected",
+                reason="Causal keywords detected",
                 source="fallback",
             )
         
-        # 4. Probability notation → Probabilistic engine
+        # 3. Probability notation → Probabilistic engine (CHECK BEFORE MATH!)
         if any(keyword in query_lower for keyword in PROBABILISTIC_KEYWORDS):
             return RoutingDecision(
                 destination="reasoning_engine",
@@ -811,7 +803,28 @@ class LLMQueryRouter:
                 source="fallback",
             )
         
-        # 5. Logic symbols → Symbolic engine
+        # 4. Mathematical patterns → Probabilistic/Mathematical engine
+        # Check AFTER causal/probabilistic to avoid misclassifying domain-specific queries
+        if any(pattern.search(query) for pattern in MATHEMATICAL_PATTERNS):
+            return RoutingDecision(
+                destination="reasoning_engine",
+                engine="probabilistic",
+                confidence=0.9,
+                reason="Mathematical notation detected",
+                source="fallback",
+            )
+        
+        # 5. Mathematical keywords → Mathematical engine
+        if any(keyword in query_lower for keyword in MATHEMATICAL_KEYWORDS):
+            return RoutingDecision(
+                destination="reasoning_engine",
+                engine="mathematical",
+                confidence=0.85,
+                reason="Mathematical keywords detected",
+                source="fallback",
+            )
+        
+        # 6. Logic symbols → Symbolic engine
         if any(symbol in query for symbol in LOGIC_SYMBOLS):
             return RoutingDecision(
                 destination="reasoning_engine",
@@ -821,23 +834,13 @@ class LLMQueryRouter:
                 source="fallback",
             )
         
-        # 6. Logic keywords → Symbolic engine
+        # 7. Logic keywords → Symbolic engine
         if any(keyword in query_lower for keyword in LOGIC_KEYWORDS):
             return RoutingDecision(
                 destination="reasoning_engine",
                 engine="symbolic",
                 confidence=0.85,
                 reason="Logic keywords detected",
-                source="fallback",
-            )
-        
-        # 7. Causal keywords → Causal engine
-        if any(keyword in query_lower for keyword in CAUSAL_KEYWORDS):
-            return RoutingDecision(
-                destination="reasoning_engine",
-                engine="causal",
-                confidence=0.85,
-                reason="Causal keywords detected",
                 source="fallback",
             )
         
