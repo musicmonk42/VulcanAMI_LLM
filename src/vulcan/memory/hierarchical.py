@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 import threading
 import time
 import uuid
@@ -1651,8 +1652,16 @@ class HierarchicalMemory(BaseMemorySystem):
 
     def start_background_tasks(self):
         """Start background consolidation and pattern mining tasks."""
+        # Use shorter intervals in CI environment
+        is_ci = os.environ.get('CI') or os.environ.get('GITHUB_ACTIONS') or os.environ.get('VULCAN_CI_MODE')
+        
         # Consolidation thread
         consolidation_interval = getattr(self.config, "consolidation_interval", 1000)
+        
+        # Override with shorter interval in CI to prevent hanging
+        if is_ci:
+            consolidation_interval = min(consolidation_interval, 5)  # Max 5 seconds in CI
+        
         if consolidation_interval > 0:
 
             def consolidation_loop():
@@ -1671,10 +1680,12 @@ class HierarchicalMemory(BaseMemorySystem):
             )
             self.consolidation_thread.start()
 
-        # Pattern mining thread
+        # Pattern mining thread - also use shorter interval in CI
+        pattern_interval = 300 if not is_ci else 5
+        
         def pattern_mining_loop():
             while not self._shutdown_event.is_set():  # CHANGED
-                if self._shutdown_event.wait(timeout=300):  # CHANGED
+                if self._shutdown_event.wait(timeout=pattern_interval):  # CHANGED
                     break  # Shutdown signaled
                 try:
                     if len(self.tool_selection_history) > 10:

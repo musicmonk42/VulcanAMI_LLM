@@ -264,6 +264,7 @@ jobs:
           # Enable CI-specific optimizations for faster test execution
           echo "VULCAN_CI_MODE=1" >> $GITHUB_ENV
           echo "VULCAN_FAST_FIXTURES=1" >> $GITHUB_ENV
+          echo "VULCAN_MEMORY_CONSOLIDATION_INTERVAL=1" >> $GITHUB_ENV
 
       - name: Monitor system resources
         run: |
