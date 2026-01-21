@@ -1,28 +1,17 @@
+# .coveragerc
 [run]
-source = ., bin
-omit = 
+parallel = true
+concurrency = multiprocessing
+source = src
+omit =
     */tests/*
-    */test_*
+    */test_*.py
     */__pycache__/*
-    */venv/*
-    */.venv/*
-    */load_test.py
-    load_test.py
-    setup.py
-    */site-packages/*
-    bin/main.tf
-    bin/outputs.tf
-    bin/variables.tf
-    bin/packer.toml
-    bin/README.md
+    */conftest.py
 
 [report]
-exclude_lines =
-    pragma: no cover
-    def __repr__
-    raise AssertionError
-    raise NotImplementedError
-    if __name__ == .__main__.:
-    if TYPE_CHECKING:
-    @abstractmethod
-    @abc.abstractmethod
+precision = 2
+skip_empty = true
+
+[html]
+directory = htmlcov
