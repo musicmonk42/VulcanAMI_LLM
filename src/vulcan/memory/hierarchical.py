@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 import threading
 import time
 import uuid
@@ -1652,7 +1653,6 @@ class HierarchicalMemory(BaseMemorySystem):
     def start_background_tasks(self):
         """Start background consolidation and pattern mining tasks."""
         # Use shorter intervals in CI environment
-        import os
         is_ci = os.environ.get('CI') or os.environ.get('GITHUB_ACTIONS') or os.environ.get('VULCAN_CI_MODE')
         
         # Consolidation thread

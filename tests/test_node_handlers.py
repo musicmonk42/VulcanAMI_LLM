@@ -67,7 +67,7 @@ def mock_context_with_cleanup():
     if hasattr(context.get("runtime"), "memory") and context["runtime"].memory:
         try:
             context["runtime"].memory.shutdown()
-        except:
+        except Exception:
             pass
 
 
