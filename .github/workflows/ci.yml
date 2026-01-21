@@ -350,30 +350,51 @@ jobs:
           # Marker expression for fast tests (excludes slow/integration tests)
           FAST_TEST_MARKERS="not slow and not load_test and not benchmark and not integration"
           
+          # Store matrix test-part in a shell variable to avoid interpolation issues
+          TEST_PART="${{ matrix.test-part }}"
+          
+          # Verify pytest-cov is available
+          echo "=================================================="
+          echo "Verifying pytest-cov installation..."
+          echo "=================================================="
+          if ! python3 -c "import pytest_cov" 2>/dev/null; then
+            echo "❌ ERROR: pytest-cov not found in Python environment"
+            echo "Available packages:"
+            pip list | grep -i pytest || true
+            exit 1
+          fi
+          echo "✓ pytest-cov is available"
+          
           # Determine pytest command based on matrix test-part
           echo "=================================================="
           echo "DEBUG: Determining test configuration"
-          echo "  Matrix test-part: '${{ matrix.test-part }}'"
-          echo "  Type: $(python3 -c "import sys; print(type('${{ matrix.test-part }}'))")"
+          echo "  Matrix test-part raw: '${{ matrix.test-part }}'"
+          echo "  TEST_PART variable: '${TEST_PART}'"
+          echo "  TEST_PART length: ${#TEST_PART}"
+          echo "  TEST_PART hex dump: $(echo -n "${TEST_PART}" | od -A n -t x1)"
           echo "=================================================="
           
-          # Use direct matrix variable reference without intermediate processing
-          case "${{ matrix.test-part }}" in
+          # Use shell variable in case statement for proper matching
+          case "${TEST_PART}" in
             unit)
-              echo "Running unit tests from tests/ directory"
+              echo "✓ Matched: Running unit tests from tests/ directory"
               PYTEST_ARGS="tests/ -m \"$FAST_TEST_MARKERS\""
               ;;
             vulcan)
-              echo "Running tests from src/vulcan/tests/ directory"
+              echo "✓ Matched: Running tests from src/vulcan/tests/ directory"
               PYTEST_ARGS="src/vulcan/tests/ -m \"$FAST_TEST_MARKERS\""
               ;;
             integration)
-              echo "Running slow/integration tests from both directories"
+              echo "✓ Matched: Running slow/integration tests from both directories"
               PYTEST_ARGS="tests/ src/vulcan/tests/ -m \"slow or integration\""
               ;;
             *)
-              echo "❌ ERROR: Unknown test-part value: '${{ matrix.test-part }}'"
-              echo "Valid options are: unit, vulcan, integration"
+              echo "❌ ERROR: Unknown test-part value: '${TEST_PART}'"
+              echo "   Raw from matrix: '${{ matrix.test-part }}'"
+              echo "   Valid options are: unit, vulcan, integration"
+              echo "   Debugging info:"
+              echo "     - Length: ${#TEST_PART}"
+              echo "     - Hex dump: $(echo -n "${TEST_PART}" | od -A n -t x1)"
               exit 1
               ;;
           esac
