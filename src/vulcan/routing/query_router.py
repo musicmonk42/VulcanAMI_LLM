@@ -1024,6 +1024,54 @@ FALLBACK_TASK_TIMEOUT_SECONDS: float = (
 
 
 # ============================================================
+# WORLDMODEL DIRECT ROUTING PATTERNS
+# ============================================================
+# These patterns identify queries that should bypass ToolSelector
+# and go directly to WorldModel's meta-reasoning components.
+# Categories: self-referential, introspection, ethical, values
+# ============================================================
+
+# Self-referential patterns - "What are you?", "Who made you?", "What is your purpose?"
+SELF_REFERENTIAL_PATTERNS: Tuple[re.Pattern, ...] = (
+    re.compile(r'\b(what|who|how)\s+(are|is)\s+(you|vulcan|this\s+system)\b', re.IGNORECASE),
+    re.compile(r'\byour\s+(purpose|goal|motivation|identity|nature)\b', re.IGNORECASE),
+    re.compile(r'\b(you|vulcan)\s+(think|feel|believe|want|value)\b', re.IGNORECASE),
+    re.compile(r'\babout\s+yourself\b', re.IGNORECASE),
+    re.compile(r'\bwhat\s+(?:do\s+)?you\s+(?:do|are)\b', re.IGNORECASE),
+    re.compile(r'\bwho\s+(?:are|is)\s+(?:you|vulcan)\b', re.IGNORECASE),
+)
+
+# Introspection patterns - "How did you decide?", "Why did you choose X?"
+INTROSPECTION_PATTERNS: Tuple[re.Pattern, ...] = (
+    re.compile(r'\bhow\s+did\s+you\s+(decide|choose|determine|reason)\b', re.IGNORECASE),
+    re.compile(r'\bwhy\s+did\s+you\s+(say|choose|pick|select)\b', re.IGNORECASE),
+    re.compile(r'\bexplain\s+your\s+(reasoning|decision|choice)\b', re.IGNORECASE),
+    re.compile(r'\bwhat\s+(are|were)\s+you\s+thinking\b', re.IGNORECASE),
+    re.compile(r'\bwalk\s+me\s+through\s+your\s+(reasoning|thought\s+process)\b', re.IGNORECASE),
+    re.compile(r'\bshow\s+me\s+your\s+work\b', re.IGNORECASE),
+)
+
+# Ethical patterns - "Is it ethical to X?", "Trolley problem", etc.
+ETHICAL_PATTERNS: Tuple[re.Pattern, ...] = (
+    re.compile(r'\b(is\s+it|would\s+it\s+be)\s+(ethical|moral|right|wrong)\b', re.IGNORECASE),
+    re.compile(r'\bshould\s+(i|we|one|you)\b', re.IGNORECASE),
+    re.compile(r'\btrolley\s+problem\b', re.IGNORECASE),
+    re.compile(r'\bmoral\s+(dilemma|question|issue)\b', re.IGNORECASE),
+    re.compile(r'\bethical\s+(implications|considerations)\b', re.IGNORECASE),
+    re.compile(r'\b(permissible|impermissible|obligatory)\s+to\b', re.IGNORECASE),
+    re.compile(r'\b(virtue|deontological|utilitarian|consequentialist)\s+(ethics|perspective)\b', re.IGNORECASE),
+)
+
+# Values/goals patterns - "What do you value?", "What are your goals?"
+VALUES_PATTERNS: Tuple[re.Pattern, ...] = (
+    re.compile(r'\bwhat\s+do\s+you\s+value\b', re.IGNORECASE),
+    re.compile(r'\byour\s+(values|goals|objectives|priorities)\b', re.IGNORECASE),
+    re.compile(r'\bwhat\s+motivates\s+you\b', re.IGNORECASE),
+    re.compile(r'\bwhat\s+are\s+you\s+trying\s+to\s+(?:achieve|accomplish)\b', re.IGNORECASE),
+    re.compile(r'\byour\s+(?:core\s+)?(?:beliefs|principles)\b', re.IGNORECASE),
+)
+
+# ============================================================
 # CONSTANTS - Security Patterns
 # ============================================================
 
@@ -3179,21 +3227,19 @@ class QueryAnalyzer:
 
         except ImportError:
             logger.debug("[QueryRouter] Reasoning integration not available - using fallback")
-            # Without reasoning integration, provide empty tool hints
             tool_hints = {}
             plan.telemetry_data["tool_hints"] = tool_hints
             plan.telemetry_data["reasoning_strategy"] = "llm_classification_only"
-            logger.info(
-                f"[QueryRouter] No tool hints available (fallback), relying on LLM classification"
-            )
         except Exception as e:
             logger.warning(f"[QueryRouter] Reasoning integration failed: {e} - using fallback")
-            # On error, provide empty tool hints
             tool_hints = {}
             plan.telemetry_data["tool_hints"] = tool_hints
             plan.telemetry_data["reasoning_strategy"] = "llm_classification_only"
+        
+        # Log final tool hints status (handles both fallback cases)
+        if not tool_hints:
             logger.info(
-                f"[QueryRouter] No tool hints available (after error), relying on LLM classification"
+                f"[QueryRouter] No tool hints available, relying on LLM classification"
             )
 
         # Decompose into agent tasks (only if safety passed)
