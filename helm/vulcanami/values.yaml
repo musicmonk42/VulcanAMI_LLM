@@ -6,6 +6,8 @@
 # Without a working Redis connection for state synchronization, multiple replicas
 # will have isolated state and cause oscillating job counts.
 # Increase this only after Redis connectivity is confirmed working.
+# NOTE: This value is used when autoscaling.enabled is false. When autoscaling is
+# enabled, the HPA uses autoscaling.minReplicas and autoscaling.maxReplicas instead.
 replicaCount: 1
 
 image:
@@ -72,7 +74,10 @@ resources:
 
 autoscaling:
   enabled: true
-  minReplicas: 2
+  # CRITICAL: Set minReplicas to 1 to allow deployment to succeed with a single healthy replica
+  # The HPA will scale up as needed. Setting minReplicas: 2 causes deployment failures
+  # when one replica cannot start within the healthcheck timeout window.
+  minReplicas: 1
   maxReplicas: 10
   targetCPUUtilizationPercentage: 70
   targetMemoryUtilizationPercentage: 80
