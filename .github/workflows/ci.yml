@@ -202,6 +202,10 @@ jobs:
           # Install pytest-cov FIRST to ensure it's available to all xdist workers
           pip install --no-cache-dir pytest-cov
           
+          # Verify pytest-cov was installed successfully
+          pip show pytest-cov || { echo "❌ pytest-cov installation failed"; exit 1; }
+          echo "✓ pytest-cov $(pip show pytest-cov | grep Version | cut -d' ' -f2) installed"
+          
           # ==================================================================
           # CRITICAL: Install VULCAN as a package to enable 'import src'
           # This fixes the "No module named 'src'" error in GitHub Actions
@@ -324,6 +328,22 @@ jobs:
               print('✓ CI environment properly configured')
           PYTHON_SCRIPT
 
+      - name: Debug test collection
+        run: |
+          echo "=== Checking for test files ==="
+          echo "Tests in tests/ directory:"
+          find tests/ -name "test_*.py" -o -name "*_test.py" 2>/dev/null | head -20 || echo "No tests found in tests/"
+          echo ""
+          echo "Tests in src/vulcan/tests/ directory:"
+          find src/vulcan/tests/ -name "test_*.py" -o -name "*_test.py" 2>/dev/null | head -20 || echo "No tests found in src/vulcan/tests/"
+          echo ""
+          echo "=== Testing pytest collection (dry run) ==="
+          echo "Collecting from tests/:"
+          pytest --collect-only tests/ -q 2>&1 | head -30 || echo "⚠️ Collection failed for tests/"
+          echo ""
+          echo "Collecting from src/vulcan/tests/:"
+          pytest --collect-only src/vulcan/tests/ -q 2>&1 | head -30 || echo "⚠️ Collection failed for src/vulcan/tests/"
+
       - name: Run tests with coverage
         run: |
           set -x
@@ -352,26 +372,6 @@ jobs:
           
           # Store matrix test-part in a shell variable to avoid interpolation issues
           TEST_PART="${{ matrix.test-part }}"
-          
-          # Verify pytest-cov is available
-          echo "=================================================="
-          echo "Verifying pytest-cov installation..."
-          echo "=================================================="
-          if ! pip show pytest-cov >/dev/null 2>&1; then
-            echo "❌ ERROR: pytest-cov package not found"
-            echo "Available pytest packages:"
-            pip list | grep -i pytest || true
-            exit 1
-          fi
-          echo "✓ pytest-cov is installed"
-          
-          # Verify pytest can load the cov plugin
-          if ! python3 -m pytest --collect-only -p pytest_cov --cov=/dev/null --cov-report= /dev/null >/dev/null 2>&1; then
-            echo "⚠️  WARNING: pytest-cov plugin may not load properly"
-            echo "Continuing anyway - will fail if plugin is truly broken"
-          else
-            echo "✓ pytest-cov plugin loads correctly"
-          fi
           
           # Determine pytest command based on matrix test-part
           echo "=================================================="
@@ -413,12 +413,16 @@ jobs:
           # Use -n 2 workers for better parallelism
           # Changed to verbose mode (-vv) for better visibility into test execution
           # Added -o timeout_func_only=true to only timeout test functions, not fixtures
+          # Added --cov-config to use .coveragerc for proper parallel coverage
           TIMEOUT_MINUTES=35
-          timeout ${TIMEOUT_MINUTES}m pytest --cov=src -vv \
-            --tb=short \
+          timeout ${TIMEOUT_MINUTES}m pytest \
+            --cov=src \
+            --cov-config=.coveragerc \
             --cov-report=xml \
             --cov-report=html \
             --cov-report=term-missing \
+            -vv \
+            --tb=short \
             --junitxml=results/junit.xml \
             --timeout=300 \
             --timeout-method=thread \
