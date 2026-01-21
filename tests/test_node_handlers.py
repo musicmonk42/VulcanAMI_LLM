@@ -58,6 +58,19 @@ def create_mock_context(
     return mock_context_dict
 
 
+@pytest.fixture
+def mock_context_with_cleanup():
+    """Create mock context and ensure cleanup."""
+    context = create_mock_context()
+    yield context
+    # Cleanup any HierarchicalMemory instances if present
+    if hasattr(context.get("runtime"), "memory") and context["runtime"].memory:
+        try:
+            context["runtime"].memory.shutdown()
+        except:
+            pass
+
+
 class TestNodeExecutorError:
     """Test NodeExecutorError exception"""
 
@@ -277,7 +290,7 @@ class TestHardwareNodeHandlers:
     @pytest.mark.asyncio
     async def test_load_tensor_node_missing_torch(self):
         """Test LOAD_TENSOR without PyTorch"""
-        with patch("node_handlers.TORCH_AVAILABLE", False):
+        with patch("unified_runtime.node_handlers.TORCH_AVAILABLE", False):
             node = {"params": {"filepath": "test.safetensors", "key": "tensor"}}
             result = await nh.load_tensor_node(node, create_mock_context(), {})
 
@@ -348,7 +361,7 @@ class TestHardwareNodeHandlers:
     @pytest.mark.asyncio
     async def test_sparse_mvm_node(self):
         """Test SPARSE_MVM node"""
-        with patch("node_handlers.TORCH_AVAILABLE", False):
+        with patch("unified_runtime.node_handlers.TORCH_AVAILABLE", False):
             node = {}
             inputs = {"matrix": [1], "vector": [1]}  # Need to provide inputs
 
@@ -360,7 +373,7 @@ class TestHardwareNodeHandlers:
     @pytest.mark.asyncio
     async def test_fused_kernel_node(self):
         """Test FUSED_KERNEL node"""
-        with patch("node_handlers.HIDET_AVAILABLE", False):
+        with patch("unified_runtime.node_handlers.HIDET_AVAILABLE", False):
             node = {
                 "params": {"subgraph": {"nodes": [], "edges": []}}
             }  # Need valid subgraph
