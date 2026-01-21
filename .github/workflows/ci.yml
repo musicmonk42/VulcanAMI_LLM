@@ -199,6 +199,9 @@ jobs:
           set -x
           python -m pip install --no-cache-dir --upgrade pip setuptools wheel
           
+          # Install pytest-cov FIRST to ensure it's available to all xdist workers
+          pip install --no-cache-dir pytest-cov
+          
           # ==================================================================
           # CRITICAL: Install VULCAN as a package to enable 'import src'
           # This fixes the "No module named 'src'" error in GitHub Actions
@@ -208,10 +211,13 @@ jobs:
           echo "=================================================="
           pip install -e .
           
+          # Install test dependencies
           for i in 1 2 3; do
-            pip install --no-cache-dir pytest pytest-cov pytest-asyncio pytest-timeout pytest-xdist mock hypothesis faker numpy python-dotenv scipy lz4 psutil && \
+            pip install --no-cache-dir pytest pytest-asyncio pytest-timeout pytest-xdist mock hypothesis faker numpy python-dotenv scipy lz4 psutil && \
             break || (echo "Retry $i/3: test dependencies install failed"; sleep $((i*10)))
           done
+          
+          # Install requirements.txt
           for i in 1 2 3; do
             pip install --no-cache-dir -r requirements.txt && break || (echo "⚠️  Retry $i/3: requirements.txt install failed"; sleep $((i*10)))
           done || {
@@ -266,6 +272,17 @@ jobs:
           echo "VULCAN_CI_MODE=1" >> $GITHUB_ENV
           echo "VULCAN_FAST_FIXTURES=1" >> $GITHUB_ENV
           echo "VULCAN_MEMORY_CONSOLIDATION_INTERVAL=1" >> $GITHUB_ENV
+
+      - name: Create minimal .env file for tests
+        run: |
+          cat > .env << 'EOF'
+          # Minimal .env for testing
+          CI=true
+          SKIP_LOCAL_LLM=true
+          SKIP_OPENAI=true
+          REASONING_MOCK_MODE=true
+          EOF
+          echo "✓ Created .env file for tests"
 
       - name: Monitor system resources
         run: |
@@ -334,12 +351,14 @@ jobs:
           FAST_TEST_MARKERS="not slow and not load_test and not benchmark and not integration"
           
           # Determine pytest command based on matrix test-part
-          # Store and sanitize the test-part value to handle any interpolation issues
-          TEST_PART="${{ matrix.test-part }}"
-          TEST_PART=$(echo "$TEST_PART" | tr -d '[:space:]')
-          echo "DEBUG: test-part value is: '$TEST_PART'"
+          echo "=================================================="
+          echo "DEBUG: Determining test configuration"
+          echo "  Matrix test-part: '${{ matrix.test-part }}'"
+          echo "  Type: $(python3 -c "import sys; print(type('${{ matrix.test-part }}'))")"
+          echo "=================================================="
           
-          case "$TEST_PART" in
+          # Use direct matrix variable reference without intermediate processing
+          case "${{ matrix.test-part }}" in
             unit)
               echo "Running unit tests from tests/ directory"
               PYTEST_ARGS="tests/ -m \"$FAST_TEST_MARKERS\""
@@ -353,7 +372,7 @@ jobs:
               PYTEST_ARGS="tests/ src/vulcan/tests/ -m \"slow or integration\""
               ;;
             *)
-              echo "Unknown test-part: '$TEST_PART' (raw: '${{ matrix.test-part }}')"
+              echo "❌ ERROR: Unknown test-part value: '${{ matrix.test-part }}'"
               echo "Valid options are: unit, vulcan, integration"
               exit 1
               ;;
