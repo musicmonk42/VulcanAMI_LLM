@@ -85,24 +85,6 @@ try:
         shutdown_blocking_executor,
         # Query Router Timeout constant
         QUERY_ROUTING_TIMEOUT_SECONDS,
-        # Complex Physics Detection constants
-        COMPLEX_PHYSICS_KEYWORDS,
-        FORCE_FULL_MATH_PATTERNS,
-        COMPLEX_PHYSICS_TIMEOUT_SECONDS,
-        COMPLEX_PHYSICS_MIN_COMPLEXITY,
-        # Query Intent Classification constants
-        PHILOSOPHICAL_KEYWORDS,
-        PHILOSOPHICAL_PATTERNS,
-        IDENTITY_KEYWORDS,
-        IDENTITY_PATTERNS,
-        CONVERSATIONAL_KEYWORDS,
-        CONVERSATIONAL_PATTERNS,
-        FACTUAL_KEYWORDS,
-        FACTUAL_PATTERNS,
-        PHILOSOPHICAL_TIMEOUT_SECONDS,
-        IDENTITY_TIMEOUT_SECONDS,
-        CONVERSATIONAL_TIMEOUT_SECONDS,
-        FACTUAL_TIMEOUT_SECONDS,
     )
 
     QUERY_ROUTER_AVAILABLE = True
@@ -123,24 +105,6 @@ except ImportError as e:
     get_query_analyzer = None
     shutdown_blocking_executor = None
     QUERY_ROUTING_TIMEOUT_SECONDS = 5.0  # Default fallback
-    # Complex physics defaults
-    COMPLEX_PHYSICS_KEYWORDS = ()
-    FORCE_FULL_MATH_PATTERNS = ()
-    COMPLEX_PHYSICS_TIMEOUT_SECONDS = 120.0
-    COMPLEX_PHYSICS_MIN_COMPLEXITY = 0.80
-    # Query intent classification defaults
-    PHILOSOPHICAL_KEYWORDS = ()
-    PHILOSOPHICAL_PATTERNS = ()
-    IDENTITY_KEYWORDS = ()
-    IDENTITY_PATTERNS = ()
-    CONVERSATIONAL_KEYWORDS = ()
-    CONVERSATIONAL_PATTERNS = ()
-    FACTUAL_KEYWORDS = ()
-    FACTUAL_PATTERNS = ()
-    PHILOSOPHICAL_TIMEOUT_SECONDS = 3.0
-    IDENTITY_TIMEOUT_SECONDS = 2.0
-    CONVERSATIONAL_TIMEOUT_SECONDS = 2.0
-    FACTUAL_TIMEOUT_SECONDS = 5.0
 
 # Agent Collaboration
 try:
@@ -459,24 +423,6 @@ __all__ = [
     "get_query_analyzer",
     "shutdown_blocking_executor",
     "QUERY_ROUTING_TIMEOUT_SECONDS",  # Query Router Timeout constant
-    # Complex Physics Detection constants
-    "COMPLEX_PHYSICS_KEYWORDS",
-    "FORCE_FULL_MATH_PATTERNS",
-    "COMPLEX_PHYSICS_TIMEOUT_SECONDS",
-    "COMPLEX_PHYSICS_MIN_COMPLEXITY",
-    # Query Intent Classification constants
-    "PHILOSOPHICAL_KEYWORDS",
-    "PHILOSOPHICAL_PATTERNS",
-    "IDENTITY_KEYWORDS",
-    "IDENTITY_PATTERNS",
-    "CONVERSATIONAL_KEYWORDS",
-    "CONVERSATIONAL_PATTERNS",
-    "FACTUAL_KEYWORDS",
-    "FACTUAL_PATTERNS",
-    "PHILOSOPHICAL_TIMEOUT_SECONDS",
-    "IDENTITY_TIMEOUT_SECONDS",
-    "CONVERSATIONAL_TIMEOUT_SECONDS",
-    "FACTUAL_TIMEOUT_SECONDS",
     # Agent Collaboration
     "AgentMessage",
     "AgentCollaborationManager",

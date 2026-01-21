@@ -50,8 +50,8 @@ ROUTING DESTINATIONS:
 
 2. REASONING_ENGINE - For queries requiring formal computation:
    - symbolic: Logic (∧∨→¬), SAT, proofs, FOL, "satisfiable", "valid", "formalize"
-   - probabilistic: Bayes, P(A|B), posteriors, "sensitivity", "specificity", "likelihood"
-   - causal: "confound", "intervention", "do()", DAG, "cause vs correlation", "randomize"
+   - probabilistic: Bayes, P(A|B), posteriors, "sensitivity", "specificity", "likelihood", P() notation
+   - causal: "confound", "intervention", "do()", DAG, "cause vs correlation", "randomize", "collider", "d-separation"
    - mathematical: Calculus, algebra, "calculate", "solve", "derivative", "integral"
    - analogical: "is like", "corresponds to", structure mapping, "analogy"
    - cryptographic: Hash computation, encryption (deterministic operations)
@@ -61,17 +61,19 @@ ROUTING DESTINATIONS:
    - Chitchat: "how are you?", "what's up?"
    - Simple facts: "What is the capital of France?", "Who is the president?"
 
-CRITICAL ROUTING RULES:
-- "you/your" + feelings/values/ethics → WORLD_MODEL (not reasoning engine)
-- "confound" or "intervention" anywhere → causal (not probabilistic)
-- Hash/crypto computation → cryptographic (deterministic, exact computation)
-- When unsure between WORLD_MODEL and REASONING_ENGINE, prefer WORLD_MODEL
-- Probability with causal keywords (confound, dag, intervention) → causal engine
-- "proof" in mathematical context → symbolic engine
-- "proof" in cryptographic context → cryptographic engine
-- Grid navigation / pathfinding / constraint satisfaction → mathematical engine
-- "Two values conflict" / "ethical dilemma" → WORLD_MODEL (not symbolic)
-- "You're designing a cryptocurrency" → cryptographic (context is crypto, not self)"""
+CRITICAL ROUTING RULES (PRIORITY ORDER):
+1. "confounding" or "confound" or "collider" or "d-separation" → ALWAYS causal (not symbolic, not probabilistic)
+2. "conditioning on" in graph context (A→B←C) → causal (graphical causal model)
+3. P(...) notation with causal keywords → causal engine
+4. P(...) notation alone → probabilistic engine
+5. "you/your" + feelings/values/ethics → WORLD_MODEL (not reasoning engine)
+6. Hash/crypto computation → cryptographic (deterministic, exact computation)
+7. When unsure between WORLD_MODEL and REASONING_ENGINE, prefer WORLD_MODEL
+8. "proof" in mathematical context → symbolic engine
+9. "proof" in cryptographic context → cryptographic engine
+10. Grid navigation / pathfinding / constraint satisfaction → mathematical engine
+11. "Two values conflict" / "ethical dilemma" → WORLD_MODEL (not symbolic)
+12. "You're designing a cryptocurrency" → cryptographic (context is crypto, not self)"""
 
 
 # ============================================================
@@ -105,6 +107,9 @@ Query: "Is A→B, B→C, ¬C satisfiable?"
 
 Query: "What is P(disease|positive test) given sensitivity 0.99?"
 {"destination": "reasoning_engine", "engine": "probabilistic", "confidence": 0.95, "reason": "Bayesian probability calculation"}
+
+Query: "Does conditioning on B induce correlation between A and C in graph A→B←C?"
+{"destination": "reasoning_engine", "engine": "causal", "confidence": 0.98, "reason": "Causal graphical model with collider"}
 
 Query: "Does X cause Y or is it confounded?"
 {"destination": "reasoning_engine", "engine": "causal", "confidence": 0.95, "reason": "Causal inference with confounding"}

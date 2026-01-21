@@ -19,79 +19,92 @@ sys.path.insert(0, str(repo_root / "src"))
 class TestFix1QueryRouterReasoningDomainDetection:
     """
     Test Fix 1: Query router correctly identifies reasoning domain queries
-    and doesn't override them with philosophical routing.
+    and routes them to appropriate reasoning engines (not philosophical).
+    
+    Updated to use LLM-based classification instead of removed regex methods.
     """
     
-    def test_sat_query_not_philosophical(self):
-        """SAT query should NOT be classified as philosophical."""
-        # INDUSTRY STANDARD FIX: QueryRouter was renamed to QueryAnalyzer
-        from vulcan.routing.query_router import QueryAnalyzer
+    def test_sat_query_routes_to_symbolic(self):
+        """SAT query should route to symbolic reasoning engine."""
+        from vulcan.routing.llm_router import get_llm_router
         
-        router = QueryAnalyzer()
+        router = get_llm_router()
         query = "Is A→B, B→C, ¬C, A∨B satisfiable?"
         
-        # Should NOT be classified as philosophical
-        is_philosophical = router._is_philosophical_query(query)
-        assert not is_philosophical, (
-            f"SAT query incorrectly classified as philosophical. "
-            f"Expected False, got {is_philosophical}"
+        # LLM router should classify this as symbolic/sat reasoning
+        decision = router.route(query)
+        assert decision.destination == "reasoning_engine", (
+            f"SAT query should route to reasoning_engine. Got: {decision.destination}"
+        )
+        assert decision.engine in ["symbolic", "logical"], (
+            f"SAT query should use symbolic/logical engine. Got: {decision.engine}"
         )
     
-    def test_bayesian_query_not_philosophical(self):
-        """Bayesian query should NOT be classified as philosophical."""
-        # INDUSTRY STANDARD FIX: QueryRouter was renamed to QueryAnalyzer
-        from vulcan.routing.query_router import QueryAnalyzer
+    def test_bayesian_query_routes_to_probabilistic(self):
+        """Bayesian query should route to probabilistic reasoning engine."""
+        from vulcan.routing.llm_router import get_llm_router
         
-        router = QueryAnalyzer()
+        router = get_llm_router()
         query = "P(disease|positive test) with sensitivity=0.99, specificity=0.95, prevalence=0.01"
         
-        is_philosophical = router._is_philosophical_query(query)
-        assert not is_philosophical, (
-            f"Bayesian query incorrectly classified as philosophical. "
-            f"Expected False, got {is_philosophical}"
+        # LLM router should classify this as probabilistic reasoning
+        decision = router.route(query)
+        assert decision.destination == "reasoning_engine", (
+            f"Bayesian query should route to reasoning_engine. Got: {decision.destination}"
+        )
+        assert decision.engine in ["probabilistic", "mathematical"], (
+            f"Bayesian query should use probabilistic/mathematical engine. Got: {decision.engine}"
         )
     
-    def test_causal_query_not_philosophical(self):
-        """Causal inference query should NOT be classified as philosophical."""
-        # INDUSTRY STANDARD FIX: QueryRouter was renamed to QueryAnalyzer
-        from vulcan.routing.query_router import QueryAnalyzer
+    def test_causal_query_routes_to_causal(self):
+        """Causal inference query should route to causal reasoning engine."""
+        from vulcan.routing.llm_router import get_llm_router
         
-        router = QueryAnalyzer()
+        router = get_llm_router()
         query = "Does conditioning on B induce correlation between A and C in graph A→B←C?"
         
-        is_philosophical = router._is_philosophical_query(query)
-        assert not is_philosophical, (
-            f"Causal query incorrectly classified as philosophical. "
-            f"Expected False, got {is_philosophical}"
+        # LLM router should classify this as causal reasoning
+        decision = router.route(query)
+        assert decision.destination == "reasoning_engine", (
+            f"Causal query should route to reasoning_engine. Got: {decision.destination}"
+        )
+        assert decision.engine == "causal", (
+            f"Causal query should use causal engine. Got: {decision.engine}"
         )
     
-    def test_fol_query_not_philosophical(self):
-        """First-order logic query should NOT be classified as philosophical."""
-        # INDUSTRY STANDARD FIX: QueryRouter was renamed to QueryAnalyzer
-        from vulcan.routing.query_router import QueryAnalyzer
+    def test_fol_query_routes_to_symbolic(self):
+        """First-order logic query should route to symbolic reasoning engine."""
+        from vulcan.routing.llm_router import get_llm_router
         
-        router = QueryAnalyzer()
+        router = get_llm_router()
         query = "∀X (human(X) → mortal(X)), human(socrates) ⊢ mortal(socrates)?"
         
-        is_philosophical = router._is_philosophical_query(query)
-        assert not is_philosophical, (
-            f"FOL query incorrectly classified as philosophical. "
-            f"Expected False, got {is_philosophical}"
+        # LLM router should classify this as symbolic reasoning
+        decision = router.route(query)
+        assert decision.destination == "reasoning_engine", (
+            f"FOL query should route to reasoning_engine. Got: {decision.destination}"
+        )
+        assert decision.engine in ["symbolic", "logical"], (
+            f"FOL query should use symbolic/logical engine. Got: {decision.engine}"
         )
     
-    def test_actual_philosophical_query_is_philosophical(self):
-        """Actual philosophical query should still be classified correctly."""
-        # INDUSTRY STANDARD FIX: QueryRouter was renamed to QueryAnalyzer
-        from vulcan.routing.query_router import QueryAnalyzer
+    def test_actual_philosophical_query_routes_correctly(self):
+        """Actual philosophical query should route to world_model or philosophical engine."""
+        from vulcan.routing.llm_router import get_llm_router
         
-        router = QueryAnalyzer()
+        router = get_llm_router()
         query = "What is the meaning of life?"
         
-        is_philosophical = router._is_philosophical_query(query)
-        assert is_philosophical, (
-            f"Genuine philosophical query not classified as philosophical. "
-            f"Expected True, got {is_philosophical}"
+        # LLM router should classify this as philosophical
+        decision = router.route(query)
+        # Could route to world_model or philosophical reasoning engine
+        assert decision.destination in ["world_model", "reasoning_engine"], (
+            f"Philosophical query should route to world_model or reasoning_engine. Got: {decision.destination}"
         )
+        if decision.destination == "reasoning_engine":
+            assert decision.engine == "philosophical", (
+                f"Philosophical query should use philosophical engine. Got: {decision.engine}"
+            )
 
 
 class TestFix2WorldModelMetaReasoningIntegration:
