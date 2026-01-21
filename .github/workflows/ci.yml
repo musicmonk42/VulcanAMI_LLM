@@ -329,7 +329,12 @@ jobs:
           PYTHON_SCRIPT
 
       - name: Debug test collection
+        timeout-minutes: 5
         run: |
+          # CRITICAL: Set Python to unbuffered mode to prevent GitHub Actions from
+          # thinking the process is stalled due to buffered output
+          export PYTHONUNBUFFERED=1
+          
           echo "=== Checking for test files ==="
           echo "Tests in tests/ directory:"
           find tests/ -name "test_*.py" -o -name "*_test.py" 2>/dev/null | head -20 || echo "No tests found in tests/"
@@ -339,10 +344,11 @@ jobs:
           echo ""
           echo "=== Testing pytest collection (dry run) ==="
           echo "Collecting from tests/:"
-          pytest --collect-only tests/ -q 2>&1 | head -30 || echo "⚠️ Collection failed for tests/"
+          # Use timeout to prevent indefinite hangs during test collection
+          timeout 120 pytest --collect-only tests/ -q --continue-on-collection-errors 2>&1 | head -50 || echo "⚠️ Collection failed or timed out for tests/"
           echo ""
           echo "Collecting from src/vulcan/tests/:"
-          pytest --collect-only src/vulcan/tests/ -q 2>&1 | head -30 || echo "⚠️ Collection failed for src/vulcan/tests/"
+          timeout 120 pytest --collect-only src/vulcan/tests/ -q --continue-on-collection-errors 2>&1 | head -50 || echo "⚠️ Collection failed or timed out for src/vulcan/tests/"
 
       - name: Run tests with coverage
         run: |
