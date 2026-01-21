@@ -366,7 +366,7 @@ jobs:
           echo "✓ pytest-cov is installed"
           
           # Verify pytest can load the cov plugin
-          if ! python3 -m pytest --co -p pytest_cov --cov=. --cov-report= >/dev/null 2>&1; then
+          if ! python3 -m pytest --collect-only -p pytest_cov --cov=/dev/null --cov-report= /dev/null >/dev/null 2>&1; then
             echo "⚠️  WARNING: pytest-cov plugin may not load properly"
             echo "Continuing anyway - will fail if plugin is truly broken"
           else
