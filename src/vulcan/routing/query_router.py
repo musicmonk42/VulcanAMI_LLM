@@ -3198,55 +3198,48 @@ class QueryAnalyzer:
             return plan
 
         # ================================================================
-        # FIX: Apply reasoning integration to select tools and strategy
-        # This wires the ToolSelector and reasoning strategies into the flow
+        # LLM-BASED ROUTING: Use LLM classification for tool selection
         # ================================================================
-        reasoning_result = None
-        tool_hints = {}  # Initialize to avoid UnboundLocalError
-        try:
-            # ARCHITECTURE CONSOLIDATION: Import from unified compatibility layer
-            from vulcan.reasoning import apply_reasoning
-
-            reasoning_result = apply_reasoning(
-                query=query,
-                query_type=query_type.value,
-                complexity=complexity_score,
-                context={"session_id": session_id} if session_id else None,
-            )
-
-            logger.info(
-                f"[QueryRouter] Reasoning applied: strategy={reasoning_result.reasoning_strategy}, "
-                f"tools={reasoning_result.selected_tools}, confidence={reasoning_result.confidence:.2f}"
-            )
-
-            # Store reasoning info in plan's telemetry_data for downstream use
-            plan.telemetry_data["reasoning_strategy"] = (
-                reasoning_result.reasoning_strategy
-            )
-            plan.telemetry_data["selected_tools"] = reasoning_result.selected_tools
-            plan.telemetry_data["reasoning_confidence"] = reasoning_result.confidence
-            
-            # Populate tool_hints from reasoning result for downstream use
-            if reasoning_result.selected_tools:
-                tool_hints = {tool: 1.0 for tool in reasoning_result.selected_tools}
-            plan.telemetry_data["tool_hints"] = tool_hints
-
-        except ImportError:
-            logger.debug("[QueryRouter] Reasoning integration not available - using fallback")
-            tool_hints = {}
-            plan.telemetry_data["tool_hints"] = tool_hints
-            plan.telemetry_data["reasoning_strategy"] = "llm_classification_only"
-        except Exception as e:
-            logger.warning(f"[QueryRouter] Reasoning integration failed: {e} - using fallback")
-            tool_hints = {}
-            plan.telemetry_data["tool_hints"] = tool_hints
-            plan.telemetry_data["reasoning_strategy"] = "llm_classification_only"
+        # ARCHITECTURE (Jan 2026):
+        # - LLM is the LANGUAGE INTERFACE - it classifies queries semantically
+        # - LLM does NOT reason - it routes to the right reasoning engine
+        # - ToolSelector in reasoning/selection handles actual tool selection
+        #   when reasoning executes (with its own LLM classification)
+        # - QueryRouter just passes classification info to agent tasks
+        #
+        # This replaces the deprecated apply_reasoning() call which was:
+        # 1. Redundant (ToolSelector already has LLM classification)
+        # 2. Causing UnboundLocalError with tool_hints
+        # 3. Not the right place for tool selection
+        # ================================================================
         
-        # Log final tool hints status (handles both fallback cases)
-        if not tool_hints:
-            logger.info(
-                f"[QueryRouter] No tool hints available, relying on LLM classification"
-            )
+        # Use LLM classification that was already obtained above
+        # Map classification to tools for telemetry and downstream use
+        selected_tools = classification.suggested_tools or []
+        if not selected_tools:
+            # Map category to default tool if no suggestions
+            category_to_tool = {
+                "PROBABILISTIC": ["probabilistic"],
+                "LOGICAL": ["symbolic"],
+                "CAUSAL": ["causal"],
+                "MATHEMATICAL": ["mathematical"],
+                "ANALOGICAL": ["analogical"],
+                "PHILOSOPHICAL": ["world_model", "philosophical"],
+                "SELF_INTROSPECTION": ["world_model"],
+                "IDENTITY": ["world_model"],
+                "MULTIMODAL": ["multimodal"],
+            }
+            selected_tools = category_to_tool.get(classification.category, ["general"])
+        
+        plan.telemetry_data["selected_tools"] = selected_tools
+        plan.telemetry_data["reasoning_strategy"] = f"llm_classification_{classification.category.lower()}"
+        plan.telemetry_data["llm_classification"] = classification.category
+        plan.telemetry_data["llm_confidence"] = classification.confidence
+        
+        logger.info(
+            f"[QueryRouter] {query_id}: LLM routing: category={classification.category}, "
+            f"tools={selected_tools}, confidence={classification.confidence:.2f}"
+        )
 
         # Decompose into agent tasks (only if safety passed)
         plan.agent_tasks = self._decompose_to_tasks(query, query_type, source, plan)
