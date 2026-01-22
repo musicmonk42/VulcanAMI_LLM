@@ -746,9 +746,19 @@ class GraphixExecutor:
         is_containerized = (
             os.path.exists("/.dockerenv") or
             os.environ.get("KUBERNETES_SERVICE_HOST") or
-            os.path.exists("/run/.containerenv") or
-            os.path.exists("/proc/1/cgroup") and "docker" in open("/proc/1/cgroup").read()
+            os.path.exists("/run/.containerenv")
         )
+        
+        # Check Docker in cgroup (with error handling)
+        if not is_containerized and os.path.exists("/proc/1/cgroup"):
+            try:
+                with open("/proc/1/cgroup", "r") as f:
+                    cgroup_content = f.read()
+                    if "docker" in cgroup_content or "kubepods" in cgroup_content:
+                        is_containerized = True
+            except (PermissionError, FileNotFoundError, IOError):
+                # Cannot read cgroup file, assume not containerized
+                pass
         
         try:
             process = psutil.Process(os.getpid())

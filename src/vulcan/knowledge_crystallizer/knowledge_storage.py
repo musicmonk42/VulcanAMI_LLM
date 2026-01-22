@@ -24,6 +24,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 
 from ..security_fixes import safe_pickle_load
+from ..vulcan_types import EnhancedJSONEncoder
 
 # Optional imports with fallbacks
 try:
@@ -42,46 +43,6 @@ except ImportError:
         logging.warning("faiss not available, vector search will be limited")
 
 logger = logging.getLogger(__name__)
-
-
-class EnhancedJSONEncoder(json.JSONEncoder):
-    """Custom JSON encoder that handles Enum, numpy arrays, and other non-serializable types."""
-    
-    def default(self, obj):
-        """Convert non-JSON-serializable objects to JSON-serializable format."""
-        # Handle Enum types (including PatternType, MetricType, etc.)
-        if isinstance(obj, Enum):
-            return obj.value
-        
-        # Handle numpy arrays
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()
-        
-        # Handle numpy scalar types
-        if isinstance(obj, (np.integer, np.floating)):
-            return obj.item()
-        
-        # Handle dataclasses with to_dict method
-        if hasattr(obj, 'to_dict') and callable(obj.to_dict):
-            try:
-                return obj.to_dict()
-            except Exception:
-                pass
-        
-        # Handle objects with __dict__ (last resort)
-        if hasattr(obj, '__dict__'):
-            try:
-                return {k: v for k, v in obj.__dict__.items() 
-                       if not k.startswith('_')}
-            except Exception:
-                pass
-        
-        # Fallback to string representation for unknown types
-        try:
-            return str(obj)
-        except Exception:
-            # If all else fails, return a placeholder
-            return f"<non-serializable: {type(obj).__name__}>"
 
 
 class StorageBackend(Enum):

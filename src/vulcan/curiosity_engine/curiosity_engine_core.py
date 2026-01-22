@@ -1462,7 +1462,6 @@ class CuriosityEngine:
         self._gap_resolution_history: Dict[str, List[Tuple[float, bool]]] = {}
         # CRITICAL FIX: Track gaps resolved in current cycle to prevent duplicates
         self._current_cycle_resolutions: Dict[int, Set[str]] = {}  # cycle_id -> set of gap keys
-        self._current_cycle_id: Optional[int] = None
         # Note: Increased MAX_GAPS_PER_TYPE from 2 to 5 to allow more
         # experiments per learning cycle. The previous limit of 2 was too restrictive
         # and caused experiments=0 in most cycles.
