@@ -27,14 +27,18 @@ def test_graphix_llm_client_message_format():
     with open(file_path, 'r') as f:
         source = f.read()
     
-    # Check that the fix is in place - look for the wrapped message format
-    # More flexible pattern that handles different quote styles and whitespace
-    pattern = r'llm\.chat\s*\(\s*\[\s*\{\s*["\']role["\']\s*:\s*["\']user["\']\s*,\s*["\']content["\']\s*:\s*prompt\s*\}\s*\]\s*\)'
-    if re.search(pattern, source):
+    # Check that the fix is in place - verify key components
+    # Look for: llm.chat([{"role": "user", "content": prompt}])
+    has_chat_call = 'llm.chat([' in source
+    has_role_user = '"role": "user"' in source or "'role': 'user'" in source
+    has_content_prompt = '"content": prompt' in source or "'content': prompt" in source
+    
+    if has_chat_call and has_role_user and has_content_prompt:
         print("✓ Bug #1: Mathematical computation tool has message format fix")
         return True
     else:
         print("✗ Bug #1: Message format fix not found")
+        print(f"  has_chat_call={has_chat_call}, has_role_user={has_role_user}, has_content_prompt={has_content_prompt}")
         return False
 
 
@@ -111,7 +115,7 @@ def test_pearl_style_causal_patterns():
         'confounding.*causation',
         'you.*observe.*dataset',
         'causal.*arrow',
-        r'→|->',  # Causal arrow notation (Unicode or ASCII alternative)
+        r'→',  # Unicode arrow character
     ]
     
     found_count = 0

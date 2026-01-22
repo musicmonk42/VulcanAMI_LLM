@@ -198,7 +198,7 @@ EDUCATIONAL_SECURITY_PATTERNS = [
     re.compile(r'confounding\s+vs\s+causation', re.IGNORECASE),
     re.compile(r'you\s+observe\s+in\s+(?:a|the)\s+dataset', re.IGNORECASE),
     re.compile(r'causal\s+(?:arrow|effect|graph|inference)', re.IGNORECASE),
-    re.compile(r'[A-Za-z]→[A-Za-z]'),  # Causal arrow notation S→D (case-insensitive)
+    re.compile(r'[A-Za-z]→[A-Za-z]', re.IGNORECASE),  # Causal arrow notation S→D (Unicode arrow)
     re.compile(r'(?:choose|select)\s+experiment.*(?:identifies?|causal)', re.IGNORECASE),
     # FIX: Bayes/probability education patterns (Jan 6 2026 logs - Bayes questions skipped)
     re.compile(r'(?:sensitivity|specificity).*(?:prevalence|compute|calculate)', re.IGNORECASE),
