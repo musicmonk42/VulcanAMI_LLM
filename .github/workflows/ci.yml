@@ -384,7 +384,7 @@ jobs:
           TEST_PART="${{ matrix.test-part }}"
           
           # Sanitize: trim whitespace and convert to lowercase for reliable matching
-          TEST_PART="$(echo "$TEST_PART" | xargs | tr '[:upper:]' '[:lower:]')"
+          TEST_PART="$(echo "$TEST_PART" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | tr '[:upper:]' '[:lower:]')"
           
           # Determine test path and marker expression based on matrix test-part
           # IMPORTANT: Keep TEST_PATH and MARKER_EXPR as separate variables
