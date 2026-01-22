@@ -19,6 +19,7 @@ resources:
   - milvus-networkpolicy.yaml
   - minio-deployment.yaml
   - minio-networkpolicy.yaml
+  - rbac.yaml
 
 labels:
   - pairs:
