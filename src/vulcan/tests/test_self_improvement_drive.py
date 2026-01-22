@@ -197,7 +197,7 @@ class TestInitialization:
     def test_csiu_disabled_by_env(self, config_path, state_path, monkeypatch):
         """Test that CSIU can be disabled via environment"""
         monkeypatch.setenv("INTRINSIC_CSIU_OFF", "1")
-        drive = SelfImprovementDrive(config_path, state_path)
+        drive = SelfImprovementDrive(config_path=config_path, state_path=state_path)
 
         assert drive._csiu_enabled is False
 
@@ -263,7 +263,9 @@ class TestConfigLoading:
             json.dump(bad_config, f)
 
         # Code uses defaults instead of raising error
-        drive = SelfImprovementDrive(str(config_file), str(temp_dir / "state.json"))
+        drive = SelfImprovementDrive(
+            config_path=str(config_file), state_path=str(temp_dir / "state.json")
+        )
         assert drive.config is not None
         assert len(drive.objectives) > 0  # Should have default objectives
 
@@ -273,7 +275,9 @@ class TestConfigLoading:
         with open(bad_config_file, "w", encoding="utf-8") as f:
             f.write("{ invalid json }")
 
-        drive = SelfImprovementDrive(str(bad_config_file), str(temp_dir / "state.json"))
+        drive = SelfImprovementDrive(
+            config_path=str(bad_config_file), state_path=str(temp_dir / "state.json")
+        )
 
         # Should use defaults
         assert len(drive.objectives) > 0
@@ -296,13 +300,13 @@ class TestStatePersistence:
     def test_save_and_load_state(self, config_path, state_path):
         """Test saving and loading state"""
         # Create drive and modify state
-        drive1 = SelfImprovementDrive(config_path, state_path)
+        drive1 = SelfImprovementDrive(config_path=config_path, state_path=state_path)
         drive1.state.completed_objectives = ["test_objective"]
         drive1.state.total_cost_usd = 1.5
         drive1._save_state()
 
         # Load in new instance
-        drive2 = SelfImprovementDrive(config_path, state_path)
+        drive2 = SelfImprovementDrive(config_path=config_path, state_path=state_path)
 
         assert "test_objective" in drive2.state.completed_objectives
         assert drive2.state.total_cost_usd == 1.5
@@ -349,11 +353,11 @@ class TestStatePersistence:
 
     def test_csiu_weights_persisted(self, config_path, state_path):
         """Test that CSIU weights are saved and loaded"""
-        drive1 = SelfImprovementDrive(config_path, state_path)
+        drive1 = SelfImprovementDrive(config_path=config_path, state_path=state_path)
         drive1._csiu_w["w1"] = 0.9
         drive1._save_state()
 
-        drive2 = SelfImprovementDrive(config_path, state_path)
+        drive2 = SelfImprovementDrive(config_path=config_path, state_path=state_path)
         assert drive2._csiu_w["w1"] == 0.9
 
 
@@ -395,7 +399,9 @@ class TestObjectives:
         with open(unique_state_path, "w", encoding="utf-8") as f:
             json.dump(state, f)
 
-        drive = SelfImprovementDrive(config_path, str(unique_state_path))
+        drive = SelfImprovementDrive(
+            config_path=config_path, state_path=str(unique_state_path)
+        )
 
         # Verify objectives loaded and state object exists
         # Note: Due to implementation details, completed_objectives may merge with
@@ -1425,12 +1431,14 @@ class TestEdgeCases:
         with open(config_file, "w", encoding="utf-8") as f:
             json.dump(config, f)
 
-        drive = SelfImprovementDrive(str(config_file), str(temp_dir / "state.json"))
+        drive = SelfImprovementDrive(
+            config_path=str(config_file), state_path=str(temp_dir / "state.json")
+        )
 
-        # Code uses default objectives even when config has empty list
-        assert len(drive.objectives) > 0  # Should have default objectives
+        # Empty objectives list should be respected (not fall back to defaults)
+        assert len(drive.objectives) == 0
         obj = drive.select_objective()
-        assert obj is not None  # Should select from defaults
+        assert obj is None  # No objectives to select
 
     def test_very_high_costs(self, drive):
         """Test handling very high costs"""
@@ -1470,7 +1478,9 @@ class TestEdgeCases:
             f.write("{ corrupted json }")
 
         # Should fall back to new state
-        drive = SelfImprovementDrive(config_path, str(state_path))
+        drive = SelfImprovementDrive(
+            config_path=config_path, state_path=str(state_path)
+        )
 
         assert isinstance(drive.state, SelfImprovementState)
 
