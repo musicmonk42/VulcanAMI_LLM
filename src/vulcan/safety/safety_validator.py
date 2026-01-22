@@ -193,13 +193,21 @@ EDUCATIONAL_SECURITY_PATTERNS = [
     re.compile(r'causal effect.*(?:identifies?|randomize)', re.IGNORECASE),
     re.compile(r'(?:randomize|intervention).*(?:confounder|treatment)', re.IGNORECASE),
     re.compile(r'minimal causal graph', re.IGNORECASE),
-    # FIX Bug #4: Pearl-style causal inference patterns
+    # FIX Bug #4: Pearl-style causal inference patterns - Enhanced
     re.compile(r'pearl[- ]style', re.IGNORECASE),
     re.compile(r'confounding\s+vs\s+causation', re.IGNORECASE),
     re.compile(r'you\s+observe\s+in\s+(?:a|the)\s+dataset', re.IGNORECASE),
     re.compile(r'causal\s+(?:arrow|effect|graph|inference)', re.IGNORECASE),
     re.compile(r'[A-Za-z]→[A-Za-z]', re.IGNORECASE),  # Causal arrow notation S→D (Unicode arrow)
     re.compile(r'(?:choose|select)\s+experiment.*(?:identifies?|causal)', re.IGNORECASE),
+    # FIX Bug #4: Statistical methods and experimental design for causal inference
+    re.compile(r'propensity\s+score.*(?:matching|weighting)', re.IGNORECASE),
+    re.compile(r'difference[- ]in[- ]differences', re.IGNORECASE),
+    re.compile(r'regression\s+discontinuity', re.IGNORECASE),
+    re.compile(r'(?:exercise|supplement|treatment)\s+causes?', re.IGNORECASE),
+    re.compile(r'correlation\s+(?:vs|versus|does\s+not\s+imply)\s+causation', re.IGNORECASE),
+    re.compile(r'(?:randomized|natural|quasi)[- ]experiment', re.IGNORECASE),
+    re.compile(r'(?:counterfactual|potential)\s+outcomes?', re.IGNORECASE),
     # FIX: Bayes/probability education patterns (Jan 6 2026 logs - Bayes questions skipped)
     re.compile(r'(?:sensitivity|specificity).*(?:prevalence|compute|calculate)', re.IGNORECASE),
     re.compile(r'(?:compute|calculate).*P\s*\(', re.IGNORECASE),
@@ -2245,15 +2253,28 @@ class EnhancedSafetyValidator(SafetyValidator):
         ]
         has_prob_education = any(kw in query_lower for kw in prob_education_keywords)
         
-        # Check for causal inference education
+        # Check for causal inference education (FIX Bug #4: Enhanced causal/statistical detection)
+        # Industry Standard: Comprehensive pattern matching for educational content
         causal_education_keywords = [
+            # Core causal inference
             "causal effect", "randomize", "intervention", "confounder",
             "treatment effect", "causal graph", "d-separation",
             "backdoor criterion", "instrumental variable",
-            # FIX Bug #4: Pearl-style causal inference patterns
-            "pearl-style", "confounding vs causation", "you observe in a dataset",
-            "you observe in the dataset", "causal arrow", "s→d", "causal inference",
+            # Pearl-style causal inference
+            "pearl-style", "pearl style", "confounding vs causation", 
+            "you observe in a dataset", "you observe in the dataset", 
+            "causal arrow", "s→d", "causal inference",
             "choose experiment", "identifies the causal",
+            # Statistical methods commonly used in causal inference
+            "propensity score", "matching", "difference-in-differences",
+            "regression discontinuity", "dag diagram", "structural equation",
+            "conditional independence", "markov blanket",
+            # Experimental design for causality
+            "randomized controlled", "observational study", "natural experiment",
+            "quasi-experimental", "counterfactual", "potential outcomes",
+            # Common causal queries
+            "exercise causes", "supplement causes", "treatment causes",
+            "correlation vs causation", "correlation does not imply causation",
         ]
         has_causal_education = any(kw in query_lower for kw in causal_education_keywords)
         

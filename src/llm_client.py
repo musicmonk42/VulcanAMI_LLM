@@ -286,12 +286,31 @@ class GraphixLLMClient:
         temperature = temperature or self.temperature
         max_tokens = max_tokens or self.max_tokens
 
-        # Validate messages
-        if not messages or not all("role" in m and "content" in m for m in messages):
-            self.logger.error("Invalid messages format")
+        # Validate messages - Industry Standard: Explicit type checking and validation
+        if not isinstance(messages, list):
+            self.logger.error(f"Invalid messages format: expected list, got {type(messages).__name__}")
             raise ValueError(
                 "Messages must be a list of dicts with 'role' and 'content'"
             )
+        
+        if not messages:
+            self.logger.error("Invalid messages format: empty list")
+            raise ValueError(
+                "Messages must be a list of dicts with 'role' and 'content'"
+            )
+        
+        # Validate each message is a dict with required keys
+        for i, msg in enumerate(messages):
+            if not isinstance(msg, dict):
+                self.logger.error(f"Invalid message at index {i}: expected dict, got {type(msg).__name__}")
+                raise ValueError(
+                    "Messages must be a list of dicts with 'role' and 'content'"
+                )
+            if "role" not in msg or "content" not in msg:
+                self.logger.error(f"Invalid message at index {i}: missing 'role' or 'content' keys. Keys: {list(msg.keys())}")
+                raise ValueError(
+                    "Messages must be a list of dicts with 'role' and 'content'"
+                )
 
         last_content = messages[-1].get("content", "") if messages else ""
         proposal_id = hashlib.sha256(last_content.encode()).hexdigest()[:8]
