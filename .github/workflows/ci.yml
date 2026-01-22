@@ -111,7 +111,7 @@ jobs:
   test:
     name: Test Python ${{ matrix.python-version }} - ${{ matrix.test-part }}
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -432,16 +432,21 @@ jobs:
           echo "=================================================="
           
           # Increased --max-worker-restart to 3 for better resilience
-          # Timeout set to 35m to ensure completion before job timeout (40m)
+          # Job timeout set to 60 minutes with inner timeout set to 55 minutes to ensure
+          # completion before job timeout. This accommodates the large test suite (~6800+ tests).
           # Added per-test timeout (--timeout=300) to prevent individual test hangs
-          # Use -n 2 workers for better parallelism
+          # Using -n auto for optimal parallelism on GitHub Actions runners (uses all CPUs)
           # Changed to verbose mode (-vv) for better visibility into test execution
           # Added -o timeout_func_only=true to only timeout test functions, not fixtures
           # Added --cov-config to use .coveragerc for proper parallel coverage
           #
           # CRITICAL FIX: Pass -m with properly quoted MARKER_EXPR directly
           # Do NOT store "-m ..." in a variable - shell word splitting breaks it
-          TIMEOUT_MINUTES=35
+          #
+          # TIMEOUT FIX: Increased job timeout to 60 minutes and inner timeout to 55 minutes
+          # to accommodate the large test suite (~6800+ tests in vulcan tests alone).
+          # Using -n auto for optimal parallelism on GitHub Actions runners.
+          TIMEOUT_MINUTES=55
           timeout ${TIMEOUT_MINUTES}m pytest \
             --cov=src \
             --cov-config=.coveragerc \
@@ -453,7 +458,7 @@ jobs:
             --junitxml=results/junit.xml \
             --timeout=300 \
             --timeout-method=thread \
-            -n 2 \
+            -n auto \
             --dist=loadfile \
             --max-worker-restart=3 \
             -o timeout_func_only=true \
