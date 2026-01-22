@@ -361,6 +361,13 @@ jobs:
           # thinking the process is stalled due to buffered output
           export PYTHONUNBUFFERED=1
           
+          # CRITICAL: Set unique coverage file per job to prevent SQLite locking conflicts
+          # when multiple test jobs run in parallel. Without this, xdist workers from
+          # different matrix jobs may try to write to the same .coverage file causing
+          # database locks and test cancellations.
+          export COVERAGE_FILE=".coverage.${{ github.run_id }}.${{ matrix.test-part }}"
+          echo "Using unique coverage file: $COVERAGE_FILE"
+          
           # Monitor test progress in background
           (
             sleep 60
