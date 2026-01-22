@@ -268,12 +268,18 @@ class TestReasoningPipelineIntegration:
         """Test inferring reasoning_type from selected_tools."""
         selected_tools = ['philosophical', 'meta_reasoning', 'world_model']
         
-        # Priority order (from agent_pool.py)
-        TOOL_SELECTION_PRIORITY_ORDER = [
-            'causal', 'analogical', 'multimodal', 'mathematical',
-            'philosophical', 'language', 'cryptographic',
-            'symbolic', 'probabilistic', 'world_model', 'general'
-        ]
+        # Priority order should match production code
+        # Industry Standard: Use actual source data instead of hardcoding
+        # Note: Import may fail if module not available, use fallback for testing
+        try:
+            from vulcan.orchestrator.agent_pool import TOOL_SELECTION_PRIORITY_ORDER
+        except ImportError:
+            # Fallback for testing environments without full module access
+            TOOL_SELECTION_PRIORITY_ORDER = [
+                'causal', 'analogical', 'multimodal', 'mathematical',
+                'philosophical', 'language', 'cryptographic',
+                'symbolic', 'probabilistic', 'world_model', 'general'
+            ]
         
         # Find primary tool
         primary_tool = None

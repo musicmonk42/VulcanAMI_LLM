@@ -3101,8 +3101,8 @@ class AgentPoolManager:
             # This is normal behavior - router may provide explicit instructions OR selected_tools
             if is_reasoning_task and not (router_reasoning_type and router_tool_name):
                 logger.debug(
-                    f"[AgentPool] Task {task_id}: Router provided selected_tools without explicit "
-                    f"reasoning_type. Will infer reasoning_type from selected_tools={selected_tools}. "
+                    f"[AgentPool] Task {task_id}: Router provided selected_tools without explicit reasoning_type. "
+                    f"Will infer reasoning_type from selected_tools={selected_tools}. "
                     f"This is expected behavior when router delegates tool selection."
                 )
                 # Track routing method for observability (not an error)

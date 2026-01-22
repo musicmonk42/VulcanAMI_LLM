@@ -204,7 +204,7 @@ EDUCATIONAL_SECURITY_PATTERNS = [
     re.compile(r'propensity\s+score.*(?:matching|weighting)', re.IGNORECASE),
     re.compile(r'difference[- ]in[- ]differences', re.IGNORECASE),
     re.compile(r'regression\s+discontinuity', re.IGNORECASE),
-    re.compile(r'(?:exercise|supplement|treatment)\s+causes?', re.IGNORECASE),
+    re.compile(r'(?:study|analysis|research).*(?:exercise|supplement|treatment)\s+causes?', re.IGNORECASE),
     re.compile(r'correlation\s+(?:vs|versus|does\s+not\s+imply)\s+causation', re.IGNORECASE),
     re.compile(r'(?:randomized|natural|quasi)[- ]experiment', re.IGNORECASE),
     re.compile(r'(?:counterfactual|potential)\s+outcomes?', re.IGNORECASE),
