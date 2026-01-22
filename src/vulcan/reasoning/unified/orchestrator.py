@@ -2723,6 +2723,7 @@ class UnifiedReasoner:
             'symbolic': ReasoningType.SYMBOLIC,
             'logic': ReasoningType.SYMBOLIC,
             'symbolic_reasoning': ReasoningType.SYMBOLIC,
+            'fol_solver': ReasoningType.SYMBOLIC,  # FIX Bug #2: FOL uses symbolic reasoning
             
             'probabilistic': ReasoningType.PROBABILISTIC,
             'probability': ReasoningType.PROBABILISTIC,
@@ -2731,6 +2732,7 @@ class UnifiedReasoner:
             'causal': ReasoningType.CAUSAL,
             'cause': ReasoningType.CAUSAL,
             'causal_reasoning': ReasoningType.CAUSAL,
+            'dag_analyzer': ReasoningType.CAUSAL,  # FIX Bug #2: DAG analysis is causal reasoning
             
             'analogical': ReasoningType.ANALOGICAL,
             'analogy': ReasoningType.ANALOGICAL,
@@ -2744,6 +2746,7 @@ class UnifiedReasoner:
             'ethical': ReasoningType.PHILOSOPHICAL,
             'world_model': ReasoningType.PHILOSOPHICAL,
             'worldmodel': ReasoningType.PHILOSOPHICAL,
+            'meta_reasoning': ReasoningType.PHILOSOPHICAL,  # FIX Bug #2: Meta-reasoning uses philosophical engine
             'ethics': ReasoningType.PHILOSOPHICAL,
             'moral': ReasoningType.PHILOSOPHICAL,
         }

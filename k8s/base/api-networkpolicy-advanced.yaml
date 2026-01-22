@@ -1,0 +1,250 @@
+# =============================================================================
+# VulcanAMI API - Advanced Network Policy with FQDN Egress Rules
+# =============================================================================
+# This is an EXAMPLE advanced NetworkPolicy using Cilium/Calico extensions.
+# 
+# REQUIREMENTS:
+#   - Cilium CNI OR Calico CNI with DNS policy support
+#   - For Cilium: version 1.12+
+#   - For Calico: version 3.20+ with eBPF dataplane
+#
+# DEPLOYMENT:
+#   kubectl apply -f api-networkpolicy-advanced.yaml
+#
+# NOTE: This file is NOT applied by default. It requires a compatible CNI.
+# For standard Kubernetes NetworkPolicy, use api-networkpolicy.yaml instead.
+# =============================================================================
+
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: vulcanami-api-fqdn-egress
+  namespace: vulcanami
+  labels:
+    app: vulcanami-api
+spec:
+  endpointSelector:
+    matchLabels:
+      app: vulcanami-api
+  
+  # =============================================================================
+  # INGRESS RULES (same as standard policy)
+  # =============================================================================
+  ingress:
+  - fromEndpoints:
+    - matchLabels:
+        app: vulcanami-api
+    - matchLabels:
+        app: ingress-nginx
+    toPorts:
+    - ports:
+      - port: "8000"
+        protocol: TCP
+      - port: "9148"
+        protocol: TCP
+
+  # =============================================================================
+  # EGRESS RULES (FQDN-based allowlisting)
+  # =============================================================================
+  egress:
+  # ----------------------------------------------------------------------------
+  # Internal cluster communication
+  # ----------------------------------------------------------------------------
+  - toEndpoints:
+    - matchLabels: {}  # Allow to all pods in same namespace
+  
+  - toEndpoints:
+    - matchLabels:
+        k8s:io.kubernetes.pod.namespace: kube-system
+        k8s-app: kube-dns
+    toPorts:
+    - ports:
+      - port: "53"
+        protocol: UDP
+      - port: "53"
+        protocol: TCP
+      rules:
+        dns:
+        - matchPattern: "*"
+
+  # ----------------------------------------------------------------------------
+  # LLM API Providers (REQUIRED)
+  # ----------------------------------------------------------------------------
+  - toFQDNs:
+    - matchName: "api.openai.com"
+    - matchPattern: "*.openai.com"
+    - matchName: "api.anthropic.com"
+    - matchPattern: "*.anthropic.com"
+    toPorts:
+    - ports:
+      - port: "443"
+        protocol: TCP
+
+  # ----------------------------------------------------------------------------
+  # Model & ML Infrastructure
+  # ----------------------------------------------------------------------------
+  - toFQDNs:
+    - matchPattern: "*.huggingface.co"
+    - matchName: "huggingface.co"
+    - matchName: "cdn-lfs.huggingface.co"
+    toPorts:
+    - ports:
+      - port: "443"
+        protocol: TCP
+
+  # ----------------------------------------------------------------------------
+  # Container Registry & Package Management
+  # ----------------------------------------------------------------------------
+  - toFQDNs:
+    - matchName: "ghcr.io"
+    - matchPattern: "*.pkg.github.com"
+    - matchName: "pypi.org"
+    - matchPattern: "*.pypi.org"
+    - matchName: "files.pythonhosted.org"
+    toPorts:
+    - ports:
+      - port: "443"
+        protocol: TCP
+
+  # ----------------------------------------------------------------------------
+  # Cloud Storage for Model Artifacts
+  # ----------------------------------------------------------------------------
+  - toFQDNs:
+    - matchPattern: "*.storage.googleapis.com"
+    - matchPattern: "*.s3.amazonaws.com"
+    - matchPattern: "*.s3.*.amazonaws.com"
+    toPorts:
+    - ports:
+      - port: "443"
+        protocol: TCP
+
+  # ----------------------------------------------------------------------------
+  # Monitoring & Observability (Optional)
+  # ----------------------------------------------------------------------------
+  - toFQDNs:
+    - matchPattern: "*.grafana.net"
+    - matchPattern: "*.datadog.com"
+    - matchPattern: "*.newrelic.com"
+    toPorts:
+    - ports:
+      - port: "443"
+        protocol: TCP
+
+  # ----------------------------------------------------------------------------
+  # GitHub API (for dependency resolution, if needed)
+  # ----------------------------------------------------------------------------
+  - toFQDNs:
+    - matchName: "api.github.com"
+    - matchName: "github.com"
+    toPorts:
+    - ports:
+      - port: "443"
+        protocol: TCP
+
+---
+# =============================================================================
+# Alternative: Calico GlobalNetworkPolicy with FQDN Support
+# =============================================================================
+# apiVersion: projectcalico.org/v3
+# kind: GlobalNetworkPolicy
+# metadata:
+#   name: vulcanami-api-fqdn-egress
+# spec:
+#   selector: app == 'vulcanami-api'
+#   types:
+#   - Egress
+#   egress:
+#   # LLM APIs
+#   - action: Allow
+#     protocol: TCP
+#     destination:
+#       ports: [443]
+#       domains:
+#       - "*.openai.com"
+#       - "*.anthropic.com"
+#   
+#   # Model Downloads
+#   - action: Allow
+#     protocol: TCP
+#     destination:
+#       ports: [443]
+#       domains:
+#       - "*.huggingface.co"
+#       - "*.storage.googleapis.com"
+#   
+#   # Package Management
+#   - action: Allow
+#     protocol: TCP
+#     destination:
+#       ports: [443]
+#       domains:
+#       - "pypi.org"
+#       - "*.pypi.org"
+#       - "files.pythonhosted.org"
+#   
+#   # Container Registry
+#   - action: Allow
+#     protocol: TCP
+#     destination:
+#       ports: [443]
+#       domains:
+#       - "ghcr.io"
+#       - "*.pkg.github.com"
+#   
+#   # DNS
+#   - action: Allow
+#     protocol: UDP
+#     destination:
+#       ports: [53]
+#   
+#   # Internal cluster
+#   - action: Allow
+#     destination:
+#       selector: all()
+
+---
+# =============================================================================
+# NetworkPolicy Compatibility Matrix
+# =============================================================================
+# 
+# Standard Kubernetes NetworkPolicy (api-networkpolicy.yaml):
+#   ✅ Works with: All CNI plugins (Calico, Cilium, Weave, Flannel, etc.)
+#   ❌ Limitations: Cannot filter by FQDN, only IP/CIDR
+#   ✅ Use for: Development, basic production setups
+#
+# Cilium NetworkPolicy (this file):
+#   ✅ Works with: Cilium CNI only
+#   ✅ Features: FQDN filtering, L7 policy, DNS-aware
+#   ✅ Use for: Production with Cilium CNI
+#
+# Calico GlobalNetworkPolicy:
+#   ✅ Works with: Calico CNI with eBPF dataplane
+#   ✅ Features: FQDN filtering, global policies
+#   ✅ Use for: Production with Calico CNI
+#
+# =============================================================================
+# Migration Path
+# =============================================================================
+#
+# 1. Development (No FQDN filtering):
+#      kubectl apply -f k8s/base/api-networkpolicy.yaml
+#
+# 2. Production with Cilium:
+#      kubectl apply -f k8s/base/api-networkpolicy-advanced.yaml
+#      kubectl delete networkpolicy vulcanami-api-netpol -n vulcanami
+#
+# 3. Production with Calico:
+#      Uncomment Calico section above
+#      kubectl apply -f k8s/base/api-networkpolicy-advanced.yaml
+#      kubectl delete networkpolicy vulcanami-api-netpol -n vulcanami
+#
+# 4. Validation:
+#      # Test allowed egress
+#      kubectl exec -n vulcanami deployment/vulcanami-api -- \
+#        curl -I https://api.openai.com
+#      
+#      # Test blocked egress (should fail)
+#      kubectl exec -n vulcanami deployment/vulcanami-api -- \
+#        curl -I https://example.com
+#
+# =============================================================================

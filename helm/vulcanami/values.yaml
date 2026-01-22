@@ -13,10 +13,23 @@ replicaCount: 1
 image:
   repository: ghcr.io/musicmonk42/vulcanami_llm-api
   pullPolicy: IfNotPresent
-  # SECURITY: Use specific version tag instead of 'latest' for production
-  # Example: tag: "v1.0.0" or tag: "1.0.0-sha256:abc123..."
-  # This MUST be overridden during deployment with --set image.tag=<version>
-  tag: "REPLACE_ME"  # REQUIRED: Must be set to a specific version during deployment
+  # SECURITY: Use specific version tag with digest for production immutability
+  # Format: tag@digest
+  # Example: tag: "v1.0.0@sha256:abc123def456..."
+  # 
+  # BEST PRACTICE: Always use image digests in production to ensure immutability
+  # Tags can be re-pushed, but digests are cryptographically guaranteed.
+  # 
+  # To get the digest of an image:
+  #   docker pull ghcr.io/musicmonk42/vulcanami_llm-api:v1.0.0
+  #   docker inspect --format='{{index .RepoDigests 0}}' ghcr.io/musicmonk42/vulcanami_llm-api:v1.0.0
+  # 
+  # This MUST be overridden during deployment with --set image.tag=<version@digest>
+  tag: "REPLACE_ME"  # REQUIRED: Must be set to version@digest (e.g., v1.0.0@sha256:abc123...)
+  
+  # Optional: Set digest separately for cleaner values
+  # If digest is provided, it will be appended to the tag
+  digest: ""  # Example: "sha256:abc123def456..."
 
 imagePullSecrets: []
 nameOverride: ""

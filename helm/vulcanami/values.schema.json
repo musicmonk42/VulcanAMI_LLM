@@ -1,0 +1,300 @@
+# ============================================================================
+# VulcanAMI Helm Values Schema - JSON Schema Draft 7
+# ============================================================================
+# This schema validates Helm values.yaml inputs to prevent misconfigurations.
+# 
+# Usage:
+#   helm install vulcanami ./helm/vulcanami --values prod-values.yaml
+#   (Helm 3.8+ automatically validates against this schema)
+#
+# Manual validation:
+#   helm lint ./helm/vulcanami --values prod-values.yaml --strict
+# ============================================================================
+
+$schema: http://json-schema.org/draft-07/schema#
+type: object
+
+# ============================================================================
+# REQUIRED FIELDS
+# ============================================================================
+required:
+  - image
+
+properties:
+  # ==========================================================================
+  # IMAGE CONFIGURATION (REQUIRED)
+  # ==========================================================================
+  image:
+    type: object
+    required:
+      - repository
+      - tag
+    properties:
+      repository:
+        type: string
+        description: "Container image repository"
+        pattern: "^[a-z0-9.-]+(/[a-z0-9._-]+)+$"
+        examples:
+          - "ghcr.io/musicmonk42/vulcanami_llm-api"
+      
+      tag:
+        type: string
+        description: |
+          Image tag (REQUIRED). Must be a specific version, not 'latest'.
+          
+          SECURITY BEST PRACTICE: Use digest pinning in production.
+          Format options:
+            - Version only: "v1.0.0"
+            - Version with digest: "v1.0.0@sha256:abc123..."
+          
+          Get digest with:
+            docker pull ghcr.io/org/image:v1.0.0
+            docker inspect --format='{{index .RepoDigests 0}}' ghcr.io/org/image:v1.0.0
+        minLength: 3
+        pattern: "^(?!latest$|stable$|main$)[a-zA-Z0-9][a-zA-Z0-9._-]*(@sha256:[a-f0-9]{64})?$"
+        examples:
+          - "v1.0.0"
+          - "v1.0.0@sha256:abc123def456..."
+          - "1.2.3-alpha"
+      
+      digest:
+        type: string
+        description: |
+          Optional: Image digest for additional security.
+          If provided, will be appended to the tag.
+          Format: sha256:<64-hex-characters>
+        pattern: "^(sha256:[a-f0-9]{64})?$"
+        examples:
+          - ""
+          - "sha256:abc123def456..."
+      
+      pullPolicy:
+        type: string
+        enum: ["IfNotPresent", "Always", "Never"]
+        default: "IfNotPresent"
+        description: |
+          Image pull policy:
+            - IfNotPresent: Pull if not present (recommended for production)
+            - Always: Always pull (use for :latest tags in development)
+            - Never: Never pull (for air-gapped environments)
+  
+  # ==========================================================================
+  # REPLICA CONFIGURATION
+  # ==========================================================================
+  replicaCount:
+    type: integer
+    minimum: 1
+    maximum: 100
+    default: 1
+    description: |
+      Number of pod replicas when autoscaling is disabled.
+      IMPORTANT: Set to 1 when Redis is unavailable to prevent split-brain.
+  
+  # ==========================================================================
+  # AUTOSCALING CONFIGURATION
+  # ==========================================================================
+  autoscaling:
+    type: object
+    properties:
+      enabled:
+        type: boolean
+        default: true
+      minReplicas:
+        type: integer
+        minimum: 1
+        maximum: 10
+        default: 1
+        description: "Minimum replica count. Set to 1 for single-replica deployments."
+      maxReplicas:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 10
+      targetCPUUtilizationPercentage:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 70
+      targetMemoryUtilizationPercentage:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 80
+  
+  # ==========================================================================
+  # SECURITY CONTEXT (IMPORTANT)
+  # ==========================================================================
+  podSecurityContext:
+    type: object
+    properties:
+      runAsNonRoot:
+        type: boolean
+        const: true
+        description: "SECURITY: Must run as non-root (enforced)"
+      runAsUser:
+        type: integer
+        minimum: 1000
+        default: 1001
+        description: "User ID (must be non-root, >= 1000)"
+      fsGroup:
+        type: integer
+        minimum: 1000
+        default: 1001
+        description: "Filesystem group ID"
+  
+  securityContext:
+    type: object
+    properties:
+      readOnlyRootFilesystem:
+        type: boolean
+        const: true
+        description: "SECURITY: Root filesystem must be read-only (enforced)"
+      allowPrivilegeEscalation:
+        type: boolean
+        const: false
+        description: "SECURITY: Privilege escalation must be disabled (enforced)"
+      capabilities:
+        type: object
+        properties:
+          drop:
+            type: array
+            contains:
+              const: "ALL"
+            description: "SECURITY: All capabilities must be dropped (enforced)"
+  
+  # ==========================================================================
+  # RESOURCE LIMITS (REQUIRED)
+  # ==========================================================================
+  resources:
+    type: object
+    required:
+      - limits
+      - requests
+    properties:
+      limits:
+        type: object
+        required:
+          - cpu
+          - memory
+        properties:
+          cpu:
+            type: string
+            pattern: "^[0-9]+(m|[0-9])$"
+            examples: ["2000m", "2"]
+          memory:
+            type: string
+            pattern: "^[0-9]+(Mi|Gi)$"
+            examples: ["4Gi", "2048Mi"]
+      requests:
+        type: object
+        required:
+          - cpu
+          - memory
+        properties:
+          cpu:
+            type: string
+            pattern: "^[0-9]+(m|[0-9])$"
+            examples: ["500m", "1"]
+          memory:
+            type: string
+            pattern: "^[0-9]+(Mi|Gi)$"
+            examples: ["1Gi", "512Mi"]
+  
+  # ==========================================================================
+  # HEALTH PROBES (REQUIRED)
+  # ==========================================================================
+  livenessProbe:
+    type: object
+    required:
+      - httpGet
+    properties:
+      httpGet:
+        type: object
+        required:
+          - path
+          - port
+        properties:
+          path:
+            type: string
+            pattern: "^/"
+          port:
+            type: [integer, string]
+  
+  readinessProbe:
+    type: object
+    required:
+      - httpGet
+    properties:
+      httpGet:
+        type: object
+        required:
+          - path
+          - port
+        properties:
+          path:
+            type: string
+            pattern: "^/"
+          port:
+            type: [integer, string]
+  
+  # ==========================================================================
+  # INGRESS CONFIGURATION
+  # ==========================================================================
+  ingress:
+    type: object
+    properties:
+      enabled:
+        type: boolean
+        default: true
+      className:
+        type: string
+        examples: ["nginx", "traefik", "istio"]
+      annotations:
+        type: object
+        description: "Ingress annotations (e.g., cert-manager, rate-limiting)"
+      hosts:
+        type: array
+        minItems: 1
+        items:
+          type: object
+          required:
+            - host
+            - paths
+          properties:
+            host:
+              type: string
+              format: hostname
+              description: "Fully qualified domain name"
+            paths:
+              type: array
+              minItems: 1
+              items:
+                type: object
+                required:
+                  - path
+                  - pathType
+                properties:
+                  path:
+                    type: string
+                    pattern: "^/"
+                  pathType:
+                    type: string
+                    enum: ["Prefix", "Exact", "ImplementationSpecific"]
+      tls:
+        type: array
+        description: "TLS configuration (required for production)"
+        items:
+          type: object
+          required:
+            - secretName
+            - hosts
+          properties:
+            secretName:
+              type: string
+              description: "Name of the TLS secret"
+            hosts:
+              type: array
+              minItems: 1
+              items:
+                type: string
+                format: hostname

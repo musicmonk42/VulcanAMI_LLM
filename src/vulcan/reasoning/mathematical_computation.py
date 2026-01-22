@@ -1993,8 +1993,9 @@ Generate ONLY the Python code:"""
             # chat.completions to maintain backward compatibility with OpenAI clients.
             # =================================================================
             elif hasattr(llm, "chat") and callable(llm.chat):
-                # GraphixLLMClient-style: client.chat(prompt) returns response
-                response = llm.chat(prompt)
+                # GraphixLLMClient-style: client.chat(messages) expects list of dicts
+                # FIX: Wrap prompt in message format expected by GraphixLLMClient
+                response = llm.chat([{"role": "user", "content": prompt}])
                 # Handle different response formats
                 if isinstance(response, str):
                     code = response

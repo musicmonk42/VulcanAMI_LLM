@@ -24,7 +24,7 @@ spec:
       port: 9148
 
   egress:
-  # Allow egress to pods in the same namespace (e.g., postgres, redis)
+  # Allow egress to pods in the same namespace (e.g., postgres, redis, milvus, minio)
   - to:
     - podSelector: {}
 
@@ -36,15 +36,56 @@ spec:
     ports:
     - protocol: UDP
       port: 53
+    - protocol: TCP
+      port: 53
 
-  # Allow HTTPS/HTTP egress for external API calls (OpenAI, model downloads, etc.)
-  # This rule allows traffic to IPs outside the cluster (no selectors = all destinations)
-  # For production, consider:
-  # 1. Using an egress gateway with allowlisting
-  # 2. Restricting to specific CIDR ranges
-  # 3. Using DNS-based policies if supported by your CNI
+  # ============================================================================
+  # EXTERNAL API EGRESS RULES
+  # ============================================================================
+  # SECURITY: These rules allow HTTPS/HTTP egress for external API calls.
+  # 
+  # Known external dependencies:
+  #   - OpenAI API (api.openai.com)
+  #   - Anthropic API (api.anthropic.com)
+  #   - HuggingFace (huggingface.co)
+  #   - GitHub (github.com, ghcr.io)
+  #   - PyPI (pypi.org)
+  #   - Model downloads (storage.googleapis.com, s3.amazonaws.com)
+  #
+  # PRODUCTION HARDENING OPTIONS:
+  #
+  # Option 1: Egress Gateway with DNS-based allowlisting (Recommended)
+  #   - Deploy Istio/Cilium egress gateway
+  #   - Configure ServiceEntry with specific FQDNs
+  #   - Requires: CNI with DNS policy support
+  #
+  # Option 2: CIDR-based restrictions
+  #   - Lookup IP ranges for known services
+  #   - Add 'to.ipBlock.cidr' selectors
+  #   - Limitation: IPs can change (requires maintenance)
+  #
+  # Option 3: External Network Policy Controller
+  #   - Use Calico/Cilium Network Policy CRDs
+  #   - Support FQDN-based egress rules
+  #   - Example:
+  #       apiVersion: projectcalico.org/v3
+  #       spec:
+  #         egress:
+  #         - action: Allow
+  #           destination:
+  #             domains:
+  #             - "*.openai.com"
+  #             - "*.anthropic.com"
+  #
+  # Current configuration: Allow all HTTPS/HTTP (suitable for development)
+  # For production, implement one of the options above.
+  # ============================================================================
+  
   - ports:
     - protocol: TCP
-      port: 443
+      port: 443  # HTTPS for external APIs
     - protocol: TCP
-      port: 80
+      port: 80   # HTTP for redirects and non-TLS endpoints
+    # No 'to' selector = allows traffic to any destination outside the cluster
+    # PRODUCTION TODO: Restrict with ipBlock or use DNS-based policies
+

@@ -1,0 +1,240 @@
+# =============================================================================
+# VulcanAMI API - RBAC Role and RoleBinding
+# =============================================================================
+# This defines the minimum required permissions for the VulcanAMI API service.
+#
+# PRINCIPLE: Least Privilege
+#   - Only grant permissions actually needed by the application
+#   - Use Role (namespaced) instead of ClusterRole when possible
+#   - Document why each permission is required
+#
+# SECURITY: This Role follows Kubernetes Security Best Practices
+#   - No cluster-wide permissions
+#   - No write access to critical resources
+#   - Read-only access where possible
+#   - No access to Secrets (use ServiceAccount token projection instead)
+# =============================================================================
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: vulcanami-api-role
+  namespace: vulcanami
+  labels:
+    app: vulcanami-api
+    app.kubernetes.io/name: vulcanami
+    app.kubernetes.io/component: api
+annotations:
+    description: "Minimum required permissions for VulcanAMI API service"
+spec:
+  rules:
+  
+  # ---------------------------------------------------------------------------
+  # ConfigMaps - Read-only access for application configuration
+  # ---------------------------------------------------------------------------
+  # WHY: Application reads runtime configuration from ConfigMaps
+  # EXAMPLES: Feature flags, model configurations, memory system settings
+  # ---------------------------------------------------------------------------
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+    # SECURITY: No 'create', 'update', or 'delete' permissions
+  
+  # ---------------------------------------------------------------------------
+  # Secrets - Read-only access for credentials
+  # ---------------------------------------------------------------------------
+  # WHY: Application needs to read API keys, database passwords, JWT secrets
+  # ALTERNATIVES CONSIDERED:
+  #   - External secret management (AWS Secrets Manager, HashiCorp Vault)
+  #   - ServiceAccount token projection (preferred for service-to-service auth)
+  # SECURITY: Read-only access is necessary but should be minimized
+  # ---------------------------------------------------------------------------
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list"]
+    # SECURITY: No 'watch' (prevents real-time secret exposure)
+    # SECURITY: No 'create', 'update', or 'delete' permissions
+    # PRODUCTION: Consider using external secret management to eliminate this
+  
+  # ---------------------------------------------------------------------------
+  # Pods - Read-only access for service discovery and health monitoring
+  # ---------------------------------------------------------------------------
+  # WHY: Application may need to discover other pods for distributed coordination
+  # EXAMPLES: Redis cluster discovery, distributed lock management
+  # ---------------------------------------------------------------------------
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+    # SECURITY: No 'watch' (prevents pod lifecycle event streaming)
+    # SECURITY: No write permissions
+  
+  # ---------------------------------------------------------------------------
+  # Services - Read-only access for service discovery
+  # ---------------------------------------------------------------------------
+  # WHY: Application discovers backing services (Postgres, Redis, Milvus, MinIO)
+  # EXAMPLES: Database connection strings, cache endpoints
+  # ---------------------------------------------------------------------------
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list"]
+    # SECURITY: No write permissions
+  
+  # ---------------------------------------------------------------------------
+  # Events - Create permission for application logging
+  # ---------------------------------------------------------------------------
+  # WHY: Application can emit Kubernetes Events for auditing and debugging
+  # EXAMPLES: Model loading events, reasoning task events, error events
+  # OPTIONAL: Remove if application doesn't use Event API
+  # ---------------------------------------------------------------------------
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+    # SECURITY: Limited to create/patch only (no delete)
+  
+  # ---------------------------------------------------------------------------
+  # Endpoints - Read-only access for service endpoint discovery
+  # ---------------------------------------------------------------------------
+  # WHY: Some service discovery mechanisms use Endpoints directly
+  # EXAMPLES: Headless services, StatefulSet pod discovery
+  # ---------------------------------------------------------------------------
+  - apiGroups: [""]
+    resources: ["endpoints"]
+    verbs: ["get", "list"]
+    # SECURITY: No write permissions
+
+  # ---------------------------------------------------------------------------
+  # REMOVED: No access to the following resources
+  # ---------------------------------------------------------------------------
+  # ❌ Namespaces: Application doesn't need to manage namespaces
+  # ❌ PersistentVolumes: Managed by cluster admin, not application
+  # ❌ Nodes: Application shouldn't access node information
+  # ❌ PersistentVolumeClaims: Application doesn't dynamically provision volumes
+  # ❌ ServiceAccounts: Application doesn't create service accounts
+  # ❌ Roles/RoleBindings: Application doesn't manage RBAC
+  # ❌ NetworkPolicies: Managed by platform team, not application
+  # ❌ ResourceQuotas: Managed by platform team
+  # ❌ LimitRanges: Managed by platform team
+  # ---------------------------------------------------------------------------
+
+---
+# =============================================================================
+# RoleBinding - Binds the Role to the ServiceAccount
+# =============================================================================
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: vulcanami-api-rolebinding
+  namespace: vulcanami
+  labels:
+    app: vulcanami-api
+    app.kubernetes.io/name: vulcanami
+    app.kubernetes.io/component: api
+  annotations:
+    description: "Binds vulcanami-api-role to vulcanami-api ServiceAccount"
+roleRef:
+  # Reference to the Role defined above
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: vulcanami-api-role
+subjects:
+  # ServiceAccount that the application pods use
+  - kind: ServiceAccount
+    name: vulcanami-api
+    namespace: vulcanami
+
+---
+# =============================================================================
+# ALTERNATIVE: Minimal Role (Even More Restrictive)
+# =============================================================================
+# If your application doesn't need runtime configuration discovery,
+# use this ultra-minimal role that only allows reading Secrets.
+# =============================================================================
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: Role
+# metadata:
+#   name: vulcanami-api-role-minimal
+#   namespace: vulcanami
+# spec:
+#   rules:
+#   - apiGroups: [""]
+#     resources: ["secrets"]
+#     verbs: ["get"]
+#     # Only allow reading specific secrets by name
+#     resourceNames:
+#       - vulcanami-secrets
+#       - postgres-secrets
+# ---
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: RoleBinding
+# metadata:
+#   name: vulcanami-api-rolebinding-minimal
+#   namespace: vulcanami
+# roleRef:
+#   apiGroup: rbac.authorization.k8s.io
+#   kind: Role
+#   name: vulcanami-api-role-minimal
+# subjects:
+#   - kind: ServiceAccount
+#     name: vulcanami-api
+#     namespace: vulcanami
+
+---
+# =============================================================================
+# SECURITY RECOMMENDATIONS
+# =============================================================================
+#
+# 1. External Secret Management (RECOMMENDED)
+#    Instead of reading Secrets directly, use:
+#      - AWS Secrets Manager + External Secrets Operator
+#      - HashiCorp Vault + Vault Agent Injector
+#      - Google Secret Manager + Workload Identity
+#      - Azure Key Vault + Pod Identity
+#    
+#    This eliminates the need for 'secrets: get' permission entirely.
+#
+# 2. ServiceAccount Token Projection
+#    For service-to-service authentication, use projected tokens:
+#      volumes:
+#      - name: service-token
+#        projected:
+#          sources:
+#          - serviceAccountToken:
+#              audience: vault
+#              expirationSeconds: 3600
+#              path: token
+#
+# 3. Pod Security Standards
+#    Enforce restricted pod security standard:
+#      kubectl label namespace vulcanami \
+#        pod-security.kubernetes.io/enforce=restricted
+#
+# 4. Audit Logging
+#    Enable audit logging for RBAC operations:
+#      - Log all 'get secrets' operations
+#      - Alert on unusual access patterns
+#      - Monitor for privilege escalation attempts
+#
+# 5. Regular RBAC Audits
+#    Periodically review and minimize permissions:
+#      kubectl auth can-i --list --as=system:serviceaccount:vulcanami:vulcanami-api
+#
+# =============================================================================
+# VALIDATION
+# =============================================================================
+#
+# Check what the ServiceAccount can do:
+#   kubectl auth can-i --list \
+#     --as=system:serviceaccount:vulcanami:vulcanami-api \
+#     --namespace=vulcanami
+#
+# Test specific permissions:
+#   # Should succeed
+#   kubectl auth can-i get secrets \
+#     --as=system:serviceaccount:vulcanami:vulcanami-api \
+#     --namespace=vulcanami
+#   
+#   # Should fail (no cluster-wide permissions)
+#   kubectl auth can-i list nodes \
+#     --as=system:serviceaccount:vulcanami:vulcanami-api
+#
+# =============================================================================
