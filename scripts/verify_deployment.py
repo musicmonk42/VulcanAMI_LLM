@@ -83,7 +83,7 @@ def verify_deployment(base_url: str) -> bool:
         ("PII Health", "/pii/health", False),
         
         # Static files
-        ("Static Chat Interface", "/", False),
+        ("Chat Interface Root", "/", False),
     ]
     
     results: Dict[str, Tuple[bool, str]] = {}
