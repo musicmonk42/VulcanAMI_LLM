@@ -802,6 +802,42 @@ This query requires symbolic logic."""
         result = router._parse_json_response(response)
         assert result["destination"] == "reasoning_engine"
         assert result["engine"] == "mathematical"
+    
+    def test_parse_json_with_braces_in_strings(self):
+        """JSON containing braces in string values should be parsed correctly."""
+        from src.vulcan.routing.llm_router import LLMQueryRouter
+        
+        router = LLMQueryRouter(llm_client=None)
+        
+        # String values containing braces should not confuse the parser
+        response = """```json
+{
+  "destination": "reasoning_engine",
+  "engine": "causal",
+  "reason": "Query contains {variable} substitution syntax"
+}
+```"""
+        result = router._parse_json_response(response)
+        assert result["destination"] == "reasoning_engine"
+        assert result["engine"] == "causal"
+        assert "{variable}" in result["reason"]
+    
+    def test_parse_json_with_escaped_quotes(self):
+        """JSON containing escaped quotes should be parsed correctly."""
+        from src.vulcan.routing.llm_router import LLMQueryRouter
+        
+        router = LLMQueryRouter(llm_client=None)
+        
+        response = '''```json
+{
+  "destination": "reasoning_engine",
+  "engine": "symbolic",
+  "reason": "Query asks \\"What is truth?\\""
+}
+```'''
+        result = router._parse_json_response(response)
+        assert result["destination"] == "reasoning_engine"
+        assert result["engine"] == "symbolic"
 
 
 # ============================================================

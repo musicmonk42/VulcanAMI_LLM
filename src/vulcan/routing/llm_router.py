@@ -775,27 +775,48 @@ class LLMQueryRouter:
         except json.JSONDecodeError as e:
             logger.debug(f"[LLMRouter] Direct JSON parse failed: {e}")
         
-        # Strategy 2: Use regex to extract JSON object from mixed content
-        # This regex handles arbitrary nesting depth by using a proper recursive pattern
+        # Strategy 2: Use brace matching to extract JSON from mixed content
+        # Handles arbitrary nesting depth with proper string literal awareness
         try:
-            # Find the first complete JSON object in the response
-            # We look for balanced braces starting from first '{'
+            # Find the first opening brace
             start_idx = cleaned.find('{')
             if start_idx != -1:
-                # Count braces to find matching closing brace
+                # Use a state machine to track whether we're inside a string literal
+                # This ensures braces inside strings don't affect the matching
                 brace_count = 0
+                in_string = False
+                escape_next = False
+                
                 for i in range(start_idx, len(cleaned)):
-                    if cleaned[i] == '{':
-                        brace_count += 1
-                    elif cleaned[i] == '}':
-                        brace_count -= 1
-                        if brace_count == 0:
-                            # Found matching brace - extract and parse
-                            json_str = cleaned[start_idx:i+1]
-                            parsed = json.loads(json_str)
-                            logger.debug(f"[LLMRouter] Extracted JSON via brace matching: {parsed.get('destination')}/{parsed.get('engine')}")
-                            return parsed
-        except (json.JSONDecodeError, ValueError) as e:
+                    char = cleaned[i]
+                    
+                    # Handle escape sequences
+                    if escape_next:
+                        escape_next = False
+                        continue
+                    
+                    if char == '\\':
+                        escape_next = True
+                        continue
+                    
+                    # Track string boundaries (only count braces outside strings)
+                    if char == '"':
+                        in_string = not in_string
+                        continue
+                    
+                    # Only count braces when not inside a string literal
+                    if not in_string:
+                        if char == '{':
+                            brace_count += 1
+                        elif char == '}':
+                            brace_count -= 1
+                            if brace_count == 0:
+                                # Found matching brace - extract and parse
+                                json_str = cleaned[start_idx:i+1]
+                                parsed = json.loads(json_str)
+                                logger.debug(f"[LLMRouter] Extracted JSON via brace matching: {parsed.get('destination')}/{parsed.get('engine')}")
+                                return parsed
+        except (json.JSONDecodeError, ValueError, IndexError) as e:
             logger.warning(f"[LLMRouter] JSON extraction failed: {str(e)[:100]}")
         
         # Strategy 3: Return safe defaults
