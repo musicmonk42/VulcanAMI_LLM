@@ -2010,6 +2010,9 @@
                         <button class="thumb-down" onclick="submitThumbsFeedback(${index}, false)" title="Poor response">👎</button>
                     </div>
                 `;
+            } else if (role === 'assistant') {
+                // Log when thumbs buttons are not shown
+                console.log('Thumbs buttons not shown for assistant message. queryId:', queryId, 'responseId:', responseId);
             }
             
             const actionsHtml = `
@@ -2487,6 +2490,14 @@
                 // Extract feedback IDs from response
                 const queryId = data.query_id || null;
                 const responseId = data.response_id || null;
+                
+                // Log feedback IDs for debugging
+                if (queryId && responseId) {
+                    console.log('Feedback IDs extracted:', { queryId, responseId });
+                } else {
+                    console.warn('Missing feedback IDs in response. queryId:', queryId, 'responseId:', responseId);
+                    console.warn('Backend may not be returning query_id and response_id fields.');
+                }
                 
                 history.push({ 
                     role: 'assistant', 
