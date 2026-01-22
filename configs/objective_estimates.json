@@ -1,0 +1,22 @@
+{
+  "description": "Domain-specific objective estimates for counterfactual reasoning",
+  "version": "1.0",
+  "objective_estimates": {
+    "prediction_accuracy": 0.95,
+    "uncertainty_calibration": 0.90,
+    "safety": 0.99,
+    "efficiency": 0.85,
+    "latency": 0.80,
+    "energy_efficiency": 0.75,
+    "response_quality": 0.92,
+    "reasoning_depth": 0.88,
+    "error_recovery": 0.85,
+    "scalability": 0.87
+  },
+  "notes": [
+    "These estimates represent typical achievable values for VULCAN in production.",
+    "Adjust based on your specific domain and workload characteristics.",
+    "Values should be between 0.0 and 1.0, representing expected success rates.",
+    "The system learns from actual outcomes and adapts these estimates over time."
+  ]
+}

@@ -730,10 +730,35 @@ class GraphixExecutor:
         Note: nice(-5) requires appropriate permissions. On failure, we log
         a warning but continue execution since this is a performance optimization,
         not a functional requirement.
+        
+        IMPROVED: Check for containerized environments and permissions before attempting.
         """
         if not PSUTIL_AVAILABLE:
             logger.debug("psutil not available - CPU priority optimization skipped")
             return
+        
+        # Check if we should suppress this warning (containerized or known non-privileged env)
+        if os.environ.get("VULCAN_SUPPRESS_CPU_PRIORITY_WARNING"):
+            logger.debug("CPU priority optimization skipped (suppressed by environment variable)")
+            return
+        
+        # Detect containerized environment (Docker, Kubernetes, etc.)
+        is_containerized = (
+            os.path.exists("/.dockerenv") or
+            os.environ.get("KUBERNETES_SERVICE_HOST") or
+            os.path.exists("/run/.containerenv")
+        )
+        
+        # Check Docker in cgroup (with error handling)
+        if not is_containerized and os.path.exists("/proc/1/cgroup"):
+            try:
+                with open("/proc/1/cgroup", "r") as f:
+                    cgroup_content = f.read()
+                    if "docker" in cgroup_content or "kubepods" in cgroup_content:
+                        is_containerized = True
+            except (PermissionError, FileNotFoundError, IOError):
+                # Cannot read cgroup file, assume not containerized
+                pass
         
         try:
             process = psutil.Process(os.getpid())
@@ -743,6 +768,23 @@ class GraphixExecutor:
             # On Linux: -20 (highest) to 19 (lowest), default is 0
             # On Windows: psutil maps nice values to priority classes
             target_nice = -5
+            
+            # Check if we have permissions before attempting (Unix-like systems)
+            if hasattr(os, 'getuid') and os.getuid() != 0 and current_nice >= 0:
+                # Non-root user with non-negative nice value can't set negative nice
+                if is_containerized:
+                    logger.debug(
+                        "Skipping CPU priority optimization in containerized environment "
+                        "(requires CAP_SYS_NICE capability). Set VULCAN_SUPPRESS_CPU_PRIORITY_WARNING=1 "
+                        "to suppress this message."
+                    )
+                else:
+                    logger.debug(
+                        "CPU priority optimization requires elevated privileges. "
+                        "Run with sudo or set CAP_SYS_NICE capability. "
+                        "Set VULCAN_SUPPRESS_CPU_PRIORITY_WARNING=1 to suppress this message."
+                    )
+                return
             
             if current_nice > target_nice:
                 process.nice(target_nice)
@@ -755,10 +797,17 @@ class GraphixExecutor:
                 logger.debug(f"CPU priority already at or above target (nice={current_nice})")
                 
         except psutil.AccessDenied:
-            logger.warning(
-                "Could not set CPU priority (permission denied). "
-                "Run with elevated privileges for priority optimization."
-            )
+            # Downgrade to debug in containerized environments
+            if is_containerized:
+                logger.debug(
+                    "Could not set CPU priority in containerized environment (expected). "
+                    "Set VULCAN_SUPPRESS_CPU_PRIORITY_WARNING=1 to suppress this message."
+                )
+            else:
+                logger.warning(
+                    "Could not set CPU priority (permission denied). "
+                    "Run with elevated privileges for priority optimization."
+                )
         except Exception as e:
             logger.warning(f"CPU priority optimization failed: {e}")
             # Non-fatal: inference will work, just potentially slower under load

@@ -1336,14 +1336,14 @@ class SelfImprovementDrive:
                 "failure_patterns": {
                     "failure_classification": {
                         "transient": {
-                            "cooldown_hours": 4,
+                            "cooldown_hours": 2,  # Reduced from 4 to 2 hours for faster recovery
                             "indicators": [
                                 "network_timeout",
                                 "temporary_service_unavailable",
                             ],
                         },
                         "systemic": {
-                            "cooldown_hours": 72,
+                            "cooldown_hours": 24,  # Reduced from 72 to 24 hours for non-code improvements
                             "indicators": [
                                 "validation_failed",
                                 "breaking_change_detected",

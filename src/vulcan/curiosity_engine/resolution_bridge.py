@@ -143,8 +143,9 @@ RESOLUTION_TTL_SECONDS = int(os.environ.get("VULCAN_RESOLUTION_TTL", "1800"))
 
 # Phantom resolution threshold
 # If a gap is resolved this many times in the tracking window, it's a phantom
+# Increased from 3 to 5 to reduce false positives in legitimate multi-experiment cycles
 PHANTOM_RESOLUTION_THRESHOLD = int(
-    os.environ.get("VULCAN_PHANTOM_THRESHOLD", "3")
+    os.environ.get("VULCAN_PHANTOM_THRESHOLD", "5")
 )
 
 # Phantom resolution tracking window (1 hour)
@@ -853,19 +854,24 @@ def get_recent_resolutions_count(
     gap_key: str,
     window_seconds: Optional[int] = None,
     db_path: Optional[Path] = None,
+    count_unique_cycles: bool = True,
 ) -> int:
     """
     Count how many times a gap was resolved in the recent window.
     
     Used for phantom resolution detection.
     
+    CRITICAL FIX: Now counts unique cycles instead of raw resolution entries
+    to prevent false positives when multiple experiments run in the same cycle.
+    
     Args:
         gap_key: Unique gap identifier
         window_seconds: Time window. None uses default (1 hour).
         db_path: Optional database path.
+        count_unique_cycles: If True, count distinct cycles; if False, count all entries
     
     Returns:
-        Number of resolutions in window.
+        Number of resolutions in window (unique cycles if count_unique_cycles=True).
     """
     if not _init_db(db_path):
         return 0
@@ -875,13 +881,24 @@ def get_recent_resolutions_count(
     
     try:
         with _get_db(db_path) as conn:
-            cursor = conn.execute(
-                """
-                SELECT COUNT(*) as cnt FROM resolution_history
-                WHERE gap_key = ? AND timestamp > ?
-                """,
-                (gap_key, cutoff),
-            )
+            if count_unique_cycles:
+                # Count distinct cycles to avoid duplicate counting within same cycle
+                cursor = conn.execute(
+                    """
+                    SELECT COUNT(DISTINCT cycle_id) as cnt FROM resolution_history
+                    WHERE gap_key = ? AND timestamp > ? AND cycle_id IS NOT NULL
+                    """,
+                    (gap_key, cutoff),
+                )
+            else:
+                # Legacy behavior: count all resolution entries
+                cursor = conn.execute(
+                    """
+                    SELECT COUNT(*) as cnt FROM resolution_history
+                    WHERE gap_key = ? AND timestamp > ?
+                    """,
+                    (gap_key, cutoff),
+                )
             row = cursor.fetchone()
             return row["cnt"] if row else 0
     except sqlite3.Error as e:
