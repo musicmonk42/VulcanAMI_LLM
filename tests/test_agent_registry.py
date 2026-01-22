@@ -61,12 +61,10 @@ def temp_dir(worker_id):
         try:
             shutil.rmtree(temp_path, ignore_errors=True)
             break
-        except Exception as e:
+        except Exception:
             if attempt < max_retries - 1:
                 time.sleep(0.1 * (attempt + 1))
-            else:
-                # Log but don't fail
-                pass
+            # Silently ignore cleanup errors on final attempt
 
 
 @pytest.fixture

@@ -317,10 +317,10 @@ class DatabaseConnectionPool:
             conn = sqlite3.connect(
                 str(db_path), 
                 check_same_thread=False,
-                timeout=self.timeout,  # ADDED: Prevent indefinite waits
-                isolation_level=None  # ADDED: Autocommit mode
+                timeout=self.timeout,  # Prevent indefinite waits
+                isolation_level=None  # Autocommit mode
             )
-            # ADDED: Enable WAL mode for better concurrency
+            # Enable WAL mode for better concurrency
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute("PRAGMA busy_timeout = 30000")  # 30 seconds
             conn.execute("PRAGMA synchronous=NORMAL")
@@ -330,7 +330,7 @@ class DatabaseConnectionPool:
     @contextmanager
     def get_connection(self):
         """Get a connection from the pool with timeout."""
-        # ADDED: Timeout on semaphore acquisition
+        # Timeout on semaphore acquisition
         acquired = self.available.acquire(timeout=self.timeout)
         if not acquired:
             raise RuntimeError(
@@ -345,7 +345,7 @@ class DatabaseConnectionPool:
                 conn = self.connections.pop()
             yield conn
         finally:
-            # IMPROVED: Always release, even if exception occurs
+            # Always release, even if exception occurs
             try:
                 if conn and not self.closed:
                     with self.lock:
