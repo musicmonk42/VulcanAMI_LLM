@@ -193,6 +193,13 @@ EDUCATIONAL_SECURITY_PATTERNS = [
     re.compile(r'causal effect.*(?:identifies?|randomize)', re.IGNORECASE),
     re.compile(r'(?:randomize|intervention).*(?:confounder|treatment)', re.IGNORECASE),
     re.compile(r'minimal causal graph', re.IGNORECASE),
+    # FIX Bug #4: Pearl-style causal inference patterns
+    re.compile(r'pearl[- ]style', re.IGNORECASE),
+    re.compile(r'confounding\s+vs\s+causation', re.IGNORECASE),
+    re.compile(r'you\s+observe\s+in\s+(?:a|the)\s+dataset', re.IGNORECASE),
+    re.compile(r'causal\s+(?:arrow|effect|graph|inference)', re.IGNORECASE),
+    re.compile(r'[A-Z]→[A-Z]', re.IGNORECASE),  # Causal arrow notation S→D
+    re.compile(r'(?:choose|select)\s+experiment.*(?:identifies?|causal)', re.IGNORECASE),
     # FIX: Bayes/probability education patterns (Jan 6 2026 logs - Bayes questions skipped)
     re.compile(r'(?:sensitivity|specificity).*(?:prevalence|compute|calculate)', re.IGNORECASE),
     re.compile(r'(?:compute|calculate).*P\s*\(', re.IGNORECASE),
@@ -2243,6 +2250,10 @@ class EnhancedSafetyValidator(SafetyValidator):
             "causal effect", "randomize", "intervention", "confounder",
             "treatment effect", "causal graph", "d-separation",
             "backdoor criterion", "instrumental variable",
+            # FIX Bug #4: Pearl-style causal inference patterns
+            "pearl-style", "confounding vs causation", "you observe in a dataset",
+            "you observe in the dataset", "causal arrow", "s→d", "causal inference",
+            "choose experiment", "identifies the causal",
         ]
         has_causal_education = any(kw in query_lower for kw in causal_education_keywords)
         

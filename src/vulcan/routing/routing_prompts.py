@@ -49,7 +49,7 @@ ROUTING DESTINATIONS:
    - Creative: "Write a poem about...", "Tell me a story about..."
 
 2. REASONING_ENGINE - For queries requiring formal computation:
-   - symbolic: Logic (∧∨→¬), SAT, proofs, FOL, "satisfiable", "valid", "formalize"
+   - symbolic: Logic (∧∨→¬), SAT, proofs, FOL, "satisfiable", "valid", "formalize", rule-based reasoning, rule chaining, nonmonotonic logic, logical inference with rules and facts
    - probabilistic: Bayes, P(A|B), posteriors, "sensitivity", "specificity", "likelihood", P() notation
    - causal: "confound", "intervention", "do()", DAG, "cause vs correlation", "randomize", "collider", "d-separation"
    - mathematical: Calculus, algebra, "calculate", "solve", "derivative", "integral"
@@ -62,18 +62,21 @@ ROUTING DESTINATIONS:
    - Simple facts: "What is the capital of France?", "Who is the president?"
 
 CRITICAL ROUTING RULES (PRIORITY ORDER):
-1. "confounding" or "confound" or "collider" or "d-separation" → ALWAYS causal (not symbolic, not probabilistic)
-2. "conditioning on" in graph context (A→B←C) → causal (graphical causal model)
-3. P(...) notation with causal keywords → causal engine
-4. P(...) notation alone → probabilistic engine
-5. "you/your" + feelings/values/ethics → WORLD_MODEL (not reasoning engine)
-6. Hash/crypto computation → cryptographic (deterministic, exact computation)
-7. When unsure between WORLD_MODEL and REASONING_ENGINE, prefer WORLD_MODEL
-8. "proof" in mathematical context → symbolic engine
-9. "proof" in cryptographic context → cryptographic engine
-10. Grid navigation / pathfinding / constraint satisfaction → mathematical engine
-11. "Two values conflict" / "ethical dilemma" → WORLD_MODEL (not symbolic)
-12. "You're designing a cryptocurrency" → cryptographic (context is crypto, not self)"""
+1. Rule-based reasoning (rules + facts + logical inference) → ALWAYS symbolic engine (not WORLD_MODEL)
+2. "rule chaining", "nonmonotonic", "exceptions to rules", "if...then" logic → symbolic engine
+3. "YES/NO" logical tasks + rule application → symbolic engine  
+4. "confounding" or "confound" or "collider" or "d-separation" → ALWAYS causal (not symbolic, not probabilistic)
+5. "conditioning on" in graph context (A→B←C) → causal (graphical causal model)
+6. P(...) notation with causal keywords → causal engine
+7. P(...) notation alone → probabilistic engine
+8. "you/your" + feelings/values/ethics → WORLD_MODEL (not reasoning engine)
+9. Hash/crypto computation → cryptographic (deterministic, exact computation)
+10. When unsure between WORLD_MODEL and REASONING_ENGINE, prefer WORLD_MODEL
+11. "proof" in mathematical context → symbolic engine
+12. "proof" in cryptographic context → cryptographic engine
+13. Grid navigation / pathfinding / constraint satisfaction → mathematical engine
+14. "Two values conflict" / "ethical dilemma" → WORLD_MODEL (not symbolic)
+15. "You're designing a cryptocurrency" → cryptographic (context is crypto, not self)"""
 
 
 # ============================================================
