@@ -174,7 +174,7 @@ COPY configs/ ./configs/
 # Copy Python config module (includes reasoning.yaml)
 COPY config/ ./config/
 
-# Copy demo files (including vulcan_chat.html)
+# Copy demo files (e.g., sse_mind.html)
 COPY demos/ ./demos/
 
 # Copy static files (chat interface HTML/CSS/JS)
@@ -255,7 +255,7 @@ COPY --from=builder /app/graphix_vulcan_llm.py ./graphix_vulcan_llm.py
 COPY --from=builder /app/configs ./configs
 # Copy Python config module (includes reasoning.yaml)
 COPY --from=builder /app/config ./config
-# Copy demo files (including vulcan_chat.html)
+# Copy demo files (e.g., sse_mind.html)
 COPY --from=builder /app/demos ./demos
 # Copy static files (chat interface HTML/CSS/JS)
 COPY --from=builder /app/static ./static

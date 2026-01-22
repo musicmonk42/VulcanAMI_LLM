@@ -2936,7 +2936,7 @@ if settings.cors_enabled:
 
 
 # =============================================================================
-# STATIC FILE SERVING (for vulcan_chat.html and demos)
+# STATIC FILE SERVING (for chat interface and demos)
 # =============================================================================
 # Mount demos directory at /demos for legacy access to demo files
 # This provides backward compatibility for existing links to demo resources
