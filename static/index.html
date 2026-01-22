@@ -2781,19 +2781,34 @@
                     const description = improvement.details || improvement.description || 'No description available';
                     const status = improvement.status || 'pending';
                     
-                    html += `<div class="improvement-item">
+                    html += `<div class="improvement-item" data-improvement-id="${escapeHtml(improvementId)}">
                         <div class="improvement-header">
                             <span class="improvement-title">${escapeHtml(title)}</span>
                             <span class="improvement-status">${escapeHtml(status)}</span>
                         </div>
                         <div class="improvement-description">${escapeHtml(description)}</div>
                         <div class="improvement-actions">
-                            <button class="btn-approve" onclick="approveImprovement('${escapeHtml(improvementId)}')">✓ Approve</button>
-                            <button class="btn-reject" onclick="rejectImprovement('${escapeHtml(improvementId)}')">✗ Reject</button>
+                            <button class="btn-approve" data-action="approve">✓ Approve</button>
+                            <button class="btn-reject" data-action="reject">✗ Reject</button>
                         </div>
                     </div>`;
                 }
                 improvementsEl.innerHTML = html;
+                
+                // Use event delegation for button clicks
+                improvementsEl.querySelectorAll('.improvement-item').forEach(item => {
+                    const improvementId = item.getAttribute('data-improvement-id');
+                    item.querySelectorAll('button').forEach(btn => {
+                        btn.addEventListener('click', async (e) => {
+                            const action = btn.getAttribute('data-action');
+                            if (action === 'approve') {
+                                await approveImprovement(improvementId);
+                            } else if (action === 'reject') {
+                                await rejectImprovement(improvementId);
+                            }
+                        });
+                    });
+                });
             } else if (improvementsData && improvementsData.count === 0) {
                 improvementsEl.innerHTML = '<div class="metric-item">No pending improvements</div>';
             } else {
@@ -2801,28 +2816,28 @@
             }
         }
         
-        // Helper function to escape HTML to prevent XSS
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
+        // Helper function to toggle improvement buttons enabled/disabled state
+        function toggleImprovementButtons(improvementId, disabled) {
+            const improvementsEl = document.getElementById('improvementsContent');
+            if (improvementsEl) {
+                const item = improvementsEl.querySelector(`[data-improvement-id="${improvementId}"]`);
+                if (item) {
+                    const buttons = item.querySelectorAll('button');
+                    buttons.forEach(btn => btn.disabled = disabled);
+                }
+            }
+        }
+        
+        // Helper function to handle API errors consistently
+        async function handleImprovementApiError(response) {
+            const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
+            throw new Error(error.detail || `HTTP ${response.status}`);
         }
         
         // Approve an improvement proposal
         async function approveImprovement(improvementId) {
             try {
-                // Disable buttons to prevent double-submission
-                // Find buttons safely by checking all buttons in the improvements container
-                const improvementsEl = document.getElementById('improvementsContent');
-                if (improvementsEl) {
-                    const buttons = improvementsEl.querySelectorAll('button');
-                    buttons.forEach(btn => {
-                        const onclick = btn.getAttribute('onclick') || '';
-                        if (onclick.includes(improvementId)) {
-                            btn.disabled = true;
-                        }
-                    });
-                }
+                toggleImprovementButtons(improvementId, true);
                 
                 const res = await fetch(`${baseUrl}/v1/improvement/approve`, {
                     method: 'POST',
@@ -2837,44 +2852,21 @@
                 if (res.ok) {
                     const result = await res.json();
                     showToast('Improvement approved successfully', 'success');
-                    // Refresh the improvements list
                     await refreshWarnings();
                 } else {
-                    const error = await res.json().catch(() => ({ detail: 'Unknown error' }));
-                    throw new Error(error.detail || `HTTP ${res.status}`);
+                    await handleImprovementApiError(res);
                 }
             } catch (e) {
                 console.error('Approval error:', e);
                 showToast(`Failed to approve improvement: ${e.message}`, 'error');
-                // Re-enable buttons on error
-                const improvementsEl = document.getElementById('improvementsContent');
-                if (improvementsEl) {
-                    const buttons = improvementsEl.querySelectorAll('button');
-                    buttons.forEach(btn => {
-                        const onclick = btn.getAttribute('onclick') || '';
-                        if (onclick.includes(improvementId)) {
-                            btn.disabled = false;
-                        }
-                    });
-                }
+                toggleImprovementButtons(improvementId, false);
             }
         }
         
         // Reject an improvement proposal
         async function rejectImprovement(improvementId) {
             try {
-                // Disable buttons to prevent double-submission
-                // Find buttons safely by checking all buttons in the improvements container
-                const improvementsEl = document.getElementById('improvementsContent');
-                if (improvementsEl) {
-                    const buttons = improvementsEl.querySelectorAll('button');
-                    buttons.forEach(btn => {
-                        const onclick = btn.getAttribute('onclick') || '';
-                        if (onclick.includes(improvementId)) {
-                            btn.disabled = true;
-                        }
-                    });
-                }
+                toggleImprovementButtons(improvementId, true);
                 
                 const res = await fetch(`${baseUrl}/v1/improvement/approve`, {
                     method: 'POST',
@@ -2889,26 +2881,14 @@
                 if (res.ok) {
                     const result = await res.json();
                     showToast('Improvement rejected', 'success');
-                    // Refresh the improvements list
                     await refreshWarnings();
                 } else {
-                    const error = await res.json().catch(() => ({ detail: 'Unknown error' }));
-                    throw new Error(error.detail || `HTTP ${res.status}`);
+                    await handleImprovementApiError(res);
                 }
             } catch (e) {
                 console.error('Rejection error:', e);
                 showToast(`Failed to reject improvement: ${e.message}`, 'error');
-                // Re-enable buttons on error
-                const improvementsEl = document.getElementById('improvementsContent');
-                if (improvementsEl) {
-                    const buttons = improvementsEl.querySelectorAll('button');
-                    buttons.forEach(btn => {
-                        const onclick = btn.getAttribute('onclick') || '';
-                        if (onclick.includes(improvementId)) {
-                            btn.disabled = false;
-                        }
-                    });
-                }
+                toggleImprovementButtons(improvementId, false);
             }
         }
         
