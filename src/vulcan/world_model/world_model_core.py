@@ -3710,12 +3710,23 @@ class WorldModel:
             
             # Note: Instead of calling CodeLLMClient.generate_code() which raises
             # RuntimeError, we log the intent and defer to human review
-            logger.warning(
-                f"[Self-Improvement] External LLM code generation is DISABLED by VULCAN Policy. "
-                f"Improvement '{objective_type}' will be deferred for human review. "
-                f"To enable autonomous code generation, implement internal code templates "
-                f"or VULCAN's symbolic reasoning for code modification."
-            )
+            # IMPROVED: More informative logging about what CAN proceed
+            improvement_type = improvement_action.get("type", "unknown")
+            is_code_improvement = improvement_type in ["fix_bugs", "enhance_safety", "optimize_performance"]
+            
+            if is_code_improvement:
+                logger.warning(
+                    f"[Self-Improvement] External LLM code generation is DISABLED by VULCAN Policy. "
+                    f"Code improvement '{objective_type}' will be deferred for human review. "
+                    f"Non-code improvements (config, tests, docs) CAN proceed autonomously. "
+                    f"To enable code generation, implement internal templates or symbolic reasoning."
+                )
+            else:
+                logger.info(
+                    f"[Self-Improvement] Non-code improvement '{objective_type}' can proceed autonomously. "
+                    f"External LLM code generation is DISABLED, but this improvement doesn't require it."
+                )
+            
             
             # Return a deferred status instead of crashing
             result = {

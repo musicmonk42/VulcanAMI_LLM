@@ -13,11 +13,14 @@ Learns from validation history to improve predictions.
 """
 
 import hashlib
+import json
 import logging
+import os
 import threading
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from unittest.mock import MagicMock
 
@@ -98,6 +101,62 @@ class CounterfactualObjectiveReasoner(SerializationMixin):
         "energy_efficiency": 0.75,
     }
 
+    @staticmethod
+    def _load_config_estimates(config_dir: str = "configs") -> Optional[Dict[str, float]]:
+        """
+        Load domain-specific objective estimates from config directory.
+        
+        Looks for configs/objective_estimates.json or configs/counterfactual_config.json
+        
+        Args:
+            config_dir: Directory to search for config files
+            
+        Returns:
+            Dict of objective estimates if found, None otherwise
+        """
+        # Try multiple config file names
+        config_paths = [
+            Path(config_dir) / "objective_estimates.json",
+            Path(config_dir) / "counterfactual_config.json",
+            Path("configs") / "objective_estimates.json",
+            Path("configs") / "counterfactual_config.json",
+        ]
+        
+        for config_path in config_paths:
+            if config_path.exists():
+                try:
+                    with open(config_path, "r", encoding="utf-8") as f:
+                        config = json.load(f)
+                        
+                    # Support both flat dict and nested structure
+                    if "objective_estimates" in config:
+                        estimates = config["objective_estimates"]
+                    else:
+                        estimates = config
+                    
+                    # Validate estimates are floats in [0, 1] range
+                    validated_estimates = {}
+                    for key, value in estimates.items():
+                        if isinstance(value, (int, float)) and 0 <= value <= 1:
+                            validated_estimates[key] = float(value)
+                        else:
+                            logger.warning(
+                                f"Invalid objective estimate for '{key}': {value}. "
+                                "Must be a number between 0 and 1. Skipping."
+                            )
+                    
+                    if validated_estimates:
+                        logger.info(
+                            f"Loaded {len(validated_estimates)} objective estimates from {config_path}"
+                        )
+                        return validated_estimates
+                        
+                except Exception as e:
+                    logger.warning(f"Failed to load config from {config_path}: {e}")
+                    continue
+        
+        return None
+
     # --- START FIX: Modified __init__ ---
     def __init__(self, world_model=None, objective_estimates: Optional[Dict[str, float]] = None):
         """
@@ -105,18 +164,27 @@ class CounterfactualObjectiveReasoner(SerializationMixin):
 
         Args:
             world_model: Reference to parent WorldModel instance (optional, defaults to MagicMock)
-            objective_estimates: Custom objective estimates dict. If None, uses DEFAULT_OBJECTIVE_ESTIMATES.
+            objective_estimates: Custom objective estimates dict. If None, tries to load from
+                                configs/ directory, then falls back to DEFAULT_OBJECTIVE_ESTIMATES.
                                 Keys are objective names, values are typical achievable values [0.0-1.0].
                                 These are used as fallback when no learned estimates are available.
         """
         self.world_model = world_model or MagicMock()
         
+        # Try to load from config file if not provided
+        if objective_estimates is None:
+            objective_estimates = self._load_config_estimates()
+        
         # Store objective estimates, using defaults if not provided
         self.objective_estimates = objective_estimates or self.DEFAULT_OBJECTIVE_ESTIMATES.copy()
-        if objective_estimates is None:
-            logger.warning(
-                "Using default objective estimates as fallback. "
-                "For production use, provide domain-specific estimates via objective_estimates parameter."
+        
+        # Only log warning if using defaults and not intentionally configured
+        if objective_estimates is None and not os.environ.get("VULCAN_SUPPRESS_DEFAULT_OBJECTIVES_WARNING"):
+            logger.debug(
+                "Using default objective estimates. "
+                "For production use, provide domain-specific estimates via objective_estimates parameter "
+                "or create configs/objective_estimates.json. "
+                "Set VULCAN_SUPPRESS_DEFAULT_OBJECTIVES_WARNING=1 to suppress this message."
             )
 
         # Prediction cache

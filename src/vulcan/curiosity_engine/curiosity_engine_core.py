@@ -1460,6 +1460,9 @@ class CuriosityEngine:
         # FIX Issue #13: Track resolution counts per gap type to detect phantom resolutions
         # key -> list of (timestamp, was_success) tuples
         self._gap_resolution_history: Dict[str, List[Tuple[float, bool]]] = {}
+        # CRITICAL FIX: Track gaps resolved in current cycle to prevent duplicates
+        self._current_cycle_resolutions: Dict[int, Set[str]] = {}  # cycle_id -> set of gap keys
+        self._current_cycle_id: Optional[int] = None
         # Note: Increased MAX_GAPS_PER_TYPE from 2 to 5 to allow more
         # experiments per learning cycle. The previous limit of 2 was too restrictive
         # and caused experiments=0 in most cycles.
@@ -1470,7 +1473,8 @@ class CuriosityEngine:
         self.GAP_RESOLUTION_TTL_SECONDS = 1800  # Note: Allow re-detection after 30 min if issue persists
         self.RESOLUTION_CLEANUP_INTERVAL = 300  # Only cleanup expired resolutions every 5 minutes
         # FIX Issue #13: Threshold for detecting phantom resolutions
-        self.PHANTOM_RESOLUTION_THRESHOLD = 3  # If resolved 3+ times in an hour, it's not really resolved
+        # Increased from 3 to 5 to reduce false positives in legitimate multi-experiment cycles
+        self.PHANTOM_RESOLUTION_THRESHOLD = int(os.environ.get("VULCAN_PHANTOM_THRESHOLD", "5"))
         self.PHANTOM_RESOLUTION_WINDOW = 3600  # 1 hour window for counting phantom resolutions
         # Note: Phantom Resolution Loop - extended cooldown for gaps that keep returning
         self.PHANTOM_GAP_COOLDOWN_SECONDS = 3600  # 1 hour cooldown for phantom gaps
@@ -1827,6 +1831,10 @@ class CuriosityEngine:
         Note (Phantom Resolution Loop): Now persists resolution state to SQLite
         via resolution_bridge, so resolutions survive subprocess restarts.
         
+        CRITICAL FIX: Added cycle-level deduplication to prevent marking the same
+        gap as resolved multiple times within a single cycle, which triggers phantom
+        resolution circuit breakers unnecessarily.
+        
         Args:
             gap: The gap to mark as resolved (KnowledgeGap object, dict, or gap_type string)
             domain: Domain string (required if gap is a string, otherwise extracted from gap object)
@@ -1842,6 +1850,28 @@ class CuriosityEngine:
         else:
             # Called with gap object or dict
             key = self._gap_key(gap)
+        
+        # CRITICAL FIX: Cycle-level deduplication
+        # If this gap was already marked resolved in this cycle, skip to prevent duplicates
+        if cycle_id is not None:
+            if cycle_id not in self._current_cycle_resolutions:
+                self._current_cycle_resolutions[cycle_id] = set()
+            
+            if key in self._current_cycle_resolutions[cycle_id]:
+                logger.debug(
+                    f"[CuriosityEngine] Gap {key} already resolved in cycle {cycle_id}, "
+                    "skipping duplicate resolution"
+                )
+                return
+            
+            # Mark as resolved in this cycle
+            self._current_cycle_resolutions[cycle_id].add(key)
+            
+            # Cleanup old cycle data (keep only last 10 cycles)
+            if len(self._current_cycle_resolutions) > 10:
+                oldest_cycles = sorted(self._current_cycle_resolutions.keys())[:-10]
+                for old_cycle in oldest_cycles:
+                    del self._current_cycle_resolutions[old_cycle]
         
         current_time = time.time()
         
@@ -1884,12 +1914,12 @@ class CuriosityEngine:
         except Exception:
             recent_resolutions = len(self._gap_resolution_history[key])
         
-        # BUG FIX #3: Phantom resolution circuit breaker
+        # BUG FIX #3: Phantom resolution circuit breaker with graduated backoff
         if recent_resolutions >= self.PHANTOM_RESOLUTION_THRESHOLD:
-            # Calculate exponential backoff: 2^(resolutions - threshold) hours
-            # 3 resolutions -> 1 hour, 4 -> 2 hours, 5 -> 4 hours, etc.
-            backoff_hours = 2 ** (recent_resolutions - self.PHANTOM_RESOLUTION_THRESHOLD)
-            backoff_seconds = min(backoff_hours * 3600, 24 * 3600)  # Cap at 24 hours
+            # Calculate graduated backoff: starts at 2 hours, doubles each time
+            # 5 resolutions -> 2h, 6 -> 4h, 7 -> 8h, 8 -> 16h (capped at 16h max)
+            backoff_hours = min(2 ** (recent_resolutions - self.PHANTOM_RESOLUTION_THRESHOLD), 16)
+            backoff_seconds = backoff_hours * 3600
             
             logger.error(
                 f"[CuriosityEngine] PHANTOM RESOLUTION CIRCUIT BREAKER: "
@@ -1899,11 +1929,11 @@ class CuriosityEngine:
             
             # Suppress the gap for the calculated backoff period
             self._suppressed_gaps[key] = time.time() + backoff_seconds
-        elif recent_resolutions > 1:
+        elif recent_resolutions > 2:
             # Still log warning for tracking, but don't suppress yet
             logger.warning(
-                f"[CuriosityEngine] PHANTOM RESOLUTION: Gap {key} 'resolved' {recent_resolutions}x "
-                f"in last hour - underlying issue likely NOT fixed"
+                f"[CuriosityEngine] POTENTIAL PHANTOM RESOLUTION: Gap {key} 'resolved' {recent_resolutions}x "
+                f"in last hour - monitoring for phantom pattern"
             )
         
         if success:

@@ -44,6 +44,46 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
+class EnhancedJSONEncoder(json.JSONEncoder):
+    """Custom JSON encoder that handles Enum, numpy arrays, and other non-serializable types."""
+    
+    def default(self, obj):
+        """Convert non-JSON-serializable objects to JSON-serializable format."""
+        # Handle Enum types (including PatternType, MetricType, etc.)
+        if isinstance(obj, Enum):
+            return obj.value
+        
+        # Handle numpy arrays
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        
+        # Handle numpy scalar types
+        if isinstance(obj, (np.integer, np.floating)):
+            return obj.item()
+        
+        # Handle dataclasses with to_dict method
+        if hasattr(obj, 'to_dict') and callable(obj.to_dict):
+            try:
+                return obj.to_dict()
+            except Exception:
+                pass
+        
+        # Handle objects with __dict__ (last resort)
+        if hasattr(obj, '__dict__'):
+            try:
+                return {k: v for k, v in obj.__dict__.items() 
+                       if not k.startswith('_')}
+            except Exception:
+                pass
+        
+        # Fallback to string representation for unknown types
+        try:
+            return str(obj)
+        except Exception:
+            # If all else fails, return a placeholder
+            return f"<non-serializable: {type(obj).__name__}>"
+
+
 class StorageBackend(Enum):
     """Storage backend types"""
 
@@ -128,13 +168,13 @@ class PrincipleVersion:
             )
 
         try:
-            # Convert base principle to JSON string
+            # Convert base principle to JSON string using custom encoder
             base_dict = (
                 asdict(base_principle)
                 if hasattr(base_principle, "__dataclass_fields__")
                 else vars(base_principle)
             )
-            base_str = json.dumps(base_dict, sort_keys=True, indent=2)
+            base_str = json.dumps(base_dict, sort_keys=True, indent=2, cls=EnhancedJSONEncoder)
             base_lines = base_str.splitlines(keepends=True)
             
             # Apply unified diff using difflib
@@ -543,21 +583,45 @@ class VersionedKnowledgeBase:
         return self.store(principle)
 
     def _compute_diff(self, old, new):
-        """Compute difference between principles"""
+        """Compute difference between principles with support for non-serializable types."""
         try:
+            # Extract dict representation with fallback to vars()
+            old_dict = asdict(old) if hasattr(old, "__dataclass_fields__") else vars(old)
+            new_dict = asdict(new) if hasattr(new, "__dataclass_fields__") else vars(new)
+            
+            # Use custom JSON encoder that handles Enum, numpy, and other types
             old_str = json.dumps(
-                asdict(old) if hasattr(old, "__dataclass_fields__") else vars(old),
+                old_dict,
                 sort_keys=True,
+                cls=EnhancedJSONEncoder,
+                indent=2
             )
             new_str = json.dumps(
-                asdict(new) if hasattr(new, "__dataclass_fields__") else vars(new),
+                new_dict,
                 sort_keys=True,
+                cls=EnhancedJSONEncoder,
+                indent=2
             )
+            
             return list(
                 difflib.unified_diff(
                     old_str.splitlines(), new_str.splitlines(), lineterm=""
                 )
             )
+        except TypeError as e:
+            # More specific error for JSON serialization issues
+            logger.warning("Failed to compute diff due to serialization error: %s. "
+                         "Attempting fallback with string representation.", e)
+            try:
+                # Fallback: convert to strings directly
+                return list(
+                    difflib.unified_diff(
+                        str(old).splitlines(), str(new).splitlines(), lineterm=""
+                    )
+                )
+            except Exception as fallback_e:
+                logger.error("Fallback diff computation also failed: %s", fallback_e)
+                return []
         except Exception as e:
             logger.warning("Failed to compute diff: %s", e)
             return []
@@ -1116,7 +1180,7 @@ class VersionedKnowledgeBase:
 
                 if format == "json":
                     with open(path, "w", encoding="utf-8") as f:
-                        json.dump(data, f, indent=2)
+                        json.dump(data, f, indent=2, cls=EnhancedJSONEncoder)
                 elif format == "pickle":
                     with open(path, "wb") as f:
                         pickle.dump(data, f)
@@ -1416,7 +1480,7 @@ class VersionedKnowledgeBase:
                             }
                         )
 
-                    changes = json.dumps(version.changes)
+                    changes = json.dumps(version.changes, cls=EnhancedJSONEncoder)
 
                     conn.execute(
                         """INSERT OR REPLACE INTO versions
