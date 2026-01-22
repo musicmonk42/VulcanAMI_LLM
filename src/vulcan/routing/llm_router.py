@@ -721,46 +721,106 @@ class LLMQueryRouter:
     
     def _parse_json_response(self, response: str) -> Dict[str, Any]:
         """
-        Parse JSON from LLM response.
+        Parse JSON from LLM response with robust markdown fence handling.
+        
+        This method handles multiple response formats that LLMs commonly return:
+        1. JSON wrapped in markdown code fences (```json ... ``` or ``` ... ```)
+        2. JSON with leading/trailing text or whitespace
+        3. Plain JSON without any wrapping
+        
+        The implementation follows industry best practices:
+        - Strip markdown fences FIRST to get clean JSON (don't rely on regex)
+        - Parse the cleaned JSON directly (most reliable)
+        - Fall back to regex extraction only if direct parsing fails
+        - Provide detailed logging for debugging
+        - Return safe defaults on any failure
         
         Args:
-            response: Raw LLM response string
+            response: Raw LLM response string, potentially containing markdown
             
         Returns:
-            Parsed JSON dict, or defaults if parsing fails
+            Dict containing parsed routing decision fields, or safe defaults
+            
+        Examples:
+            >>> router._parse_json_response('```json\\n{"destination": "skip"}\\n```')
+            {'destination': 'skip', ...}
+            
+            >>> router._parse_json_response('{"destination": "world_model"}')
+            {'destination': 'world_model', ...}
         """
-        # Strip markdown code fences if present
-        response = response.strip()
-        if response.startswith("```"):
-            lines = response.split("\n")
-            # Remove opening fence (```json or ```)
-            lines = lines[1:]
-            # Remove closing fence
+        if not response:
+            logger.warning("[LLMRouter] Empty response received")
+            return self._default_routing_response("Empty response")
+        
+        # Clean the response: strip whitespace and markdown code fences
+        cleaned = response.strip()
+        
+        # Handle markdown code fences (```json or ```)
+        if cleaned.startswith("```"):
+            lines = cleaned.split("\n")
+            # Remove opening fence line (e.g., "```json" or "```")
+            if lines:
+                lines = lines[1:]
+            # Remove closing fence line (e.g., "```")
             if lines and lines[-1].strip() == "```":
                 lines = lines[:-1]
-            response = "\n".join(lines).strip()
+            cleaned = "\n".join(lines).strip()
+            logger.debug("[LLMRouter] Stripped markdown code fences")
         
-        # Try to find JSON in response
-        json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', response)
-        if json_match:
-            try:
-                return json.loads(json_match.group())
-            except json.JSONDecodeError:
-                logger.warning(f"[LLMRouter] Failed to parse JSON: {json_match.group()[:100]}")
-        
-        # Try parsing entire response as JSON
+        # Strategy 1: Parse the cleaned response directly as JSON (most reliable)
         try:
-            return json.loads(response.strip())
-        except json.JSONDecodeError:
-            pass
+            parsed = json.loads(cleaned)
+            logger.debug(f"[LLMRouter] Successfully parsed JSON directly: {parsed.get('destination')}/{parsed.get('engine')}")
+            return parsed
+        except json.JSONDecodeError as e:
+            logger.debug(f"[LLMRouter] Direct JSON parse failed: {e}")
         
-        # Return defaults
-        logger.warning(f"[LLMRouter] No valid JSON in response, using defaults")
+        # Strategy 2: Use regex to extract JSON object from mixed content
+        # This regex handles arbitrary nesting depth by using a proper recursive pattern
+        try:
+            # Find the first complete JSON object in the response
+            # We look for balanced braces starting from first '{'
+            start_idx = cleaned.find('{')
+            if start_idx != -1:
+                # Count braces to find matching closing brace
+                brace_count = 0
+                for i in range(start_idx, len(cleaned)):
+                    if cleaned[i] == '{':
+                        brace_count += 1
+                    elif cleaned[i] == '}':
+                        brace_count -= 1
+                        if brace_count == 0:
+                            # Found matching brace - extract and parse
+                            json_str = cleaned[start_idx:i+1]
+                            parsed = json.loads(json_str)
+                            logger.debug(f"[LLMRouter] Extracted JSON via brace matching: {parsed.get('destination')}/{parsed.get('engine')}")
+                            return parsed
+        except (json.JSONDecodeError, ValueError) as e:
+            logger.warning(f"[LLMRouter] JSON extraction failed: {str(e)[:100]}")
+        
+        # Strategy 3: Return safe defaults
+        logger.warning(f"[LLMRouter] Failed to parse response (length={len(response)}), using defaults")
+        if len(response) < 200:
+            logger.debug(f"[LLMRouter] Response content: {response}")
+        return self._default_routing_response("Failed to parse LLM response")
+    
+    def _default_routing_response(self, reason: str) -> Dict[str, Any]:
+        """
+        Return default routing response for unparseable LLM outputs.
+        
+        Centralized method for default values ensures consistency.
+        
+        Args:
+            reason: Explanation of why defaults are being used
+            
+        Returns:
+            Dict with safe default routing values
+        """
         return {
             "destination": "world_model",
             "engine": None,
             "confidence": 0.5,
-            "reason": "Failed to parse LLM response",
+            "reason": reason,
         }
     
     def _minimal_fallback(self, query: str) -> RoutingDecision:

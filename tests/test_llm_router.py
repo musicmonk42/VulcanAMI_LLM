@@ -599,15 +599,19 @@ class TestEdgeCases:
 
 
 class TestJSONParsing:
-    """Tests for JSON parsing from LLM responses."""
+    """
+    Comprehensive tests for JSON parsing from LLM responses.
     
-    def test_parse_json_with_markdown_code_fence(self):
-        """JSON wrapped in markdown code fences should be parsed correctly."""
+    Tests cover all common LLM response formats and edge cases following
+    industry best practices for parser testing.
+    """
+    
+    def test_parse_json_with_markdown_json_fence(self):
+        """JSON wrapped in ```json fence should be parsed correctly."""
         from src.vulcan.routing.llm_router import LLMQueryRouter
         
         router = LLMQueryRouter(llm_client=None)
         
-        # Test with ```json fence
         response = """```json
 {
   "destination": "reasoning_engine",
@@ -628,7 +632,6 @@ class TestJSONParsing:
         
         router = LLMQueryRouter(llm_client=None)
         
-        # Test with plain ``` fence
         response = """```
 {
   "destination": "reasoning_engine",
@@ -643,12 +646,11 @@ class TestJSONParsing:
         assert result["confidence"] == 0.95
     
     def test_parse_json_without_fence(self):
-        """Plain JSON without fences should still work."""
+        """Plain JSON without fences should still work (backwards compatibility)."""
         from src.vulcan.routing.llm_router import LLMQueryRouter
         
         router = LLMQueryRouter(llm_client=None)
         
-        # Test without fence
         response = """{
   "destination": "reasoning_engine",
   "engine": "symbolic",
@@ -661,12 +663,11 @@ class TestJSONParsing:
         assert result["confidence"] == 0.88
     
     def test_parse_json_with_extra_whitespace(self):
-        """JSON with extra whitespace should be parsed correctly."""
+        """JSON with extra leading/trailing whitespace should be parsed correctly."""
         from src.vulcan.routing.llm_router import LLMQueryRouter
         
         router = LLMQueryRouter(llm_client=None)
         
-        # Test with extra whitespace
         response = """
         
 ```json
@@ -684,13 +685,77 @@ class TestJSONParsing:
         assert result["engine"] == "probabilistic"
         assert result["confidence"] == 0.92
     
-    def test_parse_malformed_json_returns_defaults(self):
-        """Malformed JSON should return defaults."""
+    def test_parse_json_with_text_before_fence(self):
+        """JSON with explanatory text before the fence should be extracted."""
         from src.vulcan.routing.llm_router import LLMQueryRouter
         
         router = LLMQueryRouter(llm_client=None)
         
-        # Test with malformed JSON (missing comma)
+        response = """Here is my classification:
+```json
+{
+  "destination": "reasoning_engine",
+  "engine": "causal",
+  "confidence": 0.90
+}
+```"""
+        result = router._parse_json_response(response)
+        assert result["destination"] == "reasoning_engine"
+        assert result["engine"] == "causal"
+    
+    def test_parse_json_with_text_after_fence(self):
+        """JSON with text after the fence should be parsed correctly."""
+        from src.vulcan.routing.llm_router import LLMQueryRouter
+        
+        router = LLMQueryRouter(llm_client=None)
+        
+        response = """```json
+{
+  "destination": "reasoning_engine",
+  "engine": "symbolic",
+  "confidence": 0.88
+}
+```
+This query requires symbolic logic."""
+        result = router._parse_json_response(response)
+        assert result["destination"] == "reasoning_engine"
+        assert result["engine"] == "symbolic"
+    
+    def test_parse_deeply_nested_json(self):
+        """Deeply nested JSON structures should be parsed correctly."""
+        from src.vulcan.routing.llm_router import LLMQueryRouter
+        
+        router = LLMQueryRouter(llm_client=None)
+        
+        response = """```json
+{
+  "destination": "reasoning_engine",
+  "engine": "causal",
+  "confidence": 0.95,
+  "metadata": {
+    "analysis": {
+      "factors": {
+        "primary": "confounding",
+        "secondary": "intervention"
+      }
+    }
+  }
+}
+```"""
+        result = router._parse_json_response(response)
+        assert result["destination"] == "reasoning_engine"
+        assert result["engine"] == "causal"
+        assert result["confidence"] == 0.95
+        assert "metadata" in result
+        assert result["metadata"]["analysis"]["factors"]["primary"] == "confounding"
+    
+    def test_parse_malformed_json_returns_defaults(self):
+        """Malformed JSON should return safe defaults."""
+        from src.vulcan.routing.llm_router import LLMQueryRouter
+        
+        router = LLMQueryRouter(llm_client=None)
+        
+        # Missing comma between fields
         response = """```json
 {
   "destination": "reasoning_engine"
@@ -701,6 +766,42 @@ class TestJSONParsing:
         assert result["destination"] == "world_model"
         assert result["engine"] is None
         assert result["confidence"] == 0.5
+    
+    def test_parse_empty_response_returns_defaults(self):
+        """Empty response should return safe defaults."""
+        from src.vulcan.routing.llm_router import LLMQueryRouter
+        
+        router = LLMQueryRouter(llm_client=None)
+        
+        result = router._parse_json_response("")
+        assert result["destination"] == "world_model"
+        assert result["engine"] is None
+    
+    def test_parse_only_whitespace_returns_defaults(self):
+        """Whitespace-only response should return safe defaults."""
+        from src.vulcan.routing.llm_router import LLMQueryRouter
+        
+        router = LLMQueryRouter(llm_client=None)
+        
+        result = router._parse_json_response("   \n\t  \n   ")
+        assert result["destination"] == "world_model"
+        assert result["engine"] is None
+    
+    def test_parse_incomplete_fence_still_extracts_json(self):
+        """JSON with incomplete/missing closing fence should still be extracted."""
+        from src.vulcan.routing.llm_router import LLMQueryRouter
+        
+        router = LLMQueryRouter(llm_client=None)
+        
+        response = """```json
+{
+  "destination": "reasoning_engine",
+  "engine": "mathematical",
+  "confidence": 0.85
+}"""  # Missing closing ```
+        result = router._parse_json_response(response)
+        assert result["destination"] == "reasoning_engine"
+        assert result["engine"] == "mathematical"
 
 
 # ============================================================
