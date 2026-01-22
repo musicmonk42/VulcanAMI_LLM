@@ -66,6 +66,7 @@ class DomainValidator:
         self.config = config or {}
         self.validation_history = deque(maxlen=1000)
         self.violation_counts = defaultdict(int)
+        self._history_lock = threading.RLock()  # Add lock for thread safety
 
     def validate(
         self, data: Any, context: Optional[Dict[str, Any]] = None
@@ -75,16 +76,17 @@ class DomainValidator:
 
     def _record_validation(self, result: ValidationResult, data: Any):
         """Record validation result."""
-        self.validation_history.append(
-            {
-                "result": result,
-                "data_summary": str(data)[:100],
-                "timestamp": time.time(),
-            }
-        )
+        with self._history_lock:  # Protect shared state
+            self.validation_history.append(
+                {
+                    "result": result,
+                    "data_summary": str(data)[:100],
+                    "timestamp": time.time(),
+                }
+            )
 
-        if not result.safe:
-            self.violation_counts[result.reason] += 1
+            if not result.safe:
+                self.violation_counts[result.reason] += 1
 
     def _max_severity(self, current: str, new: str) -> str:
         """Return the more severe of two severity levels."""
@@ -95,23 +97,24 @@ class DomainValidator:
 
     def get_stats(self) -> Dict[str, Any]:
         """Get validation statistics."""
-        if not self.validation_history:
-            return {"total_validations": 0}
+        with self._history_lock:
+            if not self.validation_history:
+                return {"total_validations": 0}
 
-        total = len(self.validation_history)
-        safe = sum(1 for v in self.validation_history if v["result"].safe)
+            total = len(self.validation_history)
+            safe = sum(1 for v in self.validation_history if v["result"].safe)
 
-        return {
-            "total_validations": total,
-            "safe_count": safe,
-            "unsafe_count": total - safe,
-            "safety_rate": safe / total if total > 0 else 0,
-            "top_violations": dict(
-                sorted(self.violation_counts.items(), key=lambda x: x[1], reverse=True)[
-                    :5
-                ]
-            ),
-        }
+            return {
+                "total_validations": total,
+                "safe_count": safe,
+                "unsafe_count": total - safe,
+                "safety_rate": safe / total if total > 0 else 0,
+                "top_violations": dict(
+                    sorted(self.violation_counts.items(), key=lambda x: x[1], reverse=True)[
+                        :5
+                    ]
+                ),
+            }
 
 
 # ============================================================

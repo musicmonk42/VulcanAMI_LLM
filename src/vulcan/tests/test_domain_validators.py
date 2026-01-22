@@ -418,6 +418,7 @@ class TestPredictionSafetyValidator:
         assert "safe_lower" in result.corrected_values
         assert "safe_upper" in result.corrected_values
 
+    @pytest.mark.timeout(10)  # 10 second timeout
     def test_validate_prediction_excessive_uncertainty(self, prediction_validator):
         """Test prediction with excessive uncertainty."""
         result = prediction_validator.validate_prediction(
