@@ -1,13 +1,28 @@
 # .coveragerc
+#
+# IMPORTANT: Coverage configuration for parallel test execution
+#
+# When running with pytest-xdist (-n <workers>), each worker needs to write
+# its coverage data to a separate file to avoid SQLite database locking issues.
+# The `parallel = true` setting handles this by appending a unique suffix.
+#
+# To avoid conflicts between concurrent CI workflow runs, each workflow should
+# use a unique data_file path via the COVERAGE_FILE environment variable.
+# Example: COVERAGE_FILE=".coverage.${GITHUB_RUN_ID}.${GITHUB_JOB}"
+#
 [run]
 parallel = true
-concurrency = multiprocessing
+concurrency = thread,multiprocessing
+branch = true
 source = src
 omit =
     */tests/*
     */test_*.py
     */__pycache__/*
     */conftest.py
+    # Omit database bridge files that may have transient state
+    **/outcome_bridge.py
+    **/resolution_bridge.py
 
 [report]
 precision = 2
