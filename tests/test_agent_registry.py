@@ -3,6 +3,7 @@ Comprehensive test suite for agent_registry.py
 """
 
 import json
+import os
 import shutil
 import tempfile
 import threading
@@ -34,11 +35,38 @@ from agent_registry import (
 
 
 @pytest.fixture
-def temp_dir():
-    """Create temporary directory for tests."""
-    temp_path = tempfile.mkdtemp()
+def worker_id(request):
+    """Get pytest-xdist worker ID for test isolation."""
+    if hasattr(request.config, 'workerinput'):
+        return request.config.workerinput['workerid']
+    return 'master'
+
+
+@pytest.fixture
+def temp_dir(worker_id):
+    """Create worker-specific temporary directory for tests."""
+    # Create worker-specific directory to avoid conflicts
+    if worker_id == "master":
+        # Not using xdist
+        temp_path = tempfile.mkdtemp()
+    else:
+        # Using xdist - create worker-specific directory
+        temp_path = tempfile.mkdtemp(suffix=f"_{worker_id}_{os.getpid()}")
+    
     yield Path(temp_path)
-    shutil.rmtree(temp_path, ignore_errors=True)
+    
+    # Cleanup with retry
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            shutil.rmtree(temp_path, ignore_errors=True)
+            break
+        except Exception as e:
+            if attempt < max_retries - 1:
+                time.sleep(0.1 * (attempt + 1))
+            else:
+                # Log but don't fail
+                pass
 
 
 @pytest.fixture
@@ -70,16 +98,32 @@ def rate_limiter():
 
 @pytest.fixture
 def agent_registry(temp_dir):
-    """Create agent registry."""
+    """Create agent registry with proper cleanup."""
+    # Use unique database file per test worker
     registry = AgentRegistry(
-        registry_file=str(temp_dir / "registry.db"),
+        registry_file=str(temp_dir / f"registry_{os.getpid()}.db"),
         key_store_dir=str(temp_dir / "keys"),
         audit_log_dir=str(temp_dir / "audit"),
         ca_key_path=str(temp_dir / "ca_key.pem"),
         ca_cert_path=str(temp_dir / "ca_cert.pem"),
     )
     yield registry
-    registry.shutdown_registry()
+    
+    # Ensure proper cleanup
+    try:
+        registry.shutdown_registry()
+    except Exception:
+        pass
+    
+    # Force close database connections
+    if hasattr(registry, 'db_pool'):
+        try:
+            registry.db_pool.close_all()
+        except Exception:
+            pass
+    
+    # Small delay to ensure file handles are released
+    time.sleep(0.1)
 
 
 class TestDatabaseConnectionPool:
@@ -529,6 +573,7 @@ class TestAgentRegistry:
 
         assert not agent_registry.check_permission("perm_agent", "execute_graph")
 
+    @pytest.mark.timeout(30)
     def test_admin_has_all_permissions(self, agent_registry):
         """Test admin role has all permissions."""
         agent_registry.register_agent(
