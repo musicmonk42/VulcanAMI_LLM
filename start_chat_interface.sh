@@ -93,29 +93,24 @@ echo "Chat Endpoints:"
 echo "  VULCAN Chat:    http://localhost:8080/vulcan/v1/chat"
 echo ""
 echo "Frontend:"
-echo "  Open vulcan_chat.html in your browser"
+echo "  Chat Interface: http://localhost:8080"
 echo ""
 echo "Press Ctrl+C to stop the platform..."
 echo ""
 
-# Open the HTML file in browser (platform-specific)
-if [ -f "vulcan_chat.html" ]; then
-    echo "Opening chat interface in browser..."
-    if command -v xdg-open > /dev/null; then
-        # Linux
-        xdg-open vulcan_chat.html 2>/dev/null &
-    elif command -v open > /dev/null; then
-        # macOS
-        open vulcan_chat.html 2>/dev/null &
-    elif command -v start > /dev/null; then
-        # Windows (Git Bash)
-        start vulcan_chat.html 2>/dev/null &
-    else
-        echo "Please open vulcan_chat.html manually in your browser"
-    fi
+# Open the chat interface URL in browser (platform-specific)
+echo "Opening chat interface in browser..."
+if command -v xdg-open > /dev/null; then
+    # Linux
+    xdg-open http://localhost:8080 2>/dev/null &
+elif command -v open > /dev/null; then
+    # macOS
+    open http://localhost:8080 2>/dev/null &
+elif command -v start > /dev/null; then
+    # Windows (Git Bash)
+    start http://localhost:8080 2>/dev/null &
 else
-    echo "Note: vulcan_chat.html not found in current directory"
-    echo "Please open your chat HTML file in a browser"
+    echo "Please open http://localhost:8080 manually in your browser"
 fi
 
 # Cleanup function

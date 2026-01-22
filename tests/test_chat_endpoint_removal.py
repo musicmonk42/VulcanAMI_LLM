@@ -150,11 +150,11 @@ def test_readme_chat_updated():
 
 def test_frontend_uses_correct_endpoint():
     """
-    Verify that vulcan_chat.html doesn't use /chat/v1/chat.
+    Verify that static/index.html doesn't use /chat/v1/chat.
     """
-    frontend_file = Path("vulcan_chat.html")
+    frontend_file = Path("static/index.html")
     if not frontend_file.exists():
-        print("⊘ vulcan_chat.html not found, skipping frontend check")
+        print("⊘ static/index.html not found, skipping frontend check")
         return True
     
     with open(frontend_file, 'r') as f:
@@ -168,7 +168,7 @@ def test_frontend_uses_correct_endpoint():
     assert '/vulcan/v1/chat' in content or '/v1/chat' in content, \
         "Frontend should use /vulcan/v1/chat or /v1/chat"
     
-    print("✓ vulcan_chat.html uses correct endpoints")
+    print("✓ static/index.html uses correct endpoints")
     return True
 
 

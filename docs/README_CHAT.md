@@ -42,7 +42,7 @@ chmod +x start_chat_interface.sh
 python src/full_platform.py
 ```
 
-2. Open `vulcan_chat.html` in your browser
+2. Open http://localhost:8080 in your browser
 
 ## Configuration
 
@@ -54,7 +54,7 @@ Settings are saved in browser localStorage.
 
 ## Features
 
-### Frontend (vulcan_chat.html)
+### Frontend (Chat Interface at /)
 - ✅ Clean, modern UI
 - ✅ Message history
 - ✅ Typing indicators
@@ -224,12 +224,8 @@ This happens when `boto3` is installed but AWS is not configured. Solutions:
 
 The backend has CORS enabled for all origins by default. If you still see issues:
 
-1. Check that you're accessing from `http://` not `file://`
-2. Run a local server for your HTML:
- ```bash
- python -m http.server 3000
- ```
-3. Then open `http://localhost:3000/vulcan_chat.html`
+1. Check that you're accessing from the web server at http://localhost:8080
+2. Verify the backend is running and accessible
 
 ### Components not loading
 
@@ -238,7 +234,7 @@ Some components may not be available depending on dependencies. Check the `/vulc
 ## Architecture
 
 ```
-User → vulcan_chat.html → HTTP POST → /vulcan/v1/chat
+User → Browser (http://localhost:8080) → HTTP POST → /vulcan/v1/chat
  ↓
  ┌─────────────────────────┐
  │ VULCAN Chat Endpoint │
@@ -256,7 +252,7 @@ User → vulcan_chat.html → HTTP POST → /vulcan/v1/chat
  - LLM Generation - Store in Memory
  - Safety Filtering - Update World Model
  ↓
- Response → JSON → vulcan_chat.html → Display
+ Response → JSON → Browser → Display
 ```
 
 ## Performance
@@ -279,8 +275,8 @@ Systems activated per message: 5-7 depending on query type and enabled features.
 | `src/vulcan/endpoints/unified_chat.py` | VULCAN chat endpoint with full platform integration |
 | `src/vulcan/main.py` | VULCAN main app with integrated `/v1/chat` |
 | `src/full_platform.py` | Unified platform that mounts all services |
+| `static/index.html` | Frontend chat interface (served at /) |
 | `start_chat_interface.sh` | One-click startup script |
-| `vulcan_chat.html` | Frontend chat interface |
 | `README_CHAT.md` | This documentation |
 
 ## Related Documentation
