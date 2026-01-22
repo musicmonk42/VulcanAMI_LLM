@@ -111,7 +111,7 @@ jobs:
   test:
     name: Test Python ${{ matrix.python-version }} - ${{ matrix.test-part }}
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 360  # 6 hours - maximum allowed for GitHub Actions
     strategy:
       fail-fast: false
       matrix:
@@ -432,17 +432,22 @@ jobs:
           echo "=================================================="
           
           # Increased --max-worker-restart to 3 for better resilience
-          # Timeout set to 35m to ensure completion before job timeout (40m)
+          # Job timeout set to 6 hours (360 minutes) - the maximum allowed by GitHub Actions.
+          # The test suite contains ~11,000+ total tests (~6800 vulcan + ~4600 unit) and 
+          # takes several hours to complete.
+          # Inner timeout removed to let pytest run to completion within the job timeout.
           # Added per-test timeout (--timeout=300) to prevent individual test hangs
-          # Use -n 2 workers for better parallelism
+          # Using -n auto for optimal parallelism on GitHub Actions runners (uses all CPUs)
           # Changed to verbose mode (-vv) for better visibility into test execution
           # Added -o timeout_func_only=true to only timeout test functions, not fixtures
           # Added --cov-config to use .coveragerc for proper parallel coverage
           #
           # CRITICAL FIX: Pass -m with properly quoted MARKER_EXPR directly
           # Do NOT store "-m ..." in a variable - shell word splitting breaks it
-          TIMEOUT_MINUTES=35
-          timeout ${TIMEOUT_MINUTES}m pytest \
+          #
+          # NOTE: Tests take several hours to run. The 6-hour job timeout accommodates this.
+          # Consider running tests in a self-hosted runner or splitting further if needed.
+          pytest \
             --cov=src \
             --cov-config=.coveragerc \
             --cov-report=xml \
@@ -453,7 +458,7 @@ jobs:
             --junitxml=results/junit.xml \
             --timeout=300 \
             --timeout-method=thread \
-            -n 2 \
+            -n auto \
             --dist=loadfile \
             --max-worker-restart=3 \
             -o timeout_func_only=true \
@@ -465,10 +470,6 @@ jobs:
           
           if [ $EXIT_CODE -ne 0 ]; then
             echo "❌ Tests failed with exit code: $EXIT_CODE"
-            if [ $EXIT_CODE -eq 124 ]; then
-              echo "⏱️  TIMEOUT: Test suite exceeded ${TIMEOUT_MINUTES} minute limit"
-              echo "Check verbose output above to identify hanging test"
-            fi
           fi
           
           # Force cleanup of any background processes
