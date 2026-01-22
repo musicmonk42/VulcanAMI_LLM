@@ -30,7 +30,7 @@ spec:
       {{- if and .Values.memorySystem.enabled .Values.memorySystem.milvus.bootstrap.enabled }}
       initContainers:
       - name: milvus-bootstrap
-        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        image: {{ include "vulcanami.image" . | quote }}
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         command:
           - python
@@ -67,7 +67,7 @@ spec:
       - name: {{ .Chart.Name }}
         securityContext:
           {{- toYaml .Values.securityContext | nindent 12 }}
-        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        image: {{ include "vulcanami.image" . | quote }}
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         ports:
         - name: http

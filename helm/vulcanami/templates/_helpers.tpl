@@ -58,3 +58,29 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{/*
+Generate the full image reference with optional digest pinning.
+SECURITY: Supports image digest pinning for production immutability.
+
+Usage:
+  {{ include "vulcanami.image" . }}
+
+Examples:
+  - tag only: ghcr.io/org/image:v1.0.0
+  - tag with digest: ghcr.io/org/image:v1.0.0@sha256:abc123...
+  - tag@digest in tag field: ghcr.io/org/image:v1.0.0@sha256:abc123...
+  - separate digest field: ghcr.io/org/image:v1.0.0@sha256:def456...
+*/}}
+{{- define "vulcanami.image" -}}
+{{- $repository := .Values.image.repository -}}
+{{- $tag := .Values.image.tag | default .Chart.AppVersion -}}
+{{- $digest := .Values.image.digest | default "" -}}
+{{- if $digest -}}
+  {{- printf "%s:%s@%s" $repository $tag $digest -}}
+{{- else if contains "@sha256:" $tag -}}
+  {{- printf "%s:%s" $repository $tag -}}
+{{- else -}}
+  {{- printf "%s:%s" $repository $tag -}}
+{{- end -}}
+{{- end }}
