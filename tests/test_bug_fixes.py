@@ -9,6 +9,12 @@ This test file validates the fixes for the following bugs:
 """
 
 import re
+from pathlib import Path
+
+
+# Get the project root directory
+PROJECT_ROOT = Path(__file__).parent.parent
+SRC_DIR = PROJECT_ROOT / "src" / "vulcan"
 
 
 # ============================================================================
@@ -17,11 +23,13 @@ import re
 
 def test_graphix_llm_client_message_format():
     """Test that mathematical computation tool wraps prompts correctly."""
-    with open('/home/runner/work/VulcanAMI_LLM/VulcanAMI_LLM/src/vulcan/reasoning/mathematical_computation.py', 'r') as f:
+    file_path = SRC_DIR / "reasoning" / "mathematical_computation.py"
+    with open(file_path, 'r') as f:
         source = f.read()
     
     # Check that the fix is in place - look for the wrapped message format
-    pattern = r'llm\.chat\(\[\{"role":\s*"user",\s*"content":\s*prompt\}\]\)'
+    # More flexible pattern that handles different quote styles and whitespace
+    pattern = r'llm\.chat\s*\(\s*\[\s*\{\s*["\']role["\']\s*:\s*["\']user["\']\s*,\s*["\']content["\']\s*:\s*prompt\s*\}\s*\]\s*\)'
     if re.search(pattern, source):
         print("✓ Bug #1: Mathematical computation tool has message format fix")
         return True
@@ -36,7 +44,8 @@ def test_graphix_llm_client_message_format():
 
 def test_tool_name_mappings():
     """Test that new tool name aliases are in the mapping."""
-    with open('/home/runner/work/VulcanAMI_LLM/VulcanAMI_LLM/src/vulcan/reasoning/unified/orchestrator.py', 'r') as f:
+    file_path = SRC_DIR / "reasoning" / "unified" / "orchestrator.py"
+    with open(file_path, 'r') as f:
         source = f.read()
     
     mappings = {
@@ -63,7 +72,8 @@ def test_tool_name_mappings():
 
 def test_symbolic_logic_prompt_patterns():
     """Test that LLM router prompt includes symbolic logic patterns."""
-    with open('/home/runner/work/VulcanAMI_LLM/VulcanAMI_LLM/src/vulcan/routing/routing_prompts.py', 'r') as f:
+    file_path = SRC_DIR / "routing" / "routing_prompts.py"
+    with open(file_path, 'r') as f:
         source = f.read()
     
     patterns_to_check = [
@@ -92,7 +102,8 @@ def test_symbolic_logic_prompt_patterns():
 
 def test_pearl_style_causal_patterns():
     """Test that safety validator includes Pearl-style causal patterns."""
-    with open('/home/runner/work/VulcanAMI_LLM/VulcanAMI_LLM/src/vulcan/safety/safety_validator.py', 'r') as f:
+    file_path = SRC_DIR / "safety" / "safety_validator.py"
+    with open(file_path, 'r') as f:
         source = f.read()
     
     patterns_to_check = [
@@ -100,7 +111,7 @@ def test_pearl_style_causal_patterns():
         'confounding.*causation',
         'you.*observe.*dataset',
         'causal.*arrow',
-        '→',  # Causal arrow notation
+        r'→|->',  # Causal arrow notation (Unicode or ASCII alternative)
     ]
     
     found_count = 0
@@ -118,7 +129,8 @@ def test_pearl_style_causal_patterns():
 
 def test_causal_education_keywords():
     """Test that causal education keywords include Pearl-style terms."""
-    with open('/home/runner/work/VulcanAMI_LLM/VulcanAMI_LLM/src/vulcan/safety/safety_validator.py', 'r') as f:
+    file_path = SRC_DIR / "safety" / "safety_validator.py"
+    with open(file_path, 'r') as f:
         source = f.read()
     
     keywords_to_check = [
