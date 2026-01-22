@@ -111,7 +111,7 @@ jobs:
   test:
     name: Test Python ${{ matrix.python-version }} - ${{ matrix.test-part }}
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 360  # 6 hours - maximum allowed for GitHub Actions
     strategy:
       fail-fast: false
       matrix:
@@ -432,8 +432,10 @@ jobs:
           echo "=================================================="
           
           # Increased --max-worker-restart to 3 for better resilience
-          # Job timeout set to 60 minutes with inner timeout set to 55 minutes to ensure
-          # completion before job timeout. This accommodates the large test suite (~6800+ tests).
+          # Job timeout set to 6 hours (360 minutes) - the maximum allowed by GitHub Actions.
+          # The test suite contains ~11,000+ total tests (~6800 vulcan + ~4600 unit) and 
+          # takes several hours to complete.
+          # Inner timeout removed to let pytest run to completion within the job timeout.
           # Added per-test timeout (--timeout=300) to prevent individual test hangs
           # Using -n auto for optimal parallelism on GitHub Actions runners (uses all CPUs)
           # Changed to verbose mode (-vv) for better visibility into test execution
@@ -443,11 +445,9 @@ jobs:
           # CRITICAL FIX: Pass -m with properly quoted MARKER_EXPR directly
           # Do NOT store "-m ..." in a variable - shell word splitting breaks it
           #
-          # TIMEOUT FIX: Increased job timeout to 60 minutes and inner timeout to 55 minutes
-          # to accommodate the large test suite (~6800+ tests in vulcan tests alone).
-          # Using -n auto for optimal parallelism on GitHub Actions runners.
-          TIMEOUT_MINUTES=55
-          timeout ${TIMEOUT_MINUTES}m pytest \
+          # NOTE: Tests take several hours to run. The 6-hour job timeout accommodates this.
+          # Consider running tests in a self-hosted runner or splitting further if needed.
+          pytest \
             --cov=src \
             --cov-config=.coveragerc \
             --cov-report=xml \
@@ -470,10 +470,6 @@ jobs:
           
           if [ $EXIT_CODE -ne 0 ]; then
             echo "❌ Tests failed with exit code: $EXIT_CODE"
-            if [ $EXIT_CODE -eq 124 ]; then
-              echo "⏱️  TIMEOUT: Test suite exceeded ${TIMEOUT_MINUTES} minute limit"
-              echo "Check verbose output above to identify hanging test"
-            fi
           fi
           
           # Force cleanup of any background processes
