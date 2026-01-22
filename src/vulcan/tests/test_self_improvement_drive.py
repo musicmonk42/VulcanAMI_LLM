@@ -163,10 +163,10 @@ class TestInitialization:
 
     def test_init_with_config(self, config_path, state_path):
         """Test initialization with configuration file"""
-        drive = SelfImprovementDrive(config_path, state_path)
+        drive = SelfImprovementDrive(config_path=config_path, state_path=state_path)
 
         assert drive.config is not None
-        assert len(drive.objectives) == 5  # Fixed: code has 5 default objectives
+        assert len(drive.objectives) == 3  # Config defines 3 objectives
         assert drive.state is not None
 
     def test_init_without_config(self, temp_dir):
@@ -1493,10 +1493,12 @@ class TestEdgeCases:
             json.dump(minimal_config, f)
 
         # Should handle gracefully with defaults
-        drive = SelfImprovementDrive(str(config_file), str(temp_dir / "state.json"))
+        drive = SelfImprovementDrive(
+            config_path=str(config_file), state_path=str(temp_dir / "state.json")
+        )
 
-        # Code uses default objectives instead of just the config one
-        assert len(drive.objectives) == 5  # Default objectives used
+        # Should use the single configured objective
+        assert len(drive.objectives) == 1
 
 
 class TestIntegration:
