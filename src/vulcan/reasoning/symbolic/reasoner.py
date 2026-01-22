@@ -769,9 +769,9 @@ class SymbolicReasoner:
         # Note: Check applicability before attempting to parse
         # This prevents parse errors like "Unexpected token 'the'" on natural language
         if check_applicability and not self.is_symbolic_query(query_str):
-            logger.warning(
-                f"[SymbolicReasoner] Query does not appear to contain formal logic, "
-                f"returning not applicable (prevents wasted computation)"
+            logger.info(
+                f"[SymbolicReasoner] Query appears to be natural language rather than formal logic. "
+                f"Returning low confidence to route to alternative reasoning engines."
             )
             return {
                 "proven": False,
@@ -780,7 +780,8 @@ class SymbolicReasoner:
                 "proof": None,
                 "method": self.prover_type,
                 "applicable": False,
-                "reason": "Query does not contain formal logic notation",
+                "reason": "Query appears to be natural language; symbolic reasoner optimized for formal logic notation (e.g., ∀x P(x) → Q(x))",
+                "suggestion": "Consider using philosophical, probabilistic, or general reasoning engines for natural language queries",
             }
         
         try:

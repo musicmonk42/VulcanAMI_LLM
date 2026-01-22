@@ -1994,8 +1994,15 @@ Generate ONLY the Python code:"""
             # =================================================================
             elif hasattr(llm, "chat") and callable(llm.chat):
                 # GraphixLLMClient-style: client.chat(messages) expects list of dicts
-                # FIX: Wrap prompt in message format expected by GraphixLLMClient
-                response = llm.chat([{"role": "user", "content": prompt}])
+                # Industry Standard: Validate prompt type before message construction
+                if not isinstance(prompt, str):
+                    logger.warning(f"Prompt is not a string (type={type(prompt).__name__}), converting to string")
+                    prompt = str(prompt)
+                
+                # Create properly formatted messages
+                messages = [{"role": "user", "content": prompt}]
+                
+                response = llm.chat(messages)
                 # Handle different response formats
                 if isinstance(response, str):
                     code = response
