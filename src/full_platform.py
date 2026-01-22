@@ -1249,6 +1249,204 @@ class AsyncServiceManager:
 
         return health_results
 
+    async def stop_service(self, app: FastAPI, name: str) -> Dict[str, Any]:
+        """
+        Stop (unmount) a service from the main app.
+        
+        This removes the service's route from the FastAPI application,
+        effectively making it unavailable. The service configuration
+        is preserved so it can be restarted later.
+        
+        Args:
+            app: The FastAPI application instance
+            name: Name of the service to stop
+            
+        Returns:
+            Dict with success status and details
+        """
+        async with self._lock:
+            service = self.services.get(name)
+            if not service:
+                return {
+                    "success": False,
+                    "error": f"Service '{name}' not found",
+                    "available_services": list(self.services.keys())
+                }
+            
+            if not service.get("mounted"):
+                return {
+                    "success": False,
+                    "error": f"Service '{name}' is not currently mounted",
+                    "status": "already_stopped"
+                }
+            
+            try:
+                # Get the mount path for the service
+                mount_path = service.get("mount_path")
+                if not mount_path:
+                    return {
+                        "success": False,
+                        "error": f"Service '{name}' has no mount path configured"
+                    }
+                
+                # Find and remove the route from FastAPI app
+                # FastAPI stores mounted apps in app.routes
+                route_removed = False
+                for i, route in enumerate(app.routes):
+                    if hasattr(route, 'path') and route.path == mount_path:
+                        app.routes.pop(i)
+                        route_removed = True
+                        break
+                
+                if not route_removed:
+                    # Route not found, but mark as stopped anyway
+                    logger.warning(
+                        f"Route for {name} at {mount_path} not found in app.routes, "
+                        "but marking as stopped"
+                    )
+                
+                # Update service status
+                service["mounted"] = False
+                service["stopped_at"] = datetime.utcnow().isoformat()
+                
+                logger.info(f"✓ Stopped service {name} (was mounted at {mount_path})")
+                
+                await flash_manager.add_message(
+                    "warning",
+                    f"Stopped {name}",
+                    f"Service at {mount_path} is now unavailable"
+                )
+                
+                return {
+                    "success": True,
+                    "service": name,
+                    "mount_path": mount_path,
+                    "status": "stopped",
+                    "stopped_at": service["stopped_at"]
+                }
+                
+            except Exception as e:
+                logger.error(f"✗ Failed to stop {name}: {e}")
+                return {
+                    "success": False,
+                    "error": str(e),
+                    "error_type": type(e).__name__
+                }
+
+    async def start_service(self, app: FastAPI, name: str) -> Dict[str, Any]:
+        """
+        Start (re-mount) a previously stopped service.
+        
+        This re-mounts a service that was previously stopped, making it
+        available again at its original mount path.
+        
+        Args:
+            app: The FastAPI application instance
+            name: Name of the service to start
+            
+        Returns:
+            Dict with success status and details
+        """
+        async with self._lock:
+            service = self.services.get(name)
+            if not service:
+                return {
+                    "success": False,
+                    "error": f"Service '{name}' not found",
+                    "available_services": list(self.services.keys())
+                }
+            
+            if service.get("mounted"):
+                return {
+                    "success": False,
+                    "error": f"Service '{name}' is already running",
+                    "status": "already_running"
+                }
+            
+            if not service.get("import_success"):
+                return {
+                    "success": False,
+                    "error": f"Service '{name}' failed to import and cannot be started",
+                    "import_error": service.get("error")
+                }
+            
+            try:
+                mount_path = service.get("mount_path")
+                service_app = service.get("app")
+                
+                if not mount_path or not service_app:
+                    return {
+                        "success": False,
+                        "error": f"Service '{name}' is missing mount_path or app configuration"
+                    }
+                
+                # Mount the service back to the app
+                # Check if it's a WSGI or ASGI app based on previous mount style
+                use_wsgi = service.get("use_wsgi", False)
+                if use_wsgi:
+                    app.mount(mount_path, WSGIMiddleware(service_app))
+                else:
+                    app.mount(mount_path, service_app)
+                
+                # Update service status
+                service["mounted"] = True
+                service["started_at"] = datetime.utcnow().isoformat()
+                if "stopped_at" in service:
+                    del service["stopped_at"]
+                
+                logger.info(f"✓ Started service {name} at {mount_path}")
+                
+                await flash_manager.add_message(
+                    "success",
+                    f"Started {name}",
+                    f"Service now available at {mount_path}"
+                )
+                
+                return {
+                    "success": True,
+                    "service": name,
+                    "mount_path": mount_path,
+                    "status": "running",
+                    "started_at": service["started_at"],
+                    "docs_url": service.get("docs_url")
+                }
+                
+            except Exception as e:
+                logger.error(f"✗ Failed to start {name}: {e}")
+                return {
+                    "success": False,
+                    "error": str(e),
+                    "error_type": type(e).__name__
+                }
+
+    async def get_service_details(self, name: str) -> Optional[Dict[str, Any]]:
+        """
+        Get detailed information about a specific service.
+        
+        Args:
+            name: Name of the service
+            
+        Returns:
+            Dict with service details or None if not found
+        """
+        async with self._lock:
+            service = self.services.get(name)
+            if not service:
+                return None
+            
+            return {
+                "name": service.get("name"),
+                "mounted": service.get("mounted", False),
+                "mount_path": service.get("mount_path"),
+                "health_path": service.get("health_path"),
+                "import_path": service.get("import_path"),
+                "import_success": service.get("import_success"),
+                "docs_url": service.get("docs_url") if service.get("mounted") else None,
+                "error": service.get("error"),
+                "stopped_at": service.get("stopped_at"),
+                "started_at": service.get("started_at"),
+            }
+
 
 # Global async service manager
 service_manager = AsyncServiceManager()
@@ -3421,6 +3619,199 @@ async def api_status():
             "auto_detect_src": settings.auto_detect_src,
         },
     }
+
+
+# =============================================================================
+# ADMIN SERVICE MANAGEMENT ENDPOINTS
+# =============================================================================
+# These endpoints allow administrators to manage individual services at runtime.
+# They require proper authentication (API key or JWT token).
+# =============================================================================
+
+@app.get("/admin/services", response_model=None)
+async def admin_list_services(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer(auto_error=False)),
+):
+    """
+    List all registered services with their current status.
+    
+    Requires authentication via API key (X-API-Key header) or JWT token.
+    
+    Returns:
+        List of all services with their status, mount paths, and health info.
+    """
+    # Verify authentication
+    api_key = request.headers.get("X-API-Key")
+    if not _verify_admin_access(api_key, credentials):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Admin authentication required. Provide X-API-Key or Bearer token."
+        )
+    
+    services = await service_manager.get_service_status()
+    return {
+        "services": services,
+        "total_count": len(services),
+        "mounted_count": sum(1 for s in services.values() if s.get("mounted")),
+        "stopped_count": sum(1 for s in services.values() if not s.get("mounted")),
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+
+@app.get("/admin/services/{service_name}", response_model=None)
+async def admin_get_service(
+    service_name: str,
+    request: Request,
+    credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer(auto_error=False)),
+):
+    """
+    Get detailed information about a specific service.
+    
+    Args:
+        service_name: Name of the service to query
+        
+    Returns:
+        Detailed service information including status, paths, and timestamps.
+    """
+    # Verify authentication
+    api_key = request.headers.get("X-API-Key")
+    if not _verify_admin_access(api_key, credentials):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Admin authentication required. Provide X-API-Key or Bearer token."
+        )
+    
+    service_details = await service_manager.get_service_details(service_name)
+    if not service_details:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Service '{service_name}' not found"
+        )
+    
+    return {
+        "service": service_details,
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+
+@app.post("/admin/services/{service_name}/stop", response_model=None)
+async def admin_stop_service(
+    service_name: str,
+    request: Request,
+    credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer(auto_error=False)),
+):
+    """
+    Stop (unmount) a specific service.
+    
+    This endpoint removes the service's routes from the application,
+    making it unavailable until it is started again. The service
+    configuration is preserved.
+    
+    Args:
+        service_name: Name of the service to stop
+        
+    Returns:
+        Result of the stop operation with status details.
+    """
+    # Verify authentication
+    api_key = request.headers.get("X-API-Key")
+    if not _verify_admin_access(api_key, credentials):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Admin authentication required. Provide X-API-Key or Bearer token."
+        )
+    
+    result = await service_manager.stop_service(app, service_name)
+    
+    if not result.get("success"):
+        status_code = status.HTTP_404_NOT_FOUND if "not found" in result.get("error", "").lower() else status.HTTP_400_BAD_REQUEST
+        raise HTTPException(
+            status_code=status_code,
+            detail=result.get("error", "Failed to stop service")
+        )
+    
+    logger.info(f"Admin stopped service: {service_name}")
+    return result
+
+
+@app.post("/admin/services/{service_name}/start", response_model=None)
+async def admin_start_service(
+    service_name: str,
+    request: Request,
+    credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer(auto_error=False)),
+):
+    """
+    Start (re-mount) a previously stopped service.
+    
+    This endpoint re-mounts a service that was previously stopped,
+    making it available again at its original mount path.
+    
+    Args:
+        service_name: Name of the service to start
+        
+    Returns:
+        Result of the start operation with status details.
+    """
+    # Verify authentication
+    api_key = request.headers.get("X-API-Key")
+    if not _verify_admin_access(api_key, credentials):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Admin authentication required. Provide X-API-Key or Bearer token."
+        )
+    
+    result = await service_manager.start_service(app, service_name)
+    
+    if not result.get("success"):
+        status_code = status.HTTP_404_NOT_FOUND if "not found" in result.get("error", "").lower() else status.HTTP_400_BAD_REQUEST
+        raise HTTPException(
+            status_code=status_code,
+            detail=result.get("error", "Failed to start service")
+        )
+    
+    logger.info(f"Admin started service: {service_name}")
+    return result
+
+
+def _verify_admin_access(
+    api_key: Optional[str], 
+    credentials: Optional[HTTPAuthorizationCredentials]
+) -> bool:
+    """
+    Verify if the request has valid admin access credentials.
+    
+    Checks both API key and JWT token authentication methods.
+    
+    Args:
+        api_key: API key from X-API-Key header
+        credentials: JWT credentials from Authorization header
+        
+    Returns:
+        True if authenticated, False otherwise
+    """
+    # Check API key authentication
+    configured_key = settings.api_key
+    if configured_key and api_key:
+        if _safe_compare(api_key, configured_key):
+            return True
+    
+    # Check JWT authentication
+    if JWT_AVAILABLE and credentials and settings.jwt_secret:
+        try:
+            token = credentials.credentials
+            payload = jwt.decode(
+                token,
+                settings.jwt_secret,
+                algorithms=["HS256"]
+            )
+            # Token is valid - allow access
+            # Optionally, check for admin role/scope in payload
+            return True
+        except (JWTError, Exception):
+            pass
+    
+    return False
 
 
 @app.post("/auth/token", response_model=None)
