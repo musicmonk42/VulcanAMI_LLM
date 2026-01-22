@@ -376,6 +376,9 @@ jobs:
           # Store matrix test-part in a shell variable to avoid interpolation issues
           TEST_PART="${{ matrix.test-part }}"
           
+          # Sanitize: trim whitespace and convert to lowercase for reliable matching
+          TEST_PART="$(echo "$TEST_PART" | xargs | tr '[:upper:]' '[:lower:]')"
+          
           # Determine test path and marker expression based on matrix test-part
           # IMPORTANT: Keep TEST_PATH and MARKER_EXPR as separate variables
           # Do NOT combine them into a single string - shell word splitting will break
@@ -390,18 +393,18 @@ jobs:
           
           # Use shell variable in case statement for proper matching
           case "${TEST_PART}" in
-            unit)
+            unit*)
               echo "✓ Matched: Running unit tests from tests/ directory"
               TEST_PATH="tests/"
               # Exclude perf/boundedness tests - they run in dedicated perf-smoke job
               MARKER_EXPR="not slow and not load_test and not benchmark and not integration and not perf and not boundedness"
               ;;
-            vulcan)
+            vulcan*)
               echo "✓ Matched: Running tests from src/vulcan/tests/ directory"
               TEST_PATH="src/vulcan/tests/"
               MARKER_EXPR="not slow and not load_test and not benchmark and not integration"
               ;;
-            integration)
+            integration*)
               echo "✓ Matched: Running slow/integration tests from both directories"
               TEST_PATH="tests/ src/vulcan/tests/"
               MARKER_EXPR="slow or integration"
