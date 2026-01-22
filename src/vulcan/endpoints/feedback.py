@@ -114,6 +114,35 @@ async def submit_feedback(request: Request) -> Dict[str, Any]:
             
             learning_system.receive_feedback(feedback)
             
+            # ALIGNMENT FIX: Also propagate detailed feedback to World Model's self-improvement drive
+            # This ensures all feedback types impact CSIU (Continuous Self-Improvement Unit) and meta-reasoning
+            world_model = None
+            if hasattr(deployment, "collective") and hasattr(deployment.collective.deps, "world_model"):
+                world_model = deployment.collective.deps.world_model
+            
+            if world_model and hasattr(world_model, "self_improvement_drive"):
+                try:
+                    # Notify self-improvement drive with detailed feedback context
+                    feedback_context = {
+                        "query_id": str(feedback_data.query_id),
+                        "response_id": str(feedback_data.response_id),
+                        "feedback_type": str(feedback_data.feedback_type),
+                        "feedback_source": "api_detailed",
+                        "reward_signal": float(feedback_data.reward_signal),
+                        "content": str(feedback_data.content)
+                    }
+                    
+                    # Record outcome based on reward signal (positive if reward > 0)
+                    world_model.self_improvement_drive.record_outcome(
+                        success=(feedback_data.reward_signal > 0),
+                        metrics={"user_satisfaction": float(feedback_data.reward_signal)},
+                        context=feedback_context
+                    )
+                    logger.info(f"[ALIGNMENT] Detailed feedback propagated to self-improvement drive: {feedback_data.reward_signal}")
+                except Exception as e:
+                    # Log but don't fail the request if self-improvement integration fails
+                    logger.warning(f"[ALIGNMENT] Failed to propagate detailed feedback to self-improvement drive: {e}")
+            
             return {
                 "status": "accepted",
                 "feedback_id": feedback.feedback_id,
@@ -186,6 +215,35 @@ async def submit_thumbs_feedback(request: Request) -> Dict[str, Any]:
                 response_id=str(thumbs_data.response_id),
                 is_positive=bool(thumbs_data.is_positive),
             )
+            
+            # ALIGNMENT FIX: Also propagate feedback to World Model and self-improvement drive
+            # This ensures feedback impacts CSIU (Continuous Self-Improvement Unit) and meta-reasoning
+            world_model = None
+            if hasattr(deployment, "collective") and hasattr(deployment.collective.deps, "world_model"):
+                world_model = deployment.collective.deps.world_model
+            
+            if world_model and hasattr(world_model, "self_improvement_drive"):
+                try:
+                    # Notify self-improvement drive of user feedback for alignment
+                    reward_signal = 1.0 if thumbs_data.is_positive else -1.0
+                    feedback_context = {
+                        "query_id": str(thumbs_data.query_id),
+                        "response_id": str(thumbs_data.response_id),
+                        "feedback_source": "ui_thumbs",
+                        "reward_signal": reward_signal,
+                        "is_positive": bool(thumbs_data.is_positive)
+                    }
+                    
+                    # Record outcome for self-improvement drive
+                    world_model.self_improvement_drive.record_outcome(
+                        success=(thumbs_data.is_positive),
+                        metrics={"user_satisfaction": reward_signal},
+                        context=feedback_context
+                    )
+                    logger.info(f"[ALIGNMENT] Thumbs feedback propagated to self-improvement drive: {reward_signal}")
+                except Exception as e:
+                    # Log but don't fail the request if self-improvement integration fails
+                    logger.warning(f"[ALIGNMENT] Failed to propagate feedback to self-improvement drive: {e}")
             
             feedback_type = "thumbs_up" if thumbs_data.is_positive else "thumbs_down"
             return {
