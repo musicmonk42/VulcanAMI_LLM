@@ -594,6 +594,117 @@ class TestEdgeCases:
 
 
 # ============================================================
+# JSON PARSING TESTS
+# ============================================================
+
+
+class TestJSONParsing:
+    """Tests for JSON parsing from LLM responses."""
+    
+    def test_parse_json_with_markdown_code_fence(self):
+        """JSON wrapped in markdown code fences should be parsed correctly."""
+        from src.vulcan.routing.llm_router import LLMQueryRouter
+        
+        router = LLMQueryRouter(llm_client=None)
+        
+        # Test with ```json fence
+        response = """```json
+{
+  "destination": "reasoning_engine",
+  "engine": "causal",
+  "confidence": 1.0,
+  "reason": "Causal reasoning query"
+}
+```"""
+        result = router._parse_json_response(response)
+        assert result["destination"] == "reasoning_engine"
+        assert result["engine"] == "causal"
+        assert result["confidence"] == 1.0
+        assert result["reason"] == "Causal reasoning query"
+    
+    def test_parse_json_with_plain_markdown_fence(self):
+        """JSON wrapped in plain ``` fence should be parsed correctly."""
+        from src.vulcan.routing.llm_router import LLMQueryRouter
+        
+        router = LLMQueryRouter(llm_client=None)
+        
+        # Test with plain ``` fence
+        response = """```
+{
+  "destination": "reasoning_engine",
+  "engine": "mathematical",
+  "confidence": 0.95,
+  "reason": "Mathematical computation"
+}
+```"""
+        result = router._parse_json_response(response)
+        assert result["destination"] == "reasoning_engine"
+        assert result["engine"] == "mathematical"
+        assert result["confidence"] == 0.95
+    
+    def test_parse_json_without_fence(self):
+        """Plain JSON without fences should still work."""
+        from src.vulcan.routing.llm_router import LLMQueryRouter
+        
+        router = LLMQueryRouter(llm_client=None)
+        
+        # Test without fence
+        response = """{
+  "destination": "reasoning_engine",
+  "engine": "symbolic",
+  "confidence": 0.88,
+  "reason": "Logic problem"
+}"""
+        result = router._parse_json_response(response)
+        assert result["destination"] == "reasoning_engine"
+        assert result["engine"] == "symbolic"
+        assert result["confidence"] == 0.88
+    
+    def test_parse_json_with_extra_whitespace(self):
+        """JSON with extra whitespace should be parsed correctly."""
+        from src.vulcan.routing.llm_router import LLMQueryRouter
+        
+        router = LLMQueryRouter(llm_client=None)
+        
+        # Test with extra whitespace
+        response = """
+        
+```json
+{
+  "destination": "reasoning_engine",
+  "engine": "probabilistic",
+  "confidence": 0.92,
+  "reason": "Probability calculation"
+}
+```
+
+        """
+        result = router._parse_json_response(response)
+        assert result["destination"] == "reasoning_engine"
+        assert result["engine"] == "probabilistic"
+        assert result["confidence"] == 0.92
+    
+    def test_parse_malformed_json_returns_defaults(self):
+        """Malformed JSON should return defaults."""
+        from src.vulcan.routing.llm_router import LLMQueryRouter
+        
+        router = LLMQueryRouter(llm_client=None)
+        
+        # Test with malformed JSON
+        response = """```json
+{
+  "destination": "reasoning_engine",
+  "engine": "causal"
+  INVALID JSON HERE
+}
+```"""
+        result = router._parse_json_response(response)
+        assert result["destination"] == "world_model"
+        assert result["engine"] is None
+        assert result["confidence"] == 0.5
+
+
+# ============================================================
 # PERFORMANCE BENCHMARK TESTS
 # ============================================================
 

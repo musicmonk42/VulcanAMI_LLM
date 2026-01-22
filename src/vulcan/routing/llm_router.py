@@ -729,6 +729,18 @@ class LLMQueryRouter:
         Returns:
             Parsed JSON dict, or defaults if parsing fails
         """
+        # Strip markdown code fences if present
+        response = response.strip()
+        if response.startswith("```"):
+            lines = response.split("\n")
+            # Remove opening fence (```json or ```)
+            if lines[0].startswith("```"):
+                lines = lines[1:]
+            # Remove closing fence
+            if lines and lines[-1].strip() == "```":
+                lines = lines[:-1]
+            response = "\n".join(lines).strip()
+        
         # Try to find JSON in response
         json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', response)
         if json_match:
