@@ -734,8 +734,7 @@ class LLMQueryRouter:
         if response.startswith("```"):
             lines = response.split("\n")
             # Remove opening fence (```json or ```)
-            if lines[0].startswith("```"):
-                lines = lines[1:]
+            lines = lines[1:]
             # Remove closing fence
             if lines and lines[-1].strip() == "```":
                 lines = lines[:-1]

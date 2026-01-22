@@ -690,12 +690,11 @@ class TestJSONParsing:
         
         router = LLMQueryRouter(llm_client=None)
         
-        # Test with malformed JSON
+        # Test with malformed JSON (missing comma)
         response = """```json
 {
-  "destination": "reasoning_engine",
+  "destination": "reasoning_engine"
   "engine": "causal"
-  INVALID JSON HERE
 }
 ```"""
         result = router._parse_json_response(response)
