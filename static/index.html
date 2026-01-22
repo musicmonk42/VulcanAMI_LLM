@@ -478,7 +478,7 @@
         }
         
         .btn-approve:hover {
-            background: #28a745;
+            filter: brightness(1.1);
             transform: translateY(-1px);
             box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
         }
@@ -489,7 +489,7 @@
         }
         
         .btn-reject:hover {
-            background: #c0392b;
+            filter: brightness(0.9);
             transform: translateY(-1px);
             box-shadow: 0 2px 8px rgba(231, 76, 60, 0.3);
         }
@@ -2812,8 +2812,17 @@
         async function approveImprovement(improvementId) {
             try {
                 // Disable buttons to prevent double-submission
-                const buttons = document.querySelectorAll(`button[onclick*="${improvementId}"]`);
-                buttons.forEach(btn => btn.disabled = true);
+                // Find buttons safely by checking all buttons in the improvements container
+                const improvementsEl = document.getElementById('improvementsContent');
+                if (improvementsEl) {
+                    const buttons = improvementsEl.querySelectorAll('button');
+                    buttons.forEach(btn => {
+                        const onclick = btn.getAttribute('onclick') || '';
+                        if (onclick.includes(improvementId)) {
+                            btn.disabled = true;
+                        }
+                    });
+                }
                 
                 const res = await fetch(`${baseUrl}/v1/improvement/approve`, {
                     method: 'POST',
@@ -2838,8 +2847,16 @@
                 console.error('Approval error:', e);
                 showToast(`Failed to approve improvement: ${e.message}`, 'error');
                 // Re-enable buttons on error
-                const buttons = document.querySelectorAll(`button[onclick*="${improvementId}"]`);
-                buttons.forEach(btn => btn.disabled = false);
+                const improvementsEl = document.getElementById('improvementsContent');
+                if (improvementsEl) {
+                    const buttons = improvementsEl.querySelectorAll('button');
+                    buttons.forEach(btn => {
+                        const onclick = btn.getAttribute('onclick') || '';
+                        if (onclick.includes(improvementId)) {
+                            btn.disabled = false;
+                        }
+                    });
+                }
             }
         }
         
@@ -2847,8 +2864,17 @@
         async function rejectImprovement(improvementId) {
             try {
                 // Disable buttons to prevent double-submission
-                const buttons = document.querySelectorAll(`button[onclick*="${improvementId}"]`);
-                buttons.forEach(btn => btn.disabled = true);
+                // Find buttons safely by checking all buttons in the improvements container
+                const improvementsEl = document.getElementById('improvementsContent');
+                if (improvementsEl) {
+                    const buttons = improvementsEl.querySelectorAll('button');
+                    buttons.forEach(btn => {
+                        const onclick = btn.getAttribute('onclick') || '';
+                        if (onclick.includes(improvementId)) {
+                            btn.disabled = true;
+                        }
+                    });
+                }
                 
                 const res = await fetch(`${baseUrl}/v1/improvement/approve`, {
                     method: 'POST',
@@ -2873,8 +2899,16 @@
                 console.error('Rejection error:', e);
                 showToast(`Failed to reject improvement: ${e.message}`, 'error');
                 // Re-enable buttons on error
-                const buttons = document.querySelectorAll(`button[onclick*="${improvementId}"]`);
-                buttons.forEach(btn => btn.disabled = false);
+                const improvementsEl = document.getElementById('improvementsContent');
+                if (improvementsEl) {
+                    const buttons = improvementsEl.querySelectorAll('button');
+                    buttons.forEach(btn => {
+                        const onclick = btn.getAttribute('onclick') || '';
+                        if (onclick.includes(improvementId)) {
+                            btn.disabled = false;
+                        }
+                    });
+                }
             }
         }
         
