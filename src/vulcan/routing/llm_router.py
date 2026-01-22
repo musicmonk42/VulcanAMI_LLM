@@ -908,6 +908,27 @@ class LLMQueryRouter:
     def clear_cache(self) -> int:
         """Clear the routing cache. Returns number of entries cleared."""
         return self.cache.clear()
+    
+    def set_llm_client(self, llm_client: Any) -> None:
+        """
+        Set or update the LLM client for this router.
+        
+        Allows late-binding of the LLM client after initialization.
+        Useful when the router is created before the LLM client is available.
+        
+        Args:
+            llm_client: LLM client with chat() method. Can be None to disable LLM.
+        """
+        was_available = self.llm_client is not None
+        self.llm_client = llm_client
+        is_available = llm_client is not None
+        
+        if not was_available and is_available:
+            logger.info(f"LLMQueryRouter: LLM client now available (was unavailable)")
+        elif was_available and not is_available:
+            logger.warning(f"LLMQueryRouter: LLM client removed (falling back to regex)")
+        else:
+            logger.debug(f"LLMQueryRouter: LLM client updated")
 
 
 # ============================================================
@@ -925,8 +946,13 @@ def get_llm_router(
     """
     Get or create the global LLMQueryRouter instance.
     
+    Auto-discovers LLM client from available sources if not provided:
+    1. vulcan.reasoning.singletons.get_llm_client()
+    2. vulcan.llm.get_hybrid_executor() -> local_llm
+    3. vulcan.main.global_llm_client (if exists)
+    
     Args:
-        llm_client: LLM client with chat() method
+        llm_client: LLM client with chat() method. If None, auto-discovers.
         force_new: Force creation of new instance
         
     Returns:
@@ -937,9 +963,68 @@ def get_llm_router(
     if _llm_router_instance is None or force_new:
         with _llm_router_lock:
             if _llm_router_instance is None or force_new:
+                # Auto-discover LLM client if not provided
+                if llm_client is None:
+                    llm_client = _discover_llm_client()
+                
                 _llm_router_instance = LLMQueryRouter(llm_client=llm_client)
     
     return _llm_router_instance
+
+
+def _discover_llm_client() -> Optional[Any]:
+    """
+    Auto-discover LLM client from available sources.
+    
+    Tries multiple sources in priority order:
+    1. vulcan.reasoning.singletons.get_llm_client()
+    2. vulcan.llm.get_hybrid_executor() -> local_llm
+    3. vulcan.main.global_llm_client (if exists)
+    
+    Returns:
+        LLM client instance, or None if unavailable.
+    """
+    # Try get_llm_client() from singletons
+    try:
+        from vulcan.reasoning.singletons import get_llm_client
+        client = get_llm_client()
+        if client is not None:
+            logger.info("[LLMRouter] ✓ Auto-discovered LLM client from singletons.get_llm_client()")
+            return client
+    except ImportError:
+        pass
+    except Exception as e:
+        logger.debug(f"[LLMRouter] Failed to get LLM from singletons: {e}")
+    
+    # Try get_hybrid_executor() -> local_llm
+    try:
+        from vulcan.llm import get_hybrid_executor
+        hybrid_executor = get_hybrid_executor()
+        if hybrid_executor is not None:
+            client = getattr(hybrid_executor, 'local_llm', None)
+            if client is not None:
+                logger.info("[LLMRouter] ✓ Auto-discovered LLM client from HybridLLMExecutor.local_llm")
+                return client
+    except ImportError:
+        pass
+    except Exception as e:
+        logger.debug(f"[LLMRouter] Failed to get LLM from hybrid executor: {e}")
+    
+    # Try main.global_llm_client (if exists)
+    try:
+        import vulcan.main as main
+        if hasattr(main, 'global_llm_client'):
+            client = main.global_llm_client
+            if client is not None:
+                logger.info("[LLMRouter] ✓ Auto-discovered LLM client from main.global_llm_client")
+                return client
+    except ImportError:
+        pass
+    except Exception as e:
+        logger.debug(f"[LLMRouter] Failed to get LLM from main.global_llm_client: {e}")
+    
+    logger.warning("[LLMRouter] ⚠ No LLM client discovered - router will use regex fallback only")
+    return None
 
 
 def route_query(query: str) -> RoutingDecision:
