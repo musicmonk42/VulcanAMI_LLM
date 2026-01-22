@@ -29,7 +29,6 @@ import pytest
 from src.vulcan.routing.llm_router import (
     LLMQueryRouter,
     get_llm_router,
-    _discover_llm_client,
 )
 
 
@@ -62,15 +61,13 @@ def reset_router_singleton():
 
 
 class TestAutoDiscovery:
-    """Tests for LLM client auto-discovery."""
+    """Tests for LLM client auto-discovery via get_llm_router()."""
     
     def test_discover_from_singletons(self, mock_llm_client):
         """Should discover LLM client from singletons.get_llm_client()."""
         with patch('vulcan.reasoning.singletons.get_llm_client', return_value=mock_llm_client):
-            from src.vulcan.routing.llm_router import _discover_llm_client
-            
-            client = _discover_llm_client()
-            assert client is mock_llm_client
+            router = get_llm_router(force_new=True)
+            assert router.llm_client is mock_llm_client
     
     def test_discover_from_hybrid_executor(self, mock_llm_client):
         """Should discover LLM client from HybridLLMExecutor.local_llm."""
@@ -79,10 +76,8 @@ class TestAutoDiscovery:
         
         with patch('vulcan.reasoning.singletons.get_llm_client', return_value=None):
             with patch('vulcan.llm.get_hybrid_executor', return_value=mock_executor):
-                from src.vulcan.routing.llm_router import _discover_llm_client
-                
-                client = _discover_llm_client()
-                assert client is mock_llm_client
+                router = get_llm_router(force_new=True)
+                assert router.llm_client is mock_llm_client
     
     def test_discover_from_main_global(self, mock_llm_client):
         """Should discover LLM client from main.global_llm_client."""
@@ -92,10 +87,8 @@ class TestAutoDiscovery:
         with patch('vulcan.reasoning.singletons.get_llm_client', return_value=None):
             with patch('vulcan.llm.get_hybrid_executor', return_value=None):
                 with patch.dict('sys.modules', {'vulcan.main': mock_main}):
-                    from src.vulcan.routing.llm_router import _discover_llm_client
-                    
-                    client = _discover_llm_client()
-                    assert client is mock_llm_client
+                    router = get_llm_router(force_new=True)
+                    assert router.llm_client is mock_llm_client
     
     def test_discovery_priority_order(self, mock_llm_client):
         """Should try sources in priority order: singletons > hybrid > main."""
@@ -113,28 +106,22 @@ class TestAutoDiscovery:
         with patch('vulcan.reasoning.singletons.get_llm_client', return_value=singleton_client):
             with patch('vulcan.llm.get_hybrid_executor', return_value=mock_executor):
                 with patch.dict('sys.modules', {'vulcan.main': mock_main}):
-                    from src.vulcan.routing.llm_router import _discover_llm_client
-                    
-                    client = _discover_llm_client()
-                    assert client is singleton_client
+                    router = get_llm_router(force_new=True)
+                    assert router.llm_client is singleton_client
     
     def test_discover_returns_none_when_unavailable(self):
         """Should return None when no LLM client is available."""
         with patch('vulcan.reasoning.singletons.get_llm_client', return_value=None):
             with patch('vulcan.llm.get_hybrid_executor', return_value=None):
-                from src.vulcan.routing.llm_router import _discover_llm_client
-                
-                client = _discover_llm_client()
-                assert client is None
+                router = get_llm_router(force_new=True)
+                assert router.llm_client is None
     
     def test_discover_handles_import_errors(self):
         """Should handle import errors gracefully."""
         with patch('vulcan.reasoning.singletons.get_llm_client', side_effect=ImportError("Module not found")):
-            from src.vulcan.routing.llm_router import _discover_llm_client
-            
-            # Should not raise, should return None
-            client = _discover_llm_client()
-            assert client is None
+            router = get_llm_router(force_new=True)
+            # Should not raise, should have no client
+            assert router.llm_client is None
     
     def test_discover_handles_attribute_errors(self):
         """Should handle missing attributes gracefully."""
@@ -144,10 +131,8 @@ class TestAutoDiscovery:
         
         with patch('vulcan.reasoning.singletons.get_llm_client', return_value=None):
             with patch('vulcan.llm.get_hybrid_executor', return_value=mock_executor):
-                from src.vulcan.routing.llm_router import _discover_llm_client
-                
-                client = _discover_llm_client()
-                assert client is None
+                router = get_llm_router(force_new=True)
+                assert router.llm_client is None
 
 
 # ============================================================

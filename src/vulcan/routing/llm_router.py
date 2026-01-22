@@ -989,12 +989,12 @@ def _discover_llm_client() -> Optional[Any]:
         from vulcan.reasoning.singletons import get_llm_client
         client = get_llm_client()
         if client is not None:
-            logger.info("[LLMRouter] ✓ Auto-discovered LLM client from singletons.get_llm_client()")
+            logger.info("LLMQueryRouter: ✓ Auto-discovered LLM client from singletons.get_llm_client()")
             return client
     except ImportError:
         pass
     except Exception as e:
-        logger.debug(f"[LLMRouter] Failed to get LLM from singletons: {e}")
+        logger.debug(f"LLMQueryRouter: Failed to get LLM from singletons: {e}")
     
     # Try get_hybrid_executor() -> local_llm
     try:
@@ -1003,27 +1003,27 @@ def _discover_llm_client() -> Optional[Any]:
         if hybrid_executor is not None:
             client = getattr(hybrid_executor, 'local_llm', None)
             if client is not None:
-                logger.info("[LLMRouter] ✓ Auto-discovered LLM client from HybridLLMExecutor.local_llm")
+                logger.info("LLMQueryRouter: ✓ Auto-discovered LLM client from HybridLLMExecutor.local_llm")
                 return client
     except ImportError:
         pass
     except Exception as e:
-        logger.debug(f"[LLMRouter] Failed to get LLM from hybrid executor: {e}")
+        logger.debug(f"LLMQueryRouter: Failed to get LLM from hybrid executor: {e}")
     
     # Try main.global_llm_client (if exists)
     try:
-        import vulcan.main as main
+        from vulcan import main
         if hasattr(main, 'global_llm_client'):
             client = main.global_llm_client
             if client is not None:
-                logger.info("[LLMRouter] ✓ Auto-discovered LLM client from main.global_llm_client")
+                logger.info("LLMQueryRouter: ✓ Auto-discovered LLM client from main.global_llm_client")
                 return client
     except ImportError:
         pass
     except Exception as e:
-        logger.debug(f"[LLMRouter] Failed to get LLM from main.global_llm_client: {e}")
+        logger.debug(f"LLMQueryRouter: Failed to get LLM from main.global_llm_client: {e}")
     
-    logger.warning("[LLMRouter] ⚠ No LLM client discovered - router will use regex fallback only")
+    logger.warning("LLMQueryRouter: ⚠ No LLM client discovered - router will use regex fallback only")
     return None
 
 
