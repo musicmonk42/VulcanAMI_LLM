@@ -408,6 +408,98 @@
             color: var(--text-primary);
         }
         
+        .improvement-item {
+            background: var(--bg-tertiary);
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            border: 1px solid var(--border-secondary);
+            transition: all 0.2s;
+        }
+        
+        .improvement-item:hover {
+            border-color: var(--accent-primary);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .improvement-item:last-child {
+            margin-bottom: 0;
+        }
+        
+        .improvement-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        
+        .improvement-title {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 0.95em;
+        }
+        
+        .improvement-status {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            font-weight: 600;
+            background: var(--warning);
+            color: #000;
+        }
+        
+        .improvement-description {
+            color: var(--text-secondary);
+            font-size: 0.9em;
+            line-height: 1.5;
+            margin-bottom: 12px;
+            white-space: pre-wrap;
+        }
+        
+        .improvement-actions {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .improvement-actions button {
+            flex: 1;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.9em;
+        }
+        
+        .btn-approve {
+            background: var(--success);
+            color: white;
+        }
+        
+        .btn-approve:hover {
+            background: #28a745;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+        }
+        
+        .btn-reject {
+            background: var(--error);
+            color: white;
+        }
+        
+        .btn-reject:hover {
+            background: #c0392b;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(231, 76, 60, 0.3);
+        }
+        
+        .improvement-actions button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
         .endpoint-list {
             display: flex;
             flex-wrap: wrap;
@@ -1286,6 +1378,13 @@
                 <div class="metric-card warning-card" id="adversarialCard">
                     <h3>🔒 Adversarial Status</h3>
                     <div class="metric-content" id="adversarialContent">
+                        <div class="metric-loading">Loading...</div>
+                    </div>
+                </div>
+                
+                <div class="metric-card warning-card" id="improvementsCard">
+                    <h3>⚡ Pending Improvements</h3>
+                    <div class="metric-content scrollable" id="improvementsContent">
                         <div class="metric-loading">Loading...</div>
                     </div>
                 </div>
@@ -2609,22 +2708,38 @@
         async function refreshWarnings() {
             // Safety Status
             const safetyData = await fetchMetric('/safety/status', 'safetyContent');
-            if (safetyData) {
-                const safetyEl = document.getElementById('safetyContent');
+            const safetyEl = document.getElementById('safetyContent');
+            
+            // Check if safety data is available and has expected structure
+            if (safetyData && typeof safetyData === 'object' && !safetyData.status) {
+                // Valid safety data received
                 let html = '';
-                html += `<div class="metric-item"><span class="metric-label">Safety Score</span><span class="metric-value ${safetyData.safety_score >= 0.9 ? 'healthy' : 'warning'}">${(safetyData.safety_score * 100).toFixed(0)}%</span></div>`;
-                html += `<div class="metric-item"><span class="metric-label">Violations Detected</span><span class="metric-value ${safetyData.violations_detected === 0 ? 'healthy' : 'error'}">${safetyData.violations_detected}</span></div>`;
-                html += `<div class="metric-item"><span class="metric-label">Violations Prevented</span><span class="metric-value">${safetyData.violations_prevented}</span></div>`;
-                html += `<div class="metric-item"><span class="metric-label">Monitoring</span><span class="metric-badge ${safetyData.monitoring_active ? 'active' : 'inactive'}">${safetyData.monitoring_active ? 'Active' : 'Inactive'}</span></div>`;
+                const safetyScore = safetyData.safety_score !== undefined ? safetyData.safety_score : 0;
+                const violationsDetected = safetyData.violations_detected !== undefined ? safetyData.violations_detected : 0;
+                const violationsPrevented = safetyData.violations_prevented !== undefined ? safetyData.violations_prevented : 0;
+                const monitoringActive = safetyData.monitoring_active !== undefined ? safetyData.monitoring_active : false;
+                
+                html += `<div class="metric-item"><span class="metric-label">Safety Score</span><span class="metric-value ${safetyScore >= 0.9 ? 'healthy' : 'warning'}">${(safetyScore * 100).toFixed(0)}%</span></div>`;
+                html += `<div class="metric-item"><span class="metric-label">Violations Detected</span><span class="metric-value ${violationsDetected === 0 ? 'healthy' : 'error'}">${violationsDetected}</span></div>`;
+                html += `<div class="metric-item"><span class="metric-label">Violations Prevented</span><span class="metric-value">${violationsPrevented}</span></div>`;
+                html += `<div class="metric-item"><span class="metric-label">Monitoring</span><span class="metric-badge ${monitoringActive ? 'active' : 'inactive'}">${monitoringActive ? 'Active' : 'Inactive'}</span></div>`;
                 safetyEl.innerHTML = html;
+            } else if (safetyData && safetyData.status === 'unavailable') {
+                // Backend returned unavailable status
+                safetyEl.innerHTML = '<div class="metric-item">Safety monitoring unavailable</div>';
+            } else {
+                // No data or error
+                safetyEl.innerHTML = '<div class="metric-item">Unable to fetch safety status</div>';
             }
             
             // Audit Logs
             const auditData = await fetchMetric('/safety/audit/recent?limit=10', 'auditContent');
-            if (auditData && auditData.audit_logs) {
+            // Support both 'logs' (backend format) and 'audit_logs' (legacy format)
+            const logs = auditData && (auditData.logs || auditData.audit_logs);
+            if (logs && logs.length > 0) {
                 const auditEl = document.getElementById('auditContent');
                 let html = '';
-                for (const log of auditData.audit_logs) {
+                for (const log of logs) {
                     const timestamp = log.timestamp ? new Date(log.timestamp * 1000).toLocaleString() : 'N/A';
                     html += `<div class="audit-entry">
                         <div class="timestamp">${timestamp}</div>
@@ -2641,6 +2756,114 @@
                 renderKeyValue(adversarialData, adversarialEl);
             } else {
                 document.getElementById('adversarialContent').innerHTML = '<div class="metric-item">Adversarial monitoring not available</div>';
+            }
+            
+            // Pending Improvements
+            const improvementsData = await fetchMetric('/v1/improvement/pending', 'improvementsContent');
+            const improvementsEl = document.getElementById('improvementsContent');
+            
+            if (improvementsData && improvementsData.pending_approvals && improvementsData.pending_approvals.length > 0) {
+                let html = '';
+                for (const improvement of improvementsData.pending_approvals) {
+                    const improvementId = improvement.id || improvement.approval_id || 'unknown';
+                    const title = improvement.title || improvement.description || 'Untitled Improvement';
+                    const description = improvement.details || improvement.description || 'No description available';
+                    const status = improvement.status || 'pending';
+                    
+                    html += `<div class="improvement-item">
+                        <div class="improvement-header">
+                            <span class="improvement-title">${escapeHtml(title)}</span>
+                            <span class="improvement-status">${escapeHtml(status)}</span>
+                        </div>
+                        <div class="improvement-description">${escapeHtml(description)}</div>
+                        <div class="improvement-actions">
+                            <button class="btn-approve" onclick="approveImprovement('${escapeHtml(improvementId)}')">✓ Approve</button>
+                            <button class="btn-reject" onclick="rejectImprovement('${escapeHtml(improvementId)}')">✗ Reject</button>
+                        </div>
+                    </div>`;
+                }
+                improvementsEl.innerHTML = html;
+            } else if (improvementsData && improvementsData.count === 0) {
+                improvementsEl.innerHTML = '<div class="metric-item">No pending improvements</div>';
+            } else {
+                improvementsEl.innerHTML = '<div class="metric-item">Improvements not available</div>';
+            }
+        }
+        
+        // Helper function to escape HTML to prevent XSS
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // Approve an improvement proposal
+        async function approveImprovement(improvementId) {
+            try {
+                // Disable buttons to prevent double-submission
+                const buttons = document.querySelectorAll(`button[onclick*="${improvementId}"]`);
+                buttons.forEach(btn => btn.disabled = true);
+                
+                const res = await fetch(`${baseUrl}/v1/improvement/approve`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        approval_id: improvementId,
+                        approved: true,
+                        notes: 'Approved via UI'
+                    })
+                });
+                
+                if (res.ok) {
+                    const result = await res.json();
+                    showToast('Improvement approved successfully', 'success');
+                    // Refresh the improvements list
+                    await refreshWarnings();
+                } else {
+                    const error = await res.json().catch(() => ({ detail: 'Unknown error' }));
+                    throw new Error(error.detail || `HTTP ${res.status}`);
+                }
+            } catch (e) {
+                console.error('Approval error:', e);
+                showToast(`Failed to approve improvement: ${e.message}`, 'error');
+                // Re-enable buttons on error
+                const buttons = document.querySelectorAll(`button[onclick*="${improvementId}"]`);
+                buttons.forEach(btn => btn.disabled = false);
+            }
+        }
+        
+        // Reject an improvement proposal
+        async function rejectImprovement(improvementId) {
+            try {
+                // Disable buttons to prevent double-submission
+                const buttons = document.querySelectorAll(`button[onclick*="${improvementId}"]`);
+                buttons.forEach(btn => btn.disabled = true);
+                
+                const res = await fetch(`${baseUrl}/v1/improvement/approve`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        approval_id: improvementId,
+                        approved: false,
+                        notes: 'Rejected via UI'
+                    })
+                });
+                
+                if (res.ok) {
+                    const result = await res.json();
+                    showToast('Improvement rejected', 'success');
+                    // Refresh the improvements list
+                    await refreshWarnings();
+                } else {
+                    const error = await res.json().catch(() => ({ detail: 'Unknown error' }));
+                    throw new Error(error.detail || `HTTP ${res.status}`);
+                }
+            } catch (e) {
+                console.error('Rejection error:', e);
+                showToast(`Failed to reject improvement: ${e.message}`, 'error');
+                // Re-enable buttons on error
+                const buttons = document.querySelectorAll(`button[onclick*="${improvementId}"]`);
+                buttons.forEach(btn => btn.disabled = false);
             }
         }
         
