@@ -302,25 +302,42 @@ class AgentProfile:
 
 
 class DatabaseConnectionPool:
-    """Thread-safe database connection pool."""
+    """Thread-safe database connection pool with timeout and WAL mode."""
 
-    def __init__(self, db_path: Path, pool_size: int = 5):
+    def __init__(self, db_path: Path, pool_size: int = 5, timeout: float = 30.0):
         self.db_path = db_path
         self.pool_size = pool_size
+        self.timeout = timeout
         self.connections = []
         self.available = threading.Semaphore(pool_size)
         self.lock = threading.RLock()
         self.closed = False
 
         for _ in range(pool_size):
-            conn = sqlite3.connect(str(db_path), check_same_thread=False)
+            conn = sqlite3.connect(
+                str(db_path), 
+                check_same_thread=False,
+                timeout=self.timeout,  # Prevent indefinite waits
+                isolation_level=None  # Autocommit mode
+            )
+            # Enable WAL mode for better concurrency
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA busy_timeout = 30000")  # 30 seconds
+            conn.execute("PRAGMA synchronous=NORMAL")
             conn.row_factory = sqlite3.Row
             self.connections.append(conn)
 
     @contextmanager
     def get_connection(self):
-        """Get a connection from the pool."""
-        self.available.acquire()
+        """Get a connection from the pool with timeout."""
+        # Timeout on semaphore acquisition
+        acquired = self.available.acquire(timeout=self.timeout)
+        if not acquired:
+            raise RuntimeError(
+                f"Failed to acquire database connection within {self.timeout}s"
+            )
+        
+        conn = None
         try:
             with self.lock:
                 if self.closed:
@@ -328,10 +345,13 @@ class DatabaseConnectionPool:
                 conn = self.connections.pop()
             yield conn
         finally:
-            with self.lock:
-                if not self.closed:
-                    self.connections.append(conn)
-            self.available.release()
+            # Always release, even if exception occurs
+            try:
+                if conn and not self.closed:
+                    with self.lock:
+                        self.connections.append(conn)
+            finally:
+                self.available.release()
 
     def close_all(self):
         """Close all connections."""
@@ -340,10 +360,8 @@ class DatabaseConnectionPool:
             for conn in self.connections:
                 try:
                     conn.close()
-                except sqlite3.Error as e:
-                    logger.error(f"Error closing connection: {e}")
                 except Exception as e:
-                    logger.error(f"Unexpected error closing connection: {e}")
+                    logger.error(f"Error closing connection: {e}")
             self.connections.clear()
 
 
