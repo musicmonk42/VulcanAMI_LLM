@@ -179,6 +179,7 @@ This is a philosophical query."""
     
     def test_malformed_json_returns_defaults(self, router):
         """Malformed JSON should return safe defaults, not crash."""
+        # Missing comma between "destination" and "engine" makes this invalid JSON
         response = """```json
 {
   "destination": "reasoning_engine"
@@ -188,7 +189,9 @@ This is a philosophical query."""
         result = router._parse_json_response(response)
         # Should return defaults, not crash
         assert "destination" in result
-        assert result["destination"] == "world_model"  # default
+        assert result["destination"] == "world_model"  # default fallback
+        assert result["engine"] is None  # default fallback
+        assert result["confidence"] == 0.5  # low confidence for parse failure
     
     def test_empty_response(self, router):
         """Empty response should return safe defaults."""
