@@ -2961,12 +2961,45 @@ class WorldModelToolWrapper:
         queries. Instead of routing these to other engines (which breaks the
         architecture), world_model now properly generates responses for them.
         
+        ROUTING FIX (Jan 23 2026): Detect specialized reasoning queries that should
+        NOT be routed to WorldModel. If such queries arrive here due to routing bugs,
+        return a low-confidence response to trigger LLM re-synthesis.
+        
         Args:
             query_lower: Lowercased query string
             
         Returns:
             Tuple of (aspect_name, result_dict)
         """
+        # =================================================================
+        # ROUTING FIX: Detect specialized queries that shouldn't be here
+        # =================================================================
+        # Queries about analogical reasoning, causal inference, math, logic, etc.
+        # should be routed to specialized reasoning engines, NOT WorldModel.
+        # If they arrive here, it's a routing bug - return low confidence to trigger LLM.
+        specialized_indicators = {
+            'analogical': ['map the deep structure', 'structure mapping', 'analogical mapping', 
+                          'analogy between', 'correspondence between', 'source domain', 'target domain'],
+            'causal': ['confound', 'confounding', 'dag', 'causal', 'intervention', 'do(', 
+                      'collider', 'd-separation', 'randomized'],
+            'mathematical': ['compute exactly', 'calculate', 'evaluate', 'solve', '∑', '∫',
+                            'derivative', 'integral', 'equation', 'formula', 'theorem'],
+            'logical': ['quantifier scope', 'scope ambiguity', '∀', '∃', '→', '∧', '∨',
+                       'satisfiable', 'fol', 'first-order logic', 'proposition'],
+        }
+        
+        for reasoning_type, indicators in specialized_indicators.items():
+            if any(indicator in query_lower for indicator in indicators):
+                self.logger.warning(
+                    f"[WorldModelToolWrapper] Detected {reasoning_type} query routed to WorldModel - "
+                    f"this should have been routed to {reasoning_type} engine. Returning low confidence."
+                )
+                return 'misrouted', {
+                    'error': f'Query appears to be {reasoning_type} reasoning, should not be routed to WorldModel',
+                    'suggested_engine': reasoning_type,
+                    'confidence': 0.1,  # Low confidence triggers LLM re-synthesis
+                }
+        
         # =================================================================
         # Bug #3 FIX: Check for CREATIVE queries FIRST
         # =================================================================
