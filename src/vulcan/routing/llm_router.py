@@ -739,13 +739,15 @@ class LLMQueryRouter:
         
         This method handles multiple response formats that LLMs commonly return:
         1. JSON wrapped in markdown code fences (```json ... ``` or ``` ... ```)
-        2. JSON with leading/trailing text or whitespace
-        3. Plain JSON without any wrapping
+        2. Inline fences without newlines (```{...}``` or ```json{...}```)
+        3. JSON with leading/trailing text or whitespace
+        4. Plain JSON without any wrapping
         
         The implementation follows industry best practices:
-        - Strip markdown fences FIRST to get clean JSON (don't rely on regex)
+        - Use regex for robust fence stripping (handles all fence formats)
+        - Validate JSON structure before parsing
         - Parse the cleaned JSON directly (most reliable)
-        - Fall back to regex extraction only if direct parsing fails
+        - Fall back to brace matching for mixed content
         - Provide detailed logging for debugging
         - Return safe defaults on any failure
         
@@ -759,6 +761,9 @@ class LLMQueryRouter:
             >>> router._parse_json_response('```json\\n{"destination": "skip"}\\n```')
             {'destination': 'skip', ...}
             
+            >>> router._parse_json_response('```json{"destination": "skip"}```')
+            {'destination': 'skip', ...}
+            
             >>> router._parse_json_response('{"destination": "world_model"}')
             {'destination': 'world_model', ...}
         """
@@ -766,20 +771,36 @@ class LLMQueryRouter:
             logger.warning("[LLMRouter] Empty response received")
             return self._default_routing_response("Empty response")
         
-        # Clean the response: strip whitespace and markdown code fences
+        # Clean the response: strip whitespace
         cleaned = response.strip()
         
-        # Handle markdown code fences (```json or ```)
-        if cleaned.startswith("```"):
-            lines = cleaned.split("\n")
-            # Remove opening fence line (e.g., "```json" or "```")
-            if lines:
-                lines = lines[1:]
-            # Remove closing fence line (e.g., "```")
-            if lines and lines[-1].strip() == "```":
-                lines = lines[:-1]
-            cleaned = "\n".join(lines).strip()
-            logger.debug("[LLMRouter] Stripped markdown code fences")
+        # Industry-standard approach: Use regex to strip markdown code fences
+        # Handles all fence formats including inline fences (```{...}```)
+        # Pattern explanation:
+        #   ^```(?:json)?\\s* - Opening fence with optional 'json' and whitespace
+        #   \\n? - Optional newline after opening fence
+        #   (.+?) - Capture group for JSON content (non-greedy)
+        #   \\n?```$ - Optional newline and closing fence at end
+        fence_pattern = re.compile(r'^```(?:json)?\s*\n?(.+?)\n?```\s*$', re.DOTALL)
+        fence_match = fence_pattern.match(cleaned)
+        
+        if fence_match:
+            # Extract JSON from inside the fence
+            cleaned = fence_match.group(1).strip()
+            logger.debug("[LLMRouter] Stripped markdown code fences using regex")
+        elif cleaned.startswith("```"):
+            # Fallback for malformed fences (e.g., missing closing fence)
+            # Remove opening fence line
+            cleaned = re.sub(r'^```(?:json)?\s*\n?', '', cleaned)
+            # Remove closing fence if present
+            cleaned = re.sub(r'\n?```\s*$', '', cleaned)
+            cleaned = cleaned.strip()
+            logger.debug("[LLMRouter] Stripped malformed markdown fence")
+        
+        # Validate that cleaned content looks like JSON
+        if cleaned and not cleaned.startswith('{'):
+            logger.debug(f"[LLMRouter] Content doesn't start with '{{', attempting brace extraction")
+            # Will be handled by Strategy 2 below
         
         # Strategy 1: Parse the cleaned response directly as JSON (most reliable)
         try:
