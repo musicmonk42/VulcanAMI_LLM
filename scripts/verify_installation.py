@@ -242,13 +242,20 @@ def verify_installation(
                 logger.info(f"✓ {description} ({result.import_time_ms:.1f}ms)")
         else:
             report.failed += 1
-            if verbose:
+            # ALWAYS log critical failures, even in non-verbose mode
+            if is_critical:
+                logger.error(f"✗ CRITICAL FAILURE: {description}")
+                if result.error_message:
+                    logger.error(f"  Module: {module_path}")
+                    logger.error(f"  Error: {result.error_message}")
+            elif verbose:
                 logger.error(f"✗ {description}")
                 if result.error_message:
                     logger.error(f"  Error: {result.error_message}")
+        
         if verify_only and not result.success and is_critical:
-            # In verify-only mode we short-circuit on critical failures to avoid
-            # initializing any optional background services during retries.
+            # In verify-only mode we short-circuit on critical failures
+            logger.error(f"Stopping verification due to critical failure in {module_path}")
             break
 
     report.total_time_ms = (time.perf_counter() - start_time) * 1000
@@ -421,6 +428,32 @@ def main() -> int:
 
         # Return appropriate exit code
         exit_code = 0 if report.overall_success else 1
+
+        # In quiet or json mode, still show critical failures to stderr
+        if not report.overall_success and (args.quiet or args.json):
+            # Always show critical failures, even in quiet mode
+            logger.error("=" * 60)
+            logger.error("VERIFICATION FAILED - Critical Import Errors:")
+            logger.error("=" * 60)
+            
+            # Get the test cases that were used
+            test_cases = TEST_CASES
+            if args.critical_only:
+                test_cases = [(m, d, c) for m, d, c in TEST_CASES if c]
+            if args.skip_slow_checks:
+                test_cases = [
+                    ("src", "Base src module", True),
+                    ("src.vulcan", "VULCAN core package", True),
+                ]
+            
+            for (m, d, c), r in zip(test_cases, report.results):
+                if c and not r.success:
+                    logger.error(f"  ✗ {d}")
+                    logger.error(f"     Module: {m}")
+                    if r.error_message:
+                        logger.error(f"     Error: {r.error_message[:200]}")
+            logger.error("=" * 60)
+
         logger.info("VERIFY_SCRIPT_EXITING")
         # Ensure any background logging threads shut down cleanly
         handlers = list(logging.getLogger().handlers)
