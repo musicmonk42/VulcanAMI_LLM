@@ -6,7 +6,11 @@ This script validates the fixes without requiring the full test environment.
 """
 
 import sys
-sys.path.insert(0, '/home/runner/work/VulcanAMI_LLM/VulcanAMI_LLM')
+from pathlib import Path
+
+# Get repository root
+REPO_ROOT = Path(__file__).parent
+sys.path.insert(0, str(REPO_ROOT))
 
 from src.vulcan.routing.llm_router import (
     LLMQueryRouter,
