@@ -920,7 +920,19 @@ class LLMQueryRouter:
                 source="fallback",
             )
         
-        # 5. Mathematical keywords → Mathematical engine
+        # 5. Analogical keywords → Analogical engine
+        # CHECK BEFORE MATHEMATICAL KEYWORDS: "computer" contains "compute" but "analogy" is stronger signal
+        # Analogical reasoning is more specific than general mathematical computation
+        if any(keyword in query_lower for keyword in ANALOGICAL_KEYWORDS):
+            return RoutingDecision(
+                destination="reasoning_engine",
+                engine="analogical",
+                confidence=0.85,
+                reason="Analogical reasoning keywords detected",
+                source="fallback",
+            )
+        
+        # 6. Mathematical keywords → Mathematical engine
         if any(keyword in query_lower for keyword in MATHEMATICAL_KEYWORDS):
             return RoutingDecision(
                 destination="reasoning_engine",
@@ -930,7 +942,7 @@ class LLMQueryRouter:
                 source="fallback",
             )
         
-        # 6. Logic symbols → Symbolic engine
+        # 7. Logic symbols → Symbolic engine
         if any(symbol in query for symbol in LOGIC_SYMBOLS):
             return RoutingDecision(
                 destination="reasoning_engine",
@@ -940,23 +952,13 @@ class LLMQueryRouter:
                 source="fallback",
             )
         
-        # 7. Logic keywords → Symbolic engine
+        # 8. Logic keywords → Symbolic engine
         if any(keyword in query_lower for keyword in LOGIC_KEYWORDS):
             return RoutingDecision(
                 destination="reasoning_engine",
                 engine="symbolic",
                 confidence=0.85,
                 reason="Logic keywords detected",
-                source="fallback",
-            )
-        
-        # 8. Analogical keywords → Analogical engine
-        if any(keyword in query_lower for keyword in ANALOGICAL_KEYWORDS):
-            return RoutingDecision(
-                destination="reasoning_engine",
-                engine="analogical",
-                confidence=0.85,
-                reason="Analogical reasoning keywords detected",
                 source="fallback",
             )
         

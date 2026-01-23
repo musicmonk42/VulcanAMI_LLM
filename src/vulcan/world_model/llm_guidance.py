@@ -255,6 +255,7 @@ class LLMGuidanceBuilder:
         
         # Extract verified knowledge
         verified_content = {
+            'facts': verified_knowledge.verified_facts,  # Use 'facts' key for test compatibility
             'verified_facts': verified_knowledge.verified_facts,
             'unverified_facts': verified_knowledge.unverified_facts,
             'conflicts': verified_knowledge.conflicts,
@@ -294,7 +295,7 @@ class LLMGuidanceBuilder:
             constraints=constraints,
             permissions=permissions,
             tone=tone,
-            format='markdown',
+            format=requested_format,
             max_length=max_length,
             metadata={
                 'requested_format': requested_format,
@@ -512,7 +513,7 @@ class LLMGuidanceBuilder:
             constraints=constraints,
             permissions=permissions,
             tone='friendly and helpful',
-            format='plain_text',
+            format='conversation',
             max_length=200,
             metadata={
                 'query_type': 'conversational',
