@@ -110,13 +110,19 @@ _gc_request_counter = 0
 # ============================================================
 # Template indicators that should NOT bypass LLM synthesis
 # Industry Standard: Detect boilerplate responses that need LLM refinement
+# 
+# FIX: Removed philosophical reasoning patterns that were incorrectly flagged as templates
+# These patterns are actually substantive analysis, not placeholder text:
+# - "Vulcan's Introspective Analysis" (philosophical header)
+# - "I'm approaching this question from my own evolving value system" (introspection)
+# - "Based on my evolved values and learned ethical boundaries" (ethical reasoning)
+# 
+# Only actual placeholder/boilerplate patterns remain
 TEMPLATE_RESPONSE_INDICATORS = [
-    "Vulcan's Introspective Analysis",
-    "I'm approaching this question from my own evolving value system",
-    "Based on my evolved values and learned ethical boundaries",
-    "balances multiple considerations",
-    "while staying true to my core objective",
-    "My Conclusion",
+    "I cannot",
+    "I'm unable to",
+    "I don't have enough",
+    "please provide more",
 ]
 
 
@@ -127,6 +133,10 @@ def _is_template_response(conclusion: Any) -> bool:
     Template responses are boilerplate text that doesn't provide substantive
     answers to user queries. These should be routed through LLM synthesis
     instead of being returned directly.
+    
+    FIX: Philosophical reasoning patterns are NOT templates - they contain
+    substantive introspective analysis. This function now detects and exempts
+    philosophical indicators before checking for actual template patterns.
     
     Uses smart extraction to handle dict responses by looking for content keys
     before falling back to string conversion.
@@ -142,6 +152,28 @@ def _is_template_response(conclusion: Any) -> bool:
     if not conclusion_str:
         return False
     
+    conclusion_lower = conclusion_str.lower()
+    
+    # FIX: Patterns that indicate philosophical/meta-cognitive reasoning (NOT templates)
+    # If response contains these, it's substantive analysis, not a template
+    PHILOSOPHICAL_INDICATORS = [
+        "vulcan's introspective analysis",
+        "approaching this question",
+        "evolved values",
+        "ethical boundaries",
+        "value system",
+        "philosophical analysis",
+        "based on my",
+        "from my perspective",
+        "my conclusion",
+        "balances multiple considerations",
+    ]
+    
+    # If response contains philosophical indicators, it's substantive, not a template
+    if any(indicator in conclusion_lower for indicator in PHILOSOPHICAL_INDICATORS):
+        return False
+    
+    # Check for actual template patterns
     return any(indicator in conclusion_str for indicator in TEMPLATE_RESPONSE_INDICATORS)
 
 
@@ -2219,14 +2251,48 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                             f"- privileged routing bypasses threshold"
                         )
             
+            # FIX: Add diagnostic logging for result selection
+            logger.info(
+                f"[VULCAN/DIAGNOSTIC] Result selection: "
+                f"best_source={best_source}, "
+                f"best_confidence={best_confidence:.2f}, "
+                f"best_reasoning_type={best_reasoning_type}, "
+                f"has_conclusion={best_conclusion is not None}, "
+                f"conclusion_length={len(best_conclusion) if best_conclusion else 0}, "
+                f"threshold={MIN_REASONING_CONFIDENCE_THRESHOLD}"
+            )
+            
             # ROOT CAUSE FIX: Check privileged status OR confidence threshold
             # BUT: Detect template responses and force LLM synthesis for them
-            is_template = _is_template_response(best_conclusion)
+            # FIX: Template detection with philosophical reasoning exemption
+            PHILOSOPHICAL_TYPES = ["PHILOSOPHICAL", "philosophical", "world_model", "meta_reasoning", "hybrid"]
+            is_philosophical = any(
+                str(best_reasoning_type).lower() == ptype.lower() 
+                for ptype in PHILOSOPHICAL_TYPES
+            )
+            
+            # Exempt high-confidence philosophical results from template detection
+            if is_philosophical and best_confidence >= 0.60:
+                is_template = False
+                logger.info(
+                    f"[VULCAN] Exempting high-confidence philosophical result from template detection "
+                    f"(type={best_reasoning_type}, confidence={best_confidence:.2f})"
+                )
+            else:
+                is_template = _is_template_response(best_conclusion)
+            
+            # Additional override: Any result >= 0.75 confidence should bypass template check
+            if best_confidence >= 0.75:
+                is_template = False
+                logger.info(
+                    f"[VULCAN] Confidence override: Using high-confidence result directly "
+                    f"(confidence={best_confidence:.2f} >= 0.75)"
+                )
             
             if is_template:
                 logger.warning(
                     "[VULCAN] Detected template response - routing to LLM for proper synthesis "
-                    f"(source={best_source}, type={best_reasoning_type})"
+                    f"(source={best_source}, type={best_reasoning_type}, confidence={best_confidence:.2f})"
                 )
                 use_reasoning_directly = False
             elif best_conclusion is not None and (has_privileged_candidate or best_confidence >= MIN_REASONING_CONFIDENCE_THRESHOLD):
