@@ -915,27 +915,6 @@ result = simplify(result)
                 return CodeTemplates.summation(expr, var, "1", "n")
         
         return None
-            r'∑\s*([^\s,;]+)',
-        ]
-        
-        for pattern in no_bounds_patterns:
-            match = re.search(pattern, normalized, re.IGNORECASE)
-            if match:
-                expr = match.group(1).strip()
-                
-                # Try to detect variable (k, i, j)
-                var = 'k'
-                for v in ['k', 'i', 'j']:
-                    if v in expr:
-                        var = v
-                        break
-                
-                # Convert expression to Python syntax
-                expr = CodeTemplates._normalize_expression(expr, var)
-                
-                return CodeTemplates.summation(expr, var, "1", "n")
-        
-        return None
     
     @staticmethod
     def _normalize_expression(expr: str, var: str) -> str:
