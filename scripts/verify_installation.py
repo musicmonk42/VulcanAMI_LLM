@@ -149,6 +149,12 @@ TEST_CASES: List[Tuple[str, str, bool]] = [
     ("src.vulcan.governance", "Governance module", False),
 ]
 
+# Fast CI test cases - only the most critical modules for quick verification
+FAST_CI_TEST_CASES: List[Tuple[str, str, bool]] = [
+    ("src", "Base src module", True),
+    ("src.vulcan", "VULCAN core package", True),
+]
+
 
 # =============================================================================
 # Core Functions
@@ -231,10 +237,7 @@ def verify_installation(
     # This speeds up CI verification by skipping optional components
     if skip_slow_checks:
         # Only test the absolute minimum critical modules for CI
-        test_cases = [
-            ("src", "Base src module", True),
-            ("src.vulcan", "VULCAN core package", True),
-        ]
+        test_cases = FAST_CI_TEST_CASES
 
     report.total_tests = len(test_cases)
 
