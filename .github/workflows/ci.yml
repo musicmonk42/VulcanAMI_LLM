@@ -389,7 +389,10 @@ jobs:
           # Store matrix test-part in a shell variable to avoid interpolation issues
           TEST_PART="${{ matrix.test-part }}"
           
-          # Sanitize: trim whitespace, convert to lowercase, remove any control characters
+          # Sanitize the test-part value for reliable matching:
+          # 1. Remove any control characters (newlines, tabs, etc)
+          # 2. Trim leading/trailing whitespace
+          # 3. Convert to lowercase
           TEST_PART="$(printf '%s' "$TEST_PART" | tr -d '[:cntrl:]' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | tr '[:upper:]' '[:lower:]')"
           
           # Determine test path and marker expression based on matrix test-part
@@ -450,7 +453,6 @@ jobs:
               echo "   Raw from matrix: '${{ matrix.test-part }}'"
               echo "   Valid options are: unit, vulcan-fast, vulcan-medium, vulcan-slow, integration"
               echo "   Debugging info:"
-              echo "     - Sanitized value: '$TEST_PART'"
               echo "     - Length: ${#TEST_PART}"
               echo "     - Hex dump: $(printf '%s' "$TEST_PART" | od -A n -t x1)"
               exit 1
