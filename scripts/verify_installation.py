@@ -121,6 +121,9 @@ class VerificationReport:
 # Test Configuration
 # =============================================================================
 
+# Maximum length for error messages in summary output
+MAX_ERROR_MESSAGE_LENGTH = 200
+
 # Module test cases: (module_path, description, is_critical)
 # Critical modules cause verification failure if they can't be imported
 TEST_CASES: List[Tuple[str, str, bool]] = [
@@ -261,7 +264,7 @@ def verify_installation(
                 logger.error(f"✗ {description}")
                 if result.error_message:
                     logger.error(f"  Error: {result.error_message}")
-        
+
         if verify_only and not result.success and is_critical:
             # In verify-only mode we short-circuit on critical failures
             logger.error(f"Stopping verification due to critical failure in {module_path}")
@@ -451,7 +454,7 @@ def main() -> int:
                     logger.error(f"  ✗ {result.description}")
                     logger.error(f"     Module: {result.module_path}")
                     if result.error_message:
-                        logger.error(f"     Error: {result.error_message[:200]}")
+                        logger.error(f"     Error: {result.error_message[:MAX_ERROR_MESSAGE_LENGTH]}")
             logger.error("=" * 60)
 
         logger.info("VERIFY_SCRIPT_EXITING")
