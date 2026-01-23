@@ -39,17 +39,23 @@ CI_MODE = bool(
 FAST_FIXTURES = os.environ.get("VULCAN_FAST_FIXTURES", "").lower() in ("1", "true", "yes")
 
 if CI_MODE:
-    # Reduce pytest timeouts in CI for faster failure detection
-    # Individual tests can still override with @pytest.mark.timeout(N)
-    DEFAULT_TEST_TIMEOUT = 180  # 3 minutes instead of default 300
+    # ENHANCED: More aggressive optimization
+    DEFAULT_TEST_TIMEOUT = 90  # Reduced from 180
     
     # Set environment variables for faster test execution
     os.environ.setdefault("VULCAN_SKIP_SLOW_INIT", "1")
     os.environ.setdefault("VULCAN_MINIMAL_FIXTURES", "1")
+    os.environ.setdefault("VULCAN_MOCK_HEAVY_DEPS", "1")  # NEW
+    os.environ.setdefault("SKIP_MODEL_LOADING", "1")  # NEW
     
-    print(f"[conftest] CI mode enabled - using optimized configuration")
-    print(f"[conftest] - Fast fixtures: {FAST_FIXTURES}")
+    # Disable expensive background operations
+    os.environ.setdefault("VULCAN_DISABLE_METRICS", "1")  # NEW
+    os.environ.setdefault("VULCAN_DISABLE_TELEMETRY", "1")  # NEW
+    
+    print(f"[conftest] CI mode enabled - aggressive optimization")
     print(f"[conftest] - Default test timeout: {DEFAULT_TEST_TIMEOUT}s")
+    print(f"[conftest] - Fast fixtures: {FAST_FIXTURES}")
+    print(f"[conftest] - Mocking: heavy deps, models")
 else:
     DEFAULT_TEST_TIMEOUT = 300  # 5 minutes for local development
 

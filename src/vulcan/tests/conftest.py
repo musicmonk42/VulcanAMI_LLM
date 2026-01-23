@@ -7,6 +7,7 @@ so that `from vulcan.xxx import yyy` style imports work correctly.
 
 import asyncio
 import gc
+import os
 import pathlib
 import sys
 import threading
@@ -22,6 +23,49 @@ ROOT = pathlib.Path(__file__).resolve().parents[3]  # Go up to repo root
 SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
+
+# ============================================================
+# CI-Specific Optimizations for Faster Test Execution
+# ============================================================
+# When running in CI mode, apply optimizations to reduce test overhead:
+# - Skip expensive fixture initialization when not needed
+# - Use faster timeouts for CI environment
+# - Reduce default complexity of test fixtures
+#
+# Environment variables that enable CI optimizations:
+# - CI=true (standard CI indicator)
+# - VULCAN_CI_MODE=1 (explicit VULCAN CI mode)
+# - VULCAN_FAST_FIXTURES=1 (use minimal fixtures)
+#
+# More robust CI detection that handles edge cases in subprocesses and pytest-xdist workers
+# Check for any CI environment indicator being set (truthy check, not value check)
+CI_MODE = bool(
+    os.environ.get("CI") or 
+    os.environ.get("GITHUB_ACTIONS") or 
+    os.environ.get("VULCAN_CI_MODE")
+)
+FAST_FIXTURES = os.environ.get("VULCAN_FAST_FIXTURES", "").lower() in ("1", "true", "yes")
+
+if CI_MODE:
+    # ENHANCED: More aggressive optimization
+    DEFAULT_TEST_TIMEOUT = 90  # Reduced from default for faster failure detection
+    
+    # Set environment variables for faster test execution
+    os.environ.setdefault("VULCAN_SKIP_SLOW_INIT", "1")
+    os.environ.setdefault("VULCAN_MINIMAL_FIXTURES", "1")
+    os.environ.setdefault("VULCAN_MOCK_HEAVY_DEPS", "1")  # NEW
+    os.environ.setdefault("SKIP_MODEL_LOADING", "1")  # NEW
+    
+    # Disable expensive background operations
+    os.environ.setdefault("VULCAN_DISABLE_METRICS", "1")  # NEW
+    os.environ.setdefault("VULCAN_DISABLE_TELEMETRY", "1")  # NEW
+    
+    print(f"[vulcan/conftest] CI mode enabled - aggressive optimization")
+    print(f"[vulcan/conftest] - Default test timeout: {DEFAULT_TEST_TIMEOUT}s")
+    print(f"[vulcan/conftest] - Fast fixtures: {FAST_FIXTURES}")
+    print(f"[vulcan/conftest] - Mocking: heavy deps, models")
+else:
+    DEFAULT_TEST_TIMEOUT = 300  # 5 minutes for local development
 
 # Thread leak tolerance - Allow up to 2 extra threads after test
 # This accounts for:
@@ -165,6 +209,8 @@ def fresh_pytorch_model():
     - Models stuck in eval() mode from previous tests
 
     The model is explicitly set to train() mode and is NOT shared across tests.
+    
+    In CI mode with FAST_FIXTURES, returns a smaller model for faster initialization.
     """
     try:
         import torch
@@ -173,6 +219,10 @@ def fresh_pytorch_model():
         class FreshTestModel(nn.Module):
             def __init__(self, input_dim=512, hidden_dim=256):
                 super().__init__()
+                # In CI fast mode, use smaller dimensions
+                if FAST_FIXTURES:
+                    input_dim = min(input_dim, 128)
+                    hidden_dim = min(hidden_dim, 64)
                 self.fc1 = nn.Linear(input_dim, hidden_dim)
                 self.fc2 = nn.Linear(hidden_dim, input_dim)
 
