@@ -132,6 +132,7 @@ class LLMGuidanceBuilder:
     
     # Industry Standard: Class-level constants for universal constraints and permissions
     UNIVERSAL_CONSTRAINTS = [
+        "Do NOT generate facts without evidence or verification",
         "Do not fabricate information or sources",
         "Do not contradict verified facts",
         "Do not make unsupported claims without evidence",
@@ -141,7 +142,7 @@ class LLMGuidanceBuilder:
     ]
     
     UNIVERSAL_PERMISSIONS = [
-        "Use natural language and clear explanations",
+        "Use natural language, clear word choice, and accessible explanations",
         "Organize information logically",
         "Use examples and analogies when helpful",
         "Provide context and background information",
