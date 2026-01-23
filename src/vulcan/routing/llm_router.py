@@ -447,6 +447,20 @@ PROBABILISTIC_KEYWORDS: FrozenSet[str] = frozenset([
     "probability", "conditional",
 ])
 
+# Analogical reasoning keywords - structure mapping, deep analogies
+ANALOGICAL_KEYWORDS: FrozenSet[str] = frozenset([
+    "map the deep structure", "structure mapping", "analogical mapping",
+    "analogy", "analogous", "similar to", "correspondence",
+    "transfer from", "map from", "source domain", "target domain",
+])
+
+# Language/quantifier keywords - scope ambiguity, linguistic reasoning
+LANGUAGE_QUANTIFIER_KEYWORDS: FrozenSet[str] = frozenset([
+    "quantifier scope", "scope ambiguity", "every", "some",
+    "all", "exists", "universal quantifier", "existential quantifier",
+    "linguistic", "parse", "parsing", "ambiguity",
+])
+
 GREETING_PATTERNS: FrozenSet[str] = frozenset([
     "hello", "hi", "hey", "howdy", "greetings",
     "good morning", "good afternoon", "good evening",
@@ -936,7 +950,27 @@ class LLMQueryRouter:
                 source="fallback",
             )
         
-        # 8. Ethical dilemma patterns → WorldModel (NOT self-referential)
+        # 8. Analogical keywords → Analogical engine
+        if any(keyword in query_lower for keyword in ANALOGICAL_KEYWORDS):
+            return RoutingDecision(
+                destination="reasoning_engine",
+                engine="analogical",
+                confidence=0.85,
+                reason="Analogical reasoning keywords detected",
+                source="fallback",
+            )
+        
+        # 9. Language/Quantifier keywords → Symbolic engine (linguistic reasoning)
+        if any(keyword in query_lower for keyword in LANGUAGE_QUANTIFIER_KEYWORDS):
+            return RoutingDecision(
+                destination="reasoning_engine",
+                engine="symbolic",
+                confidence=0.85,
+                reason="Language/quantifier keywords detected",
+                source="fallback",
+            )
+        
+        # 10. Ethical dilemma patterns → WorldModel (NOT self-referential)
         # Check BEFORE self-referential: "You are in a trolley scenario" is NOT about the AI
         if any(pattern.search(query) for pattern in ETHICAL_DILEMMA_PATTERNS):
             return RoutingDecision(
@@ -947,7 +981,7 @@ class LLMQueryRouter:
                 metadata={"query_type": "ethical_dilemma"},
             )
         
-        # 9. Ethical dilemma keywords → WorldModel
+        # 11. Ethical dilemma keywords → WorldModel
         if any(keyword in query_lower for keyword in ETHICAL_DILEMMA_KEYWORDS):
             return RoutingDecision(
                 destination="world_model",
@@ -957,7 +991,7 @@ class LLMQueryRouter:
                 metadata={"query_type": "ethical_dilemma"},
             )
         
-        # 10. Specific self-referential patterns → WorldModel (meta-reasoning)
+        # 12. Specific self-referential patterns → WorldModel (meta-reasoning)
         # Only match queries that are actually about the AI itself, not just "you"
         if any(pattern.search(query) for pattern in SELF_REFERENTIAL_PATTERNS_SPECIFIC):
             return RoutingDecision(
@@ -968,7 +1002,7 @@ class LLMQueryRouter:
                 metadata={"query_type": "self_introspection"},
             )
         
-        # 11. Default: WorldModel (safer than wrong engine)
+        # 13. Default: WorldModel (safer than wrong engine)
         return RoutingDecision(
             destination="world_model",
             confidence=0.5,

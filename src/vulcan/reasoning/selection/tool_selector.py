@@ -27,6 +27,14 @@ import hashlib
 
 import numpy as np
 
+# Import routing keywords to avoid duplication
+from vulcan.routing.llm_router import (
+    ANALOGICAL_KEYWORDS,
+    CAUSAL_KEYWORDS,
+    MATHEMATICAL_KEYWORDS,
+    LOGIC_KEYWORDS,
+)
+
 # CRITICAL FIX: Define logger BEFORE any imports that might fail
 logger = logging.getLogger(__name__)
 
@@ -2961,12 +2969,68 @@ class WorldModelToolWrapper:
         queries. Instead of routing these to other engines (which breaks the
         architecture), world_model now properly generates responses for them.
         
+        ROUTING FIX (Jan 23 2026): Detect specialized reasoning queries that should
+        NOT be routed to WorldModel. If such queries arrive here due to routing bugs,
+        return a low-confidence response to trigger LLM re-synthesis.
+        
         Args:
             query_lower: Lowercased query string
             
         Returns:
             Tuple of (aspect_name, result_dict)
         """
+        # =================================================================
+        # ROUTING FIX: Detect specialized queries that shouldn't be here
+        # =================================================================
+        # Queries about analogical reasoning, causal inference, math, logic, etc.
+        # should be routed to specialized reasoning engines, NOT WorldModel.
+        # If they arrive here, it's a routing bug - return low confidence to trigger LLM.
+        
+        # Use imported keyword constants to avoid duplication
+        if any(keyword in query_lower for keyword in ANALOGICAL_KEYWORDS):
+            self.logger.warning(
+                "[WorldModelToolWrapper] Detected analogical query routed to WorldModel - "
+                "this should have been routed to analogical engine. Returning low confidence."
+            )
+            return 'misrouted', {
+                'error': 'Query appears to be analogical reasoning, should not be routed to WorldModel',
+                'suggested_engine': 'analogical',
+                'confidence': 0.1,
+            }
+        
+        if any(keyword in query_lower for keyword in CAUSAL_KEYWORDS):
+            self.logger.warning(
+                "[WorldModelToolWrapper] Detected causal query routed to WorldModel - "
+                "this should have been routed to causal engine. Returning low confidence."
+            )
+            return 'misrouted', {
+                'error': 'Query appears to be causal reasoning, should not be routed to WorldModel',
+                'suggested_engine': 'causal',
+                'confidence': 0.1,
+            }
+        
+        if any(keyword in query_lower for keyword in MATHEMATICAL_KEYWORDS):
+            self.logger.warning(
+                "[WorldModelToolWrapper] Detected mathematical query routed to WorldModel - "
+                "this should have been routed to mathematical engine. Returning low confidence."
+            )
+            return 'misrouted', {
+                'error': 'Query appears to be mathematical reasoning, should not be routed to WorldModel',
+                'suggested_engine': 'mathematical',
+                'confidence': 0.1,
+            }
+        
+        if any(keyword in query_lower for keyword in LOGIC_KEYWORDS):
+            self.logger.warning(
+                "[WorldModelToolWrapper] Detected logical query routed to WorldModel - "
+                "this should have been routed to symbolic engine. Returning low confidence."
+            )
+            return 'misrouted', {
+                'error': 'Query appears to be logical reasoning, should not be routed to WorldModel',
+                'suggested_engine': 'symbolic',
+                'confidence': 0.1,
+            }
+        
         # =================================================================
         # Bug #3 FIX: Check for CREATIVE queries FIRST
         # =================================================================
