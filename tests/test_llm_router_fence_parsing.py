@@ -209,7 +209,16 @@ This is a philosophical query."""
         assert result["destination"] == "world_model"
     
     def test_production_bug_format(self, router):
-        """Test the exact format from production logs that caused the bug."""
+        """
+        Test the exact format from production logs that caused the bug.
+        
+        Production error: "JSON extraction failed: Expecting property name 
+        enclosed in double quotes: line 1 column 2 (char 1)"
+        
+        This error indicated that the line-based fence stripping was leaving
+        invalid characters at the start of the JSON string. The regex-based
+        approach fixes this by properly extracting the JSON content.
+        """
         # This is the format from the error logs showing "line 1 column 2"
         response = """```json
 {
