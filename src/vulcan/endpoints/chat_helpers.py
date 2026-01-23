@@ -61,6 +61,11 @@ def safe_reasoning_type_to_string(
     if reasoning_type is None:
         return default
     
+    # Handle empty strings - return them unchanged (don't use default)
+    # Industry Standard: Explicit None checks (None is not "") separate from empty string handling
+    if isinstance(reasoning_type, str):
+        return reasoning_type  # Return as-is, even if empty
+    
     # Handle Enum instances - extract .value (the string representation)
     # Industry Standard: Check for Enum base class for type safety
     if isinstance(reasoning_type, Enum):
