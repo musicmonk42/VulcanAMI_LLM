@@ -73,6 +73,7 @@ class ImportResult:
     module_path: str
     description: str
     success: bool
+    is_critical: bool = False
     error_message: Optional[str] = None
     import_time_ms: float = 0.0
 
@@ -107,6 +108,7 @@ class VerificationReport:
                     "module": r.module_path,
                     "description": r.description,
                     "success": r.success,
+                    "is_critical": r.is_critical,
                     "error": r.error_message,
                     "time_ms": r.import_time_ms,
                 }
@@ -153,13 +155,14 @@ TEST_CASES: List[Tuple[str, str, bool]] = [
 # =============================================================================
 
 
-def test_import(module_path: str, description: str) -> ImportResult:
+def test_import(module_path: str, description: str, is_critical: bool = False) -> ImportResult:
     """
     Test if a module can be imported.
 
     Args:
         module_path: Dotted path to the module (e.g., "src.vulcan").
         description: Human-readable description of what's being tested.
+        is_critical: Whether this is a critical import.
 
     Returns:
         ImportResult: Object containing test results and timing.
@@ -173,6 +176,7 @@ def test_import(module_path: str, description: str) -> ImportResult:
             module_path=module_path,
             description=description,
             success=True,
+            is_critical=is_critical,
             import_time_ms=elapsed_ms,
         )
     except ImportError as e:
@@ -181,6 +185,7 @@ def test_import(module_path: str, description: str) -> ImportResult:
             module_path=module_path,
             description=description,
             success=False,
+            is_critical=is_critical,
             error_message=str(e),
             import_time_ms=elapsed_ms,
         )
@@ -190,6 +195,7 @@ def test_import(module_path: str, description: str) -> ImportResult:
             module_path=module_path,
             description=description,
             success=False,
+            is_critical=is_critical,
             error_message=f"Unexpected error: {type(e).__name__}: {e}",
             import_time_ms=elapsed_ms,
         )
@@ -233,7 +239,7 @@ def verify_installation(
     report.total_tests = len(test_cases)
 
     for module_path, description, is_critical in test_cases:
-        result = test_import(module_path, description)
+        result = test_import(module_path, description, is_critical)
         report.results.append(result)
 
         if result.success:
@@ -263,8 +269,8 @@ def verify_installation(
     # Determine overall success - all critical modules must pass
     critical_failures = [
         r
-        for (m, d, c), r in zip(test_cases, report.results)
-        if c and not r.success
+        for r in report.results
+        if r.is_critical and not r.success
     ]
     report.overall_success = len(critical_failures) == 0
 
@@ -436,22 +442,13 @@ def main() -> int:
             logger.error("VERIFICATION FAILED - Critical Import Errors:")
             logger.error("=" * 60)
             
-            # Get the test cases that were used
-            test_cases = TEST_CASES
-            if args.critical_only:
-                test_cases = [(m, d, c) for m, d, c in TEST_CASES if c]
-            if args.skip_slow_checks:
-                test_cases = [
-                    ("src", "Base src module", True),
-                    ("src.vulcan", "VULCAN core package", True),
-                ]
-            
-            for (m, d, c), r in zip(test_cases, report.results):
-                if c and not r.success:
-                    logger.error(f"  ✗ {d}")
-                    logger.error(f"     Module: {m}")
-                    if r.error_message:
-                        logger.error(f"     Error: {r.error_message[:200]}")
+            # Show all critical failures from the report
+            for result in report.results:
+                if result.is_critical and not result.success:
+                    logger.error(f"  ✗ {result.description}")
+                    logger.error(f"     Module: {result.module_path}")
+                    if result.error_message:
+                        logger.error(f"     Error: {result.error_message[:200]}")
             logger.error("=" * 60)
 
         logger.info("VERIFY_SCRIPT_EXITING")
