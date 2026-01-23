@@ -2264,30 +2264,35 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
             
             # ROOT CAUSE FIX: Check privileged status OR confidence threshold
             # BUT: Detect template responses and force LLM synthesis for them
-            # FIX: Template detection with philosophical reasoning exemption
+            # FIX: Template detection with philosophical reasoning exemption and confidence override
             PHILOSOPHICAL_TYPES = ["PHILOSOPHICAL", "philosophical", "world_model", "meta_reasoning", "hybrid"]
             is_philosophical = any(
                 str(best_reasoning_type).lower() == ptype.lower() 
                 for ptype in PHILOSOPHICAL_TYPES
             )
             
-            # Exempt high-confidence philosophical results from template detection
+            # Determine if we should bypass template detection entirely
+            should_bypass_template_check = False
+            bypass_reason = ""
+            
+            # Reason 1: High-confidence philosophical results (>= 0.60)
             if is_philosophical and best_confidence >= 0.60:
+                should_bypass_template_check = True
+                bypass_reason = f"high-confidence philosophical result (type={best_reasoning_type}, confidence={best_confidence:.2f})"
+            
+            # Reason 2: Very high confidence (>= 0.75) regardless of type
+            elif best_confidence >= 0.75:
+                should_bypass_template_check = True
+                bypass_reason = f"very high confidence (confidence={best_confidence:.2f} >= 0.75)"
+            
+            # Perform template detection if not bypassed
+            if should_bypass_template_check:
                 is_template = False
                 logger.info(
-                    f"[VULCAN] Exempting high-confidence philosophical result from template detection "
-                    f"(type={best_reasoning_type}, confidence={best_confidence:.2f})"
+                    f"[VULCAN] Bypassing template detection for {bypass_reason}"
                 )
             else:
                 is_template = _is_template_response(best_conclusion)
-            
-            # Additional override: Any result >= 0.75 confidence should bypass template check
-            if best_confidence >= 0.75:
-                is_template = False
-                logger.info(
-                    f"[VULCAN] Confidence override: Using high-confidence result directly "
-                    f"(confidence={best_confidence:.2f} >= 0.75)"
-                )
             
             if is_template:
                 logger.warning(

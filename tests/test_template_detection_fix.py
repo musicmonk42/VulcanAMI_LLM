@@ -48,8 +48,8 @@ def _normalize_conclusion_to_string(conclusion: Any) -> Optional[str]:
     
     # If dict, try to extract string content from common keys
     if isinstance(conclusion, dict):
-        # Priority order for key extraction
-        for key in ['conclusion', 'response', 'result', 'answer', 'text', 'content']:
+        # Priority order for key extraction (matches production implementation)
+        for key in ('conclusion', 'result', 'response', 'answer', 'content'):
             if key in conclusion and conclusion[key]:
                 val = conclusion[key]
                 if isinstance(val, str):
@@ -307,9 +307,8 @@ class TestTemplateDetectionFix(unittest.TestCase):
         )
     
     def test_case_sensitive_template_detection(self):
-        """Test that template patterns are detected with proper case handling."""
-        # Note: The actual template indicators should be checked case-insensitively too
-        # but the current implementation checks them with case-sensitive "in" operator
+        """Test that template patterns are detected case-insensitively."""
+        # Template indicators are checked case-insensitively (indicator.lower() in conclusion_lower)
         template_response = "I cannot help with this request."
         
         result = _is_template_response(template_response)
