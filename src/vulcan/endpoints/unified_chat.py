@@ -173,8 +173,8 @@ def _is_template_response(conclusion: Any) -> bool:
     if any(indicator in conclusion_lower for indicator in PHILOSOPHICAL_INDICATORS):
         return False
     
-    # Check for actual template patterns
-    return any(indicator in conclusion_str for indicator in TEMPLATE_RESPONSE_INDICATORS)
+    # Check for actual template patterns (case-insensitive)
+    return any(indicator.lower() in conclusion_lower for indicator in TEMPLATE_RESPONSE_INDICATORS)
 
 
 def _normalize_conclusion_to_string(conclusion: Any) -> Optional[str]:
