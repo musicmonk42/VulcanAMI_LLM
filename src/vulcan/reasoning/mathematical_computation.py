@@ -802,6 +802,118 @@ result = summation(expr, ({index}, {lower}, {upper}))
 result = simplify(result)
 """
 
+    @staticmethod
+    def generate_from_query(query: str) -> Optional[str]:
+        """
+        Generate SymPy code from a mathematical query.
+        
+        This method parses mathematical queries and generates appropriate SymPy code.
+        Currently supports summation queries with various notation formats.
+        
+        Args:
+            query: Mathematical query string (e.g., "Compute ∑(2k-1) from k=1 to n")
+            
+        Returns:
+            Generated SymPy code string, or None if query cannot be parsed
+            
+        Examples:
+            >>> CodeTemplates.generate_from_query("Compute ∑(2k-1) from k=1 to n")
+            # Returns code for summation of 2*k-1
+            
+            >>> CodeTemplates.generate_from_query("Calculate ∑(k²+2k+1) from k=1 to n")
+            # Returns code for summation of k²+2k+1
+        """
+        if not query or not query.strip():
+            return None
+        
+        query_lower = query.lower()
+        
+        # ISSUE #1 FIX: Unicode normalization BEFORE any pattern matching
+        # Normalize Unicode characters to ASCII equivalents for consistent parsing
+        query_normalized = query.replace('−', '-')  # Unicode minus (U+2212) → ASCII hyphen
+        query_normalized = query_normalized.replace('∑', '∑')  # Keep summation symbol
+        
+        # Check for summation queries
+        if any(kw in query_lower for kw in ["sum", "summation", "∑"]) or "∑" in query:
+            # Pattern 1: ∑(expression) from index=lower to upper
+            # Matches: "Compute ∑(2k-1) from k=1 to n"
+            sum_match = re.search(
+                r'∑\s*\(([^)]+)\)\s+from\s+(\w+)\s*=\s*(\d+)\s+to\s+(\w+)',
+                query_normalized,
+                re.IGNORECASE
+            )
+            if sum_match:
+                expr = sum_match.group(1).strip()  # e.g., "2k-1" or "2k - 1"
+                index = sum_match.group(2)  # e.g., "k"
+                lower = sum_match.group(3)  # e.g., "1"
+                upper = sum_match.group(4)  # e.g., "n"
+                
+                # ISSUE #1 FIX: Normalize expression whitespace and convert implicit multiplication
+                # Remove spaces around operators for consistency
+                expr = expr.replace(' ', '')
+                # Convert implicit multiplication: 2k → 2*k
+                expr = re.sub(r'(\d)([a-z])', r'\1*\2', expr, flags=re.IGNORECASE)
+                
+                logger.debug(f"[CodeTemplates] Matched ∑(expr) from pattern: expr={expr}, {index}={lower} to {upper}")
+                return CodeTemplates.summation(expr, index, lower, upper)
+            
+            # Pattern 2: sum from index=lower to upper of expression
+            # Matches: "sum from k=1 to n of (2k-1)"
+            sum_match2 = re.search(
+                r'sum(?:mation)?\s+(?:from\s+)?(\w+)\s*=\s*(\d+)\s+to\s+(\w+)\s+(?:of\s+)?\(?([^)\n.]+)\)?',
+                query_normalized,
+                re.IGNORECASE
+            )
+            if sum_match2:
+                index = sum_match2.group(1)
+                lower = sum_match2.group(2)
+                upper = sum_match2.group(3)
+                expr = sum_match2.group(4).strip()
+                
+                # Normalize expression
+                expr = expr.replace(' ', '')
+                expr = re.sub(r'(\d)([a-z])', r'\1*\2', expr, flags=re.IGNORECASE)
+                
+                logger.debug(f"[CodeTemplates] Matched natural language sum pattern: expr={expr}, {index}={lower} to {upper}")
+                return CodeTemplates.summation(expr, index, lower, upper)
+            
+            # Pattern 3: ∑(expression) without explicit bounds
+            # Matches: "Compute ∑(2k-1)" - should use default bounds
+            sum_match3 = re.search(r'∑\s*\(([^)]+)\)', query_normalized)
+            if sum_match3:
+                expr = sum_match3.group(1).strip()
+                
+                # Try to find bounds separately
+                bounds_match = re.search(
+                    r'(?:from\s+)?(\w+)\s*=\s*(\d+)\s+to\s+(\w+)',
+                    query_normalized,
+                    re.IGNORECASE
+                )
+                
+                # Normalize expression
+                expr = expr.replace(' ', '')
+                expr = re.sub(r'(\d)([a-z])', r'\1*\2', expr, flags=re.IGNORECASE)
+                
+                if bounds_match:
+                    index = bounds_match.group(1)
+                    lower = bounds_match.group(2)
+                    upper = bounds_match.group(3)
+                    logger.debug(f"[CodeTemplates] Matched ∑(expr) with separate bounds: expr={expr}, {index}={lower} to {upper}")
+                    return CodeTemplates.summation(expr, index, lower, upper)
+                else:
+                    # Use default bounds k=1 to n
+                    logger.debug(f"[CodeTemplates] Matched ∑(expr) with default bounds: expr={expr}")
+                    return CodeTemplates.summation(expr, "k", "1", "n")
+            
+            # ISSUE #1 FIX: Return None instead of wrong default
+            # If we detect a summation query but can't extract the expression,
+            # return None to signal failure rather than computing the wrong thing
+            logger.warning(f"[CodeTemplates] Summation query detected but expression extraction failed: {query[:100]}")
+            return None
+        
+        # For non-summation queries, return None (not implemented yet)
+        return None
+
 
 # ============================================================================
 # MATHEMATICAL COMPUTATION TOOL
