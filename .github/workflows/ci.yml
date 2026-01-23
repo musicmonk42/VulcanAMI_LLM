@@ -389,8 +389,11 @@ jobs:
           # Store matrix test-part in a shell variable to avoid interpolation issues
           TEST_PART="${{ matrix.test-part }}"
           
-          # Sanitize: trim whitespace and convert to lowercase for reliable matching
-          TEST_PART="$(echo "$TEST_PART" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | tr '[:upper:]' '[:lower:]')"
+          # Sanitize the test-part value for reliable matching:
+          # 1. Remove any control characters (newlines, tabs, etc)
+          # 2. Trim leading/trailing whitespace
+          # 3. Convert to lowercase
+          TEST_PART="$(printf '%s' "$TEST_PART" | tr -d '[:cntrl:]' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | tr '[:upper:]' '[:lower:]')"
           
           # Determine test path and marker expression based on matrix test-part
           # IMPORTANT: Keep TEST_PATH and MARKER_EXPR as separate variables
@@ -399,9 +402,9 @@ jobs:
           echo "=================================================="
           echo "DEBUG: Determining test configuration"
           echo "  Matrix test-part raw: '${{ matrix.test-part }}'"
-          echo "  TEST_PART variable: '${TEST_PART}'"
+          echo "  TEST_PART variable: '$TEST_PART'"
           echo "  TEST_PART length: ${#TEST_PART}"
-          echo "  TEST_PART hex dump: $(echo -n "${TEST_PART}" | od -A n -t x1)"
+          echo "  TEST_PART hex dump: $(printf '%s' "$TEST_PART" | od -A n -t x1)"
           echo "=================================================="
           
           # Use shell variable in case statement for proper matching
@@ -446,12 +449,12 @@ jobs:
               PYTEST_EXTRA_OPTS=""
               ;;
             *)
-              echo "❌ ERROR: Unknown test-part value: '${TEST_PART}'"
+              echo "❌ ERROR: Unknown test-part value: '$TEST_PART'"
               echo "   Raw from matrix: '${{ matrix.test-part }}'"
               echo "   Valid options are: unit, vulcan-fast, vulcan-medium, vulcan-slow, integration"
               echo "   Debugging info:"
               echo "     - Length: ${#TEST_PART}"
-              echo "     - Hex dump: $(echo -n "${TEST_PART}" | od -A n -t x1)"
+              echo "     - Hex dump: $(printf '%s' "$TEST_PART" | od -A n -t x1)"
               exit 1
               ;;
           esac
