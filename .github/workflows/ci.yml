@@ -406,20 +406,20 @@ jobs:
           
           # Use shell variable in case statement for proper matching
           case "${TEST_PART}" in
-            unit*)
+            unit)
               echo "✓ Matched: Running unit tests from tests/ directory"
               TEST_PATH="tests/"
               MARKER_EXPR="not slow and not load_test and not benchmark and not integration and not perf and not boundedness"
               PYTEST_EXTRA_OPTS=""
               ;;
-            vulcan-fast*)
+            vulcan-fast)
               echo "✓ Matched: Running fast vulcan tests (<5s each)"
               TEST_PATH="src/vulcan/tests/"
               MARKER_EXPR="not slow and not load_test and not benchmark and not integration"
               # Exclude slow test modules
               PYTEST_EXTRA_OPTS="--ignore=src/vulcan/tests/test_processing.py --ignore=src/vulcan/tests/test_self_improvement_drive.py --ignore=src/vulcan/tests/test_principle_extractor.py --ignore=src/vulcan/tests/test_metrics.py --ignore=src/vulcan/tests/test_adaptive_thresholds.py"
               ;;
-            vulcan-medium*)
+            vulcan-medium)
               echo "✓ Matched: Running medium vulcan tests (5-30s each)"
               TEST_PATH="src/vulcan/tests/test_processing.py"
               TEST_PATH="$TEST_PATH src/vulcan/tests/test_tool_selector.py"
@@ -428,7 +428,7 @@ jobs:
               MARKER_EXPR="not slow and not integration"
               PYTEST_EXTRA_OPTS=""
               ;;
-            vulcan-slow*)
+            vulcan-slow)
               echo "✓ Matched: Running slow vulcan tests (>30s each)"
               TEST_PATH="src/vulcan/tests/test_self_improvement_drive.py"
               TEST_PATH="$TEST_PATH src/vulcan/tests/test_principle_extractor.py"
@@ -439,7 +439,7 @@ jobs:
               MARKER_EXPR="not integration"
               PYTEST_EXTRA_OPTS=""
               ;;
-            integration*)
+            integration)
               echo "✓ Matched: Running slow/integration tests from both directories"
               TEST_PATH="tests/ src/vulcan/tests/"
               MARKER_EXPR="slow or integration"
