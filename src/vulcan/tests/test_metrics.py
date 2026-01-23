@@ -71,7 +71,10 @@ class TestInitialization(unittest.TestCase):
         self.assertEqual(collector.max_histogram_size, 10000)
         self.assertEqual(collector.max_timeseries_size, 1000)
         self.assertEqual(collector.cleanup_interval, 300)
-        self.assertIsNotNone(collector._lock)
+        # Uses sharded locks instead of single _lock
+        self.assertIsNotNone(collector._counter_lock)
+        self.assertIsNotNone(collector._gauge_lock)
+        self.assertIsNotNone(collector._histogram_lock)
         self.assertFalse(collector._shutdown_event.is_set())
 
         # Cleanup
