@@ -105,6 +105,39 @@ logger.info(
 _gc_request_counter = 0
 
 
+# ============================================================
+# TEMPLATE RESPONSE DETECTION
+# ============================================================
+# Template indicators that should NOT bypass LLM synthesis
+# Industry Standard: Detect boilerplate responses that need LLM refinement
+TEMPLATE_RESPONSE_INDICATORS = [
+    "Vulcan's Introspective Analysis",
+    "I'm approaching this question from my own evolving value system",
+    "Based on my evolved values and learned ethical boundaries",
+    "balances multiple considerations",
+    "while staying true to my core objective",
+    "My Conclusion",
+]
+
+
+def _is_template_response(conclusion: Any) -> bool:
+    """
+    Detect if a response is a hardcoded template that should be re-processed.
+    
+    Template responses are boilerplate text that doesn't provide substantive
+    answers to user queries. These should be routed through LLM synthesis
+    instead of being returned directly.
+    
+    Args:
+        conclusion: The reasoning conclusion to check
+        
+    Returns:
+        True if the response contains template indicators, False otherwise
+    """
+    conclusion_str = str(conclusion) if conclusion else ""
+    return any(indicator in conclusion_str for indicator in TEMPLATE_RESPONSE_INDICATORS)
+
+
 def _normalize_conclusion_to_string(conclusion: Any) -> Optional[str]:
     """
     Normalize a conclusion value to a string, handling dict and other types.
@@ -2180,7 +2213,16 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                         )
             
             # ROOT CAUSE FIX: Check privileged status OR confidence threshold
-            if best_conclusion is not None and (has_privileged_candidate or best_confidence >= MIN_REASONING_CONFIDENCE_THRESHOLD):
+            # BUT: Detect template responses and force LLM synthesis for them
+            is_template = _is_template_response(best_conclusion)
+            
+            if is_template:
+                logger.warning(
+                    "[VULCAN] Detected template response - routing to LLM for proper synthesis "
+                    f"(source={best_source}, type={best_reasoning_type})"
+                )
+                use_reasoning_directly = False
+            elif best_conclusion is not None and (has_privileged_candidate or best_confidence >= MIN_REASONING_CONFIDENCE_THRESHOLD):
                 use_reasoning_directly = True
                 
                 # Format the reasoning result as the final response
