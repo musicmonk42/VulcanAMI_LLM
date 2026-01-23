@@ -234,6 +234,19 @@ class SymbolicReasoner:
             
         query_lower = query.lower()
         
+        # FIX (Jan 23 2026): Early detection of analogical reasoning queries
+        # Queries with analogical keywords should NOT be routed to symbolic reasoner
+        # even if they contain some logic-like notation (e.g., S→T for domain mapping)
+        analogical_keywords = [
+            'structure mapping', 'analogical mapping', 'analogy', 'analogies', 'analogical',
+            'domain mapping', 'map the deep structure', 'map the',
+            'source domain', 'target domain', 'deep structure',
+        ]
+        has_analogical_keyword = any(kw in query_lower for kw in analogical_keywords)
+        if has_analogical_keyword:
+            # Contains analogical keywords - should route to analogical reasoner
+            return False
+        
         # Strong indicators of formal logic - Unicode symbols
         logic_symbols = ['→', '∧', '∨', '¬', '⇒', '⇔', '∀', '∃', '⊢', '⊨']
         
@@ -359,7 +372,24 @@ class SymbolicReasoner:
                 - applicable: bool - Whether symbolic reasoning applies
                 - reason: str - Explanation if not applicable
                 - confidence: float - Confidence in the applicability decision
+                - suggestion: str (optional) - Suggested alternative reasoning engine
         """
+        # Check for analogical reasoning patterns first
+        query_lower = query.lower()
+        analogical_keywords = [
+            'structure mapping', 'analogical mapping', 'analogy', 'analogies', 'analogical',
+            'domain mapping', 'map the deep structure', 'map the',
+            'source domain', 'target domain', 'deep structure',
+        ]
+        has_analogical_keyword = any(kw in query_lower for kw in analogical_keywords)
+        if has_analogical_keyword:
+            return {
+                'applicable': False,
+                'reason': 'Query contains analogical reasoning keywords (structure mapping, domain mapping, etc.)',
+                'confidence': 0.0,
+                'suggestion': 'analogical'
+            }
+        
         if self.is_symbolic_query(query):
             return {
                 'applicable': True,
@@ -769,20 +799,44 @@ class SymbolicReasoner:
         # Note: Check applicability before attempting to parse
         # This prevents parse errors like "Unexpected token 'the'" on natural language
         if check_applicability and not self.is_symbolic_query(query_str):
-            logger.info(
-                f"[SymbolicReasoner] Query appears to be natural language rather than formal logic. "
-                f"Returning low confidence to route to alternative reasoning engines."
-            )
-            return {
-                "proven": False,
-                # Note: Return 0.0 for non-applicable so it routes to correct engine
-                "confidence": SYMBOLIC_NOT_APPLICABLE_CONFIDENCE,
-                "proof": None,
-                "method": self.prover_type,
-                "applicable": False,
-                "reason": "Query appears to be natural language; symbolic reasoner optimized for formal logic notation (e.g., ∀x P(x) → Q(x))",
-                "suggestion": "Consider using philosophical, probabilistic, or general reasoning engines for natural language queries",
-            }
+            # FIX (Jan 23 2026): Check if query contains analogical reasoning patterns
+            # and suggest the analogical reasoning engine instead of generic alternatives
+            analogical_keywords = [
+                'structure mapping', 'analogical mapping', 'analogy', 'analogies', 'analogical',
+                'domain mapping', 'map the deep structure', 'map the',
+                'source domain', 'target domain', 'deep structure',
+            ]
+            has_analogical = any(kw in query_lower for kw in analogical_keywords)
+            
+            if has_analogical:
+                logger.info(
+                    f"[SymbolicReasoner] Query contains analogical reasoning keywords. "
+                    f"Suggesting analogical reasoning engine."
+                )
+                return {
+                    "proven": False,
+                    "confidence": SYMBOLIC_NOT_APPLICABLE_CONFIDENCE,
+                    "proof": None,
+                    "method": self.prover_type,
+                    "applicable": False,
+                    "reason": "Query contains analogical reasoning patterns (structure mapping, domain mapping, etc.); symbolic reasoner is for formal logic notation",
+                    "suggestion": "analogical",
+                }
+            else:
+                logger.info(
+                    f"[SymbolicReasoner] Query appears to be natural language rather than formal logic. "
+                    f"Returning low confidence to route to alternative reasoning engines."
+                )
+                return {
+                    "proven": False,
+                    # Note: Return 0.0 for non-applicable so it routes to correct engine
+                    "confidence": SYMBOLIC_NOT_APPLICABLE_CONFIDENCE,
+                    "proof": None,
+                    "method": self.prover_type,
+                    "applicable": False,
+                    "reason": "Query appears to be natural language; symbolic reasoner optimized for formal logic notation (e.g., ∀x P(x) → Q(x))",
+                    "suggestion": "Consider using philosophical, probabilistic, or general reasoning engines for natural language queries",
+                }
         
         try:
             # Track whether fallback parsing was used (indicates parse degradation)

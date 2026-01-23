@@ -450,8 +450,10 @@ PROBABILISTIC_KEYWORDS: FrozenSet[str] = frozenset([
 # Analogical reasoning keywords - structure mapping, deep analogies
 ANALOGICAL_KEYWORDS: FrozenSet[str] = frozenset([
     "map the deep structure", "structure mapping", "analogical mapping",
-    "analogy", "analogous", "similar to", "correspondence",
-    "transfer from", "map from", "source domain", "target domain",
+    "analogy", "analogous", "analogies", "analogical", "similar to", "correspondence",
+    "transfer from", "map from", "map the", "domain mapping",
+    "source domain", "target domain", "deep structure",
+    "s→t", "s->t",  # Domain mapping notation
 ])
 
 # Language/quantifier keywords - scope ambiguity, linguistic reasoning
