@@ -12,7 +12,12 @@ from collections import defaultdict, deque
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
-import numpy as np
+try:
+    import numpy as np
+    NUMPY_AVAILABLE = True
+except ImportError:
+    NUMPY_AVAILABLE = False
+    np = None
 
 logger = logging.getLogger(__name__)
 

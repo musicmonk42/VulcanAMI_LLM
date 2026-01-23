@@ -524,9 +524,6 @@ class PerformanceTracker:
             metadata: Additional metadata
         """
         with self._lock:
-            # Note: total_attempts is incremented in record_attempt() or record_execution()
-            # Do NOT increment here to avoid double counting
-
             record = PerformanceRecord(
                 problem_signature=problem_signature,
                 timestamp=time.time(),
@@ -541,6 +538,7 @@ class PerformanceTracker:
             self.strategy_successes[strategy_used] += 1
             self.strategy_execution_times[strategy_used].append(execution_time)
             self.total_successes += 1
+            self.total_attempts += 1  # FIX: Always increment total_attempts
 
             logger.debug(
                 "Recorded success for problem %s using strategy %s",
@@ -565,9 +563,6 @@ class PerformanceTracker:
             execution_time: Execution time
         """
         with self._lock:
-            # Note: total_attempts is incremented in record_attempt() or record_execution()
-            # Do NOT increment here to avoid double counting
-
             record = PerformanceRecord(
                 problem_signature=problem_signature,
                 timestamp=time.time(),
@@ -586,6 +581,7 @@ class PerformanceTracker:
 
             self.failure_reasons[reason] += 1
             self.total_failures += 1
+            self.total_attempts += 1  # FIX: Always increment total_attempts
 
             logger.debug(
                 "Recorded failure for problem %s: %s", problem_signature[:8], reason

@@ -416,7 +416,8 @@ class TestObjectives:
         obj = drive.select_objective()
 
         assert obj is not None
-        assert obj.type == "fix_circular_imports"  # Weight 1.0
+        # fix_circular_imports (weight 1.0) is blacklisted, so next highest is selected
+        assert obj.type == "optimize_performance"  # Weight 0.8 (highest non-blacklisted)
 
     def test_select_objective_skips_completed(self, drive):
         """Test that completed objectives are skipped"""
@@ -1255,7 +1256,8 @@ class TestMainStep:
         """Test that step increments attempt counter"""
         # FIX: Disable approval so attempts get incremented immediately
         drive.config["constraints"]["require_human_approval"] = False
-        obj = drive.objectives[0]
+        # fix_circular_imports is blacklisted, so optimize_performance will be selected
+        obj = next(o for o in drive.objectives if o.type == "optimize_performance")
         initial_attempts = obj.attempts
 
         context = {"is_startup": True, "other_drives_total_priority": 999.0}

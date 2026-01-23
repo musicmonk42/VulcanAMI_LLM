@@ -1238,7 +1238,19 @@ class SelfImprovementDrive:
         if not drive_config:
             logger.warning("No self_improvement config found, using defaults")
             return self._default_config()
-        return drive_config
+        
+        # Merge with defaults for missing required fields
+        defaults = self._default_config()
+        merged_config = defaults.copy()
+        merged_config.update(drive_config)
+        
+        # Ensure required nested fields exist
+        if "objectives" not in merged_config or not merged_config["objectives"]:
+            merged_config["objectives"] = defaults["objectives"]
+        if "constraints" not in merged_config or not merged_config["constraints"]:
+            merged_config["constraints"] = defaults["constraints"]
+        
+        return merged_config
 
     def _default_config(self) -> Dict[str, Any]:
         """

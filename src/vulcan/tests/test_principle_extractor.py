@@ -575,7 +575,8 @@ class TestPrincipleExtractor:
         """Test creating principle extractor"""
         assert extractor is not None
         assert extractor.min_evidence_count == 2
-        assert extractor.min_confidence == 0.5
+        # BALANCED strategy enforces min_confidence of 0.6 (see _adjust_thresholds)
+        assert extractor.min_confidence == 0.6
         assert extractor.strategy == ExtractionStrategy.BALANCED
 
     def test_strategy_adjustment(self):
