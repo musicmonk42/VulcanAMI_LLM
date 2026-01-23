@@ -421,13 +421,21 @@ jobs:
               ;;
             vulcan-medium*)
               echo "✓ Matched: Running medium vulcan tests (5-30s each)"
-              TEST_PATH="src/vulcan/tests/test_processing.py src/vulcan/tests/test_tool_selector.py src/vulcan/tests/test_probabilistic_reasoning.py src/vulcan/tests/test_reasoning_explainer.py"
+              TEST_PATH="src/vulcan/tests/test_processing.py"
+              TEST_PATH="$TEST_PATH src/vulcan/tests/test_tool_selector.py"
+              TEST_PATH="$TEST_PATH src/vulcan/tests/test_probabilistic_reasoning.py"
+              TEST_PATH="$TEST_PATH src/vulcan/tests/test_reasoning_explainer.py"
               MARKER_EXPR="not slow and not integration"
               PYTEST_EXTRA_OPTS=""
               ;;
             vulcan-slow*)
               echo "✓ Matched: Running slow vulcan tests (>30s each)"
-              TEST_PATH="src/vulcan/tests/test_self_improvement_drive.py src/vulcan/tests/test_principle_extractor.py src/vulcan/tests/test_metrics.py src/vulcan/tests/test_adaptive_thresholds.py src/vulcan/tests/test_extracted_modules.py src/vulcan/tests/test_neural_safety.py"
+              TEST_PATH="src/vulcan/tests/test_self_improvement_drive.py"
+              TEST_PATH="$TEST_PATH src/vulcan/tests/test_principle_extractor.py"
+              TEST_PATH="$TEST_PATH src/vulcan/tests/test_metrics.py"
+              TEST_PATH="$TEST_PATH src/vulcan/tests/test_adaptive_thresholds.py"
+              TEST_PATH="$TEST_PATH src/vulcan/tests/test_extracted_modules.py"
+              TEST_PATH="$TEST_PATH src/vulcan/tests/test_neural_safety.py"
               MARKER_EXPR="not integration"
               PYTEST_EXTRA_OPTS=""
               ;;
@@ -455,7 +463,9 @@ jobs:
           # Increased --max-worker-restart to 3 for better resilience
           # Job timeout set to 2 hours (120 minutes) per test partition instead of 6 hours for all.
           # Tests are now split into 5 parallel jobs (unit, vulcan-fast, vulcan-medium, vulcan-slow, integration)
-          # Added per-test timeout (--timeout=60) to prevent individual test hangs
+          # Added per-test timeout (--timeout=60) to prevent individual test hangs.
+          # Note: The 60s timeout is per test, while conftest.py's 90s timeout is a default that can be
+          # overridden by individual tests using @pytest.mark.timeout(N). Most tests average 4.75s.
           # Using -n auto for optimal parallelism on GitHub Actions runners (uses all CPUs)
           # Changed to verbose mode (-vv) for better visibility into test execution
           # Added -o timeout_func_only=true to only timeout test functions, not fixtures
