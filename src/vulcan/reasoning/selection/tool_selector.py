@@ -27,6 +27,14 @@ import hashlib
 
 import numpy as np
 
+# Import routing keywords to avoid duplication
+from vulcan.routing.llm_router import (
+    ANALOGICAL_KEYWORDS,
+    CAUSAL_KEYWORDS,
+    MATHEMATICAL_KEYWORDS,
+    LOGIC_KEYWORDS,
+)
+
 # CRITICAL FIX: Define logger BEFORE any imports that might fail
 logger = logging.getLogger(__name__)
 
@@ -2977,28 +2985,51 @@ class WorldModelToolWrapper:
         # Queries about analogical reasoning, causal inference, math, logic, etc.
         # should be routed to specialized reasoning engines, NOT WorldModel.
         # If they arrive here, it's a routing bug - return low confidence to trigger LLM.
-        specialized_indicators = {
-            'analogical': ['map the deep structure', 'structure mapping', 'analogical mapping', 
-                          'analogy between', 'correspondence between', 'source domain', 'target domain'],
-            'causal': ['confound', 'confounding', 'dag', 'causal', 'intervention', 'do(', 
-                      'collider', 'd-separation', 'randomized'],
-            'mathematical': ['compute exactly', 'calculate', 'evaluate', 'solve', '∑', '∫',
-                            'derivative', 'integral', 'equation', 'formula', 'theorem'],
-            'logical': ['quantifier scope', 'scope ambiguity', '∀', '∃', '→', '∧', '∨',
-                       'satisfiable', 'fol', 'first-order logic', 'proposition'],
-        }
         
-        for reasoning_type, indicators in specialized_indicators.items():
-            if any(indicator in query_lower for indicator in indicators):
-                self.logger.warning(
-                    f"[WorldModelToolWrapper] Detected {reasoning_type} query routed to WorldModel - "
-                    f"this should have been routed to {reasoning_type} engine. Returning low confidence."
-                )
-                return 'misrouted', {
-                    'error': f'Query appears to be {reasoning_type} reasoning, should not be routed to WorldModel',
-                    'suggested_engine': reasoning_type,
-                    'confidence': 0.1,  # Low confidence triggers LLM re-synthesis
-                }
+        # Use imported keyword constants to avoid duplication
+        if any(keyword in query_lower for keyword in ANALOGICAL_KEYWORDS):
+            self.logger.warning(
+                "[WorldModelToolWrapper] Detected analogical query routed to WorldModel - "
+                "this should have been routed to analogical engine. Returning low confidence."
+            )
+            return 'misrouted', {
+                'error': 'Query appears to be analogical reasoning, should not be routed to WorldModel',
+                'suggested_engine': 'analogical',
+                'confidence': 0.1,
+            }
+        
+        if any(keyword in query_lower for keyword in CAUSAL_KEYWORDS):
+            self.logger.warning(
+                "[WorldModelToolWrapper] Detected causal query routed to WorldModel - "
+                "this should have been routed to causal engine. Returning low confidence."
+            )
+            return 'misrouted', {
+                'error': 'Query appears to be causal reasoning, should not be routed to WorldModel',
+                'suggested_engine': 'causal',
+                'confidence': 0.1,
+            }
+        
+        if any(keyword in query_lower for keyword in MATHEMATICAL_KEYWORDS):
+            self.logger.warning(
+                "[WorldModelToolWrapper] Detected mathematical query routed to WorldModel - "
+                "this should have been routed to mathematical engine. Returning low confidence."
+            )
+            return 'misrouted', {
+                'error': 'Query appears to be mathematical reasoning, should not be routed to WorldModel',
+                'suggested_engine': 'mathematical',
+                'confidence': 0.1,
+            }
+        
+        if any(keyword in query_lower for keyword in LOGIC_KEYWORDS):
+            self.logger.warning(
+                "[WorldModelToolWrapper] Detected logical query routed to WorldModel - "
+                "this should have been routed to symbolic engine. Returning low confidence."
+            )
+            return 'misrouted', {
+                'error': 'Query appears to be logical reasoning, should not be routed to WorldModel',
+                'suggested_engine': 'symbolic',
+                'confidence': 0.1,
+            }
         
         # =================================================================
         # Bug #3 FIX: Check for CREATIVE queries FIRST

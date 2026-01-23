@@ -57,7 +57,10 @@ class TestAnalogicalRouting:
     def test_analogical_keywords_defined(self):
         """Analogical keywords should be defined."""
         assert ANALOGICAL_KEYWORDS
-        assert "analogical mapping" in ANALOGICAL_KEYWORDS or "analogy" in ANALOGICAL_KEYWORDS
+        # Verify specific expected keywords are present
+        assert "analogical mapping" in ANALOGICAL_KEYWORDS
+        assert "analogy" in ANALOGICAL_KEYWORDS
+        assert "structure mapping" in ANALOGICAL_KEYWORDS or "map the deep structure" in ANALOGICAL_KEYWORDS
     
     def test_map_deep_structure_query(self, router_no_llm):
         """Query about mapping deep structures should route to analogical engine."""

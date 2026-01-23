@@ -128,13 +128,20 @@ def _is_template_response(conclusion: Any) -> bool:
     answers to user queries. These should be routed through LLM synthesis
     instead of being returned directly.
     
+    Uses smart extraction to handle dict responses by looking for content keys
+    before falling back to string conversion.
+    
     Args:
         conclusion: The reasoning conclusion to check
         
     Returns:
         True if the response contains template indicators, False otherwise
     """
-    conclusion_str = str(conclusion) if conclusion else ""
+    # Use normalize function to intelligently extract text from dicts
+    conclusion_str = _normalize_conclusion_to_string(conclusion)
+    if not conclusion_str:
+        return False
+    
     return any(indicator in conclusion_str for indicator in TEMPLATE_RESPONSE_INDICATORS)
 
 
