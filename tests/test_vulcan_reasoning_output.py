@@ -133,8 +133,8 @@ class TestTimeoutConfiguration:
         """Test VULCAN_HARD_TIMEOUT is set to a reasonable value."""
         # Should be at least 60 seconds for CPU-intensive reasoning
         assert VULCAN_HARD_TIMEOUT >= 60.0
-        # Default should be 120 seconds
-        assert VULCAN_HARD_TIMEOUT == 120.0
+        # Updated to 300 seconds (5 minutes) for CPU execution
+        assert VULCAN_HARD_TIMEOUT == 300.0
 
     def test_per_token_timeout_value(self):
         """Test PER_TOKEN_TIMEOUT is set correctly."""
@@ -359,8 +359,8 @@ class TestOpenAIFormatting:
     @pytest.mark.asyncio
     async def test_format_with_openai_success(self, executor_with_openai):
         """Test successful OpenAI formatting."""
-        # Mock the _call_openai method to return a formatted string
-        executor_with_openai._call_openai = AsyncMock(
+        # Mock the _call_openai_formatting method to return a formatted string
+        executor_with_openai._call_openai_formatting = AsyncMock(
             return_value="The integral of x² is **x³/3 + C**."
         )
         
@@ -385,7 +385,7 @@ class TestOpenAIFormatting:
     async def test_format_with_openai_failure_fallback(self, executor_with_openai):
         """Test fallback when OpenAI formatting fails."""
         # Mock OpenAI to fail
-        executor_with_openai._call_openai = AsyncMock(return_value=None)
+        executor_with_openai._call_openai_formatting = AsyncMock(return_value=None)
         
         reasoning_output = VulcanReasoningOutput(
             query_id="openai-fmt-002",

@@ -74,6 +74,42 @@ EXPLICIT_MATH_KEYWORDS: Tuple[str, ...] = (
 )
 
 # ============================================================================
+# SUMMATION PARSING PATTERNS (Issue #1 Fix)
+# ============================================================================
+# Regex patterns for parsing summation expressions in various notations.
+# Compiled as tuples for use in generate_from_query() method.
+#
+# Pattern groups:
+# 1. Unicode summation patterns: ∑(expr) from k=1 to n
+# 2. Natural language patterns: sum from k=1 to n of expr
+# 3. No-bounds patterns: ∑(expr) with default bounds
+
+UNICODE_SUMMATION_PATTERNS: Tuple[str, ...] = (
+    # ∑(expr) from k=1 to n
+    r'∑\s*\(([^)]+)\)\s+from\s+([a-z])=(\d+|[a-z])\s+to\s+([a-z]+)',
+    # ∑(expr) k=1 to n (without "from")
+    r'∑\s*\(([^)]+)\)\s+([a-z])=(\d+|[a-z])\s+to\s+([a-z]+)',
+    # ∑expr from k=1 to n (no parentheses)
+    r'∑\s*([^\s]+)\s+from\s+([a-z])=(\d+|[a-z])\s+to\s+([a-z]+)',
+)
+
+NATURAL_LANGUAGE_SUMMATION_PATTERNS: Tuple[str, ...] = (
+    # sum from k=1 to n of (expr)
+    r'sum\s+from\s+([a-z])=(\d+|[a-z])\s+to\s+([a-z]+)\s+of\s+\(([^)]+)\)',
+    # sum from k=1 to n of expr
+    r'sum\s+from\s+([a-z])=(\d+|[a-z])\s+to\s+([a-z]+)\s+of\s+([^\s,;]+)',
+    # summation from k=1 to n of expr
+    r'summation\s+from\s+([a-z])=(\d+|[a-z])\s+to\s+([a-z]+)\s+of\s+([^\s,;]+)',
+)
+
+NO_BOUNDS_SUMMATION_PATTERNS: Tuple[str, ...] = (
+    # ∑(expr) - use default bounds
+    r'∑\s*\(([^)]+)\)',
+    # ∑expr - use default bounds
+    r'∑\s*([^\s,;]+)',
+)
+
+# ============================================================================
 # ISSUE #3 FIX: Proof Verification Detection Patterns (Compiled for Performance)
 # ============================================================================
 # Compiled regex patterns for efficient proof verification detection.
@@ -801,6 +837,136 @@ result = summation(expr, ({index}, {lower}, {upper}))
 # Simplify the result
 result = simplify(result)
 """
+
+    @staticmethod
+    def generate_from_query(query: str) -> Optional[str]:
+        """
+        Generate code from a natural language query.
+        
+        Parses mathematical queries in various formats and generates appropriate code.
+        Supports:
+        - Unicode notation: ∑(2k-1) from k=1 to n
+        - Natural language: sum from k=1 to n of (2k-1)
+        - Various variable names: k, i, j
+        - Unicode characters: ∑ (U+2211), − (U+2212), ² (U+00B2)
+        
+        Args:
+            query: Natural language mathematical query
+            
+        Returns:
+            Generated code string or None if query cannot be parsed
+        """
+        if not query:
+            return None
+        
+        # Normalize Unicode characters
+        # U+2211 (∑) -> sum keyword for detection
+        # U+2212 (−) -> ASCII hyphen (-)
+        # U+00B2 (²) -> **2
+        normalized = query.replace('\u2211', '∑')  # Summation sign
+        normalized = normalized.replace('\u2212', '-')  # Unicode minus to ASCII
+        normalized = normalized.replace('\xb2', '**2')  # Superscript 2
+        normalized = normalized.replace('²', '**2')  # Superscript 2 (alternative)
+        
+        # Try Unicode summation patterns first
+        for pattern in UNICODE_SUMMATION_PATTERNS:
+            match = re.search(pattern, normalized, re.IGNORECASE)
+            if match:
+                expr = match.group(1).strip()
+                var = match.group(2)
+                lower = match.group(3)
+                upper = match.group(4)
+                
+                # Convert expression to Python syntax
+                expr = CodeTemplates._normalize_expression(expr, var)
+                
+                return CodeTemplates.summation(expr, var, lower, upper)
+        
+        # Try natural language patterns
+        for pattern in NATURAL_LANGUAGE_SUMMATION_PATTERNS:
+            match = re.search(pattern, normalized, re.IGNORECASE)
+            if match:
+                var = match.group(1)
+                lower = match.group(2)
+                upper = match.group(3)
+                expr = match.group(4).strip()
+                
+                # Convert expression to Python syntax
+                expr = CodeTemplates._normalize_expression(expr, var)
+                
+                return CodeTemplates.summation(expr, var, lower, upper)
+        
+        # Try patterns without explicit bounds (use defaults)
+        for pattern in NO_BOUNDS_SUMMATION_PATTERNS:
+            match = re.search(pattern, normalized, re.IGNORECASE)
+            if match:
+                expr = match.group(1).strip()
+                
+                # Try to detect variable (k, i, j)
+                var = 'k'
+                for v in ['k', 'i', 'j']:
+                    if v in expr:
+                        var = v
+                        break
+                
+                # Convert expression to Python syntax
+                expr = CodeTemplates._normalize_expression(expr, var)
+                
+                return CodeTemplates.summation(expr, var, "1", "n")
+        
+        return None
+            r'∑\s*([^\s,;]+)',
+        ]
+        
+        for pattern in no_bounds_patterns:
+            match = re.search(pattern, normalized, re.IGNORECASE)
+            if match:
+                expr = match.group(1).strip()
+                
+                # Try to detect variable (k, i, j)
+                var = 'k'
+                for v in ['k', 'i', 'j']:
+                    if v in expr:
+                        var = v
+                        break
+                
+                # Convert expression to Python syntax
+                expr = CodeTemplates._normalize_expression(expr, var)
+                
+                return CodeTemplates.summation(expr, var, "1", "n")
+        
+        return None
+    
+    @staticmethod
+    def _normalize_expression(expr: str, var: str) -> str:
+        """
+        Normalize mathematical expression to Python syntax.
+        
+        Converts expressions like "2k-1" to "2*k-1" for Python evaluation.
+        Handles cases like "12k", "2k²", etc.
+        
+        Args:
+            expr: Mathematical expression
+            var: Variable name (e.g., 'k')
+            
+        Returns:
+            Normalized expression
+        """
+        # Remove parentheses if they wrap the entire expression
+        expr = expr.strip()
+        if expr.startswith('(') and expr.endswith(')'):
+            expr = expr[1:-1].strip()
+        
+        # Handle implicit multiplication: 2k -> 2*k, 12k -> 12*k
+        # Match one or more digits followed by letter (variable)
+        # Using \d+ instead of \d to handle multi-digit coefficients
+        expr = re.sub(r'(\d+)([a-zA-Z])', r'\1*\2', expr)
+        
+        # Handle expressions like k² -> k**2
+        expr = expr.replace('²', '**2')
+        expr = expr.replace('\xb2', '**2')
+        
+        return expr
 
 
 # ============================================================================

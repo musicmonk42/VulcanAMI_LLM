@@ -466,7 +466,7 @@ jobs:
           # Added per-test timeout (--timeout=60) to prevent individual test hangs.
           # Note: The 60s timeout is per test, while conftest.py's 90s timeout is a default that can be
           # overridden by individual tests using @pytest.mark.timeout(N). Most tests average 4.75s.
-          # Using -n auto for optimal parallelism on GitHub Actions runners (uses all CPUs)
+          # Using -n 2 to reduce resource contention and prevent worker crashes
           # Changed to verbose mode (-vv) for better visibility into test execution
           # Added -o timeout_func_only=true to only timeout test functions, not fixtures
           # Added --cov-config to use .coveragerc for proper parallel coverage
@@ -487,7 +487,7 @@ jobs:
             --junitxml=results/junit.xml \
             --timeout=60 \
             --timeout-method=thread \
-            -n auto \
+            -n 2 \
             --dist=loadfile \
             --max-worker-restart=3 \
             -o timeout_func_only=true \
