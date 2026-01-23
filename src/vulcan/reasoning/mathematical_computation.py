@@ -832,6 +832,23 @@ result = simplify(result)
         # Normalize Unicode characters to ASCII equivalents for consistent parsing
         query_normalized = query.replace('−', '-')  # Unicode minus (U+2212) → ASCII hyphen
         query_normalized = query_normalized.replace('∑', '∑')  # Keep summation symbol
+        # Normalize Unicode superscripts to ** notation
+        query_normalized = query_normalized.replace('²', '**2')
+        query_normalized = query_normalized.replace('³', '**3')
+        query_normalized = query_normalized.replace('⁴', '**4')
+        
+        # Helper function to normalize expressions
+        def normalize_expr(expr: str) -> str:
+            """Normalize a mathematical expression for SymPy."""
+            # Remove spaces around operators for consistency
+            expr = expr.replace(' ', '')
+            # Normalize Unicode superscripts
+            expr = expr.replace('²', '**2')
+            expr = expr.replace('³', '**3')
+            expr = expr.replace('⁴', '**4')
+            # Convert implicit multiplication: 2k → 2*k
+            expr = re.sub(r'(\d)([a-z])', r'\1*\2', expr, flags=re.IGNORECASE)
+            return expr
         
         # Check for summation queries
         if any(kw in query_lower for kw in ["sum", "summation", "∑"]) or "∑" in query:
@@ -848,13 +865,29 @@ result = simplify(result)
                 lower = sum_match.group(3)  # e.g., "1"
                 upper = sum_match.group(4)  # e.g., "n"
                 
-                # ISSUE #1 FIX: Normalize expression whitespace and convert implicit multiplication
-                # Remove spaces around operators for consistency
-                expr = expr.replace(' ', '')
-                # Convert implicit multiplication: 2k → 2*k
-                expr = re.sub(r'(\d)([a-z])', r'\1*\2', expr, flags=re.IGNORECASE)
+                # Normalize expression
+                expr = normalize_expr(expr)
                 
                 logger.debug(f"[CodeTemplates] Matched ∑(expr) from pattern: expr={expr}, {index}={lower} to {upper}")
+                return CodeTemplates.summation(expr, index, lower, upper)
+            
+            # Pattern 1b: ∑expression from index=lower to upper (no parentheses)
+            # Matches: "∑k² from k=1 to n"
+            sum_match1b = re.search(
+                r'∑\s*([^\s]+)\s+from\s+(\w+)\s*=\s*(\d+)\s+to\s+(\w+)',
+                query_normalized,
+                re.IGNORECASE
+            )
+            if sum_match1b:
+                expr = sum_match1b.group(1).strip()
+                index = sum_match1b.group(2)
+                lower = sum_match1b.group(3)
+                upper = sum_match1b.group(4)
+                
+                # Normalize expression
+                expr = normalize_expr(expr)
+                
+                logger.debug(f"[CodeTemplates] Matched ∑expr from pattern (no parens): expr={expr}, {index}={lower} to {upper}")
                 return CodeTemplates.summation(expr, index, lower, upper)
             
             # Pattern 2: sum from index=lower to upper of expression
@@ -871,8 +904,7 @@ result = simplify(result)
                 expr = sum_match2.group(4).strip()
                 
                 # Normalize expression
-                expr = expr.replace(' ', '')
-                expr = re.sub(r'(\d)([a-z])', r'\1*\2', expr, flags=re.IGNORECASE)
+                expr = normalize_expr(expr)
                 
                 logger.debug(f"[CodeTemplates] Matched natural language sum pattern: expr={expr}, {index}={lower} to {upper}")
                 return CodeTemplates.summation(expr, index, lower, upper)
@@ -891,8 +923,7 @@ result = simplify(result)
                 )
                 
                 # Normalize expression
-                expr = expr.replace(' ', '')
-                expr = re.sub(r'(\d)([a-z])', r'\1*\2', expr, flags=re.IGNORECASE)
+                expr = normalize_expr(expr)
                 
                 if bounds_match:
                     index = bounds_match.group(1)
