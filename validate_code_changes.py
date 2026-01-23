@@ -6,6 +6,13 @@ Tests the changes without requiring full module imports.
 
 import sys
 import re
+from pathlib import Path
+
+# Get repository root
+REPO_ROOT = Path(__file__).parent
+LLM_ROUTER_PATH = REPO_ROOT / 'src/vulcan/routing/llm_router.py'
+SYMBOLIC_REASONER_PATH = REPO_ROOT / 'src/vulcan/reasoning/symbolic/reasoner.py'
+ORCHESTRATOR_PATH = REPO_ROOT / 'src/vulcan/reasoning/unified/orchestrator.py'
 
 def test_llm_router_keywords():
     """Test that ANALOGICAL_KEYWORDS in llm_router.py has the required keywords."""
@@ -14,7 +21,7 @@ def test_llm_router_keywords():
     print("=" * 80)
     
     # Read the file
-    with open('/home/runner/work/VulcanAMI_LLM/VulcanAMI_LLM/src/vulcan/routing/llm_router.py', 'r') as f:
+    with open(LLM_ROUTER_PATH, 'r') as f:
         content = f.read()
     
     # Find the ANALOGICAL_KEYWORDS section
@@ -62,14 +69,14 @@ def test_symbolic_reasoner_rejection():
     print("=" * 80)
     
     # Read the file
-    with open('/home/runner/work/VulcanAMI_LLM/VulcanAMI_LLM/src/vulcan/reasoning/symbolic/reasoner.py', 'r') as f:
+    with open(SYMBOLIC_REASONER_PATH, 'r') as f:
         content = f.read()
     
-    # Check for analogical keyword detection in is_symbolic_query
-    if 'analogical_keywords' in content and 'structure mapping' in content:
-        print("✓ Analogical keyword detection found in is_symbolic_query")
+    # Check for ANALOGICAL_KEYWORDS class constant
+    if 'ANALOGICAL_KEYWORDS = [' in content and 'structure mapping' in content:
+        print("✓ ANALOGICAL_KEYWORDS class constant found")
     else:
-        print("✗ Analogical keyword detection NOT FOUND in is_symbolic_query")
+        print("✗ ANALOGICAL_KEYWORDS class constant NOT FOUND")
         return False
     
     # Check for early return on analogical patterns
@@ -78,6 +85,12 @@ def test_symbolic_reasoner_rejection():
     else:
         print("✗ Early return logic NOT FOUND")
         return False
+    
+    # Check for usage of self.ANALOGICAL_KEYWORDS
+    if 'self.ANALOGICAL_KEYWORDS' in content:
+        print("✓ Methods use self.ANALOGICAL_KEYWORDS (no duplication)")
+    else:
+        print("⚠ Methods may not use class constant (check for duplication)")
     
     # Check check_applicability method has suggestion
     if "'suggestion': 'analogical'" in content or '"suggestion": "analogical"' in content:
@@ -114,7 +127,7 @@ def test_orchestrator_aliases():
     print("=" * 80)
     
     # Read the file
-    with open('/home/runner/work/VulcanAMI_LLM/VulcanAMI_LLM/src/vulcan/reasoning/unified/orchestrator.py', 'r') as f:
+    with open(ORCHESTRATOR_PATH, 'r') as f:
         content = f.read()
     
     # Check for analogical tool mappings

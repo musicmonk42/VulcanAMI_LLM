@@ -135,6 +135,14 @@ class SymbolicReasoner:
     
     # Maximum length for short queries that can be simple propositional formulas
     MAX_SHORT_QUERY_LENGTH = 50
+    
+    # FIX (Jan 23 2026): Analogical keywords for early rejection
+    # Queries with these keywords should route to analogical reasoner, not symbolic
+    ANALOGICAL_KEYWORDS = [
+        'structure mapping', 'analogical mapping', 'analogy', 'analogies', 'analogical',
+        'domain mapping', 'map the deep structure', 'map the',
+        'source domain', 'target domain', 'deep structure',
+    ]
 
     def __init__(self, prover_type: str = "parallel"):
         """
@@ -237,12 +245,7 @@ class SymbolicReasoner:
         # FIX (Jan 23 2026): Early detection of analogical reasoning queries
         # Queries with analogical keywords should NOT be routed to symbolic reasoner
         # even if they contain some logic-like notation (e.g., S→T for domain mapping)
-        analogical_keywords = [
-            'structure mapping', 'analogical mapping', 'analogy', 'analogies', 'analogical',
-            'domain mapping', 'map the deep structure', 'map the',
-            'source domain', 'target domain', 'deep structure',
-        ]
-        has_analogical_keyword = any(kw in query_lower for kw in analogical_keywords)
+        has_analogical_keyword = any(kw in query_lower for kw in self.ANALOGICAL_KEYWORDS)
         if has_analogical_keyword:
             # Contains analogical keywords - should route to analogical reasoner
             return False
@@ -376,12 +379,7 @@ class SymbolicReasoner:
         """
         # Check for analogical reasoning patterns first
         query_lower = query.lower()
-        analogical_keywords = [
-            'structure mapping', 'analogical mapping', 'analogy', 'analogies', 'analogical',
-            'domain mapping', 'map the deep structure', 'map the',
-            'source domain', 'target domain', 'deep structure',
-        ]
-        has_analogical_keyword = any(kw in query_lower for kw in analogical_keywords)
+        has_analogical_keyword = any(kw in query_lower for kw in self.ANALOGICAL_KEYWORDS)
         if has_analogical_keyword:
             return {
                 'applicable': False,
@@ -801,12 +799,7 @@ class SymbolicReasoner:
         if check_applicability and not self.is_symbolic_query(query_str):
             # FIX (Jan 23 2026): Check if query contains analogical reasoning patterns
             # and suggest the analogical reasoning engine instead of generic alternatives
-            analogical_keywords = [
-                'structure mapping', 'analogical mapping', 'analogy', 'analogies', 'analogical',
-                'domain mapping', 'map the deep structure', 'map the',
-                'source domain', 'target domain', 'deep structure',
-            ]
-            has_analogical = any(kw in query_lower for kw in analogical_keywords)
+            has_analogical = any(kw in query_lower for kw in self.ANALOGICAL_KEYWORDS)
             
             if has_analogical:
                 logger.info(
