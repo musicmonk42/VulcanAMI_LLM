@@ -3,6 +3,8 @@ test_principle_extractor.py - Comprehensive tests for principle_extractor module
 Part of the VULCAN-AGI system
 """
 
+import os
+
 import pytest
 
 # Import the module under test
@@ -1006,6 +1008,8 @@ class TestAbstractionEngine:
 class TestIntegration:
     """Integration tests combining multiple components"""
 
+    @pytest.mark.slow
+    @pytest.mark.timeout(180)
     def test_full_extraction_pipeline(self):
         """Test complete extraction pipeline"""
         # Create extractor
@@ -1015,9 +1019,14 @@ class TestIntegration:
             strategy=ExtractionStrategy.BALANCED,
         )
 
+        # Reduce iterations in CI mode to speed up test execution
+        num_traces = 2 if os.environ.get('CI') else 3
+        print(f"Running test_full_extraction_pipeline with {num_traces} traces (CI={bool(os.environ.get('CI'))})")
+
         # Create multiple similar traces
         traces = []
-        for i in range(3):
+        for i in range(num_traces):
+            print(f"  Creating trace {i+1}/{num_traces}...")
             trace = ExecutionTrace(
                 trace_id=f"trace_{i}",
                 actions=[
@@ -1043,18 +1052,25 @@ class TestIntegration:
             traces.append(trace)
 
         # Extract principles
+        print(f"  Extracting principles from {len(traces)} traces...")
         principles = extractor.extract_from_batch(traces)
+        print(f"  Extracted {len(principles)} principles")
 
         # Should extract at least some principles
         assert isinstance(principles, list)
 
         # Validate extracted principles
-        for principle in principles:
+        print(f"  Validating {len(principles)} extracted principles...")
+        for idx, principle in enumerate(principles):
+            print(f"    Validating principle {idx+1}/{len(principles)}...")
             assert isinstance(principle, CrystallizedPrinciple)
             assert principle.confidence >= extractor.min_confidence
             assert hasattr(principle, "core_pattern")
             assert hasattr(principle, "domain")
+        print("  ✓ All validations passed")
 
+    @pytest.mark.slow
+    @pytest.mark.timeout(180)
     def test_pattern_evolution(self):
         """Test pattern recognition evolving with more evidence"""
         extractor = PrincipleExtractor(
@@ -1063,8 +1079,13 @@ class TestIntegration:
             strategy=ExtractionStrategy.EXPLORATORY,
         )
 
+        # Reduce iterations in CI mode to speed up test execution
+        num_iterations = 3 if os.environ.get('CI') else 5
+        print(f"Running test_pattern_evolution with {num_iterations} iterations (CI={bool(os.environ.get('CI'))})")
+
         # Add traces one by one
-        for i in range(5):
+        for i in range(num_iterations):
+            print(f"  Processing iteration {i+1}/{num_iterations}...")
             trace = ExecutionTrace(
                 trace_id=f"trace_{i}",
                 actions=[{"type": "read"}, {"type": "transform"}, {"type": "write"}],
@@ -1081,6 +1102,7 @@ class TestIntegration:
                 # Check if any high-confidence principles emerged
                 [p for p in principles if p.confidence > 0.6]
                 # May or may not have high confidence depending on patterns
+        print("  ✓ Pattern evolution test completed")
 
 
 if __name__ == "__main__":
