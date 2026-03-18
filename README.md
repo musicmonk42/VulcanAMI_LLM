@@ -1,6 +1,6 @@
-# Graphix Vulcan (Proprietary)
+# Graphix Vulcan 
 
-Proprietary software owned and created by Brian D Anderson Novatrax Labs LTD. 
+ software owned and created by Brian D Anderson Novatrax Labs LTD. 
 Patents pending
 
 
