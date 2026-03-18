@@ -1,15 +1,8 @@
 # Graphix Vulcan (Proprietary)
 
-Proprietary software owned and created by Novatrax Labs LTD. All rights reserved.
-
-Copyright © 2024 Novatrax Labs LTD. All rights reserved.
+Proprietary software owned and created by Brian D Anderson Novatrax Labs LTD. 
 Patents pending
 
-Important legal notice
-- This software and documentation are the confidential and proprietary information of Novatrax Labs LTD (“Novatrax”).
-- Any use is subject to your written agreement with Novatrax. No license is granted by implication, estoppel, or otherwise.
-- Do not distribute, disclose, copy, or host this code or documentation outside of approved environments and recipients identified in your agreement.
-- If you received this in error, notify Novatrax and delete all copies.
 
 Last updated: 2024-12-14
 
