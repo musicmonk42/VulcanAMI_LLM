@@ -3,7 +3,7 @@
 **Version:** 2.2.0 
 **Last Updated:** December 23, 2024
 
-Welcome to the root documentation corpus for the Graphix Vulcan Platform (Proprietary & Confidential — Novatrax Labs LTD). 
+
 This folder aggregates deep technical, governance, safety, execution, optimization, and integration references.
 
 > **📚 Complete documentation index:** See [INDEX.md](INDEX.md) for full navigation
