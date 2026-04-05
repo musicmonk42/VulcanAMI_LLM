@@ -12,6 +12,10 @@ from .analogical import AnalogicalToolWrapper
 from .multimodal import MultimodalToolWrapper
 from .philosophical import PhilosophicalToolWrapper
 from .cryptographic import CryptographicToolWrapper
+from .symbolic import SymbolicToolWrapper
+from .probabilistic import ProbabilisticToolWrapper
+from .world_model_queries import WorldModelToolWrapper
+from .mathematical import MathematicalToolWrapper
 
 __all__ = [
     "CausalToolWrapper",
@@ -19,4 +23,8 @@ __all__ = [
     "MultimodalToolWrapper",
     "PhilosophicalToolWrapper",
     "CryptographicToolWrapper",
+    "SymbolicToolWrapper",
+    "ProbabilisticToolWrapper",
+    "WorldModelToolWrapper",
+    "MathematicalToolWrapper",
 ]
