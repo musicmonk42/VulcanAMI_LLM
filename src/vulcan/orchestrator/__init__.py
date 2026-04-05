@@ -184,7 +184,9 @@ try:
     from .agent_pool import (
         AgentPoolManager,
         AGENT_SELECTION_TIMEOUT_SECONDS,
-        # ISSUE 2 FIX: New exports for main process validation
+    )
+    # ISSUE 2 FIX: New exports for main process validation
+    from .agent_pool_proxy import (
         AgentPoolProxy,
         is_main_process,
     )

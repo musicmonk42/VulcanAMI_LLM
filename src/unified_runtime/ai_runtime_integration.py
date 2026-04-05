@@ -1428,8 +1428,10 @@ class AIRuntime:
         except Exception as e:
             logger.error(f"Failed to initialize OpenAI provider: {e}")
 
-        # Always register Mock provider under lowercase 'mock'
-        self.providers["mock"] = MockProvider()
+        # Only register Mock provider in dev/test environments
+        from src.env_utils import is_dev_env
+        if is_dev_env():
+            self.providers["mock"] = MockProvider()
 
         # Optionally register LocalGPT provider if artifacts are configured
         try:

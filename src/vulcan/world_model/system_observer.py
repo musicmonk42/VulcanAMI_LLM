@@ -184,7 +184,7 @@ class SystemObserver:
         
         # Convert to world model observation
         try:
-            from .world_model_core import Observation
+            from .observation_types import Observation
             
             obs = Observation(
                 timestamp=event.timestamp,
@@ -284,7 +284,7 @@ class SystemObserver:
         
         # Convert to world model observation
         try:
-            from .world_model_core import Observation
+            from .observation_types import Observation
             
             obs = Observation(
                 timestamp=event.timestamp,
@@ -380,7 +380,7 @@ class SystemObserver:
         
         # Feed to world model - this is important learning signal
         try:
-            from .world_model_core import Observation
+            from .observation_types import Observation
             
             obs = Observation(
                 timestamp=event.timestamp,
@@ -468,7 +468,7 @@ class SystemObserver:
         
         # Convert to world model observation
         try:
-            from .world_model_core import Observation
+            from .observation_types import Observation
             
             obs = Observation(
                 timestamp=event.timestamp,
@@ -527,7 +527,7 @@ class SystemObserver:
         
         # Feed to world model
         try:
-            from .world_model_core import Observation
+            from .observation_types import Observation
             
             obs = Observation(
                 timestamp=event.timestamp,

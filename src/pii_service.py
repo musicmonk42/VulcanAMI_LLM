@@ -400,26 +400,10 @@ async def detect_pii(request: PIIRequest):
     Detect PII in provided text.
     Returns detection results with identified PII types and confidence scores.
     """
-    text = request.text
-    # TODO: Implement actual PII detection using security nodes
-    # This would integrate with:
-    # - Named entity recognition models
-    # - Pattern matching for common PII formats
-    # - Context-aware PII identification
-    # - Confidence scoring
-
-    result = PIIDetectionResult(
-        text_analyzed=True,
-        pii_found=False,
-        pii_types=[],
-        confidence=0.95,
+    raise HTTPException(
+        status_code=501,
+        detail="PII detection not implemented. Configure a detection backend before enabling this endpoint."
     )
-
-    if PROMETHEUS_AVAILABLE and pii_detections:
-        for pii_type in result.pii_types:
-            pii_detections.labels(pii_type=pii_type).inc()
-
-    return result
 
 
 @app.post("/redact", response_model=PIIDetectionResult, tags=["PII Detection"])
@@ -428,23 +412,10 @@ async def redact_pii(request: PIIRequest):
     Detect and redact PII from provided text.
     Returns redacted text with PII replaced by placeholders.
     """
-    text = request.text
-    # TODO: Implement actual PII redaction
-    # This would:
-    # - Detect PII using detection logic
-    # - Replace PII with appropriate placeholders
-    # - Maintain text readability
-    # - Preserve document structure
-
-    result = PIIDetectionResult(
-        text_analyzed=True,
-        pii_found=False,
-        pii_types=[],
-        redacted_text=text,  # TODO: Replace with actual redacted text
-        confidence=0.95,
+    raise HTTPException(
+        status_code=501,
+        detail="PII redaction not implemented. Configure a detection backend before enabling this endpoint."
     )
-
-    return result
 
 
 # ====================================================================

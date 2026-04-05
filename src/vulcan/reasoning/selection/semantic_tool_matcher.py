@@ -1125,7 +1125,7 @@ class SemanticToolMatcher:
                     if cls._shared_model is None:
                         MultiTierFeatureExtractor = None
                         try:
-                            from .tool_selector import MultiTierFeatureExtractor as MTFE
+                            from .feature_extraction import MultiTierFeatureExtractor as MTFE
 
                             MultiTierFeatureExtractor = MTFE
                         except ImportError as e:

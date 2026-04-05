@@ -6777,10 +6777,16 @@ class WorldModel:
                     
                     # Track values that have been tested and validated
                     if check_count > 0:
+                        if priority == 0:
+                            priority_label = 'critical'
+                        elif priority == 1:
+                            priority_label = 'high'
+                        else:
+                            priority_label = 'normal'
                         values.append({
                             'value': name.replace('_', ' ').title(),
                             'description': description,
-                            'priority': 'critical' if priority == 0 else 'high' if priority == 1 else 'normal',
+                            'priority': priority_label,
                             'tested': check_count,
                             'violations': violation_count,
                             'reliability': 1.0 - (violation_count / max(1, check_count))

@@ -513,7 +513,12 @@ class HierarchicalContext:
 
             # Store each token separately
             for i, token in enumerate(generated):
-                trace = traces[i] if i < len(traces) else (traces[0] if traces else {})
+                if i < len(traces):
+                    trace = traces[i]
+                elif traces:
+                    trace = traces[0]
+                else:
+                    trace = {}
                 self.store(prompt, token, trace, importance)
         else:
             # Single token

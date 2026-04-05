@@ -94,7 +94,12 @@ async def execute_step(request: Request) -> dict:
 
     except asyncio.TimeoutError:
         error_counter.labels(error_type="timeout").inc()
-        timeout_val = step_request.timeout if 'step_request' in locals() else (getattr(settings, "max_execution_time_s", 30.0) if settings else 30.0)
+        if 'step_request' in locals():
+            timeout_val = step_request.timeout
+        elif settings:
+            timeout_val = getattr(settings, "max_execution_time_s", 30.0)
+        else:
+            timeout_val = 30.0
         logger.error(f"Step execution timeout after {timeout_val}s")
         raise HTTPException(
             status_code=504, detail=f"Execution timeout after {timeout_val}s"

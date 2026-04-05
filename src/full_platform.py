@@ -517,7 +517,12 @@ class UnifiedPlatformSettings(BaseSettings):
             elif self.api_key:
                 self.auth_method = AuthMethod.API_KEY
             else:
-                self.auth_method = AuthMethod.NONE
+                from src.env_utils import is_dev_env
+                if not is_dev_env():
+                    raise ValueError(
+                        "No authentication configured. Set JWT_SECRET or API_KEY, "
+                        "or set VULCAN_ENV=development|test to run without auth."
+                    )
 
 
 settings = UnifiedPlatformSettings()
@@ -938,11 +943,16 @@ async def verify_authentication(
     - Strict checks depending on configured method
     """
     if settings.auth_method == AuthMethod.NONE:
-        return {"authenticated": True, "method": "none"}
+        from src.env_utils import is_dev_env
+        if not is_dev_env():
+            raise AuthenticationError("Authentication not configured")
+        return {"authenticated": True, "method": "none", "warning": "dev-mode-no-auth"}
 
     # API Key authentication (strict)
     if settings.auth_method == AuthMethod.API_KEY:
-        configured_key = settings.api_key or ""
+        configured_key = settings.api_key
+        if not configured_key:
+            raise AuthenticationError("API key not configured")
         # Prefer X-API-Key header; optionally allow Bearer to carry API key for compatibility
         presented_key = api_key or (bearer.credentials if bearer else None)
         if _safe_compare(presented_key, configured_key):
@@ -3058,6 +3068,10 @@ app = FastAPI(
 
 print(f"[STARTUP] FastAPI app created in {_get_startup_elapsed():.2f}s")
 
+# Register globals for route module access via src.platform.globals
+from src.platform.globals import init_app as _init_globals
+_init_globals(app, settings, service_manager)
+
 # Request size limiting middleware (header-based)
 @app.middleware("http")
 async def request_size_limit_middleware(request: Request, call_next):
@@ -3834,7 +3848,9 @@ async def get_token(request: Request, sub: Optional[str] = None):
     if not settings.jwt_secret:
         raise HTTPException(status_code=500, detail="JWT secret not configured")
 
-    configured_key = settings.api_key or ""
+    configured_key = settings.api_key
+    if not configured_key:
+        raise HTTPException(status_code=500, detail="API key not configured for token issuance")
     presented_key = request.headers.get("X-API-Key")
     if not _safe_compare(presented_key, configured_key):
         raise AuthenticationError("Invalid API key for token issuance")

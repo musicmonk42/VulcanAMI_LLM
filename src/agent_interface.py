@@ -1792,8 +1792,12 @@ if __name__ == "__main__":
     print("Testing HTTP Mode (will fail without server)")
     print("=" * 60)
 
+    api_key = os.environ.get("VULCAN_TEST_API_KEY")
+    if not api_key:
+        print("Set VULCAN_TEST_API_KEY to run this test")
+        sys.exit(1)
     http_config = ConnectionConfig(
-        mode=CommunicationMode.HTTP, host="localhost", port=8080, api_key="test_key"
+        mode=CommunicationMode.HTTP, host="localhost", port=8080, api_key=api_key,
     )
 
     interface = AgentInterface(http_config)

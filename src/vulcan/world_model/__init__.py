@@ -231,13 +231,22 @@ from .prediction_engine import (
 )
 
 # Import world model core and router
-from .world_model_core import (
-    ConsistencyValidator,
-    InterventionManager,
+# Note: Helper classes have been extracted into separate modules for maintainability.
+# We import from the new modules (canonical location) and re-export for backward compat.
+from .observation_types import (
+    ComponentIntegrationError,
     ModelContext,
+    NullMetaReasoningComponent,
+    NullMotivationalIntrospection,
+    NullObjectiveHierarchy,
     Observation,
-    ObservationProcessor,
-    PredictionManager,
+)
+from .observation_processor import ObservationProcessor
+from .intervention_orchestrator import InterventionManager
+from .prediction_orchestrator import PredictionManager
+from .consistency_validator import ConsistencyValidator
+from .self_improvement import CodeLLMClient
+from .world_model_core import (
     WorldModel,
 )
 from .world_model_router import (
@@ -395,6 +404,11 @@ __all__ = [
     "InterventionManager",
     "PredictionManager",
     "ConsistencyValidator",
+    "CodeLLMClient",
+    "ComponentIntegrationError",
+    "NullObjectiveHierarchy",
+    "NullMotivationalIntrospection",
+    "NullMetaReasoningComponent",
     # World Model Router Classes
     "WorldModelRouter",
     "UpdatePlan",

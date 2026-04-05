@@ -117,7 +117,20 @@ jq.exe
 # IDE / Editor specific
 .idea/
 .vscode/
+.cursor/
+.windsurf/
 *.swp
+
+# AI Governance (public repo - keep internal state private)
+.agent/
+.claude/
+.failsafe/
+.qorelogic/
+CLAUDE.md
+GEMINI.md
+COPILOT.md
+CURSOR.md
+plan-*.md
 
 # Cache / build helpers
 pip-wheel-metadata/

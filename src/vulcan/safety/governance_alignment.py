@@ -882,9 +882,12 @@ class GovernanceManager:
 
             risk_score = risk_scores.get(action_risk, 0.7)
             complexity_score = complexity_scores.get(action_complexity, 0.7)
-            cost_score = (
-                1.0 if action_cost < 100 else (0.8 if action_cost < 1000 else 0.6)
-            )
+            if action_cost < 100:
+                cost_score = 1.0
+            elif action_cost < 1000:
+                cost_score = 0.8
+            else:
+                cost_score = 0.6
 
             # Combined score for approval
             approval_score = (risk_score + complexity_score + cost_score) / 3.0

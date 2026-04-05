@@ -1879,7 +1879,7 @@ class AutoScaler:
         
         # Import SIMPLE_MODE constants if available
         try:
-            from .agent_pool import SIMPLE_MODE, SIMPLE_MODE_CHECK_INTERVAL
+            from .agent_pool_types import SIMPLE_MODE, SIMPLE_MODE_CHECK_INTERVAL
         except ImportError:
             SIMPLE_MODE = False
             SIMPLE_MODE_CHECK_INTERVAL = 300
