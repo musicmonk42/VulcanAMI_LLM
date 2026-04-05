@@ -50,11 +50,7 @@ except ImportError:
     ONNX_AVAILABLE = False
     ort = None
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger("AnalogPhotonicEmulator")
+logger = logging.getLogger(__name__)
 
 # Physical constants
 SPEED_OF_LIGHT = const.c  # m/s

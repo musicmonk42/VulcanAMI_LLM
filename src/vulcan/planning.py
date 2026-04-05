@@ -2734,7 +2734,6 @@ class ConsensusProtocol:
 # ============================================================
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
 
     print("VULCAN-AGI Planning Module - Enhanced Version")
     print("=" * 50)

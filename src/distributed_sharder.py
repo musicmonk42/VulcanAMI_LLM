@@ -37,11 +37,7 @@ except ImportError:
     RAY_AVAILABLE = False
     ray = None  # type: ignore
 
-# Configure logging
-logger = logging.getLogger("DistributedSharder")
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+logger = logging.getLogger(__name__)
 
 # Constants
 MAX_SHARD_SIZE_MB = 100

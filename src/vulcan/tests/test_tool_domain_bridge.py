@@ -26,8 +26,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-# Configure logging for tests
-logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 

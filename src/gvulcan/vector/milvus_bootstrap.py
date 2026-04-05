@@ -441,10 +441,6 @@ def main(
 if __name__ == "__main__":
     import argparse
 
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-    )
-
     parser = argparse.ArgumentParser(description="Bootstrap Milvus collections")
     parser.add_argument("--config", type=Path, help="Path to configuration file")
     parser.add_argument("--host", default="milvus", help="Milvus host")

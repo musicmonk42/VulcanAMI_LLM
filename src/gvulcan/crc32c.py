@@ -524,7 +524,6 @@ def verify_manifest(manifest_path: Union[str, Path]) -> Dict[str, bool]:
 
 if __name__ == "__main__":
     # Example usage and testing
-    logging.basicConfig(level=logging.INFO)
 
     # Test basic CRC32C
     print("=== Testing Basic CRC32C ===")

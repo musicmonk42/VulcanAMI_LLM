@@ -80,13 +80,6 @@ except ImportError:
     RATE_LIMIT_AVAILABLE = False
     print("⚠️  slowapi not available - rate limiting disabled")
 
-# ====================================================================
-# LOGGING CONFIGURATION
-# ====================================================================
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
 logger = logging.getLogger(__name__)
 
 # ====================================================================

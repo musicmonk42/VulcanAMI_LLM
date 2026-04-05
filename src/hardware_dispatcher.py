@@ -71,11 +71,7 @@ except ImportError:
     cp = None
     CUPY_AVAILABLE = False
 
-# Setup logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger("HardwareDispatcher")
+logger = logging.getLogger(__name__)
 
 # Constants
 MAX_TENSOR_SIZE = 1_000_000_000  # 1B elements

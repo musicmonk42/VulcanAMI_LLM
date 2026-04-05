@@ -1132,7 +1132,6 @@ class SLIAlertManager:
 
 if __name__ == "__main__":
     # Example usage and testing
-    logging.basicConfig(level=logging.INFO)
 
     print("=== Testing SLI System ===\n")
 

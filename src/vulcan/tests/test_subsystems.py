@@ -298,7 +298,6 @@ def run_subsystem_tests() -> Dict[str, Any]:
 
 if __name__ == "__main__":
     # Run tests if executed directly
-    logging.basicConfig(level=logging.INFO)
     results = run_subsystem_tests()
     print(f"\nSubsystem Test Results:")
     print(f"Passed: {results['passed']}/{results['total']}")

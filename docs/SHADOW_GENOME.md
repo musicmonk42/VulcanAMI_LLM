@@ -241,4 +241,24 @@ When rewiring imports away from a God file, grep for ALL symbols imported from t
 Plan revision required. VETO issued.
 
 ---
+
+## Failure Entry #13
+
+**Date**: 2026-04-05T00:00:00Z
+**Verdict ID**: GATE-TRIBUNAL-CLEANUP-2026-04-05
+**Failure Mode**: COMPLEXITY_VIOLATION
+
+### What Failed
+Phase 2 of cleanup plan proposes splitting `src/platform/services.py` (565 lines) into two files, but the resulting `services.py` containing `AsyncServiceManager` would be ~350 lines -- exceeding the 250-line Section 4 Razor limit by 40%.
+
+### Why It Failed
+The plan estimated "~300 lines" for the post-split `services.py` without measuring the actual line range. `AsyncServiceManager` starts at line 229 and runs to line 565 (337 lines of class body). Adding an import preamble for symbols extracted to `service_imports.py` brings the total to ~350 lines. The estimate was aspirational rather than measured -- the same failure pattern documented in Shadow Genome Entry #6 and Entry #7.
+
+### Pattern to Avoid
+When splitting a file, measure the actual line count of each resulting segment BEFORE committing to the split strategy. If a single class exceeds 250 lines, the class itself must be further decomposed -- a file split alone is insufficient. Use `grep -n "class ClassName"` and `wc -l` to verify the math adds up.
+
+### Remediation Attempted
+Plan revision required. VETO issued.
+
+---
 _Shadow Genome tracks failure patterns to prevent repetition._

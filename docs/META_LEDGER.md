@@ -230,5 +230,45 @@ SHA256(content_hash + previous_hash) = ae1daee5f81d3489603beb5167a0f29b583a6180f
 **Decision**: Import rewiring implemented. Created src/platform/globals.py with lazy accessors. Rewired 7 route modules to use globals.py. Redirected 13 callers of extracted God file classes. Fixer diagnostic caught 4 issues (init_app never called, split-brain settings, 2 stdlib collisions) — all fixed. B5 marked complete.
 
 ---
+
+### Entry #12: GATE TRIBUNAL (Cleanup and Dedup Plan)
+
+**Timestamp**: 2026-04-05T00:00:00Z
+**Phase**: GATE
+**Author**: Judge
+**Risk Grade**: L3
+**Verdict**: VETO
+
+**Content Hash**:
+SHA256(plan-cleanup-and-dedup.md) = d62e99aafb2defb1b45b939ea722bf7dedf6a361f4d1c3d2d0e35f87995bfe68
+
+**Previous Hash**: ae1daee5f81d3489603beb5167a0f29b583a6180f0f7a66ca6295d6610279928
+
+**Chain Hash**:
+SHA256(content_hash + previous_hash) = eaa696b2775d2ab69ba16bfb476e96e6028e539a309e153732e9bbfda4704883
+
+**Decision**: VETO -- Cleanup and deduplication plan contains 1 blocking violation (CDV-1). Phase 2 services.py split produces a post-split file of ~350 lines (AsyncServiceManager at lines 229-565 plus import preamble), exceeding the 250-line Section 4 Razor limit by 40%. Phase 1 (basicConfig removal), Phase 3 (God file dedup), and Phase 4 (detect-secrets) pass all 6 audit checks. Non-blocking observation: 6 standalone scripts will lose logging output unless added to the Phase 1 exceptions list. Implementation blocked pending plan revision for Phase 2.
+
+---
+
+### Entry #13: GATE TRIBUNAL (Cleanup and Dedup Plan, Revision 2)
+
+**Timestamp**: 2026-04-05T00:00:00Z
+**Phase**: GATE
+**Author**: Judge
+**Risk Grade**: L3
+**Verdict**: PASS
+
+**Content Hash**:
+SHA256(plan-cleanup-and-dedup.md) = 076d38d9826592685b596f3e756acb8e9d8d186731caeb3acb6be9838806419f
+
+**Previous Hash**: eaa696b2775d2ab69ba16bfb476e96e6028e539a309e153732e9bbfda4704883
+
+**Chain Hash**:
+SHA256(content_hash + previous_hash) = 471bed7b658b800b7f8fa9e6a3a6a163c4f54509496dd0f0d65e4b16728627d3
+
+**Decision**: PASS -- Revised cleanup and deduplication plan resolves both prior findings. CDV-1 fixed: services.py 3-way split produces service_imports.py (~228 lines), service_lifecycle.py (~195 lines), services.py (~194 lines) -- all under 250-line Section 4 Razor limit. ML-2 fixed: 6 standalone scripts explicitly listed with logging_config.configure() replacement, no logging output lost. All 6 audit passes clear. Implementation approved.
+
+---
 *Chain integrity: VALID*
-*Merkle chain: 11 entries*
+*Merkle chain: 13 entries*

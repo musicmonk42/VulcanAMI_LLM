@@ -10,8 +10,6 @@ import time
 import unittest
 from unittest.mock import Mock, patch
 
-# Configure logging for test output
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 

@@ -272,11 +272,6 @@ class Settings(BaseSettings):
 # Create the singleton settings instance
 settings = Settings()
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-
 
 # ============================================================
 # UTILITY FUNCTIONS

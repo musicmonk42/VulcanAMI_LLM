@@ -64,11 +64,7 @@ except ImportError:
 
     Gauge = Counter = Histogram = _NoOpMetric  # type: ignore
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger("DriftDetector")
+logger = logging.getLogger(__name__)
 
 
 # Metrics - Handle duplicate registration gracefully with singleton pattern

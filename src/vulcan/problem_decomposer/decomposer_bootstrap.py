@@ -819,6 +819,5 @@ def run_bootstrap_test():
 
 if __name__ == "__main__":
     # Run test when module executed directly
-    logging.basicConfig(level=logging.INFO)
     success = run_bootstrap_test()
     exit(0 if success else 1)

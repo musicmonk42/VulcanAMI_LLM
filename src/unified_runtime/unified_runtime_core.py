@@ -138,10 +138,7 @@ except ImportError:
     AutobiographicalMemory = None
     MEMORY_AVAILABLE = False
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger("UnifiedRuntime")
+logger = logging.getLogger(__name__)
 
 
 # ============================================================================

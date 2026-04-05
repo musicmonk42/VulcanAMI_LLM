@@ -1252,7 +1252,6 @@ class MerkleGraph:
 
 if __name__ == "__main__":
     # Example usage and testing
-    logging.basicConfig(level=logging.INFO)
 
     # Test basic Merkle tree
     print("=== Testing Basic Merkle Tree ===")

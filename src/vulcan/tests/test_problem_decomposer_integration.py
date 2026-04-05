@@ -11,7 +11,6 @@ from unittest.mock import Mock
 
 import pytest
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 

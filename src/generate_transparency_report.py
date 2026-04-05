@@ -137,15 +137,8 @@ MAX_AUDIT_LOG_LINES = 100000
 ANOMALY_THRESHOLD_STDDEV = 3.0  # Statistical threshold
 MIN_SAMPLES_FOR_ANOMALY = 5
 
-# --- Setup Logging ---
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(filename)s:%(lineno)d %(message)s",
-    handlers=[
-        RotatingFileHandler(LOG_PATH, maxBytes=MAX_REPORT_SIZE, backupCount=3),
-        logging.StreamHandler(),
-    ],
-)
+from src.logging_config import configure as _configure_logging
+_configure_logging()
 logger = logging.getLogger(__name__)
 
 

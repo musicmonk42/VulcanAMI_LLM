@@ -430,5 +430,4 @@ def setup_completion():
 
 if __name__ == "__main__":
     # Run interactive mode if executed directly
-    logging.basicConfig(level=logging.INFO)
     run_interactive_mode()

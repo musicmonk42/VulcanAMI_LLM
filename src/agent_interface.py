@@ -44,11 +44,7 @@ except ImportError:
 
     warnings.warn("websocket-client not installed. WebSocket mode unavailable.")
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger("AgentInterface")
+logger = logging.getLogger(__name__)
 
 # Constants
 DEFAULT_TIMEOUT = 30

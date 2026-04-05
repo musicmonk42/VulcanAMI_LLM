@@ -125,11 +125,7 @@ adaptive_penalty_gauge = _register_or_get_metric(
     "The current value of the adaptive diversity penalty",
 )
 
-# --- Logging ---
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger("TournamentManager")
+logger = logging.getLogger(__name__)
 
 
 def trace_id() -> str:

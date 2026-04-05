@@ -11,11 +11,7 @@ from typing import Callable, Dict, Optional, Sequence, Tuple, Union
 
 import numpy as np
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger("HardwareEmulator")
+logger = logging.getLogger(__name__)
 
 # Optional imports with graceful degradation
 try:
