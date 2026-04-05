@@ -536,63 +536,82 @@ class TamperEvidentLogger:
                 )
                 break  # Shutdown requested
             except asyncio.TimeoutError:
-                # Normal timeout, process batch
                 pass
 
             try:
-                async with self._lock:
-                    if self._batch_queue:
-                        batch = self._batch_queue
-                        self._batch_queue = []
-                        if self._metrics:
-                            self._metrics["batch_size"].set(0)
-
-                        try:
-                            if self.config.async_logging:
-                                await self._log_to_file_async(batch)
-                            else:
-                                self._log_to_file_sync(batch)
-                        except Exception as e:
-                            self._logger.error(f"Failed to write batch to file: {e}")
-                            if self.config.alert_callback:
-                                self.config.alert_callback(f"Batch write failed: {e}")
-
-                        critical_entries = [e for e in batch if e.get("critical")]
-                        if critical_entries and self.config.dlt_enabled:
-                            dlt_results = await self._anchor_to_dlt(critical_entries)
-                            for entry, dlt_result in zip(critical_entries, dlt_results):
-                                if (
-                                    isinstance(dlt_result, str)
-                                    and "Failed" in dlt_result
-                                ):
-                                    entry["dlt_error"] = dlt_result
-                                    if self.config.dlt_anchor_critical:
-                                        self._logger.critical(dlt_result)
-                                        if self.config.alert_callback:
-                                            self.config.alert_callback(dlt_result)
-                                else:
-                                    entry["dlt_tx_id"] = dlt_result
-
-                        if self.config.syslog_enabled:
-                            for syslog_entry in batch:
-                                try:
-                                    syslog_data = {
-                                        k: v
-                                        for k, v in syslog_entry.items()
-                                        if k not in ["dlt_error"]
-                                    }
-                                    syslog.syslog(
-                                        self.config.syslog_facility | syslog.LOG_INFO,
-                                        json.dumps(syslog_data, ensure_ascii=False),
-                                    )
-                                except Exception as e:
-                                    self._logger.debug(
-                                        f"Failed to send log to syslog: {e}"
-                                    )
+                batch = await self._collect_batch()
+                if batch:
+                    await self._write_batch(batch)
             except asyncio.CancelledError:
                 break
             except Exception as e:
                 self._logger.error(f"Error in batch processing loop: {e}")
+
+    async def _collect_batch(self) -> List[Dict[str, Any]]:
+        """Drain the batch queue under lock and return its contents."""
+        async with self._lock:
+            if not self._batch_queue:
+                return []
+            batch = self._batch_queue
+            self._batch_queue = []
+            if self._metrics:
+                self._metrics["batch_size"].set(0)
+            return batch
+
+    async def _write_batch(self, batch: List[Dict[str, Any]]):
+        """Write a collected batch to file, DLT, and syslog destinations."""
+        try:
+            if self.config.async_logging:
+                await self._log_to_file_async(batch)
+            else:
+                self._log_to_file_sync(batch)
+        except Exception as e:
+            self._logger.error(f"Failed to write batch to file: {e}")
+            if self.config.alert_callback:
+                self.config.alert_callback(f"Batch write failed: {e}")
+
+        critical_entries = [e for e in batch if e.get("critical")]
+        if critical_entries and self.config.dlt_enabled:
+            await self._anchor_critical_entries(critical_entries)
+
+        if self.config.syslog_enabled:
+            self._send_batch_to_syslog(batch)
+
+    async def _anchor_critical_entries(
+        self, critical_entries: List[Dict[str, Any]]
+    ):
+        """Anchor critical entries to DLT and record results."""
+        dlt_results = await self._anchor_to_dlt(critical_entries)
+        for entry, dlt_result in zip(critical_entries, dlt_results):
+            self._write_single_entry(entry, dlt_result)
+
+    def _write_single_entry(self, entry: Dict[str, Any], dlt_result: Optional[str]):
+        """Apply a single DLT result to its corresponding entry."""
+        if not (isinstance(dlt_result, str) and "Failed" in dlt_result):
+            entry["dlt_tx_id"] = dlt_result
+            return
+
+        entry["dlt_error"] = dlt_result
+        if self.config.dlt_anchor_critical:
+            self._logger.critical(dlt_result)
+            if self.config.alert_callback:
+                self.config.alert_callback(dlt_result)
+
+    def _send_batch_to_syslog(self, batch: List[Dict[str, Any]]):
+        """Forward each entry in the batch to syslog."""
+        for syslog_entry in batch:
+            try:
+                syslog_data = {
+                    k: v
+                    for k, v in syslog_entry.items()
+                    if k not in ["dlt_error"]
+                }
+                syslog.syslog(
+                    self.config.syslog_facility | syslog.LOG_INFO,
+                    json.dumps(syslog_data, ensure_ascii=False),
+                )
+            except Exception as e:
+                self._logger.debug(f"Failed to send log to syslog: {e}")
 
     async def _anchor_to_dlt(
         self, entries: List[Dict[str, Any]]

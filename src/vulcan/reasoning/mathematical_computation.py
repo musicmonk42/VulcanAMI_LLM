@@ -1952,7 +1952,12 @@ result = simplify(integral)
         
         # PRIORITY 4: Limits (check before integration since both are calculus)
         if "limit" in query_lower:
-            direction = "+" if "right" in query_lower else ("-" if "left" in query_lower else "")
+            if "right" in query_lower:
+                direction = "+"
+            elif "left" in query_lower:
+                direction = "-"
+            else:
+                direction = ""
             return self._templates.limit("sin(x)/x", var, "0", direction)
         
         # PRIORITY 5: Series expansion
@@ -2009,7 +2014,12 @@ result = simplify(integral)
             has_diff_keyword = bool(re.search(r'\bdiff\b', query_lower))
         
         if has_diff_keyword:
-            order = 2 if "second" in query_lower else (3 if "third" in query_lower else 1)
+            if "second" in query_lower:
+                order = 2
+            elif "third" in query_lower:
+                order = 3
+            else:
+                order = 1
             return self._templates.differentiation("x**3 + x**2", var, order)
         
         # PRIORITY 8: Specific algebraic operations

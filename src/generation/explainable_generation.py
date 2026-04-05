@@ -1523,7 +1523,12 @@ class ExplainableGeneration:
         conf = decision.get("confidence", 0)
         entropy = decision.get("entropy", 0)
 
-        interpretation = "high" if conf > 0.7 else "moderate" if conf > 0.4 else "low"
+        if conf > 0.7:
+            interpretation = "high"
+        elif conf > 0.4:
+            interpretation = "moderate"
+        else:
+            interpretation = "low"
 
         return {
             "query": "What is the confidence level?",

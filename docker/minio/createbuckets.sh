@@ -8,8 +8,8 @@ set -e
 MC_ALIAS="local"
 ENDPOINT="${MINIO_ENDPOINT:-http://minio:9000}"
 # Use environment variables with defaults for development only
-ACCESS="${MINIO_ROOT_USER:-minioadmin}"
-SECRET="${MINIO_ROOT_PASSWORD:-minioadmin}"
+ACCESS="${MINIO_ROOT_USER:?MINIO_ROOT_USER must be set}"
+SECRET="${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD must be set}"
 
 mc alias set $MC_ALIAS $ENDPOINT $ACCESS $SECRET
 

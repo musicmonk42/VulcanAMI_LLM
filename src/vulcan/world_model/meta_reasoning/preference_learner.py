@@ -1413,13 +1413,15 @@ class PreferenceLearner:
                 }
 
             # Calculate KL divergence
+            safe_new_dist = new_dist if new_dist else {}
+            safe_old_dist = old_dist if old_dist else {}
             kl_score = self._kl_divergence(
-                new_dist if new_dist else {}, old_dist if old_dist else {}
+                safe_new_dist, safe_old_dist
             )  # P=new, Q=old
 
             # Identify changed preferences
             changed = self._identify_changed_preferences(
-                old_dist if old_dist else {}, new_dist if new_dist else {}
+                safe_old_dist, safe_new_dist
             )
 
             detected = kl_score > drift_threshold

@@ -551,7 +551,10 @@ class UnifiedGeneration:
             # Use existing probs
             pvec = [float(p) if isinstance(p, (int, float)) else 0.0 for p in probs_raw]
             total = sum(pvec)
-            probs = [p / total for p in pvec] if total > 0 else self._uniform(len(pvec))
+            if total > 0:
+                probs = [p / total for p in pvec]
+            else:
+                probs = self._uniform(len(pvec))
         else:
             # Uniform
             probs = self._uniform(len(props))
