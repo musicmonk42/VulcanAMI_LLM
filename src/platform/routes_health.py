@@ -40,7 +40,10 @@ async def status_page(request: Request):
     Status page with flash messaging, live service health, and API explorer.
     """
     # Late imports to avoid circular dependencies at module load time
-    from src.full_platform import flash_manager, service_manager, settings
+    from src.platform.globals import get_flash_manager, get_service_manager, get_settings
+    settings = get_settings()
+    service_manager = get_service_manager()
+    flash_manager = get_flash_manager()
 
     base_url = f"http://{request.url.hostname}:{request.url.port or settings.port}"
 
@@ -248,17 +251,14 @@ async def health_ready():
         200 OK with {"status": "ready"} if ready to serve requests
         503 Service Unavailable if not ready
     """
-    from src.full_platform import (
-        _services_init_complete,
-        _services_init_failed,
-        app,
-        service_manager,
-    )
+    from src.platform.globals import get_app, get_service_manager, is_services_init_complete, is_services_init_failed
+    app = get_app()
+    service_manager = get_service_manager()
 
     try:
         # Check if services initialization is complete and successful
-        services_init_complete = _services_init_complete
-        services_init_failed = _services_init_failed
+        services_init_complete = is_services_init_complete()
+        services_init_failed = is_services_init_failed()
 
         # Check if service manager is initialized and has services mounted
         service_status = await service_manager.get_service_status()
@@ -316,7 +316,9 @@ async def health_ready():
 @router.get("/health", response_model=None)
 async def health_check(request: Request):
     """Comprehensive health check for all services."""
-    from src.full_platform import service_manager, settings
+    from src.platform.globals import get_service_manager, get_settings
+    settings = get_settings()
+    service_manager = get_service_manager()
 
     base_url = f"http://{request.url.hostname}:{request.url.port or settings.port}"
 

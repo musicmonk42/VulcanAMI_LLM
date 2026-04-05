@@ -29,10 +29,12 @@ from .portfolio_executor import (
 )
 from .safety_governor import SafetyGovernor, SafetyLevel, ToolContract, VetoReason
 from .selection_cache import SelectionCache
-from .tool_selector import (
+from .selection_types import (
     SelectionMode,
     SelectionRequest,
     SelectionResult,
+)
+from .tool_selector import (
     ToolSelector,
     create_tool_selector,
 )

@@ -57,7 +57,7 @@ class TestAuthFailClosed:
             "API_KEY": "",
         }
         with patch.dict(os.environ, env, clear=False):
-            from src.full_platform import UnifiedPlatformSettings
+            from src.platform.settings import UnifiedPlatformSettings
             with pytest.raises(ValueError, match="No authentication configured"):
                 UnifiedPlatformSettings()
 
@@ -69,17 +69,17 @@ class TestAuthFailClosed:
             "API_KEY": "",
         }
         with patch.dict(os.environ, env, clear=False):
-            from src.full_platform import UnifiedPlatformSettings
+            from src.platform.settings import UnifiedPlatformSettings
             settings = UnifiedPlatformSettings()
             assert settings.auth_method.value == "none"
 
     def test_configured_key_rejects_empty(self):
         """API key auth must reject empty configured key (PV-1 fix)."""
-        from src.full_platform import AuthenticationError
+        from src.platform.auth import AuthenticationError
         # Verify that the configured_key path doesn't fall back to ""
         # by checking the source doesn't contain 'or ""' pattern
         import inspect
-        from src.full_platform import verify_authentication
+        from src.platform.auth import verify_authentication
         source = inspect.getsource(verify_authentication)
         assert 'or ""' not in source, (
             "verify_authentication must not fall back to empty string for configured_key"

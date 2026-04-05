@@ -141,4 +141,104 @@ When decomposing a God file, inventory ALL content -- not just the extractable c
 Plan revision required. VETO issued on Revision 2.
 
 ---
+
+## Failure Entry #8
+
+**Date**: 2026-04-05T00:00:00Z
+**Verdict ID**: GATE-TRIBUNAL-REWIRING-2026-04-05
+**Failure Mode**: SECURITY_STUB
+
+### What Failed
+Import rewiring plan proposes `settings = get_settings()` at module level in the thinned `full_platform.py` shell and in every route module. This triggers `UnifiedPlatformSettings.__init__()` at import time, which raises `ValueError` when no auth credentials are configured and `VULCAN_ENV` is not in the dev allowlist.
+
+### Why It Failed
+The original code used lazy function-scoped imports (`from src.full_platform import settings` inside route handler bodies) to defer Settings construction until request time. The plan converts these to eager module-level calls without accounting for the fail-closed auth validation in the constructor. The security behavior is correct (fail-closed), but the trigger point moves from request-time to import-time, breaking all test imports.
+
+### Pattern to Avoid
+When refactoring lazy imports to eager module-level imports, always check whether the imported object's constructor has side effects (network calls, validation, env checks). If it does, keep the lazy pattern or separate construction from validation. Specifically: Pydantic Settings classes that perform auth validation in `__init__` must not be instantiated at module level.
+
+### Remediation Attempted
+Plan revision required. VETO issued.
+
+---
+
+## Failure Entry #9
+
+**Date**: 2026-04-05T00:00:00Z
+**Verdict ID**: GATE-TRIBUNAL-REWIRING-2026-04-05
+**Failure Mode**: GHOST_PATH
+
+### What Failed
+Import rewiring plan claims to break circular imports between `full_platform.py` and `src/platform/routes_*.py`, but only provides a concrete rewiring pattern for `settings`. Route modules also lazy-import `app`, `service_manager`, and `flash_manager` from `src.full_platform` (12 occurrences across 5 route files). No accessor pattern is specified for these three globals.
+
+### Why It Failed
+The plan focused on the most obvious singleton (`settings`) and used "Same pattern" / "etc." for the remaining globals without working through the concrete import paths. `app`, `service_manager`, and `flash_manager` are runtime-constructed objects in `full_platform.py` that have no equivalent `get_*()` accessor in `src/platform/`. Without one, route modules must still import from `full_platform`, leaving the circular dependency intact.
+
+### Pattern to Avoid
+When claiming to break circular imports, enumerate ALL symbols that flow across the circular boundary and provide a concrete resolution for each one. Do not use "same pattern" when the pattern does not apply (there is no `get_service_manager()` function).
+
+### Remediation Attempted
+Plan revision required. VETO issued.
+
+---
+
+## Failure Entry #10
+
+**Date**: 2026-04-05T00:00:00Z
+**Verdict ID**: GATE-TRIBUNAL-REWIRING-2026-04-05
+**Failure Mode**: COMPLEXITY_VIOLATION
+
+### What Failed
+Plan proposes adding re-exports to `src/vulcan/orchestrator/__init__.py` and `src/vulcan/reasoning/selection/__init__.py` that conflict with existing re-exports. For example, `AgentPoolProxy` and `is_main_process` are already imported from `.agent_pool` in the existing `__init__.py`, but the plan proposes importing them from `.agent_pool_proxy`. Similarly, `SelectionMode` is already imported from `.tool_selector` but the plan proposes it from `.selection_types`.
+
+### Why It Failed
+The plan did not audit the existing `__init__.py` files before proposing additions. The Phase 2 re-export instructions were drafted against the architecture plan's expected state rather than the actual codebase state after implementation.
+
+### Pattern to Avoid
+Before proposing `__init__.py` modifications, always read the current file contents. Verify that proposed imports do not shadow or conflict with existing imports. When extracted modules re-export symbols that the God file also exports, specify explicitly whether the new import replaces or supplements the old one.
+
+### Remediation Attempted
+Plan revision required. VETO issued.
+
+---
+
+## Failure Entry #11
+
+**Date**: 2026-04-05T00:00:00Z
+**Verdict ID**: GATE-TRIBUNAL-REWIRING-R2-2026-04-05
+**Failure Mode**: SECURITY_STUB
+
+### What Failed
+Import rewiring plan Revision 2 proposes a `__getattr__` handler in the `full_platform.py` shell that calls `create_app()` on every attribute access of `full_platform.app`, with no singleton caching.
+
+### Why It Failed
+Python's `__getattr__` at module level is called every time an attribute is not found in the module's namespace. Unlike `get_settings()` in `globals.py` which uses a double-checked lock pattern, the `__getattr__` handler returns `create_app()` directly without caching the result as a module attribute. Each `from src.full_platform import app` in a different route handler triggers a fresh `create_app()`, constructing duplicate `FastAPI` instances, `UnifiedPlatformSettings` instances, and `AsyncServiceManager` instances. The `init_app()` call inside `create_app()` overwrites globals on each invocation, creating a race condition.
+
+### Pattern to Avoid
+When using module-level `__getattr__` for lazy initialization, always cache the result by assigning it to the module namespace (e.g., `globals()["app"] = _app`) so that subsequent accesses find the attribute directly and `__getattr__` is not invoked again. Module-level `__getattr__` is a fallback mechanism, not a factory -- treat it like a `@property` with caching.
+
+### Remediation Attempted
+Plan revision required. VETO issued.
+
+---
+
+## Failure Entry #12
+
+**Date**: 2026-04-05T00:00:00Z
+**Verdict ID**: GATE-TRIBUNAL-REWIRING-R2-2026-04-05
+**Failure Mode**: GHOST_PATH
+
+### What Failed
+Import rewiring plan Revision 2 claims to rewire all `routes_health.py` imports from `full_platform` to `globals`, but `routes_health.py:251-256` imports `_services_init_complete` and `_services_init_failed` -- mutable boolean flags with no corresponding accessor in `globals.py`.
+
+### Why It Failed
+The plan inventoried the 4 main singletons (`app`, `settings`, `service_manager`, `flash_manager`) but missed the 2 mutable state flags used by the `/health/ready` endpoint. These flags are set by background initialization tasks and read by the readiness check. They are not singletons with constructors -- they are runtime booleans that change state during the application lifecycle.
+
+### Pattern to Avoid
+When rewiring imports away from a God file, grep for ALL symbols imported from that file across the entire codebase -- not just the obvious singletons. Module-level boolean flags, constants, and utility functions are easy to overlook but equally critical. Use `grep -r "from src.full_platform import" src/` and enumerate every unique symbol.
+
+### Remediation Attempted
+Plan revision required. VETO issued.
+
+---
 _Shadow Genome tracks failure patterns to prevent repetition._

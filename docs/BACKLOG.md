@@ -14,8 +14,9 @@
 - [ ] [B2] Map existing test coverage gaps against critical safety paths
 - [ ] [B3] Validate governance consensus thresholds against production requirements
 - [ ] [B4] Remove logging.basicConfig() from 77 files (centralized logging created, mechanical removal pending)
-- [ ] [B5] Rewire full_platform.py imports to use src/platform/ modules
+- [x] [B5] Rewire full_platform.py imports to use src/platform/ modules — Route modules use globals.py, God file callers redirected
 - [ ] [B6] Further decompose services.py (565 lines) to ≤250 lines
+- [ ] [B7] Remove duplicate class bodies from God files (deferred from import rewiring)
 
 ## Wishlist (Nice to Have)
 - [ ] [W1] Automated QoreLogic chain validation in CI pipeline

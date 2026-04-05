@@ -340,7 +340,7 @@ def _notify_system_observer(actor: Optional[str], event: str, meta: Optional[Dic
         # This is the proper way to add registry events to the world model's awareness
         if hasattr(observer, 'world_model') and observer.world_model:
             try:
-                from vulcan.world_model.world_model_core import Observation
+                from vulcan.world_model.observation_types import Observation
                 
                 obs = Observation(
                     timestamp=time.time(),

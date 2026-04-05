@@ -17,8 +17,8 @@ from pathlib import Path
 
 from fastapi import FastAPI
 
-from platform.background import release_background_task_lock
-from platform.startup import _get_startup_elapsed, setup_unified_logging
+from src.platform.background import release_background_task_lock
+from src.platform.startup import _get_startup_elapsed, setup_unified_logging
 
 logger = logging.getLogger("unified_platform")
 
@@ -36,8 +36,8 @@ async def lifespan(app: FastAPI):
     AFTER the yield. This ensures /health/live responds immediately.
     """
     # Import from full_platform to access shared state
-    import full_platform
-    from full_platform import _background_services_initialization
+    import src.full_platform as full_platform
+    from src.full_platform import _background_services_initialization
 
     worker_id = os.getpid()
 

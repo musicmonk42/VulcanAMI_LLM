@@ -37,7 +37,8 @@ def _verify_admin_access(
         True if authenticated, False otherwise
     """
     from src.platform.auth import JWT_AVAILABLE, _safe_compare
-    from src.full_platform import settings
+    from src.platform.globals import get_settings
+    settings = get_settings()
 
     # Check API key authentication
     configured_key = settings.api_key
@@ -78,7 +79,8 @@ async def admin_list_services(
     Returns:
         List of all services with their status, mount paths, and health info.
     """
-    from src.full_platform import service_manager
+    from src.platform.globals import get_service_manager
+    service_manager = get_service_manager()
 
     # Verify authentication
     api_key = request.headers.get("X-API-Key")
@@ -113,7 +115,8 @@ async def admin_get_service(
     Returns:
         Detailed service information including status, paths, and timestamps.
     """
-    from src.full_platform import service_manager
+    from src.platform.globals import get_service_manager
+    service_manager = get_service_manager()
 
     # Verify authentication
     api_key = request.headers.get("X-API-Key")
@@ -155,7 +158,9 @@ async def admin_stop_service(
     Returns:
         Result of the stop operation with status details.
     """
-    from src.full_platform import app, service_manager
+    from src.platform.globals import get_app, get_service_manager
+    app = get_app()
+    service_manager = get_service_manager()
 
     # Verify authentication
     api_key = request.headers.get("X-API-Key")
@@ -196,7 +201,9 @@ async def admin_start_service(
     Returns:
         Result of the start operation with status details.
     """
-    from src.full_platform import app, service_manager
+    from src.platform.globals import get_app, get_service_manager
+    app = get_app()
+    service_manager = get_service_manager()
 
     # Verify authentication
     api_key = request.headers.get("X-API-Key")

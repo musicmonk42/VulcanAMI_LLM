@@ -2690,7 +2690,7 @@ class MotivationalIntrospection(SerializationMixin):
                 # Create prediction context
                 # Need to import ModelContext
                 try:
-                    from vulcan.world_model.world_model_core import ModelContext
+                    from vulcan.world_model.observation_types import ModelContext
                 except ImportError:
                     # Fallback context dict if ModelContext dataclass not found
                     ModelContext = dict

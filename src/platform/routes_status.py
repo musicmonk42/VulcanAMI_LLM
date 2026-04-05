@@ -48,7 +48,7 @@ async def _proxy_vulcan_status_endpoint(
     Returns:
         Response from the VULCAN handler or error response
     """
-    from src.full_platform import _check_vulcan_deployment, _get_vulcan_module
+    from src.platform.utils import _check_vulcan_deployment, _get_vulcan_module
 
     if fallback_response is None:
         fallback_response = {"status": "unavailable"}

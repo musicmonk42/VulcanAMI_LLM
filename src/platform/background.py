@@ -132,10 +132,10 @@ async def _background_model_loading(app_state: Any, components_status: dict, log
     CRITICAL FIX: This prevents Railway healthcheck failures by ensuring the server
     accepts connections before heavy model loading completes.
     """
-    from platform.startup import _configure_ml_threading
+    from src.platform.startup import _configure_ml_threading
 
     # Import the global flag from full_platform
-    import full_platform
+    import src.full_platform as full_platform
 
     try:
         logger.info("=" * 70)

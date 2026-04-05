@@ -3068,6 +3068,10 @@ app = FastAPI(
 
 print(f"[STARTUP] FastAPI app created in {_get_startup_elapsed():.2f}s")
 
+# Register globals for route module access via src.platform.globals
+from src.platform.globals import init_app as _init_globals
+_init_globals(app, settings, service_manager)
+
 # Request size limiting middleware (header-based)
 @app.middleware("http")
 async def request_size_limit_middleware(request: Request, call_next):

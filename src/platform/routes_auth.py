@@ -30,7 +30,8 @@ async def get_token(request: Request, sub: Optional[str] = None):
         JWTAuth,
         _safe_compare,
     )
-    from src.full_platform import settings
+    from src.platform.globals import get_settings
+    settings = get_settings()
 
     if not JWT_AVAILABLE:
         raise HTTPException(status_code=501, detail="JWT not available")

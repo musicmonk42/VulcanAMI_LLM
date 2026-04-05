@@ -10,7 +10,7 @@
 import argparse
 import logging
 
-from platform.startup import setup_unified_logging
+from src.platform.startup import setup_unified_logging
 
 logger = logging.getLogger("unified_platform")
 

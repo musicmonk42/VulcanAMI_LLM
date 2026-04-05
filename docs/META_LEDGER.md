@@ -151,6 +151,84 @@ SHA256(session_hash + previous_hash) = 7ff105eb9fea4536238107afbe4af6ca86f5198bd
 **Artifacts**: CONCEPT.md, ARCHITECTURE_PLAN.md, META_LEDGER.md, BACKLOG.md, SHADOW_GENOME.md, SYSTEM_STATE.md, AUDIT_REPORT.md, plan-full-remediation.md, 48 new modules, 8 test files, 14 modified files, 4 deleted files.
 
 ---
+
+### Entry #8: GATE TRIBUNAL (Import Rewiring Plan)
+
+**Timestamp**: 2026-04-05T00:00:00Z
+**Phase**: GATE
+**Author**: Judge
+**Risk Grade**: L3
+**Verdict**: VETO
+
+**Content Hash**:
+SHA256(AUDIT_REPORT.md) = 6178f27c4bb9da62c0874d77b7066b9c7e71322a231a7845a697047c3e34bae0
+
+**Previous Hash**: 7ff105eb9fea4536238107afbe4af6ca86f5198bd9581929133999d3189a160a
+
+**Chain Hash**:
+SHA256(content_hash + previous_hash) = eb7d716dfc3b4599e5e6b99c82bc5eacf8104d9fde8082af4f67b9c8381203a1
+
+**Decision**: VETO -- Import rewiring plan contains 5 violations (IRV-1 through IRV-5). Critical: module-level `get_settings()` triggers fail-closed auth ValueError at import time, breaking all test imports (IRV-1). Missing FastAPI import in shell (IRV-2). Conflicting __init__.py re-exports shadow existing imports (IRV-3). Incomplete rewiring for app/service_manager/flash_manager leaves circular imports unresolved (IRV-4). No deduplication timeline for God file dead code (IRV-5). Implementation blocked pending plan revision.
+
+---
+
+### Entry #9: GATE TRIBUNAL (Import Rewiring Plan, Revision 2)
+
+**Timestamp**: 2026-04-05T00:00:00Z
+**Phase**: GATE
+**Author**: Judge
+**Risk Grade**: L3
+**Verdict**: VETO
+
+**Content Hash**:
+SHA256(AUDIT_REPORT.md) = 2e6500e053e18672639ea8aa03e483b43fb347ba75be350c5487a5bd19e7ff82
+
+**Previous Hash**: eb7d716dfc3b4599e5e6b99c82bc5eacf8104d9fde8082af4f67b9c8381203a1
+
+**Chain Hash**:
+SHA256(content_hash + previous_hash) = fedb29c653d3659df22fb1770af3f7073ee8e4f04040db06bfc6b89959a7dc6d
+
+**Decision**: VETO -- Import rewiring plan Revision 2 resolves all 5 prior violations (IRV-1 through IRV-5). Lazy accessor pattern in globals.py correctly defers construction. FastAPI import present. __init__.py changes are clean in-place swaps. All 4 globals covered. Dedup timeline documented. However, 2 new violations found: IRV-6 (Critical) -- __getattr__ calls create_app() on every attribute access with no singleton caching, creating duplicate app instances and race conditions on globals; IRV-7 (Medium) -- _services_init_complete and _services_init_failed flags have no migration path, breaking /health/ready endpoint. Implementation blocked pending Revision 3.
+
+---
+
+### Entry #10: GATE TRIBUNAL (Import Rewiring Plan, Revision 3)
+
+**Timestamp**: 2026-04-05T00:00:00Z
+**Phase**: GATE
+**Author**: Judge
+**Risk Grade**: L3
+**Verdict**: PASS
+
+**Content Hash**:
+SHA256(AUDIT_REPORT.md) = 4547feb82fcb988dfff67aea3cded44da2704d4347e697ba3fad08392fa1740b
+
+**Previous Hash**: fedb29c653d3659df22fb1770af3f7073ee8e4f04040db06bfc6b89959a7dc6d
+
+**Chain Hash**:
+SHA256(content_hash + previous_hash) = f12209c43ef9cadb66e04070f6402f6155272779522b6ab673f591e67ac69bd7
+
+**Decision**: PASS -- Import rewiring plan Revision 3 resolves all 7 prior violations (IRV-1 through IRV-7). IRV-6 fixed: __getattr__ now caches via globals()["app"] = _app after first create_app() call; Python PEP 562 semantics guarantee __getattr__ becomes a no-op once the attribute exists in module __dict__. IRV-7 fixed: globals.py now includes _services_init_complete and _services_init_failed boolean flags with getter/setter functions, covering the /health/ready endpoint's needs. All 6 audit passes clear: no security stubs, no ghost paths, Section 4 Razor compliant (globals.py ~88 lines, shell ~200 lines), no hallucinated dependencies, no orphan modules, acyclic dependency graph. Implementation approved.
+
+---
+
+### Entry #11: IMPLEMENTATION (Import Rewiring)
+
+**Timestamp**: 2026-04-05T00:00:00Z
+**Phase**: BUILD
+**Author**: Specialist
+**Risk Grade**: L3
+
+**Content Hash**:
+SHA256(implementation_files) = f16c79f07a46c2f84f923da4c3d83780248668ef905ece75426b02cc9334aa30
+
+**Previous Hash**: f12209c43ef9cadb66e04070f6402f6155272779522b6ab673f591e67ac69bd7
+
+**Chain Hash**:
+SHA256(content_hash + previous_hash) = ae1daee5f81d3489603beb5167a0f29b583a6180f0f7a66ca6295d6610279928
+
+**Decision**: Import rewiring implemented. Created src/platform/globals.py with lazy accessors. Rewired 7 route modules to use globals.py. Redirected 13 callers of extracted God file classes. Fixer diagnostic caught 4 issues (init_app never called, split-brain settings, 2 stdlib collisions) — all fixed. B5 marked complete.
+
+---
 *Chain integrity: VALID*
-*Session: SEALED*
-*Merkle chain: 7 entries, genesis → bootstrap → 3 VETOs → PASS → build → seal*
+*Merkle chain: 11 entries*

@@ -14,7 +14,7 @@ import logging
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
-from platform.utils import _check_vulcan_deployment, _get_vulcan_module
+from src.platform.utils import _check_vulcan_deployment, _get_vulcan_module
 
 logger = logging.getLogger("unified_platform")
 

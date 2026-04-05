@@ -21,7 +21,9 @@ async def component_health():
     This endpoint provides comprehensive visibility into all services,
     subsystems, and specialized components.
     """
-    from src.full_platform import app, service_manager
+    from src.platform.globals import get_app, get_service_manager
+    app = get_app()
+    service_manager = get_service_manager()
 
     # Get service status
     service_status = await service_manager.get_service_status()
@@ -115,7 +117,9 @@ async def component_health():
 @router.get("/api/status", response_model=None)
 async def api_status():
     """JSON API for service status."""
-    from src.full_platform import service_manager, settings
+    from src.platform.globals import get_service_manager, get_settings
+    settings = get_settings()
+    service_manager = get_service_manager()
 
     return {
         "platform": {
