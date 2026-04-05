@@ -270,5 +270,45 @@ SHA256(content_hash + previous_hash) = 471bed7b658b800b7f8fa9e6a3a6a163c4f545094
 **Decision**: PASS -- Revised cleanup and deduplication plan resolves both prior findings. CDV-1 fixed: services.py 3-way split produces service_imports.py (~228 lines), service_lifecycle.py (~195 lines), services.py (~194 lines) -- all under 250-line Section 4 Razor limit. ML-2 fixed: 6 standalone scripts explicitly listed with logging_config.configure() replacement, no logging output lost. All 6 audit passes clear. Implementation approved.
 
 ---
+
+### Entry #14: GATE TRIBUNAL (Deep Decomposition Plan)
+
+**Timestamp**: 2026-04-05T00:00:00Z
+**Phase**: GATE
+**Author**: Judge
+**Risk Grade**: L3
+**Verdict**: VETO
+
+**Content Hash**:
+SHA256(plan-deep-decomposition.md) = 1a6a7f190c098ea0bc91588bbb107862a3e55f49927d93dc3ed5359335d0ccf8
+
+**Previous Hash**: 471bed7b658b800b7f8fa9e6a3a6a163c4f54509496dd0f0d65e4b16728627d3
+
+**Chain Hash**:
+SHA256(content_hash + previous_hash) = 9a3a174b946742b7f22fddcab45b4887a380dab6e5a3950532ff71f770d54fbe
+
+**Decision**: VETO -- Deep decomposition plan contains 5 blocking violations (DDV-1 through DDV-5). Line estimates systematically understated by 25-55% for the five largest targets. ToolSelector class (2,779 lines) mapped to only 1,250 lines of modules (45%). _execute_agent_task (1,587 lines) mapped to 900 lines (57%). STATE group (1,060 lines) mapped to 500 lines (47%). UnifiedReasoner (5,967 lines) mapped to 4,469 lines (75%). WorldModel slim orchestrator physically requires ~454 lines for 143 delegation stubs but claims 250. Same failure mode as Entry #3. Implementation blocked pending complete line accounting for all phases.
+
+---
+
+### Entry #15: GATE TRIBUNAL (Deep Decomposition Plan, Revision 2)
+
+**Timestamp**: 2026-04-05T00:00:00Z
+**Phase**: GATE
+**Author**: Judge
+**Risk Grade**: L3
+**Verdict**: PASS (Conditional)
+
+**Content Hash**:
+SHA256(plan-deep-decomposition.md) = f7a84513bee046b17ea20c563df7bb3fa245dde9d524e36290f668f651d79dd7
+
+**Previous Hash**: 9a3a174b946742b7f22fddcab45b4887a380dab6e5a3950532ff71f770d54fbe
+
+**Chain Hash**:
+SHA256(content_hash + previous_hash) = a16974e02362f95f7f48b415a47423c2c51d01d69eb245d6b40b5a5fa8bca704
+
+**Decision**: PASS (Conditional) -- Revision 2 resolves all 5 prior violations (DDV-1 through DDV-5) through fundamental architecture change: delete God classes entirely, replace with context dataclasses + standalone function modules. No delegation stubs needed (DDV-5 eliminated). Line accounting verified across all 7 phases: ToolSelector 91% coverage (DDV-1), _execute_agent_task 101% (DDV-2), STATE over-allocated at 735 for 297 actual lines (DDV-3, harmless), UnifiedReasoner 105% (DDV-4). All proposed modules at or below 250-line Section 4 Razor limit. Three non-blocking observations: OBS-1 inflated STATE source figure, OBS-2 pre-existing _check_improvement_approval TODO stub (backlog item), OBS-3 caller migration required for vulcan_integration.py. Implementation approved conditional on: (1) all WorldModel() constructor callers migrated to factory, (2) STATE module sizes right-sized, (3) approval stub TODO added to backlog.
+
+---
 *Chain integrity: VALID*
-*Merkle chain: 13 entries*
+*Merkle chain: 15 entries*

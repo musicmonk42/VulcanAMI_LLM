@@ -1398,1102 +1398,147 @@ class WorldModel:
     # Central coordinator for ALL user requests
     # ============================================================
     
+    # =========================================================================
+    # REQUEST HANDLING - Delegated to request_handling module
+    # =========================================================================
+
     def process_request(self, query: str, **kwargs) -> Dict[str, Any]:
-        """
-        Main entry point - World Model coordinates ALL requests.
-        
-        Industry Standard: Central orchestration with clear request routing,
-        comprehensive error handling, and transparent result reporting.
-        
-        This method implements the core orchestration architecture:
-        1. Classify request type (reasoning, knowledge, creative, ethical, conversational)
-        2. Route to appropriate handler
-        3. Retrieve/verify knowledge if needed
-        4. Build LLM guidance for formatting
-        5. Return structured response with metadata
-        
-        Args:
-            query: User's natural language query
-            **kwargs: Additional context (conversation history, preferences, etc.)
-        
-        Returns:
-            Dictionary with:
-                - response: Final natural language response
-                - confidence: Overall confidence (0.0-1.0)
-                - source: Processing source (reasoning_engine, knowledge_retrieval, etc.)
-                - metadata: Classification, retrieval, verification details
-        """
-        try:
-            # Step 1: Classify the request
-            classification = self.request_classifier.classify(query, context=kwargs.get('context'))
-            
-            logger.info(
-                f"[WorldModel.process_request] Request classified: "
-                f"type={classification.request_type.value}, domain={classification.domain}, "
-                f"confidence={classification.confidence:.2f}"
-            )
-            
-            # Step 2: Route to appropriate handler based on request type
-            from vulcan.vulcan_types import RequestType
-            
-            if classification.request_type == RequestType.REASONING:
-                return self._handle_reasoning_request(query, classification, **kwargs)
-            
-            elif classification.request_type == RequestType.KNOWLEDGE_SYNTHESIS:
-                return self._handle_knowledge_request(query, classification, **kwargs)
-            
-            elif classification.request_type == RequestType.CREATIVE:
-                return self._handle_creative_request(query, classification, **kwargs)
-            
-            elif classification.request_type == RequestType.ETHICAL:
-                return self._handle_ethical_request(query, classification, **kwargs)
-            
-            else:  # CONVERSATIONAL
-                return self._handle_conversational_request(query, classification, **kwargs)
-                
-        except Exception as e:
-            logger.error(f"[WorldModel.process_request] Error processing request: {e}", exc_info=True)
-            return {
-                'response': f"I encountered an error processing your request: {str(e)}",
-                'confidence': 0.0,
-                'source': 'error',
-                'metadata': {'error': str(e), 'error_type': type(e).__name__},
-            }
-    
-    def _handle_reasoning_request(
-        self,
-        query: str,
-        classification,
-        **kwargs
-    ) -> Dict[str, Any]:
-        """
-        Handle requests that require reasoning.
-        
-        Routes to appropriate reasoning engine, then formats result using LLM guidance.
-        
-        Industry Standard: Separation of reasoning (VULCAN engines) from formatting (LLM).
-        """
-        try:
-            # Get reasoning engine based on classification
-            engine = classification.reasoning_engine
-            
-            logger.info(f"[WorldModel] Routing to reasoning engine: {engine}")
-            
-            # Invoke reasoning engine - this is where actual computation happens
-            reasoning_result = self._invoke_reasoning_engine(query, engine)
-            
-            # Build LLM guidance for formatting the result
-            guidance = self.llm_guidance_builder.build_for_reasoning(
-                reasoning_result, query
-            )
-            
-            # Format with LLM (converts structured output to natural language)
-            formatted_response = self._format_with_llm(guidance)
-            
-            return {
-                'response': formatted_response,
-                'confidence': reasoning_result.get('confidence', 0.0),
-                'source': 'reasoning_engine',
-                'engine': engine,
-                'reasoning_result': reasoning_result,  # Include raw result for debugging
-                'metadata': {
-                    'classification': classification.to_dict(),
-                    'reasoning_type': engine,
-                },
-            }
-        except Exception as e:
-            logger.error(f"[WorldModel] Reasoning request failed: {e}", exc_info=True)
-            return {
-                'response': f"Reasoning failed: {str(e)}",
-                'confidence': 0.0,
-                'source': 'error',
-                'metadata': {'error': str(e)},
-            }
-    
-    def _handle_knowledge_request(
-        self,
-        query: str,
-        classification,
-        **kwargs
-    ) -> Dict[str, Any]:
-        """
-        Handle requests that require knowledge retrieval and synthesis.
-        
-        Industry Standard: Knowledge retrieval → Verification → Structuring → Formatting.
-        """
-        try:
-            # Retrieve knowledge
-            knowledge = self.knowledge_handler.retrieve_knowledge(
-                domain=classification.domain,
-                topic=classification.subdomain or classification.domain,
-                query=query,
-            )
-            
-            # Verify knowledge
-            verified = self.knowledge_handler.verify_knowledge(knowledge)
-            
-            logger.info(
-                f"[WorldModel] Knowledge retrieved: {len(verified.verified_facts)} facts, "
-                f"confidence={verified.confidence:.2f}"
-            )
-            
-            # Determine format (paper, explanation, summary)
-            format_type = self._determine_synthesis_format(query)
-            
-            # Build LLM guidance
-            guidance = self.llm_guidance_builder.build_for_knowledge_synthesis(
-                verified, classification.subdomain or classification.domain, format_type
-            )
-            
-            # Format with LLM
-            formatted_response = self._format_with_llm(guidance)
-            
-            return {
-                'response': formatted_response,
-                'confidence': verified.confidence,
-                'source': 'knowledge_retrieval',
-                'verified_facts': len(verified.verified_facts),
-                'sources': knowledge.sources,
-                'metadata': {
-                    'classification': classification.to_dict(),
-                    'retrieval': knowledge.metadata,
-                    'verification': verified.metadata,
-                },
-            }
-        except Exception as e:
-            logger.error(f"[WorldModel] Knowledge request failed: {e}", exc_info=True)
-            return {
-                'response': f"Knowledge retrieval failed: {str(e)}",
-                'confidence': 0.0,
-                'source': 'error',
-                'metadata': {'error': str(e)},
-            }
-    
-    def _handle_creative_request(
-        self,
-        query: str,
-        classification,
-        **kwargs
-    ) -> Dict[str, Any]:
-        """
-        Handle creative requests with knowledge grounding.
-        
-        Industry Standard: Knowledge retrieval → Constraint building → 
-        Creative generation → Verification.
-        """
-        try:
-            # Prepare creative guidance
-            creative_guidance = self.creative_handler.prepare_creative_guidance(
-                format_type=classification.creative_format,
-                subject=classification.subdomain,
-                domain=classification.domain,
-                query=query,
-            )
-            
-            logger.info(
-                f"[WorldModel] Creative guidance prepared: format={creative_guidance.format}, "
-                f"subject={creative_guidance.subject_knowledge.topic}"
-            )
-            
-            # Build LLM guidance
-            guidance = self.llm_guidance_builder.build_for_creative(
-                creative_guidance, query
-            )
-            
-            # Generate with LLM
-            creative_output = self._format_with_llm(guidance)
-            
-            # Verify the output - pass full guidance, not just constraints
-            verification = self.creative_handler.verify_creative_output(
-                creative_output, creative_guidance
-            )
-            
-            if not verification['passed']:
-                logger.warning(
-                    f"[WorldModel] Creative output failed verification: "
-                    f"{verification['violations']}"
-                )
-            
-            return {
-                'response': creative_output,
-                'confidence': 0.85 if verification['passed'] else 0.60,
-                'source': 'creative_handler',
-                'format': classification.creative_format,
-                'grounded_in': creative_guidance.subject_knowledge.facts[:3],
-                'verification': verification,
-                'metadata': {
-                    'classification': classification.to_dict(),
-                    'knowledge': creative_guidance.subject_knowledge.metadata,
-                },
-            }
-        except Exception as e:
-            logger.error(f"[WorldModel] Creative request failed: {e}", exc_info=True)
-            return {
-                'response': f"Creative generation failed: {str(e)}",
-                'confidence': 0.0,
-                'source': 'error',
-                'metadata': {'error': str(e)},
-            }
-    
-    def _handle_ethical_request(
-        self,
-        query: str,
-        classification,
-        **kwargs
-    ) -> Dict[str, Any]:
-        """
-        Handle ethical/philosophical requests using meta-reasoning.
-        
-        Industry Standard: Meta-reasoning analysis → Structuring → Formatting.
-        """
-        try:
-            # Use meta-reasoning components
-            ethical_analysis = self._run_ethical_analysis(query)
-            
-            # Build LLM guidance
-            guidance = self.llm_guidance_builder.build_for_ethical(
-                ethical_analysis, query
-            )
-            
-            # Format with LLM
-            formatted_response = self._format_with_llm(guidance)
-            
-            return {
-                'response': formatted_response,
-                'confidence': ethical_analysis.get('confidence', 0.70),
-                'source': 'meta_reasoning',
-                'analysis': ethical_analysis,
-                'metadata': {
-                    'classification': classification.to_dict() if hasattr(classification, 'to_dict') else {},
-                },
-            }
-        except Exception as e:
-            logger.error(f"[WorldModel] Ethical request failed: {e}", exc_info=True)
-            return {
-                'response': f"Ethical analysis failed: {str(e)}",
-                'confidence': 0.0,
-                'source': 'error',
-                'metadata': {'error': str(e)},
-            }
-    
-    def _handle_self_referential_request(
-        self,
-        query: str,
-        context: Optional[Dict[str, Any]] = None,
-        **kwargs
-    ) -> Dict[str, Any]:
-        """
-        Handle self-referential queries - "What are you?", "What is your purpose?"
-        
-        **Industry Standard: Meta-Reasoning for Self-Awareness**
-        Uses motivational_introspection to understand and explain VULCAN's self.
-        This is where VULCAN's identity, purpose, and self-model live.
-        
-        Examples:
-            - "What are you?"
-            - "Who made you?"
-            - "What is your purpose?"
-            - "What do you believe?"
-        
-        Args:
-            query: The self-referential query
-            context: Optional context dictionary
-            **kwargs: Additional parameters
-            
-        Returns:
-            Dict with response, confidence, source, and metadata
-        """
-        logger.info(f"[WorldModel] Handling self-referential request")
-        
-        try:
-            introspection = None
-            motivation = None
-            
-            # Use motivational_introspection if available
-            if hasattr(self, 'motivational_introspection') and self.motivational_introspection:
-                try:
-                    introspection = self.motivational_introspection.introspect_current_objective()
-                    motivation = self.motivational_introspection.explain_motivation_structure()
-                except Exception as e:
-                    logger.warning(f"[WorldModel] Motivational introspection failed: {e}")
-            
-            # Synthesize response from introspection
-            response = self._synthesize_self_response(query, introspection, motivation, context)
-            
-            return {
-                'response': response.get('response', 'I am VULCAN, an AI reasoning system.'),
-                'confidence': response.get('confidence', 0.75),
-                'source': 'meta_reasoning',
-                'category': 'self_referential',
-                'metadata': {
-                    'introspection': introspection if introspection else {},
-                    'motivation': motivation if motivation else {},
-                },
-            }
-        except Exception as e:
-            logger.error(f"[WorldModel] Self-referential request failed: {e}", exc_info=True)
-            return {
-                'response': "I am VULCAN, an AI reasoning system designed to help with complex reasoning tasks.",
-                'confidence': 0.60,
-                'source': 'fallback',
-                'metadata': {'error': str(e)},
-            }
-    
-    def _handle_introspection_request(
-        self,
-        query: str,
-        context: Optional[Dict[str, Any]] = None,
-        **kwargs
-    ) -> Dict[str, Any]:
-        """
-        Handle introspection queries - "How did you decide?", "Why did you choose X?"
-        
-        **Industry Standard: Transparency and Explainability**
-        Uses transparency_interface to explain VULCAN's decisions and reasoning.
-        This is critical for AI alignment and trustworthiness.
-        
-        Examples:
-            - "How did you decide that?"
-            - "Why did you choose X?"
-            - "Explain your reasoning"
-            - "What were you thinking?"
-        
-        Args:
-            query: The introspection query
-            context: Optional context with decision history
-            **kwargs: Additional parameters
-            
-        Returns:
-            Dict with response, confidence, source, and metadata
-        """
-        logger.info(f"[WorldModel] Handling introspection request")
-        
-        try:
-            explanation = None
-            
-            # Use transparency_interface if available
-            if hasattr(self, 'transparency_interface') and self.transparency_interface:
-                try:
-                    explanation = self.transparency_interface.explain_decision(
-                        decision=context.get('last_decision') if context else None,
-                        factors=context.get('decision_factors') if context else None,
-                        reasoning_steps=context.get('reasoning_steps') if context else None,
-                    )
-                except Exception as e:
-                    logger.warning(f"[WorldModel] Transparency interface failed: {e}")
-            
-            # Synthesize response from explanation
-            response = self._synthesize_introspection_response(query, explanation, context)
-            
-            return {
-                'response': response.get('response', 'I can explain my reasoning process.'),
-                'confidence': response.get('confidence', 0.70),
-                'source': 'meta_reasoning',
-                'category': 'introspection',
-                'metadata': {
-                    'explanation': explanation if explanation else {},
-                },
-            }
-        except Exception as e:
-            logger.error(f"[WorldModel] Introspection request failed: {e}", exc_info=True)
-            return {
-                'response': "I make decisions based on the available information and reasoning methods.",
-                'confidence': 0.60,
-                'source': 'fallback',
-                'metadata': {'error': str(e)},
-            }
-    
-    def _synthesize_self_response(
-        self,
-        query: str,
-        introspection: Any,
-        motivation: Any,
-        context: Optional[Dict[str, Any]]
-    ) -> Dict[str, Any]:
-        """
-        Synthesize self-referential response from introspection data.
-        
-        **Industry Standard: Template-based Response Generation with Fallback**
-        """
-        # Default response
-        response = "I am VULCAN, an AI reasoning system designed to assist with complex reasoning, causal analysis, and decision support."
-        confidence = 0.75
-        
-        # Enhance with introspection if available
-        if introspection and isinstance(introspection, dict):
-            if 'purpose' in introspection:
-                response += f" My purpose is: {introspection['purpose']}"
-                confidence = 0.85
-        
-        return {
-            'response': response,
-            'confidence': confidence,
-        }
-    
-    def _synthesize_introspection_response(
-        self,
-        query: str,
-        explanation: Any,
-        context: Optional[Dict[str, Any]]
-    ) -> Dict[str, Any]:
-        """
-        Synthesize introspection response from explanation data.
-        
-        **Industry Standard: Template-based Response Generation with Fallback**
-        """
-        # Default response
-        response = "I make decisions by analyzing the available information, considering multiple perspectives, and applying appropriate reasoning methods."
-        confidence = 0.70
-        
-        # Enhance with explanation if available
-        if explanation and isinstance(explanation, dict):
-            if 'reasoning_steps' in explanation:
-                steps = explanation['reasoning_steps']
-                if steps:
-                    response += f" The key steps were: {', '.join(str(s) for s in steps[:3])}"
-                    confidence = 0.80
-        
-        return {
-            'response': response,
-            'confidence': confidence,
-        }
-    
-    def _handle_conversational_request(
-        self,
-        query: str,
-        classification,
-        **kwargs
-    ) -> Dict[str, Any]:
-        """
-        Handle simple conversational requests.
-        
-        Industry Standard: Minimal processing for simple exchanges.
-        """
-        try:
-            # Build simple guidance
-            from vulcan.world_model.llm_guidance import LLMGuidance
-            
-            guidance = LLMGuidance(
-                task="Respond conversationally to the user",
-                verified_content={'query': query},
-                structure={'format': 'conversational'},
-                constraints=[
-                    "Keep response brief and friendly",
-                    "Do not make factual claims you cannot verify",
-                ],
-                permissions=[
-                    "You may be conversational and friendly",
-                    "You may ask clarifying questions",
-                ],
-                tone="friendly and helpful",
-                format="conversation",
-                max_length=200,
-                metadata={'source': 'conversational'},
-            )
-            
-            response = self._format_with_llm(guidance)
-            
-            return {
-                'response': response,
-                'confidence': 0.90,  # Conversational doesn't need high confidence
-                'source': 'conversational',
-                'metadata': {
-                    'classification': classification.to_dict(),
-                },
-            }
-        except Exception as e:
-            logger.error(f"[WorldModel] Conversational request failed: {e}", exc_info=True)
-            return {
-                'response': "Hello! How can I help you today?",
-                'confidence': 0.50,
-                'source': 'fallback',
-                'metadata': {'error': str(e)},
-            }
-    
+        """Main entry point - delegates to request_handling module."""
+        from .request_handling import process_request
+        return process_request(self, query, **kwargs)
+
+    def _handle_reasoning_request(self, query: str, classification, **kwargs) -> Dict[str, Any]:
+        """Delegates to request_handling module."""
+        from .request_handling import _handle_reasoning_request
+        return _handle_reasoning_request(self, query, classification, **kwargs)
+
+    def _handle_knowledge_request(self, query: str, classification, **kwargs) -> Dict[str, Any]:
+        """Delegates to request_handling module."""
+        from .request_handling import _handle_knowledge_request
+        return _handle_knowledge_request(self, query, classification, **kwargs)
+
+    def _handle_creative_request(self, query: str, classification, **kwargs) -> Dict[str, Any]:
+        """Delegates to request_handling module."""
+        from .request_handling import _handle_creative_request
+        return _handle_creative_request(self, query, classification, **kwargs)
+
+    def _handle_ethical_request(self, query: str, classification, **kwargs) -> Dict[str, Any]:
+        """Delegates to request_handling module."""
+        from .request_handling import _handle_ethical_request
+        return _handle_ethical_request(self, query, classification, **kwargs)
+
+    def _handle_self_referential_request(self, query: str, context: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
+        """Delegates to request_dispatch module."""
+        from .request_dispatch import _handle_self_referential_request
+        return _handle_self_referential_request(self, query, context, **kwargs)
+
+    def _handle_introspection_request(self, query: str, context: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
+        """Delegates to request_dispatch module."""
+        from .request_dispatch import _handle_introspection_request
+        return _handle_introspection_request(self, query, context, **kwargs)
+
+    def _synthesize_self_response(self, query: str, introspection: Any, motivation: Any, context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        """Delegates to request_dispatch module."""
+        from .request_dispatch import _synthesize_self_response
+        return _synthesize_self_response(self, query, introspection, motivation, context)
+
+    def _synthesize_introspection_response(self, query: str, explanation: Any, context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        """Delegates to request_dispatch module."""
+        from .request_dispatch import _synthesize_introspection_response
+        return _synthesize_introspection_response(self, query, explanation, context)
+
+    def _handle_conversational_request(self, query: str, classification, **kwargs) -> Dict[str, Any]:
+        """Delegates to request_dispatch module."""
+        from .request_dispatch import _handle_conversational_request
+        return _handle_conversational_request(self, query, classification, **kwargs)
+
+    # =========================================================================
+    # REQUEST FORMATTING - Delegated to request_formatting module
+    # =========================================================================
+
     def _invoke_reasoning_engine(self, query: str, engine: str) -> Dict[str, Any]:
-        """
-        Invoke appropriate reasoning engine.
-        
-        Industry Standard: Lazy loading with graceful fallback.
-        """
-        try:
-            if engine == 'symbolic':
-                from vulcan.reasoning.symbolic.reasoner import SymbolicReasoner
-                reasoner = SymbolicReasoner()
-                result = reasoner.query(query, timeout=10)
-                return result
-            
-            elif engine == 'probabilistic':
-                from vulcan.reasoning.probabilistic_reasoning import ProbabilisticReasoner
-                reasoner = ProbabilisticReasoner()
-                result = reasoner.predict_with_uncertainty(query)
-                return result
-            
-            elif engine == 'causal':
-                from vulcan.reasoning.causal_reasoning import CausalReasoner
-                reasoner = CausalReasoner()
-                result = reasoner.analyze(query)
-                return result
-            
-            elif engine == 'mathematical':
-                from vulcan.reasoning.mathematical_computation import MathematicalReasoner
-                reasoner = MathematicalReasoner()
-                result = reasoner.compute(query)
-                return result
-            
-            else:
-                # Fallback to unified reasoner
-                logger.warning(f"[WorldModel] Unknown engine '{engine}', using unified reasoner")
-                from vulcan.reasoning.unified import UnifiedReasoner
-                reasoner = UnifiedReasoner()
-                result = reasoner.reason(query)
-                return result
-                
-        except Exception as e:
-            logger.error(f"[WorldModel] Reasoning engine '{engine}' failed: {e}")
-            return {
-                'conclusion': f"Reasoning failed: {str(e)}",
-                'confidence': 0.0,
-                'status': 'error',
-                'error': str(e),
-            }
-    
+        """Delegates to request_formatting module."""
+        from .request_formatting import _invoke_reasoning_engine
+        return _invoke_reasoning_engine(self, query, engine)
+
     def _run_ethical_analysis(self, query: str) -> Dict[str, Any]:
-        """
-        Run ethical analysis using meta-reasoning components.
-        
-        Industry Standard: Leverage existing meta-reasoning infrastructure.
-        """
-        try:
-            # Use ethical boundary monitor if available
-            if hasattr(self, 'ethical_boundary_monitor') and self.ethical_boundary_monitor:
-                analysis = self.ethical_boundary_monitor.analyze_query(query)
-                return analysis
-            
-            # Fallback to motivational introspection
-            if hasattr(self, 'motivational_introspection') and self.motivational_introspection:
-                analysis = self.motivational_introspection.analyze_query(query)
-                return analysis
-            
-            # Basic fallback
-            return {
-                'analysis': 'Ethical analysis not available',
-                'confidence': 0.50,
-            }
-        except Exception as e:
-            logger.error(f"[WorldModel] Ethical analysis failed: {e}")
-            return {
-                'analysis': f"Analysis failed: {str(e)}",
-                'confidence': 0.0,
-            }
-    
+        """Delegates to request_formatting module."""
+        from .request_formatting import _run_ethical_analysis
+        return _run_ethical_analysis(self, query)
+
     def _format_with_llm(self, guidance) -> str:
-        """
-        Use LLM to format content according to guidance.
-        
-        Industry Standard: LLM as formatting layer, not reasoning layer.
-        """
-        try:
-            # Build formatting prompt
-            prompt = self._build_formatting_prompt(guidance)
-            
-            # Use HybridLLMExecutor with FORMAT mode
-            from vulcan.llm.hybrid_executor import get_hybrid_executor
-            
-            executor = get_hybrid_executor()
-            if executor:
-                result = executor.execute_sync(
-                    prompt=prompt,
-                    max_tokens=guidance.max_length or 1024,
-                )
-                return result.get('text', '')
-        except Exception as e:
-            logger.error(f"[WorldModel] LLM formatting failed: {e}")
-        
-        # Fallback: return structured content directly
-        return self._fallback_format(guidance)
-    
+        """Delegates to request_formatting module."""
+        from .request_formatting import _format_with_llm
+        return _format_with_llm(self, guidance)
+
     def _build_formatting_prompt(self, guidance) -> str:
-        """
-        Build the prompt for LLM formatting.
-        
-        Industry Standard: Structured prompt with clear instructions.
-        """
-        prompt_parts = [
-            f"TASK: {guidance.task}",
-            "",
-            "CONTENT TO FORMAT:",
-            json.dumps(guidance.verified_content, indent=2, default=str),
-            "",
-            "STRUCTURE:",
-            json.dumps(guidance.structure, indent=2),
-            "",
-            "CONSTRAINTS (you MUST follow these):",
-        ]
-        for constraint in guidance.constraints:
-            prompt_parts.append(f"- {constraint}")
-        
-        prompt_parts.append("")
-        prompt_parts.append("PERMISSIONS (you MAY do these):")
-        for permission in guidance.permissions:
-            prompt_parts.append(f"- {permission}")
-        
-        prompt_parts.append("")
-        prompt_parts.append(f"TONE: {guidance.tone}")
-        prompt_parts.append(f"FORMAT: {guidance.format}")
-        
-        return "\n".join(prompt_parts)
-    
+        """Delegates to request_formatting module."""
+        from .request_formatting import _build_formatting_prompt
+        return _build_formatting_prompt(self, guidance)
+
     def _fallback_format(self, guidance) -> str:
-        """
-        Fallback formatting when LLM is unavailable.
-        
-        Industry Standard: Graceful degradation with structured output.
-        """
-        content = guidance.verified_content
-        
-        if 'conclusion' in content:
-            return f"Result: {content['conclusion']}"
-        elif 'facts' in content:
-            return "\n".join([f"• {fact}" for fact in content['facts'][:10]])
-        else:
-            return str(content)
-    
+        """Delegates to request_formatting module."""
+        from .request_formatting import _fallback_format
+        return _fallback_format(self, guidance)
+
     def _determine_synthesis_format(self, query: str) -> str:
-        """
-        Determine synthesis format from query.
-        
-        Industry Standard: Pattern matching with default fallback.
-        """
-        query_lower = query.lower()
-        
-        if 'paper' in query_lower or 'essay' in query_lower:
-            return 'paper'
-        elif 'summary' in query_lower or 'summarize' in query_lower:
-            return 'summary'
-        else:
-            return 'explanation'
+        """Delegates to request_formatting module."""
+        from .request_formatting import _determine_synthesis_format
+        return _determine_synthesis_format(self, query)
+
+    # =========================================================================
+    # SELF-IMPROVEMENT - Delegated to self_improvement_engine/apply modules
+    # =========================================================================
 
     def start_autonomous_improvement(self):
-        """Start the autonomous self-improvement background thread"""
-
-        if not self.self_improvement_enabled:
-            logger.warning(
-                "Cannot start autonomous improvement - self-improvement drive not initialized"
-            )
-            return
-
-        if self.improvement_thread and self.improvement_thread.is_alive():
-            logger.warning("Self-improvement thread already running")
-            return
-
-        self.improvement_running = True
-        self.improvement_thread = threading.Thread(
-            target=self._autonomous_improvement_loop,
-            name="VulcanSelfImprovement",
-            daemon=True,
-        )
-        self.improvement_thread.start()
-
-        logger.info("🚀 Autonomous self-improvement drive started")
+        """Delegates to self_improvement_engine module."""
+        from .self_improvement_engine import start_autonomous_improvement
+        return start_autonomous_improvement(self)
 
     def stop_autonomous_improvement(self):
-        """Stop the autonomous self-improvement drive"""
-
-        self.improvement_running = False
-
-        if self.improvement_thread:
-            self.improvement_thread.join(timeout=5.0)
-
-        logger.info("🛑 Autonomous self-improvement drive stopped")
+        """Delegates to self_improvement_engine module."""
+        from .self_improvement_engine import stop_autonomous_improvement
+        return stop_autonomous_improvement(self)
 
     def _autonomous_improvement_loop(self):
-        """Main loop for autonomous self-improvement"""
-
-        logger.info("🔄 Autonomous improvement loop starting")
-
-        # Check interval can be configured via environment variable
-        # Default to 86400 seconds (24 hours) to prevent cost drain from frequent checks
-        # Set SELF_IMPROVEMENT_INTERVAL to lower values (e.g., 60) only for development
-        check_interval = int(os.getenv("SELF_IMPROVEMENT_INTERVAL", "86400"))
-        logger.info(f"Self-improvement check interval: {check_interval} seconds")
-
-        # Safeguard: Check kill switch at the start of the loop
-        kill_switch_env = os.getenv("VULCAN_ENABLE_SELF_IMPROVEMENT", "1").lower()
-        if kill_switch_env in ("0", "false", "no", "off"):
-            logger.warning(
-                "🛑 Self-improvement disabled via VULCAN_ENABLE_SELF_IMPROVEMENT=0. "
-                "Exiting autonomous improvement loop."
-            )
-            self.improvement_running = False
-            return
-
-        while self.improvement_running:
-            try:
-                # Re-check kill switch each iteration (allows runtime disable)
-                kill_switch_env = os.getenv("VULCAN_ENABLE_SELF_IMPROVEMENT", "1").lower()
-                if kill_switch_env in ("0", "false", "no", "off"):
-                    logger.warning(
-                        "🛑 Self-improvement disabled via VULCAN_ENABLE_SELF_IMPROVEMENT=0. "
-                        "Stopping autonomous improvement loop."
-                    )
-                    self.improvement_running = False
-                    break
-
-                # Build current context
-                context = self._build_improvement_context()
-
-                # Check if self-improvement should trigger
-                if self.self_improvement_drive.should_trigger(context):
-                    logger.info("✨ Self-improvement drive triggered!")
-
-                    # Generate improvement action
-                    improvement_action = self.self_improvement_drive.step(context)
-
-                    if improvement_action:
-                        # Check if waiting for approval
-                        if improvement_action.get("_wait_for_approval"):
-                            approval_id = improvement_action["_pending_approval"]
-                            logger.info(f"⏳ Waiting for approval: {approval_id}")
-                            # Will check status on next iteration
-                        else:
-                            # Execute improvement
-                            self._execute_improvement(improvement_action)
-
-                # Sleep until next check
-                time.sleep(check_interval)
-
-            except Exception as e:
-                logger.error(
-                    f"Error in autonomous improvement loop: {e}", exc_info=True
-                )
-                time.sleep(check_interval)
-
-        logger.info("🔄 Autonomous improvement loop stopped")
+        """Delegates to self_improvement_engine module."""
+        from .self_improvement_engine import _autonomous_improvement_loop
+        return _autonomous_improvement_loop(self)
 
     def _build_improvement_context(self) -> Dict[str, Any]:
-        """Build context for self-improvement decisions"""
+        """Delegates to self_improvement_engine module."""
+        from .self_improvement_engine import _build_improvement_context
+        return _build_improvement_context(self)
 
-        with self.lock:
-            # Check if startup
-            is_startup = (
-                time.time() - self.system_state["session_start"]
-            ) < 300  # 5 min
-
-            # Count recent errors
-            current_time = time.time()
-            window = 3600  # 1 hour
-            recent_errors = [
-                e
-                for e in self.system_state["errors_in_window"]
-                if e["timestamp"] > current_time - window
-            ]
-
-            # Get system resources
-            cpu_percent = self._get_cpu_usage()
-            memory_mb = self._get_memory_usage()
-
-            context = {
-                "is_startup": is_startup,
-                "error_detected": len(recent_errors) > 0,
-                "error_count": len(recent_errors),
-                "system_resources": {
-                    "cpu_percent": cpu_percent,
-                    "memory_mb": memory_mb,
-                    "low_activity_duration_minutes": self._get_low_activity_duration(),
-                },
-                "performance_metrics": self.system_state["performance_metrics"].copy(),
-                "other_drives_total_priority": 0.0,
-            }
-
-            return context
-
-    # =========================================================================
-    # CORE EXECUTION REPLACEMENT: _execute_improvement
-    # =========================================================================
-
-    # Helper methods simulating external utilities
     def _load_file(self, file_path: str) -> str:
-        """Simulates loading a file."""
-        try:
-            full_path = self.repo_root / file_path
-            with open(full_path, "r", encoding="utf-8") as f:
-                return f.read()
-        except FileNotFoundError:
-            return ""  # Return empty string if file doesn't exist
-        except Exception as e:
-            logger.warning(f"Failed to load file {file_path}: {e}")
-            raise
+        """Delegates to self_improvement_engine module."""
+        from .self_improvement_engine import _load_file
+        return _load_file(self, file_path)
 
     def _build_llm_prompt_for_improvement(self, action: Dict[str, Any]) -> str:
-        """Simulates building the detailed prompt for the LLM based on objective."""
-        objective_type = action.get("_drive_metadata", {}).get(
-            "objective_type", "System Improvement"
-        )
-        goal = action.get("high_level_goal", "Perform general system hygiene.")
-        raw_obs = json.dumps(action.get("raw_observation", {}), indent=2)
+        """Delegates to self_improvement_engine module."""
+        from .self_improvement_engine import _build_llm_prompt_for_improvement
+        return _build_llm_prompt_for_improvement(self, action)
 
-        # In a real system, we'd include file contents here. Mocking for brevity.
-        prompt = f"""
-        Objective: {objective_type}
-        High Level Goal: {goal}
-
-        Please provide the necessary code changes to achieve this goal. Focus only on one Python file for this single step.
-
-        You must specify the target file path and the complete, updated content of that file.
-
-        Format your response exactly as follows:
-        FILE: <path/relative/to/repo/root/file.py>
-        ```python
-        <complete updated file content here>
-        ```
-        Task Details:
-        {raw_obs}
-        """
-        return prompt
-
-    def _parse_llm_response(
-        self, response_text: str
-    ) -> Tuple[Optional[str], Optional[str]]:
-        """Parses the LLM's structured response for file path and content."""
-        lines = response_text.strip().split("\n")
-        file_path = None
-        code_lines = []
-        in_code_block = False
-
-        for line in lines:
-            if line.startswith("FILE:"):
-                file_path = line.replace("FILE:", "").strip()
-            elif line.strip().startswith("```python"):
-                in_code_block = True
-            elif line.strip().startswith("```") and in_code_block:
-                in_code_block = False
-            elif in_code_block:
-                code_lines.append(line)
-
-        if file_path:
-            return file_path, "\n".join(code_lines)
-        return None, None
+    def _parse_llm_response(self, response_text: str) -> Tuple[Optional[str], Optional[str]]:
+        """Delegates to self_improvement_apply module."""
+        from .self_improvement_apply import _parse_llm_response
+        return _parse_llm_response(self, response_text)
 
     def _validate_code_ast(self, content: str) -> None:
-        """Simulates ast_tools.parse_code/validate_syntax."""
-        if not content:
-            raise ValueError("Code content is empty.")
-        ast.parse(content)  # Will raise SyntaxError on failure
+        """Delegates to self_improvement_apply module."""
+        from .self_improvement_apply import _validate_code_ast
+        return _validate_code_ast(self, content)
 
-    def _apply_diff_and_commit(
-        self, file_path: str, original_code: str, updated_code: str, commit_message: str
-    ) -> Tuple[str, bool]:
-        """
-        Simulates diff_tools.make_diff, file I/O, and git_tools.commit_changes.
-        Returns tuple of (diff_summary, commit_succeeded).
-        
-        FIX: Returns whether commit actually succeeded to prevent inconsistent logging.
-        """
-        full_path = self.repo_root / file_path
-
-        # 1. Generate Diff (Simulated diff_tools)
-        diff_lines = list(
-            difflib.unified_diff(
-                original_code.splitlines(),
-                updated_code.splitlines(),
-                fromfile=f"a/{file_path}",
-                tofile=f"b/{file_path}",
-                lineterm="",
-            )
-        )
-        diff_summary = "\n".join(diff_lines)
-
-        # 2. Apply Change (File I/O)
-        full_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(full_path, "w", encoding="utf-8") as f:
-            f.write(updated_code)
-
-        # 3. Git Commit (Simulated git_tools)
-        # Note: Check if auto-commit is enabled via settings
-        # Default: DISABLED to prevent "Cannot commit: /app is not a Git repository" errors
-        try:
-            from vulcan.settings import settings
-            auto_commit_enabled = settings.self_improvement_auto_commit
-        except (ImportError, AttributeError):
-            auto_commit_enabled = False
-        
-        if not auto_commit_enabled:
-            logger.info("Self-improvement auto-commit disabled (set VULCAN_SELF_IMPROVEMENT_AUTO_COMMIT=true to enable)")
-            return diff_summary, False
-        
-        # Check if the repo root is actually a Git repository
-        if not (self.repo_root / ".git").exists():
-            logger.warning(
-                f"Cannot commit: {self.repo_root} is not a Git repository. Skipping commit."
-            )
-            # Note: Return False for commit_succeeded when not a git repo
-            return diff_summary, False
-
-        # Execute Git commands using subprocess (robust, non-mock check)
-        try:
-            # nosec B603, B607: subprocess call is safe - using list arguments
-            # with hardcoded 'git' command, file_path is internal validated path
-            subprocess.run(  # nosec B603 B607
-                ["git", "add", file_path],
-                cwd=self.repo_root,
-                check=True,
-                capture_output=True,
-            )
-
-            # nosec B603, B607: subprocess call is safe - using list arguments
-            commit_result = subprocess.run(  # nosec B603 B607
-                ["git", "commit", "-m", f"vulcan(auto): {commit_message}"],
-                cwd=self.repo_root,
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-
-            # Get short hash
-            # nosec B603, B607: subprocess call is safe - using list arguments
-            hash_result = subprocess.run(  # nosec B603 B607
-                ["git", "rev-parse", "--short", "HEAD"],
-                cwd=self.repo_root,
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-
-            logger.info(f"Git Commit successful: {hash_result.stdout.strip()}")
-            return diff_summary, True
-
-        except subprocess.CalledProcessError as e:
-            # This happens if 'git commit' runs but there are no actual changes (e.g., LLM returned identical code)
-            if "nothing to commit" in e.stderr:
-                logger.info(
-                    "Commit skipped: No functional changes detected by Git after writing."
-                )
-                return diff_summary, False
-            logger.error(f"Git commit failed for {file_path}: {e.stderr}")
-            raise RuntimeError(f"Git commit failed: {e.stderr}") from e
-        except Exception as e:
-            logger.error(f"Critical error during file application or Git: {e}")
-            raise
+    def _apply_diff_and_commit(self, file_path: str, original_code: str, updated_code: str, commit_message: str) -> Tuple[str, bool]:
+        """Delegates to self_improvement_apply module."""
+        from .self_improvement_apply import _apply_diff_and_commit
+        return _apply_diff_and_commit(self, file_path, original_code, updated_code, commit_message)
 
     def _execute_improvement(self, improvement_action: Dict[str, Any]):
-        """
-        Execute an improvement action using the full LLM -> AST -> Diff -> Git pipeline.
-        This replaces the mock _perform_improvement and its handlers.
-        
-        Note: Self-Improvement Loop Deadlock Prevention
-        
-        The original implementation used CodeLLMClient.generate_code() which raises
-        a RuntimeError because external LLM code generation is disabled by VULCAN Policy.
-        This created a deadlock where self-improvement was programmed to use OpenAI
-        but the policy explicitly blocked it.
-        
-        FIX: Instead of calling external LLM, we now:
-        1. Log that external code generation is disabled
-        2. Queue the improvement for human review (if enabled)
-        3. Return a "deferred" status instead of crashing
-        4. The improvement can still proceed through the human approval workflow
-        """
-
-        objective_type = improvement_action.get("_drive_metadata", {}).get(
-            "objective_type", "unknown"
-        )
-        high_level_goal = improvement_action.get("high_level_goal", objective_type)
-
-        logger.info(
-            f"🎯 Executing integrated improvement pipeline for: {objective_type}"
-        )
-
-        success = False
-        result: Dict[str, Any] = {"status": "failed", "error": "Initialization error"}
-
-        # --- Note: Check if external LLM code generation should be used ---
-        # External LLM code generation is DISABLED by VULCAN Policy. Instead of
-        # crashing with RuntimeError, we gracefully handle this by deferring
-        # the improvement to human review or using internal code templates.
-        
-        # Check for internal code generation capability first
-        use_internal_generation = True  # Default to internal approach
-        
-        try:
-            # Build LLM prompt for this improvement (we'll use it for logging)
-            prompt = self._build_llm_prompt_for_improvement(improvement_action)
-            
-            # Note: Instead of calling CodeLLMClient.generate_code() which raises
-            # RuntimeError, we log the intent and defer to human review
-            # IMPROVED: More informative logging about what CAN proceed
-            improvement_type = improvement_action.get("type", "unknown")
-            is_code_improvement = improvement_type in ["fix_bugs", "enhance_safety", "optimize_performance"]
-            
-            if is_code_improvement:
-                logger.warning(
-                    f"[Self-Improvement] External LLM code generation is DISABLED by VULCAN Policy. "
-                    f"Code improvement '{objective_type}' will be deferred for human review. "
-                    f"Non-code improvements (config, tests, docs) CAN proceed autonomously. "
-                    f"To enable code generation, implement internal templates or symbolic reasoning."
-                )
-            else:
-                logger.info(
-                    f"[Self-Improvement] Non-code improvement '{objective_type}' can proceed autonomously. "
-                    f"External LLM code generation is DISABLED, but this improvement doesn't require it."
-                )
-            
-            
-            # Return a deferred status instead of crashing
-            result = {
-                "status": "deferred",
-                "objective_type": objective_type,
-                "reason": "external_llm_code_generation_disabled",
-                "message": (
-                    "Self-improvement deferred: External LLM code generation is disabled "
-                    "by VULCAN Policy. The improvement has been queued for human review. "
-                    "OpenAI is only permitted for language interpretation, not code generation."
-                ),
-                "prompt_preview": prompt[:500] + "..." if len(prompt) > 500 else prompt,
-                "execution_timestamp": time.time(),
-                "requires_human_review": True,
-            }
-            
-            # Log this as an info message rather than an error
-            logger.info(
-                f"✋ Improvement '{objective_type}' deferred for human review "
-                f"(reason: external LLM code generation disabled)"
-            )
-            
-            # Record the outcome as deferred (not failed)
-            self.self_improvement_drive.record_outcome(
-                objective_type, success=False, details=result
-            )
-            
-            return result
-            
-        except Exception as e:
-            # Catch any other errors during prompt building
-            result["error"] = f"Improvement preparation failed: {str(e)}"
-            logger.error(result["error"], exc_info=True)
-            
-            self.self_improvement_drive.record_outcome(
-                objective_type, success=False, details=result
-            )
-            return result
-        
-        # NOTE: The legacy code path using CodeLLMClient has been removed because:
-        # 1. External LLM code generation is disabled by VULCAN Policy
-        # 2. The code would never be reached (we return 'deferred' status above)
-        # 3. Future implementations should use VULCAN's internal symbolic reasoning
-        #    for code generation, not external LLMs
-        #
-        # To enable autonomous code generation in the future:
-        # 1. Implement internal code templates for common improvements
-        # 2. Use VULCAN's symbolic reasoning for code modification
-        # 3. Integrate with the AST-based code transformation pipeline
-
-    # =========================================================================
-    # REMOVED MOCK HANDLERS:
-    # _perform_improvement, _fix_circular_imports, _optimize_performance,
-    # _improve_test_coverage, _enhance_safety_systems, _fix_known_bugs
-    # Logic consolidated into _execute_improvement.
-    # =========================================================================
+        """Delegates to self_improvement_apply module."""
+        from .self_improvement_apply import _execute_improvement
+        return _execute_improvement(self, improvement_action)
 
     def report_error(self, error: Exception, context: Optional[Dict[str, Any]] = None):
         """Report an error to the world model (triggers self-improvement)"""
