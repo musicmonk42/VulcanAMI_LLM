@@ -11,7 +11,7 @@
 
 ## Backlog (Planned Work)
 - [x] [B1] Establish /qor-audit baseline for all security-touching modules — Phase 1 security fixes complete (V1-V5)
-- [ ] [B2] Map existing test coverage gaps against critical safety paths
+- [x] [B2] Map test coverage gaps on safety paths — 8 test files written: 4 safety module tests, 3 edge case tests, 1 decomposition smoke test. Closes #974.
 - [ ] [B3] Validate governance consensus thresholds against production requirements
 - [x] [B4] Remove logging.basicConfig() from 89 files — 68 files modified, only logging_config.py retains it. Closes #970.
 - [x] [B5] Rewire full_platform.py imports to use src/platform/ modules — Route modules use globals.py, God file callers redirected
