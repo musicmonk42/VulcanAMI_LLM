@@ -1357,5 +1357,4 @@ def test_integration():
 
 if __name__ == "__main__":
     # Run test when module executed directly
-    logging.basicConfig(level=logging.INFO)
     test_integration()

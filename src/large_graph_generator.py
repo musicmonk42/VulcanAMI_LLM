@@ -9,10 +9,11 @@ import logging
 import random
 from typing import Any, Dict, List, Optional
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+try:
+    from src.logging_config import configure as _configure_logging
+except ModuleNotFoundError:
+    from logging_config import configure as _configure_logging
+_configure_logging()
 logger = logging.getLogger("LargeGraphGenerator")
 
 # NetworkX is optional but required for functionality

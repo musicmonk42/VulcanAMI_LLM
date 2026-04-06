@@ -25,10 +25,7 @@ except ImportError:
     graphviz = None
     GRAPHVIZ_AVAILABLE = False
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+logger = logging.getLogger(__name__)
 
 # Module-level constants for resource management
 MAX_LOG_DIR_SIZE_MB = 1000  # Maximum size of log directory in MB
@@ -932,7 +929,6 @@ class ObservabilityManager:
 
 # Example usage
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
 
     # Initialize with notification channels
     obs = ObservabilityManager(

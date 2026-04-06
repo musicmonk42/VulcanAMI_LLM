@@ -44,11 +44,7 @@ except ImportError:
             return "risky"
 
 
-# Setup logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger("PatternMatcher")
+logger = logging.getLogger(__name__)
 
 # --- Constants ---
 MAX_GRAPH_NODES = 10000  # Maximum nodes in a graph

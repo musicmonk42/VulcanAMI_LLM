@@ -230,5 +230,105 @@ SHA256(content_hash + previous_hash) = ae1daee5f81d3489603beb5167a0f29b583a6180f
 **Decision**: Import rewiring implemented. Created src/platform/globals.py with lazy accessors. Rewired 7 route modules to use globals.py. Redirected 13 callers of extracted God file classes. Fixer diagnostic caught 4 issues (init_app never called, split-brain settings, 2 stdlib collisions) — all fixed. B5 marked complete.
 
 ---
+
+### Entry #12: GATE TRIBUNAL (Cleanup and Dedup Plan)
+
+**Timestamp**: 2026-04-05T00:00:00Z
+**Phase**: GATE
+**Author**: Judge
+**Risk Grade**: L3
+**Verdict**: VETO
+
+**Content Hash**:
+SHA256(plan-cleanup-and-dedup.md) = d62e99aafb2defb1b45b939ea722bf7dedf6a361f4d1c3d2d0e35f87995bfe68
+
+**Previous Hash**: ae1daee5f81d3489603beb5167a0f29b583a6180f0f7a66ca6295d6610279928
+
+**Chain Hash**:
+SHA256(content_hash + previous_hash) = eaa696b2775d2ab69ba16bfb476e96e6028e539a309e153732e9bbfda4704883
+
+**Decision**: VETO -- Cleanup and deduplication plan contains 1 blocking violation (CDV-1). Phase 2 services.py split produces a post-split file of ~350 lines (AsyncServiceManager at lines 229-565 plus import preamble), exceeding the 250-line Section 4 Razor limit by 40%. Phase 1 (basicConfig removal), Phase 3 (God file dedup), and Phase 4 (detect-secrets) pass all 6 audit checks. Non-blocking observation: 6 standalone scripts will lose logging output unless added to the Phase 1 exceptions list. Implementation blocked pending plan revision for Phase 2.
+
+---
+
+### Entry #13: GATE TRIBUNAL (Cleanup and Dedup Plan, Revision 2)
+
+**Timestamp**: 2026-04-05T00:00:00Z
+**Phase**: GATE
+**Author**: Judge
+**Risk Grade**: L3
+**Verdict**: PASS
+
+**Content Hash**:
+SHA256(plan-cleanup-and-dedup.md) = 076d38d9826592685b596f3e756acb8e9d8d186731caeb3acb6be9838806419f
+
+**Previous Hash**: eaa696b2775d2ab69ba16bfb476e96e6028e539a309e153732e9bbfda4704883
+
+**Chain Hash**:
+SHA256(content_hash + previous_hash) = 471bed7b658b800b7f8fa9e6a3a6a163c4f54509496dd0f0d65e4b16728627d3
+
+**Decision**: PASS -- Revised cleanup and deduplication plan resolves both prior findings. CDV-1 fixed: services.py 3-way split produces service_imports.py (~228 lines), service_lifecycle.py (~195 lines), services.py (~194 lines) -- all under 250-line Section 4 Razor limit. ML-2 fixed: 6 standalone scripts explicitly listed with logging_config.configure() replacement, no logging output lost. All 6 audit passes clear. Implementation approved.
+
+---
+
+### Entry #14: GATE TRIBUNAL (Deep Decomposition Plan)
+
+**Timestamp**: 2026-04-05T00:00:00Z
+**Phase**: GATE
+**Author**: Judge
+**Risk Grade**: L3
+**Verdict**: VETO
+
+**Content Hash**:
+SHA256(plan-deep-decomposition.md) = 1a6a7f190c098ea0bc91588bbb107862a3e55f49927d93dc3ed5359335d0ccf8
+
+**Previous Hash**: 471bed7b658b800b7f8fa9e6a3a6a163c4f54509496dd0f0d65e4b16728627d3
+
+**Chain Hash**:
+SHA256(content_hash + previous_hash) = 9a3a174b946742b7f22fddcab45b4887a380dab6e5a3950532ff71f770d54fbe
+
+**Decision**: VETO -- Deep decomposition plan contains 5 blocking violations (DDV-1 through DDV-5). Line estimates systematically understated by 25-55% for the five largest targets. ToolSelector class (2,779 lines) mapped to only 1,250 lines of modules (45%). _execute_agent_task (1,587 lines) mapped to 900 lines (57%). STATE group (1,060 lines) mapped to 500 lines (47%). UnifiedReasoner (5,967 lines) mapped to 4,469 lines (75%). WorldModel slim orchestrator physically requires ~454 lines for 143 delegation stubs but claims 250. Same failure mode as Entry #3. Implementation blocked pending complete line accounting for all phases.
+
+---
+
+### Entry #15: GATE TRIBUNAL (Deep Decomposition Plan, Revision 2)
+
+**Timestamp**: 2026-04-05T00:00:00Z
+**Phase**: GATE
+**Author**: Judge
+**Risk Grade**: L3
+**Verdict**: PASS (Conditional)
+
+**Content Hash**:
+SHA256(plan-deep-decomposition.md) = f7a84513bee046b17ea20c563df7bb3fa245dde9d524e36290f668f651d79dd7
+
+**Previous Hash**: 9a3a174b946742b7f22fddcab45b4887a380dab6e5a3950532ff71f770d54fbe
+
+**Chain Hash**:
+SHA256(content_hash + previous_hash) = a16974e02362f95f7f48b415a47423c2c51d01d69eb245d6b40b5a5fa8bca704
+
+**Decision**: PASS (Conditional) -- Revision 2 resolves all 5 prior violations (DDV-1 through DDV-5) through fundamental architecture change: delete God classes entirely, replace with context dataclasses + standalone function modules. No delegation stubs needed (DDV-5 eliminated). Line accounting verified across all 7 phases: ToolSelector 91% coverage (DDV-1), _execute_agent_task 101% (DDV-2), STATE over-allocated at 735 for 297 actual lines (DDV-3, harmless), UnifiedReasoner 105% (DDV-4). All proposed modules at or below 250-line Section 4 Razor limit. Three non-blocking observations: OBS-1 inflated STATE source figure, OBS-2 pre-existing _check_improvement_approval TODO stub (backlog item), OBS-3 caller migration required for vulcan_integration.py. Implementation approved conditional on: (1) all WorldModel() constructor callers migrated to factory, (2) STATE module sizes right-sized, (3) approval stub TODO added to backlog.
+
+---
+
+### Entry #16: GATE TRIBUNAL (Test Coverage Plan)
+
+**Timestamp**: 2026-04-05T00:00:00Z
+**Phase**: GATE
+**Author**: Judge
+**Risk Grade**: L3
+**Verdict**: PASS
+
+**Content Hash**:
+SHA256(plan-test-coverage.md) = 2b14ca213ccee66902998ea70f0a14a410e1f8f8b0a26172e8f90ee702634e07
+
+**Previous Hash**: a16974e02362f95f7f48b415a47423c2c51d01d69eb245d6b40b5a5fa8bca704
+
+**Chain Hash**:
+SHA256(content_hash + previous_hash) = 64d536ceabad8a47a0d00383ef0a8b2dee5e8b7297222a0a6844b3cc77de53a8
+
+**Decision**: PASS -- Safety-critical test coverage plan approved. All 8 proposed test files target real, existing modules (4 Phase 1 safety modules verified at source paths). No production code modified. No new dependencies. No ghost paths. Two non-blocking observations: OBS-1 (auth tests must use mock/synthetic JWT keys, not real secrets), OBS-2 (Phase 3 references "23 WorldModel modules" but actual count is 54; auto-discovery pattern compensates). Implementation approved.
+
+---
 *Chain integrity: VALID*
-*Merkle chain: 11 entries*
+*Merkle chain: 16 entries*

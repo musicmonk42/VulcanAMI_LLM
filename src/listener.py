@@ -42,11 +42,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger("GraphixListener")
+logger = logging.getLogger(__name__)
 
 # Try to import the full AgentRegistry, fall back to built-in implementation
 try:

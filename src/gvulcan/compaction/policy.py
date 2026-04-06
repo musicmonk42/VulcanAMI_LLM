@@ -1169,7 +1169,6 @@ class CompactionPlanner:
 
 if __name__ == "__main__":
     # Example usage and testing
-    logging.basicConfig(level=logging.INFO)
 
     print("=" * 80)
     print(" " * 20 + "COMPACTION POLICY SYSTEM TEST")

@@ -18,10 +18,6 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-# Setup logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
 logger = logging.getLogger(__name__)
 
 # Import memory module components

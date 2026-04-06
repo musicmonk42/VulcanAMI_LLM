@@ -285,12 +285,6 @@ if __name__ == "__main__":
     import multiprocessing
     multiprocessing.freeze_support()  # REQUIRED for Windows compatibility
     
-    # Configure logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
-    
     # Log startup information
     logger.info("=" * 70)
     logger.info("VULCAN-AGI: Advanced General Intelligence System")

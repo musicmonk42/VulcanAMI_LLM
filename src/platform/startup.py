@@ -57,14 +57,6 @@ def setup_unified_logging():
     # File handler with explicit UTF-8 encoding
     file_handler = logging.FileHandler("unified_platform.log", encoding="utf-8")
 
-    # Configure logging with UTF-8 handlers
-    logging.basicConfig(
-        level=getattr(logging, settings.log_level.upper()),
-        format=settings.log_format,
-        handlers=[stdout_handler, file_handler],
-        force=True,  # Force re-configuration
-    )
-
     # Set log levels for sub-apps
     logging.getLogger("uvicorn").setLevel(logging.INFO)
     logging.getLogger("fastapi").setLevel(logging.INFO)

@@ -60,11 +60,7 @@ except ImportError:
     GROK_KERNEL_AUDIT_AVAILABLE = False
     GrokKernelAudit = None
 
-# Configure logging
-logger = logging.getLogger("FeedbackProtocol")
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+logger = logging.getLogger(__name__)
 
 # Constants
 MIN_SCORE = 0.0

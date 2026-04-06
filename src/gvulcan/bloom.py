@@ -611,7 +611,6 @@ def test_false_positive_rate(
 
 if __name__ == "__main__":
     # Example usage and testing
-    logging.basicConfig(level=logging.INFO)
 
     print("=== Testing Basic Bloom Filter ===")
     bf = BloomFilter.create_optimal(expected_items=1000, false_positive_rate=0.01)

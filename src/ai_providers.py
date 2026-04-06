@@ -33,11 +33,7 @@ from src.utils.url_validator import validate_url_scheme
 # Pydantic for declarative structures
 from pydantic import BaseModel, Field, validator
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger("AIProviders")
+logger = logging.getLogger(__name__)
 
 # --- Constants ---
 CACHE_VERSION = "v2"

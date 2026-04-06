@@ -459,11 +459,7 @@ except ImportError:
     logger_init.debug("⚠️ SystemObserver not available - world model will not receive Arena events")
 
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger("GraphixArena")
+logger = logging.getLogger(__name__)
 
 # Constants
 MAX_PAYLOAD_SIZE = 10_000_000  # 10MB

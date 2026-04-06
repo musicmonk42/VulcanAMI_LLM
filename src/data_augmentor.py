@@ -15,11 +15,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger("DataAugmentor")
+logger = logging.getLogger(__name__)
 
 # Constants
 MAX_COMPLEXITY = 10

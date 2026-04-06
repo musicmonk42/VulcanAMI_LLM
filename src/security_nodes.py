@@ -60,10 +60,7 @@ try:
 except ImportError:
     GrokKernelAudit = None
 
-logger = logging.getLogger("SecurityNodes")
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+logger = logging.getLogger(__name__)
 
 # Constants for validation
 MAX_DATA_SIZE = 10 * 1024 * 1024  # 10MB max data size

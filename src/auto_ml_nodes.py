@@ -44,11 +44,7 @@ except ImportError:
     GROK_KERNEL_AUDIT_AVAILABLE = False
     GrokKernelAudit = None
 
-# Configure logging
-logger = logging.getLogger("AutoMLNodes")
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+logger = logging.getLogger(__name__)
 
 # Constants
 MAX_TENSOR_SIZE = 1000000

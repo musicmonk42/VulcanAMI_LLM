@@ -104,12 +104,11 @@ try:
 except ImportError:
     generate_large_graph = None
 
-# Logging setup (aligned with stdio_policy.py)
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(filename)s:%(lineno)d %(message)s",
-    handlers=[logging.FileHandler("validation_test_logs.log"), logging.StreamHandler()],
-)
+try:
+    from src.logging_config import configure as _configure_logging
+except ModuleNotFoundError:
+    from logging_config import configure as _configure_logging
+_configure_logging()
 logger = logging.getLogger("ValidationTest")
 
 

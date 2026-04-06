@@ -83,14 +83,11 @@ try:
 except ImportError:
     ARGON2_AVAILABLE = False
 
-# Configure logging EARLY
-# Use stdout instead of stderr so Railway/cloud platforms classify logs correctly
-# (stderr is often treated as error-level regardless of actual log level)
-_stdout_handler = logging.StreamHandler(sys.stdout)
-_stdout_handler.setFormatter(
-    logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-)
-logging.basicConfig(level=logging.INFO, handlers=[_stdout_handler])
+try:
+    from src.logging_config import configure as _configure_logging
+except ModuleNotFoundError:
+    from logging_config import configure as _configure_logging
+_configure_logging()
 logger = logging.getLogger("GraphAPIServer")
 
 # Vulcan reasoning imports (after logger initialization)

@@ -32,11 +32,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger("PersistenceLayer")
+logger = logging.getLogger(__name__)
 
 # Constants
 DEFAULT_MAX_CONNECTIONS = 5

@@ -41,11 +41,7 @@ except ImportError:
     VULCAN_INTEGRATION_AVAILABLE = False
     VulcanGraphixBridge = None
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger("AgentRegistry")
+logger = logging.getLogger(__name__)
 
 # Security constants
 MIN_KEY_SIZE = 2048

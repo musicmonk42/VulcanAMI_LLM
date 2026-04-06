@@ -12,10 +12,18 @@ Author: VulcanAMI Team
 
 import os
 import re
-from typing import Any
+from typing import Any, List
 
 from .config import CREATIVE_TASK_KEYWORDS
 from .types import ReasoningTask
+from ..reasoning_types import ReasoningType
+
+# Default tools for ensemble reasoning when no specific tools are selected
+DEFAULT_ENSEMBLE_TOOLS: List[ReasoningType] = [
+    ReasoningType.PROBABILISTIC,
+    ReasoningType.SYMBOLIC,
+    ReasoningType.CAUSAL,
+]
 
 
 # ==============================================================================

@@ -144,26 +144,11 @@ else:
     CSV_REPORT = Path("load_test_report.csv")
     PROM_REPORT = Path("prometheus_metrics.txt")
 
-# Logging setup with rotating handler - conditional on testing mode
-if not _TESTING_MODE:
-    from logging.handlers import RotatingFileHandler
-
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(filename)s:%(lineno)d - %(message)s",
-        handlers=[
-            RotatingFileHandler(
-                LOG_PATH, maxBytes=MAX_LOG_SIZE, backupCount=BACKUP_COUNT
-            ),
-            logging.StreamHandler(),
-        ],
-    )
-else:
-    # Minimal logging for testing
-    logging.basicConfig(
-        level=logging.WARNING,
-        format="%(asctime)s [%(levelname)s] %(filename)s:%(lineno)d - %(message)s",
-    )
+try:
+    from src.logging_config import configure as _configure_logging
+except ModuleNotFoundError:
+    from logging_config import configure as _configure_logging
+_configure_logging()
 
 logger = logging.getLogger("LoadTest")
 

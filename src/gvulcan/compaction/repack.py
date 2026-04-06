@@ -903,7 +903,6 @@ Currently Active: {len(self.active_tasks)}
 
 if __name__ == "__main__":
     # Example usage and testing
-    logging.basicConfig(level=logging.INFO)
 
     print("=" * 80)
     print(" " * 20 + "ADAPTIVE REPACK SYSTEM TEST")

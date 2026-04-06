@@ -143,9 +143,7 @@ Your architecture includes multi-layered safety validation, compliance checking 
 
 When refusing a request, explain why the request cannot be fulfilled and suggest safer alternatives if available."""
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+logger = logging.getLogger(__name__)
 
 # Constants
 MOCK_RESPONSE_TRUNCATION_LENGTH = 100

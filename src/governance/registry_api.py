@@ -381,9 +381,7 @@ class SimpleKMS(AbstractKMS):
 
 
 # --- Configuration ---
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logger = logging.getLogger(__name__)
 DEFAULT_GRAMMAR_VERSION = "2.3.0"
 
 

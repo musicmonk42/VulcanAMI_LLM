@@ -703,7 +703,6 @@ Percentiles:
 
 if __name__ == "__main__":
     # Example usage and testing
-    logging.basicConfig(level=logging.INFO)
 
     print("=== Testing Basic DQS Computation ===")
     comp = DQSComponents(

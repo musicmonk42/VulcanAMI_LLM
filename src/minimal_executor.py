@@ -37,10 +37,12 @@ except ImportError:
             logging.info(f"DUMMY_METRIC_NODE: {metrics}")
 
 
-# Configure logging with rotation
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+try:
+    from src.logging_config import configure as _configure_logging
+except ModuleNotFoundError:
+    from logging_config import configure as _configure_logging
+_configure_logging()
+logger = logging.getLogger(__name__)
 
 # Constants
 DEFAULT_NODE_TIMEOUT = 30.0  # seconds

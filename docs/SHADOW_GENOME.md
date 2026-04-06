@@ -241,4 +241,44 @@ When rewiring imports away from a God file, grep for ALL symbols imported from t
 Plan revision required. VETO issued.
 
 ---
+
+## Failure Entry #13
+
+**Date**: 2026-04-05T00:00:00Z
+**Verdict ID**: GATE-TRIBUNAL-CLEANUP-2026-04-05
+**Failure Mode**: COMPLEXITY_VIOLATION
+
+### What Failed
+Phase 2 of cleanup plan proposes splitting `src/platform/services.py` (565 lines) into two files, but the resulting `services.py` containing `AsyncServiceManager` would be ~350 lines -- exceeding the 250-line Section 4 Razor limit by 40%.
+
+### Why It Failed
+The plan estimated "~300 lines" for the post-split `services.py` without measuring the actual line range. `AsyncServiceManager` starts at line 229 and runs to line 565 (337 lines of class body). Adding an import preamble for symbols extracted to `service_imports.py` brings the total to ~350 lines. The estimate was aspirational rather than measured -- the same failure pattern documented in Shadow Genome Entry #6 and Entry #7.
+
+### Pattern to Avoid
+When splitting a file, measure the actual line count of each resulting segment BEFORE committing to the split strategy. If a single class exceeds 250 lines, the class itself must be further decomposed -- a file split alone is insufficient. Use `grep -n "class ClassName"` and `wc -l` to verify the math adds up.
+
+### Remediation Attempted
+Plan revision required. VETO issued.
+
+---
+
+## Failure Entry #10
+
+**Date**: 2026-04-05T00:00:00Z
+**Verdict ID**: GATE-TRIBUNAL-DEEP-DECOMP-2026-04-05
+**Failure Mode**: COMPLEXITY_VIOLATION
+
+### What Failed
+Deep decomposition plan (`plan-deep-decomposition.md`) -- line estimates for the five largest decomposition targets are systematically understated by 25-55%. ToolSelector class (2,779 lines) mapped to 1,250 lines of destination modules. _execute_agent_task (1,587 lines) mapped to 900 lines. STATE group (1,060 lines) mapped to 500 lines. UnifiedReasoner (5,967 lines) mapped to 4,469 lines. WorldModel slim orchestrator needs ~454 lines for 143 delegation stubs but claims 250.
+
+### Why It Failed
+This is a recurrence of the Entry #3 / Entry #6 / Entry #7 / Entry #9 pattern: aspirational line estimates rather than measured ones. Method extraction is a 1:1+ operation (output >= input due to import overhead). A plan that shows output < input is mathematically invalid -- the missing lines have no destination. The plan used a uniform "~250 lines" estimate for nearly every module without verifying that the source methods actually fit within that budget.
+
+### Pattern to Avoid
+For every decomposition target: (1) measure actual source line count with `wc -l` and `grep -n`, (2) list destination modules with method assignments, (3) verify output sum >= input sum. Do not use uniform "~250" estimates -- measure each group. This is the FOURTH time this exact failure pattern has appeared in the project history.
+
+### Remediation Attempted
+VETO issued. Plan revision required with complete line accounting for DDV-1 through DDV-5.
+
+---
 _Shadow Genome tracks failure patterns to prevent repetition._

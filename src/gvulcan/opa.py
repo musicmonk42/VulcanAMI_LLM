@@ -810,7 +810,6 @@ class PolicyRegistry:
 
 if __name__ == "__main__":
     # Example usage and testing
-    logging.basicConfig(level=logging.INFO)
 
     print("=== Testing OPA Client ===")
     client = OPAClient(bundle_version="1.0.0", enable_cache=True)

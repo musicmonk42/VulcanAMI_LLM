@@ -1453,5 +1453,4 @@ def test_principle_learning():
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
     test_principle_learning()

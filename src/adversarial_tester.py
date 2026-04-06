@@ -50,11 +50,7 @@ except ImportError:
     HAS_LIME = False
     warnings.warn("LIME not installed. Some interpretability features will be limited.")
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger("AdversarialTester")
+logger = logging.getLogger(__name__)
 
 # Constants
 GRADIENT_EPSILON = 1e-7
@@ -2189,7 +2185,6 @@ class AdversarialTester:
 
 # Example usage and testing
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
 
     # Create sample data
     np.random.seed(42)

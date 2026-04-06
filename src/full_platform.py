@@ -602,13 +602,16 @@ def setup_unified_logging():
     # File handler with explicit UTF-8 encoding
     file_handler = logging.FileHandler("unified_platform.log", encoding="utf-8")
 
-    # Configure logging with UTF-8 handlers
-    logging.basicConfig(
-        level=getattr(logging, settings.log_level.upper()),
-        format=settings.log_format,
-        handlers=[stdout_handler, file_handler],
-        force=True,  # Force re-configuration
+    # Attach handlers to root logger
+    fmt = logging.Formatter(
+        "%(asctime)s %(name)s %(levelname)s %(message)s"
     )
+    stdout_handler.setFormatter(fmt)
+    file_handler.setFormatter(fmt)
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+    root.addHandler(stdout_handler)
+    root.addHandler(file_handler)
 
     # Set log levels for sub-apps
     logging.getLogger("uvicorn").setLevel(logging.INFO)
@@ -620,18 +623,10 @@ def setup_unified_logging():
 
 # NOTE: setup_unified_logging() is NO LONGER called here.
 # It is now called inside the lifespan() function.
-logger = logging.getLogger("unified_platform")
+logger = logging.getLogger(__name__)
 
 # Multi-worker warning (this will still log from the watcher process)
 if settings.workers > 1 and settings.warn_on_multi_worker:
-    # We must configure logging here *just for this warning*
-    # It will be re-configured by the worker later.
-    logging.basicConfig(
-        level=getattr(logging, settings.log_level.upper()),
-        format=settings.log_format,
-        handlers=[logging.StreamHandler(sys.stdout)],
-        force=True,
-    )
     logger.warning("=" * 70)
     logger.warning("⚠️  MULTI-WORKER MODE DETECTED")
     logger.warning("=" * 70)

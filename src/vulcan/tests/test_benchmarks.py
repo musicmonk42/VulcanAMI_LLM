@@ -295,7 +295,6 @@ def run_all_benchmarks() -> Dict[str, Any]:
 
 if __name__ == "__main__":
     # Run benchmarks if executed directly
-    logging.basicConfig(level=logging.INFO)
     results = run_all_benchmarks()
     print(f"\nBenchmark Results:")
     print(f"Total time: {results['total_time']:.2f}s")

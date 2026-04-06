@@ -3518,9 +3518,6 @@ def reset_nso_aligner():
 # ============================================================
 
 if __name__ == "__main__":
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s - %(message)s"
-    )
 
     # Mock LLM clients for demonstration
     class MockLLMClient:
