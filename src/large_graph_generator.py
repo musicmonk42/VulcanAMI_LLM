@@ -9,7 +9,10 @@ import logging
 import random
 from typing import Any, Dict, List, Optional
 
-from src.logging_config import configure as _configure_logging
+try:
+    from src.logging_config import configure as _configure_logging
+except ModuleNotFoundError:
+    from logging_config import configure as _configure_logging
 _configure_logging()
 logger = logging.getLogger("LargeGraphGenerator")
 

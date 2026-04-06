@@ -144,7 +144,10 @@ else:
     CSV_REPORT = Path("load_test_report.csv")
     PROM_REPORT = Path("prometheus_metrics.txt")
 
-from src.logging_config import configure as _configure_logging
+try:
+    from src.logging_config import configure as _configure_logging
+except ModuleNotFoundError:
+    from logging_config import configure as _configure_logging
 _configure_logging()
 
 logger = logging.getLogger("LoadTest")

@@ -602,6 +602,17 @@ def setup_unified_logging():
     # File handler with explicit UTF-8 encoding
     file_handler = logging.FileHandler("unified_platform.log", encoding="utf-8")
 
+    # Attach handlers to root logger
+    fmt = logging.Formatter(
+        "%(asctime)s %(name)s %(levelname)s %(message)s"
+    )
+    stdout_handler.setFormatter(fmt)
+    file_handler.setFormatter(fmt)
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+    root.addHandler(stdout_handler)
+    root.addHandler(file_handler)
+
     # Set log levels for sub-apps
     logging.getLogger("uvicorn").setLevel(logging.INFO)
     logging.getLogger("fastapi").setLevel(logging.INFO)

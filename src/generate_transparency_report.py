@@ -137,7 +137,10 @@ MAX_AUDIT_LOG_LINES = 100000
 ANOMALY_THRESHOLD_STDDEV = 3.0  # Statistical threshold
 MIN_SAMPLES_FOR_ANOMALY = 5
 
-from src.logging_config import configure as _configure_logging
+try:
+    from src.logging_config import configure as _configure_logging
+except ModuleNotFoundError:
+    from logging_config import configure as _configure_logging
 _configure_logging()
 logger = logging.getLogger(__name__)
 
