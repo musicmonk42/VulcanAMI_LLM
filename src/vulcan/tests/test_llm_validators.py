@@ -469,6 +469,9 @@ class TestWorldModelIntegration:
         from vulcan.safety.llm_validators import EnhancedSafetyValidator
 
         wm = MagicMock()
+        # confidence must return a real float so HallucinationValidator
+        # can do arithmetic on it without TypeError
+        wm.confidence.return_value = 0.9
         wm.validate_generation.return_value = False
         wm.suggest_correction.return_value = "corrected_token"
 

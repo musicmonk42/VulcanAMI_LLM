@@ -1,689 +1,315 @@
-# Graphix Vulcan 
+<div align="center">
 
- software owned and created by Brian D Anderson Novatrax Labs LTD. 
-Patents pending
+# Vulcan AMI
 
+**Adaptive Machine Intelligence — Multi-Modal Reasoning with Safety Governance**
 
-Last updated: 2024-12-14
+[![CI](https://github.com/musicmonk42/VulcanAMI_LLM/actions/workflows/ci.yml/badge.svg)](https://github.com/musicmonk42/VulcanAMI_LLM/actions/workflows/ci.yml)
+[![Security](https://github.com/musicmonk42/VulcanAMI_LLM/actions/workflows/security.yml/badge.svg)](https://github.com/musicmonk42/VulcanAMI_LLM/actions/workflows/security.yml)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](docker/)
 
----
+*Created by Brian D. Anderson — Novatrax Labs LTD*
 
-## Overview
-
-Vulcan AMI (Adaptive Machine Intelligence) is Novatrax’s AI-native graph execution and governance platform. It enables you to:
-
-- Represent complex AI and data workflows as a typed, JSON-based intermediate representation (IR).
-- Validate and execute the graph as a safe, observable, and scalable DAG.
-- Govern changes to graphs via a trust-weighted consensus engine with policy hooks.
-- Collect deep observability (latency, errors, counters, disk/cleanup) and export to Prometheus/Grafana.
-- Audit sensitive actions to a secure store with optional alerting (e.g., Slack).
-
-Typical use cases
-- Safety-governed agentic systems
-- Provenance-aware ML operations
-- Orchestrating LLM and tool pipelines with control and visibility
-- Policy-driven evolution of workflows across teams
+</div>
 
 ---
 
-## Key Benefits
+## Table of Contents
 
-### 🧠 **Frontier AGI Technology**
-- **VULCAN-AMI Cognitive Architecture**: Complete reasoning system with causal inference, meta-cognition, and self-awareness (285,000+ lines of code)
-- **World Model Orchestration (NEW)**: LLMs only format verified content - reasoning engines compute, knowledge systems verify, LLMs present
-- **Hybrid Symbolic-Subsymbolic AI**: Combines explainability of logic with adaptability of neural networks
-- **Autonomous Self-Improvement**: System learns and improves its own reasoning without manual intervention
-- **Multi-Modal Reasoning**: Cross-domain inference across vision, language, and structured data
-
-### 🔒 **Production-Grade Security & Governance**
-- **Trust-Weighted Consensus**: Multi-stakeholder voting with reputation-based weights for collaborative AI governance
-- **Comprehensive Audit Trails**: SQLite-backed immutable logs with WAL mode and integrity checks
-- **Privacy-Preserving Unlearning**: GDPR-compliant data removal with cryptographic verification (legally required in EU)
-- **Rate Limiting & Authentication**: JWT/API key layers with Redis-backed throttling and DDoS protection
-
-### 📊 **Complete Observability**
-- **Prometheus Integration**: Latency histograms (p50/p95/p99), error rates, cache hits, resource usage
-- **Grafana Dashboards**: Auto-generated visualizations with alert threshold examples
-- **Causal Attribution**: Every decision traceable to its reasoning path for full explainability
-- **Real-Time Monitoring**: Live metrics for all system components and execution flows
-
-### ⚡ **Optimized Performance**
-- **Graph Compilation**: 10-100x speedup via LLVM-based compilation to native machine code
-- **Hardware Agnostic**: Supports CPU, GPU, and future hardware (photonic computing, memristor arrays)
-- **Persistent Memory v46**: S3-backed storage with CloudFront CDN acceleration and LSM tree optimization
-- **Distributed Execution**: Horizontal scaling with Kubernetes orchestration and auto-scaling
-- **Autonomous Evolution**: Metaprogramming node handlers enable self-improving graphs (8 handlers, 59 tests, 100% passing)
-
-### 🎯 **Features**
-- **Docker & Kubernetes**: Production deployment patterns with Helm charts and multi-environment configs
-- **Reproducible Builds**: 4,007 SHA256-hashed dependencies, 100% pinned versions for supply chain security
-- **Comprehensive Testing**: 43% test coverage with 89 test files, 42+ CI/CD checks, and 29 reproducibility scenarios
-- **Complete Documentation**: 96 markdown files covering architecture, APIs, deployment, security, and operations
-- **Metaprogramming Features**: Autonomous graph evolution with PATTERN_COMPILE, FIND_SUBGRAPH, GRAPH_SPLICE, GRAPH_COMMIT handlers ([docs/METAPROGRAMMING_DEPLOYMENT.md](docs/METAPROGRAMMING_DEPLOYMENT.md))
+- [Mission](#mission)
+- [What Vulcan Does](#what-vulcan-does)
+- [Architecture](#architecture)
+- [Reasoning Pipeline](#reasoning-pipeline)
+- [Safety & Governance](#safety--governance)
+- [Key Subsystems](#key-subsystems)
+- [Maturity Status](#maturity-status)
+- [Quick Start](#quick-start)
+- [Configuration](#configuration)
+- [Deployment](#deployment)
+- [Testing](#testing)
+- [Documentation Index](#documentation-index)
+- [Security](#security)
+- [License](#license)
 
 ---
 
-## Key Capabilities
+## Mission
 
-- **Graph IR and validation**
- - Typed nodes/edges with size limits, unique IDs, and cycle detection.
- - Policy hooks to extend validation for domain and safety rules.
- - **NEW**: 8 metaprogramming node handlers (PATTERN_COMPILE, FIND_SUBGRAPH, GRAPH_SPLICE, GRAPH_COMMIT, NSO_MODIFY, ETHICAL_LABEL, EVAL, HALT)
+Vulcan bridges the gap between symbolic reasoning and neural AI by providing a safe, auditable execution fabric for autonomous intelligence.
 
-- **Executor**
- - Concurrent, layerized execution for DAGs with per-node error handling and timeouts.
- - Extensible node types (input, transform, filter, generative, combine, output).
- - Observability and audit integrated at node and graph levels.
- - **NEW**: GraphAwareEvolutionEngine with dual-mode operation (metaprogramming + dict fallback)
-
-- **Governance and consensus**
- - Trust-weighted voting (approve/reject/abstain) with quorum thresholds.
- - Proposal lifecycle (draft/open/approved/rejected/expired/applied/failed).
- - Optional VULCAN world-model assessment hooks for additional risk/context checks.
- - Thread-safe operations with periodic cleanup of expired proposals.
- - **NEW**: NSO authorization and ethical labeling for autonomous graph modifications
-
-- **Observability and dashboards**
- - Prometheus metrics: latency histograms (p50/p95), errors, explainability gauges, cleanup stats, disk usage, and more.
- - Auto-generated Grafana dashboard JSON export with example alert thresholds.
-
-- **Security and audit**
- - SQLite-backed audit trail with WAL, integrity checks, and recovery routines.
- - Selective alerting to channels (e.g., Slack) with severity filtering and stats.
- - Rate limiting and JWT/API key layers for service endpoints.
- - **NEW**: Multi-layer defense for graph self-modification (fail-safe defaults, complete audit trail, version control)
+It is not an LLM wrapper. It is a **cognitive architecture** that coordinates multiple reasoning engines — causal, probabilistic, symbolic, analogical, philosophical — under a unified safety governance layer, with cryptographic accountability at every step.
 
 ---
 
-## System requirements
+## What Vulcan Does
 
-- Operating system: Linux x86_64 (recommended), macOS (development)
-- Python: 3.11+
-- Optional services:
- - Redis (rate limiting and caching)
- - Prometheus (metrics scrape) and Grafana (dashboards)
- - Slack Incoming Webhook (security alerts)
-- Storage:
- - SQLite by default (embedded); external DB may be supported under enterprise deployment
+**For AI researchers**: A platform for composing heterogeneous reasoning systems with formal safety constraints and trust-weighted governance.
 
-Note: Platform components and integrations are configurable; enterprise deployment patterns may differ from development defaults.
+**For engineers**: A modular Python framework with FastAPI endpoints, Prometheus observability, Docker/K8s deployment, and a graph execution engine with content-addressable storage.
 
----
+**For organizations**: An auditable AI system where every decision is traceable to its reasoning path, every change requires consensus, and every data removal is cryptographically verifiable.
 
-## Quick start (development)
+### Core Capabilities
 
-**📚 New to the project?** See [docs/NEW_ENGINEER_SETUP.md](docs/NEW_ENGINEER_SETUP.md) for step-by-step Docker, Kubernetes, and Helm deployment instructions.
-
-**⚡ Quick Reference:** See [docs/QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md) for common commands and troubleshooting.
-
-Important: The steps below are for internal or licensed development environments only. Do not expose development services to the public internet.
-
-1) Clone and environment
-```bash
-git clone <your-internal-repo-url> graphix_vulcan
-cd graphix_vulcan
-python -m venv .venv
-source .venv/bin/activate # Windows: .venv\Scripts\activate
-```
-
-2) Install
-```bash
-pip install --upgrade pip
-pip install -r requirements.txt
-
-# For development (includes testing, linting, and code quality tools)
-pip install -r requirements-dev.txt
-```
-
-3) Configure environment
-Set required secrets via environment variables or a secure secret manager. At minimum:
-```bash
-# Use .env.example as a template
-cp .env.example .env
-# Edit .env and set the following variables:
-# - JWT_SECRET_KEY=<strong-unique-secret>
-# - BOOTSTRAP_KEY=<one-time-bootstrap-secret> # only needed to create the initial admin/agent
-# - REDIS_URL=redis://<host>:<port> # optional; falls back to in-memory rate limiting
-# - AUDIT_DB_PATH=./audit.db # default shown; secure paths recommended in production
-# - SLACK_WEBHOOK_URL=<optional-for-alerts>
-# - HOST=127.0.0.1 # SECURITY: localhost binding (change to 0.0.0.0 for containers)
-# - API_HOST=127.0.0.1 # SECURITY: localhost binding (change to 0.0.0.0 for containers)
-
-Example (development only):
-```bash
-export JWT_SECRET_KEY="dev-only-change-me"
-export BOOTSTRAP_KEY="dev-bootstrap"
-export REDIS_URL="redis://localhost:6379"
-export AUDIT_DB_PATH="./audit.db"
-export HOST="127.0.0.1" # Secure default - localhost only
-export API_HOST="127.0.0.1" # Secure default - localhost only
-# export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
-```
-
-4) Start a service
-
-Option A — Registry API (Flask)
-```bash
-python app.py
-# Health check: curl http://127.0.0.1:5000/health
-# Metrics (if enabled): curl http://127.0.0.1:5000/metrics
-```
-
-Option B — Arena API (FastAPI)
-```bash
-# SECURITY NOTE: Defaults to 127.0.0.1 (localhost only)
-# For Docker/container deployment, set HOST=0.0.0.0 in environment
-uvicorn src.graphix_arena:app --host 127.0.0.1 --port 8000 --reload
-# Health check: curl http://127.0.0.1:8000/health
-# Metrics (if enabled): curl http://127.0.0.1:8000/metrics
-```
-
-5) Minimal executor demo (local)
-```bash
-python src/minimal_executor.py
-```
-
-6) **Interactive CLI (NEW - v2.0.0)** 🆕
-```bash
-# Cross-platform interactive command-line interface
-# Works on Windows, Linux, and macOS
-python -m vulcan.cli
-
-# Configure with environment variables
-export VULCAN_SERVER_URL=http://localhost:8000
-export VULCAN_API_KEY=your-api-key-here
-
-# Available commands: query, status, memory, config, help, exit
-# Features: command history, tab completion, syntax colors
-# See docs/CLI_USAGE.md for complete documentation
-```
-
-Notes
-- The services above are alternative entry points commonly used during development. Your licensed deployment may provide a consolidated or managed runtime with additional controls.
-- Do not use development defaults in production.
-
-### Validation & CI/CD
-
-This repository includes comprehensive validation and testing tooling to ensure reproducible builds and correct CI/CD configuration:
-
-```bash
-# ⭐ NEW: Simulate all possible reproducibility build scenarios (RECOMMENDED)
-./simulate_all_builds.sh --skip-docker # Full validation (29 scenarios)
-./simulate_all_builds.sh --quick # Quick validation before commits
-
-# Quick validation (recommended before commits)
-./quick_test.sh quick
-
-# Quick validation of specific components
-./quick_test.sh docker # Docker tests only
-./quick_test.sh security # Security tests only
-./quick_test.sh k8s # Kubernetes tests only
-
-# Full comprehensive test suite (42+ checks)
-./test_full_cicd.sh
-
-# Run pytest test suite
-pytest tests/test_cicd_reproducibility.py -v
-
-# Run existing validation script
-./validate_cicd_docker.sh
-```
-
-**What is validated:**
-- ✅ All possible reproducibility build scenarios (29 scenarios tested)
-- ✅ Docker and Docker Compose v2 configurations
-- ✅ Hash-verified dependencies (requirements-hashed.txt with 4,007 SHA256 hashes)
-- ✅ Docker security features (non-root user, health checks, JWT validation)
-- ✅ GitHub Actions workflows (YAML validation)
-- ✅ Kubernetes manifests (multi-document YAML support)
-- ✅ Helm charts (lint validation)
-- ✅ Security configuration (no committed secrets)
-- ✅ Reproducibility settings (pinned versions)
-- ✅ Python dependencies (440 pinned packages, no vulnerabilities)
-
-**### Test Files:** 245 comprehensive test files
-- **Test Functions:** 11,811 test functions (54.9% coverage)
-- **Test Classes:** 2,361 test classes
-- **Test Categories:**
- - 90 files in tests/ directory (standard suite)
- - 124 files in src/vulcan/tests/ (VULCAN subsystem tests)
- - 3 files in stress_tests/ (performance tests)
- - 28 files embedded in other locations
-
-**Expected output:**
-```
-Total Scenarios Tested: 29
-Passed: 25 (✓)
-Failed: 0 (✗)
-Skipped: 4 (⊘)
-Pass Rate: 100%
-
-Status: ✅ 100% READY FOR DEVELOPMENT ✓
-```
-
-**Docker Compose v2 Note**: This repository uses modern Docker Compose v2 syntax (`docker compose` not `docker-compose`). Docker Compose v2 is bundled with Docker Engine 20.10.13+.
-
-For comprehensive testing documentation, see:
-- **[docs/TESTING_GUIDE.md](docs/TESTING_GUIDE.md)** - Complete testing guide
-- [docs/CI_CD.md](docs/CI_CD.md) - CI/CD pipeline documentation
-- [docs/REPRODUCIBLE_BUILDS.md](docs/REPRODUCIBLE_BUILDS.md) - Reproducible build guide
-- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) - Deployment instructions
+| Capability | Description | Status |
+|-----------|-------------|--------|
+| Multi-modal reasoning | Causal, probabilistic, symbolic, analogical, philosophical engines | Production |
+| Safety governance | Multi-layer validation, trust-weighted consensus, ethical boundaries | Production |
+| Graph execution | Typed DAG with validation pipeline, concurrent execution, policy hooks | Production |
+| Tool selection | ML-based selection (LightGBM, Bayesian priors, isotonic calibration) | Production |
+| Cryptographic audit | Tamper-evident hash chains, ZK-SNARK proofs (Groth16/bn128) | Production |
+| Memory hierarchy | Runtime + persistent (S3-backed LSM tree) + governed unlearning | Implemented |
+| Self-improvement | LLM-driven code generation with AST validation and governed pipeline | Experimental |
+| Hardware abstraction | CPU/GPU dispatch with photonic/memristor/quantum emulation layer | Scaffolding |
 
 ---
 
-## Configuration reference (selected)
-
-Authentication and authorization
-- JWT_SECRET_KEY: required for JWT signing/verification (Registry API)
-- API keys: X-API-Key header (Arena API), if enabled
-- BOOTSTRAP_KEY: one-time onboarding key to create the first admin/agent
-
-Rate limiting and caching
-- REDIS_URL: if present, used as the rate-limit backend; otherwise in-memory fallback is used (development only)
-
-Observability
-- Exposes Prometheus metrics when enabled; ensure your service exports a /metrics endpoint using the provided registry
-- Grafana dashboard JSON export available from the observability manager
-
-Security auditing
-- AUDIT_DB_PATH: path to the SQLite audit database
-- SLACK_WEBHOOK_URL: optional, to receive high-severity alerts
-- Retention and cleanup settings are configurable in code or via env in managed deployments
-
-Governance and consensus
-- Quorum, approval thresholds, and expiry settings are tunable; defaults provided in code are development-friendly
-
----
-
-## Architecture (high level)
-
-VulcanAMI is structured as a **layered AI operating system** that integrates multiple sophisticated components:
+## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ API Layer (Flask/FastAPI) │
-│ Registry API | Arena API | Gateway | Health │
+│                    API Layer (FastAPI)                       │
+│          Unified Platform · Health · Auth · Docs             │
 ├─────────────────────────────────────────────────────────────┤
-│ Governance Layer │
-│ Trust-Weighted Consensus | Policy Enforcement | Voting │
+│                  Safety & Governance                        │
+│   Consensus Protocol · Safety Validator · Audit Logger      │
+│   Trust-Weighted Voting · Ethical Boundaries · Alignment    │
 ├─────────────────────────────────────────────────────────────┤
-│ VULCAN-AMI Core (285,000+ LOC) │
-│ ┌──────────────┬──────────────┬──────────────────────────┐ │
-│ │ Reasoning │ World Model │ Meta-Reasoning (Self- │ │
-│ │ Systems │ (Causal) │ Improvement/Awareness) │ │
-│ ├──────────────┼──────────────┼──────────────────────────┤ │
-│ │ Memory │ Planning │ Safety & Ethics │ │
-│ │ Hierarchy │ Engine │ Boundaries (CSIU) │ │
-│ └──────────────┴──────────────┴──────────────────────────┘ │
+│               Reasoning & Orchestration                     │
+│  ┌────────────┬────────────┬─────────────┬───────────────┐  │
+│  │   World    │  Unified   │    Tool     │    Agent      │  │
+│  │   Model    │  Reasoner  │  Selector   │    Pool       │  │
+│  │ (request   │ (strategy  │ (ML-based   │ (lifecycle,   │  │
+│  │  dispatch) │  planning) │  selection) │  execution)   │  │
+│  └────────────┴────────────┴─────────────┴───────────────┘  │
 ├─────────────────────────────────────────────────────────────┤
-│ Graph Execution & Compilation Layer │
-│ GraphixIR Compiler | Unified Runtime | LLM Core (3.2K LOC) │
+│                Reasoning Engines                            │
+│  Causal · Probabilistic · Symbolic · Analogical             │
+│  Mathematical · Philosophical · Creative · Multi-Modal      │
 ├─────────────────────────────────────────────────────────────┤
-│ Persistent Memory v46 (5.3K LOC) - Storage Layer │
-│ Graph RAG | LSM Tree | Unlearning | ZK Proofs | S3/CDN │
+│              Graph Execution (gvulcan)                       │
+│  Content-Addressable Storage · Merkle Trees · Bloom Filters │
+│  Packfiles · S3 Backend · Milvus Vector Store · ZK Proofs   │
 ├─────────────────────────────────────────────────────────────┤
-│ Observability & Security Layer │
-│ Prometheus | Grafana | Audit Logs | Security Scanning │
+│             Memory & Persistence                            │
+│  Hierarchical Memory · LSM Tree · Graph RAG                 │
+│  Governed Unlearning · Cost Optimization                    │
 ├─────────────────────────────────────────────────────────────┤
-│ Infrastructure & Deployment │
-│ Docker/K8s | Helm Charts | Redis | SQLite/PostgreSQL │
+│            Observability & Infrastructure                   │
+│  Prometheus · Grafana · Docker/K8s · Helm · Redis · SQLite  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### Core Components
-
-- **VULCAN-AMI Cognitive Architecture**
- - Causal reasoning with interventions and counterfactual simulation
- - Meta-reasoning with CSIU framework (Curiosity, Safety, Impact, Uncertainty)
- - Autonomous self-improvement and motivational introspection
- - Multi-modal reasoning across domains
-
-- **Graph IR and Validation**
- - JSON schema capturing nodes, edges, metadata, and policy constraints
- - Structural validation (node/edge shapes, references, cycles, size limits)
- - Policy and safety hooks (custom domain validators)
- - LLVM-based compilation for 10-100x performance optimization
-
-- **Execution Engine**
- - DAG scheduler with layerized concurrency
- - Per-node handlers (transform/filter/generative/combine/etc.)
- - Per-node timeouts, error taxonomy, and outcomes
- - Hardware-agnostic execution (CPU, GPU, future hardware)
-
-- **Governance and Consensus**
- - Proposals (draft → open → approved/rejected → applied/failed)
- - Trust-weighted votes with quorum and approval thresholds
- - Application layer applies IR mutations safely with rollback capability
- - Audit and observability integrated at every stage
-
-- **Persistent Memory v46**
- - Graph RAG for intelligent retrieval
- - Log-Structured Merge (LSM) tree for high-performance storage
- - Machine unlearning with cryptographic verification (GDPR compliance)
- - S3-backed with CloudFront CDN for global distribution
-
-- **Observability**
- - Prometheus metrics via per-process registry
- - Dashboard JSON (Grafana) and alert examples
- - Causal attribution for explainability
- - Real-time performance monitoring
-
-- **Security and Audit**
- - Persistent audit DB with WAL mode and integrity checks
- - Selective alerting to channels with severity/type filters
- - JWT/API key authentication with rate limiting
- - Security scanning integrated into CI/CD
-
-**For complete architecture documentation, see:**
-- [docs/ARCHITECTURE_OVERVIEW.md](docs/ARCHITECTURE_OVERVIEW.md) - Full system architecture
-- [docs/COMPREHENSIVE_REPO_OVERVIEW.md](docs/COMPREHENSIVE_REPO_OVERVIEW.md) - Repository overview
-- [docs/INDEX.md](docs/INDEX.md) - Documentation index
-
 ---
 
-## APIs (indicative)
+## Reasoning Pipeline
 
-Registry API (Flask)
-- POST /registry/bootstrap: guarded bootstrap to create the first agent/admin
-- POST /auth/login: returns JWT for authenticated calls
-- POST /registry/onboard: onboard/register agents
-- POST /ir/propose: submit IR proposals for governance
-- GET /audit/logs: query audit events
-- GET /health: liveness check
-- GET /metrics: Prometheus exposition (if enabled)
+When a query arrives, Vulcan processes it through a structured pipeline:
 
-Arena API (FastAPI)
-- API key middleware via X-API-Key (if enabled)
-- Endpoints for controlled graph execution and orchestration
-- Health/metrics endpoints are recommended in managed deployments
-
-Note: Exact routes may vary by version and deployment profile. Refer to your internal API reference for authoritative schemas and authentication flows.
-
----
-
-## Security, privacy, and compliance
-
-- Secrets: Never commit secrets to version control. Use a secret manager or encrypted env injection.
-- Data handling: Audit logs and metrics may include metadata about workflows and agents. Configure retention and access controls per your policy.
-- Network: Place services behind authenticated gateways. Use TLS/HTTPS in all environments outside local development.
-- Least privilege: Restrict DB and Redis access to the minimal required scope. Rotate credentials periodically.
-- Hardening: Enable rate limiting, input validation, and governance checks before executing externally controlled graphs.
-- Responsible disclosure: Report suspected vulnerabilities to your Novatrax account team or the designated security contact in your agreement. Do not post vulnerabilities publicly.
-
----
-
-## Deployment notes
-
-This repository supports multiple deployment options:
-
-### Local Development
-- Docker Compose for local development and testing
-- Quick start: `docker compose up -d`
-
-### Production Deployment Options
-
-**Kubernetes (Recommended)**
-- Kustomize overlays for different environments (development, staging, production)
-- Helm charts for templated deployments
-- Automated deployment scripts for validation and deployment
- - `./scripts/validate-deployment.sh <environment>` - Pre-deployment validation
- - `./scripts/deploy.sh <environment> --image-tag <version>` - Automated deployment
-- See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for detailed instructions
-
-**Azure Kubernetes Service (AKS)**
-- Automated GitHub Actions workflow included
-- CI/CD pipeline with `.github/workflows/azure-kubernetes-service-helm.yml`
-- **Prerequisites**: Configure `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, and `AZURE_SUBSCRIPTION_ID` secrets
-- See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#4-azure-aks-deployment) and [docs/CI_CD.md](docs/CI_CD.md#azure-aks-deployment-workflow) for setup
-
-**Other Cloud Providers**
-- Google GKE
-- AWS EKS
-- Tencent TKE (workflow included)
-
-### Best Practices
-- Production deployments are typically containerized and run behind an API gateway with centralized auth, logging, and metrics scrape.
-- A single primary entry point is recommended per service image (avoid running multiple servers in the same container unless directed by Novatrax).
-- Externalize configuration and secrets; disable debug/reload modes; enforce TLS and strict CORS as applicable.
-- For horizontal scaling, use a durable store for governance and audit, and coordinate idempotent apply operations.
-
----
-
-## Support and updates
-
-- Enterprise customers should contact their Novatrax Labs account team for support, onboarding, and SLAs.
-- New versions, patches, and security advisories are communicated via your agreed channel.
-- Compatibility and migration guidance are provided with each release.
-
----
-
-## Licensing
-
-Copyright (C) 2026 Brian D. Anderson and Novatrax Labs
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
----------------------------------------------------------------------
-
-GNU GENERAL PUBLIC LICENSE
-Version 3, 29 June 2007
-
-Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>
-Everyone is permitted to copy and distribute verbatim copies
-of this license document, but changing it is not allowed.
-
-                            Preamble
-
-The GNU General Public License is a free, copyleft license for
-software and other kinds of works.
-
-The licenses for most software and other practical works are designed
-to take away your freedom to share and change the works. By contrast,
-the GNU General Public License is intended to guarantee your freedom to
-share and change all versions of a program--to make sure it remains free
-software for all its users. We, the Free Software Foundation, use the
-GNU General Public License for most of our software; it applies also to
-any other work released this way by its authors. You can apply it to
-your programs, too.
-
-When we speak of free software, we are referring to freedom, not
-price. Our General Public Licenses are designed to make sure that you
-have the freedom to distribute copies of free software (and charge for
-them if you wish), that you receive source code or can get it if you
-want it, that you can change the software or use pieces of it in new
-free programs, and that you know you can do these things.
-
-To protect your rights, we need to prevent others from denying you
-these rights or asking you to surrender the rights. Therefore, you have
-certain responsibilities if you distribute copies of the software, or if
-you modify it: responsibilities to respect the freedom of others.
-
-For example, if you distribute copies of such a program, whether
-gratis or for a fee, you must pass on to the recipients the same
-freedoms that you received. You must make sure that they, too, receive
-or can get the source code. And you must show them these terms so they
-know their rights.
-
-Developers that use the GNU GPL protect your rights with two steps:
-(1) assert copyright on the software, and (2) offer you this License
-giving you legal permission to copy, distribute and/or modify it.
-
-For the developers' and authors' protection, the GPL clearly explains
-that there is no warranty for this free software. For both users' and
-authors' sake, the GPL requires that modified versions be marked as
-changed, so that their problems will not be attributed erroneously to
-authors of previous versions.
-
-Some devices are designed to deny users access to install or run
-modified versions of the software inside them, although the manufacturer
-can do so. This is fundamentally incompatible with the aim of protecting
-users' freedom to change the software. The systematic pattern of such
-abuse occurs in the area of products for individuals to use, which is
-precisely where it is most unacceptable. Therefore, we have designed
-this version of the GPL to prohibit the practice for those products.
-If such problems arise substantially in other domains, we stand ready
-to extend this provision to those domains in future versions of the GPL,
-as needed to protect the freedom of users.
-
-Finally, every program is threatened constantly by software patents.
-States should not allow patents to restrict development and use of
-software on general-purpose computers, but in those that do, we wish to
-avoid the special danger that patents applied to a free program could
-make it effectively proprietary. To prevent this, the GPL assures that
-patents cannot be used to render the program non-free.
-
-The precise terms and conditions for copying, distribution and
-modification follow.
-
-                       TERMS AND CONDITIONS
-
-0. Definitions.
-
-"This License" refers to version 3 of the GNU General Public License.
-
-"Copyright" also means copyright-like laws that apply to other kinds of
-works, such as semiconductor masks.
-
-"The Program" refers to any copyrightable work licensed under this
-License. Each licensee is addressed as "you". "Licensees" and
-"recipients" may be individuals or organizations.
-
-To "modify" a work means to copy from or adapt all or part of the work
-in a fashion requiring copyright permission, other than the making of an
-exact copy. The resulting work is called a "modified version" of the
-earlier work or a work "based on" the earlier work.
-
-A "covered work" means either the unmodified Program or a work based
-on the Program.
-
-To "propagate" a work means to do anything with it that, without
-permission, would make you directly or secondarily liable for
-infringement under applicable copyright law, except executing it on a
-computer or modifying a private copy. Propagation includes copying,
-distribution (with or without modification), making available to the
-public, and in some countries other activities as well.
-
-To "convey" a work means any kind of propagation that enables other
-parties to make or receive copies. Mere interaction with a user through
-a computer network, with no transfer of a copy, is not conveying.
-
-[... SNIPPED ONLY HERE FOR MESSAGE LENGTH — IN YOUR FILE KEEP THE REST UNCHANGED ...]
-
-                     END OF TERMS AND CONDITIONS
-
-            How to Apply These Terms to Your New Programs
-
-If you develop a new program, and you want it to be of the greatest
-possible use to the public, the best way to achieve this is to make it
-free software which everyone can redistribute and change under these terms.
-
-To do so, attach the following notices to the program. It is safest
-to attach them to the start of each source file to most effectively
-state the exclusion of warranty; and each file should have at least
-the "copyright" line and a pointer to where the full notice is found.
-
-    <one line to give the program's name and a brief idea of what it does.>
-    Copyright (C) 2026 Brian D. Anderson and Novatrax Labs
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program. If not, see <https://www.gnu.org/licenses/>.
-
----
-
-## Acknowledgments
-
-This product may integrate with or interoperate alongside third-party components and services under their respective terms. Such third-party terms do not grant any rights in Novatrax proprietary software.
-
----
-
-## Feedback
-
-For feature requests or questions, contact your Novatrax Labs representative. Please do not open public issues or discussions unless explicitly permitted in your agreement.
-
----
-
-## Distillation Module Updates (v1.1.0)
-
-### Recent Critical Fixes
-
-#### Issue #1: Non-Blocking Webhook Delivery (P0)
-**Problem:** Training trigger webhooks blocked user requests for 10+ seconds.  
-**Solution:** Asynchronous webhook delivery using background daemon threads.  
-**Impact:** User requests now return in ~1ms (99.99% improvement).
-
-**Configuration (Helm):**
-```yaml
-distillation:
-  training:
-    webhookUrl: "https://training-server.example.com/api/v1/trigger"
-    triggerThreshold: 500  # Trigger after N captured examples
-    webhookTimeoutSeconds: 10  # Background timeout (fire-and-forget)
+```
+Query → Classification → Strategy Selection → Tool Selection → Engine Execution → Safety Validation → Response
 ```
 
-**Configuration (Environment Variables):**
+1. **Classification** — The World Model categorizes the query (reasoning, knowledge, creative, ethical, conversational)
+2. **Strategy** — The Unified Reasoner selects a strategy (portfolio, parallel, ensemble, adaptive, hierarchical)
+3. **Tool Selection** — ML-based scoring with LightGBM cost prediction, Bayesian memory priors, and confidence calibration
+4. **Execution** — The selected reasoning engine processes the query (causal inference, symbolic logic, probabilistic reasoning, etc.)
+5. **Safety** — Results pass through pattern-based validation, ethical boundary checks, and governance alignment
+6. **Formatting** — LLM guidance formats verified content for the user
+
+---
+
+## Safety & Governance
+
+Safety is not bolted on — it's load-bearing at every layer.
+
+| Layer | What It Does |
+|-------|-------------|
+| **Pattern Validation** | Detects eval/exec/subprocess injection, path traversal, and code execution attempts |
+| **Consensus Protocol** | Trust-weighted voting with 51% quorum, 66% approval threshold. Agents have configurable trust weights |
+| **Governance Alignment** | Six levels (AUTONOMOUS → EMERGENCY) with stakeholder types (USER, OPERATOR, SAFETY_OFFICER) |
+| **Ethical Boundaries** | Configurable constraints for ethical dilemma detection, principle extraction, and conflict resolution |
+| **Audit Trail** | Tamper-evident hash chains with JSONL storage and optional SQLite indexing |
+| **Secret Scanning** | Pre-commit hook (detect-secrets) blocks credential commits |
+
+**Canonical protocols** (`src/protocols/`):
+- [`ConsensusProtocol`](src/protocols/consensus.py) — Trust-weighted voting, leader election, proposal lifecycle
+- [`AuditProtocol`](src/protocols/audit.py) — Tamper-evident logging, hash chain verification, field redaction
+- [`SafetyProtocol`](src/protocols/safety.py) — Pattern matching, blacklist/whitelist, severity-tiered validation
+
+---
+
+## Key Subsystems
+
+### Graph Execution Engine (`src/gvulcan/`)
+Git-like content-addressable storage with packfiles, Merkle trees, Bloom filters, CRC32C integrity. S3-backed with local cache, compaction policies, and Milvus vector store integration. Includes a genuine **Groth16 ZK-SNARK** implementation using `py_ecc.bn128` elliptic curve pairings for cryptographic verification of data unlearning.
+
+### Curiosity Engine (`src/vulcan/curiosity_engine/`)
+Autonomous knowledge-gap detection with experiment generation, iterative design, dynamic budgeting, resource monitoring, and cycle-aware dependency graphs. Drives self-directed exploration.
+
+### Semantic Bridge (`src/vulcan/semantic_bridge/`)
+Cross-domain concept mapping with transfer engine, conflict resolution, domain registry, and caching. Enables reasoning transfer across knowledge domains.
+
+### Persistent Memory (`src/persistant_memory_v46/`)
+S3-backed durable storage with LSM-tree indexing, Graph-RAG retrieval, governed unlearning (GDPR-compliant data removal), and zero-knowledge proof verification.
+
+---
+
+## Maturity Status
+
+> Transparency about what works, what's unproven, and what's scaffolding.
+
+| Component | Lines | Tests | Maturity |
+|-----------|------:|------:|----------|
+| Reasoning pipeline (World Model, Reasoner, Tool Selector) | ~15K | 30+ | **Production** — working end-to-end |
+| Safety & governance (protocols, validators, consensus) | ~5K | 40+ | **Production** — multi-layer, tested |
+| Graph execution engine (gvulcan) | ~8K | 20+ | **Production** — content-addressable storage |
+| Platform & API (FastAPI, auth, routes) | ~6K | 15+ | **Production** — deployed on Railway |
+| Memory hierarchy (3 subsystems) | ~4K | 10+ | **Implemented** — consistency model TBD |
+| Self-improvement pipeline | ~1K | 5+ | **Experimental** — approval gate incomplete |
+| Hardware dispatch (CPU/GPU/photonic/quantum) | ~2K | 5+ | **Scaffolding** — real dispatch, emulated backends |
+| Curiosity engine | ~3K | 5+ | **Experimental** — needs production validation |
+
+---
+
+## Quick Start
+
+> **New to the project?** See [docs/NEW_ENGINEER_SETUP.md](docs/NEW_ENGINEER_SETUP.md) for detailed setup.
+> **Quick reference:** See [docs/QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md) for common commands.
+
+### Prerequisites
+
+- Python 3.11+
+- Docker (optional, for containerized deployment)
+- Redis (optional, for rate limiting)
+
+### Setup
+
 ```bash
-DISTILLATION_TRAINING_WEBHOOK_URL="https://training-server.example.com/api/v1/trigger"
-DISTILLATION_TRAINING_TRIGGER_THRESHOLD=500
+git clone https://github.com/musicmonk42/VulcanAMI_LLM.git
+cd VulcanAMI_LLM
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
 ```
 
-#### Issue #2: Dynamic Evaluation Prompts (P1)
-**Problem:** Static evaluation prompts allowed model memorization.  
-**Solution:** Dynamic prompt loading from external JSON file with sampling support.  
-**Impact:** Prevents overfitting, allows evaluation set updates without code changes.
+### Configure
 
-**Configuration (Helm):**
-```yaml
-distillation:
-  evaluator:
-    promptsPath: "config/evaluation_prompts.json"
-    sampleSize: 5  # Sample N prompts per evaluation (prevents memorization)
-    randomSeed: 42  # Optional: for reproducible sampling
-```
-
-**Configuration (Environment Variables):**
 ```bash
-DISTILLATION_EVALUATOR_PROMPTS_PATH="config/evaluation_prompts.json"
-DISTILLATION_EVALUATOR_SAMPLE_SIZE=5
-DISTILLATION_EVALUATOR_RANDOM_SEED=42  # Optional
+cp .env.example .env
+# Edit .env — at minimum set:
+#   JWT_SECRET_KEY=<strong-unique-secret>
+#   VULCAN_ENV=development  (or 'production' with full auth configured)
 ```
 
-**Evaluation Prompts File Format:**
-```json
-[
-    {
-        "prompt": "What is 2 + 2?",
-        "expected_contains": ["4"],
-        "domain": "arithmetic"
-    },
-    {
-        "prompt": "What is the capital of France?",
-        "expected_contains": ["Paris"],
-        "domain": "factual"
-    }
-]
+> **Security**: In production, auth is fail-closed. If no JWT_SECRET or API_KEY is configured and VULCAN_ENV is not `development` or `test`, the platform refuses to start.
+
+### Run
+
+```bash
+# Unified Platform (production server)
+python -m src.full_platform
+
+# Interactive CLI
+python -m vulcan.cli
+
+# Minimal executor demo
+python src/minimal_executor.py
 ```
 
-### Deployment Notes
+---
 
-1. **No Breaking Changes:** Existing deployments continue to work without modification.
-2. **Opt-In Features:** New webhook and evaluator features activate only when configured.
-3. **Safe Defaults:** Missing configurations fall back to built-in defaults.
-4. **Performance:** Webhook delivery is now non-blocking (< 1ms overhead).
-5. **Security:** All changes have passed comprehensive security review.
+## Configuration
 
-For detailed information, see:
-- `DISTILLATION_FIXES_COMPLETION_REPORT.md`
-- `DISTILLATION_FIXES_SECURITY_SUMMARY.md`
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `JWT_SECRET_KEY` | Yes (prod) | JWT signing secret |
+| `API_KEY` | Yes (prod) | API key for endpoint auth |
+| `VULCAN_ENV` | No | `production` (default), `development`, `test` |
+| `REDIS_URL` | No | Redis for rate limiting (fallback: in-memory) |
+| `AUDIT_DB_PATH` | No | SQLite audit database path |
+| `SLACK_WEBHOOK_URL` | No | Security alert webhook |
+
+See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for the full reference.
+
+---
+
+## Deployment
+
+| Method | Guide |
+|--------|-------|
+| Docker Compose | `docker compose up -d` |
+| Kubernetes (Kustomize) | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) |
+| Helm Charts | [docs/HELM_DEPLOYMENT.md](docs/HELM_DEPLOYMENT.md) |
+| Azure AKS | [docs/AZURE_SETUP_GUIDE.md](docs/AZURE_SETUP_GUIDE.md) |
+| Railway | [docs/RAILWAY_ENV_VARS.md](docs/RAILWAY_ENV_VARS.md) |
+
+CI/CD workflows: [`ci.yml`](.github/workflows/ci.yml), [`deploy.yml`](.github/workflows/deploy.yml), [`security.yml`](.github/workflows/security.yml), [`docker.yml`](.github/workflows/docker.yml)
+
+---
+
+## Testing
+
+```bash
+# Full test suite
+pytest tests/ src/vulcan/tests/ -x --tb=short
+
+# Safety-specific tests
+pytest tests/test_safety_edge_cases.py tests/test_auth_edge_cases.py tests/test_consensus_edge_cases.py -v
+
+# Protocol tests
+pytest tests/test_consensus_protocol.py tests/test_audit_protocol.py tests/test_safety_protocol.py -v
+
+# Static analysis
+pytest tests/test_no_hardcoded_secrets.py tests/test_no_nested_ternaries.py -v
+```
+
+See [docs/TESTING_GUIDE.md](docs/TESTING_GUIDE.md) for the complete testing documentation.
+
+---
+
+## Documentation Index
+
+| Document | Description |
+|----------|-------------|
+| [ARCHITECTURE_OVERVIEW.md](docs/ARCHITECTURE_OVERVIEW.md) | Full system architecture deep dive |
+| [API_DOCUMENTATION.md](docs/API_DOCUMENTATION.md) | API reference |
+| [SECURITY.md](docs/SECURITY.md) | Security model and practices |
+| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Deployment guide |
+| [TESTING_GUIDE.md](docs/TESTING_GUIDE.md) | Testing documentation |
+| [CI_CD.md](docs/CI_CD.md) | CI/CD pipeline reference |
+| [CLI_USAGE.md](docs/CLI_USAGE.md) | Interactive CLI guide |
+| [NEW_ENGINEER_SETUP.md](docs/NEW_ENGINEER_SETUP.md) | Onboarding guide |
+| [QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md) | Common commands |
+| [CONFIGURATION.md](docs/CONFIGURATION.md) | Full configuration reference |
+| [INDEX.md](docs/INDEX.md) | Complete documentation index |
+
+---
+
+## Security
+
+- **Fail-closed authentication**: Production requires configured JWT or API key credentials
+- **Secret scanning**: Pre-commit hook via [detect-secrets](https://github.com/Yelp/detect-secrets) blocks credential commits
+- **Tamper-evident audit**: Hash-chained logging with integrity verification
+- **Rate limiting**: Redis-backed throttling with DDoS protection
+- **Input validation**: Pattern-based detection of injection and code execution attempts
+
+**Reporting vulnerabilities**: Contact your Novatrax Labs representative or the designated security contact. See [docs/SECURITY.md](docs/SECURITY.md).
+
+---
+
+## License
+
+Copyright (C) 2026 Brian D. Anderson and Novatrax Labs LTD
+
+Licensed under the [GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0.en.html). See [LICENSE](LICENSE) for the full text.
+
+---
+
+<div align="center">
+
+*Vulcan AMI — Trust. Transparency. Adaptability.*
+
+</div>
