@@ -13,6 +13,13 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Protocol, runtime_checkable
 
+# Production-recommended thresholds (consolidated from 3 implementations)
+DEFAULT_QUORUM_RATIO = 0.51       # 51% participation required
+DEFAULT_APPROVAL_THRESHOLD = 0.66  # 66% weighted approval for pass
+DEFAULT_PROPOSAL_DURATION_DAYS = 7
+MIN_TRUST_WEIGHT = 0.0
+MAX_TRUST_WEIGHT = 1.0
+
 
 class ProposalStatus(str, Enum):
     DRAFT = "draft"
@@ -73,12 +80,17 @@ class ConsensusProtocol(Protocol):
 class ConsensusEngine:
     """Canonical consensus implementation with trust-weighted voting."""
 
-    def __init__(self, quorum_ratio: float = 0.5):
+    def __init__(
+        self,
+        quorum_ratio: float = DEFAULT_QUORUM_RATIO,
+        approval_threshold: float = DEFAULT_APPROVAL_THRESHOLD,
+    ):
         self._agents: dict[str, Agent] = {}
         self._proposals: dict[str, Proposal] = {}
         self._leader: str | None = None
         self._lock = threading.RLock()
         self._quorum_ratio = quorum_ratio
+        self._approval_threshold = approval_threshold
 
     def register_agent(self, agent_id: str, trust_weight: float) -> None:
         with self._lock:
@@ -129,7 +141,7 @@ class ConsensusEngine:
             if not quorum_met:
                 return {"verdict": "pending", "confidence": 0.0}
             confidence = approve_weight / total_weight if total_weight else 0
-            if confidence > 0.5:
+            if confidence > self._approval_threshold:
                 prop.status = ProposalStatus.APPROVED
                 return {"verdict": "approved", "confidence": confidence}
             prop.status = ProposalStatus.REJECTED
