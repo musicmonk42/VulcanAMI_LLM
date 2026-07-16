@@ -1,0 +1,30 @@
+name: Security Smoke Gate
+
+on:
+  pull_request:
+  push:
+    branches: [ main, work ]
+
+jobs:
+  serving-boundary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install scoped dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Run hard security smoke suite
+        env:
+          JWT_SECRET: ${{ secrets.JWT_SECRET || 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }}
+          JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY || 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' }}
+          OPENAI_API_KEY: sk-test
+          VULCAN_ENV: production
+          VULCAN_SAFETY_LEVEL: strict
+          VULCAN_ENABLE_SELF_IMPROVEMENT: 'false'
+        run: |
+          python -m py_compile src/full_platform.py src/vulcan/endpoints/unified_chat.py src/vulcan/orchestrator/dependencies.py
+          pytest -q --confcutdir=tests/security tests/security

@@ -94,6 +94,26 @@ class ReasoningEngine(Enum):
     CRYPTOGRAPHIC = "cryptographic"
 
 
+@dataclass(frozen=True)
+class UntrustedRoutingProposal:
+    """Strictly validated metadata suggested by a language model.
+
+    This type deliberately has no authority-bearing fields.  In particular, a
+    provider cannot request an engine-gate bypass or make a direct-answer
+    decision; the caller turns this proposal into a system-owned decision.
+    """
+    destination: RoutingDestination
+    engine: Optional[ReasoningEngine]
+    provider_confidence: Optional[float]
+    reason: str
+    provider: str = "llm"
+
+
+_PROPOSAL_FIELDS = frozenset({"destination", "engine", "confidence", "reason"})
+_MAX_PROPOSAL_BYTES = 4096
+_MAX_PROPOSAL_REASON_CHARS = 256
+
+
 @dataclass
 class RoutingDecision:
     """
@@ -723,17 +743,58 @@ class LLMQueryRouter:
         # Parse response
         response_text = response if isinstance(response, str) else str(response)
         
-        # Extract JSON from response
-        data = self._parse_json_response(response_text)
-        
+        proposal = self._parse_untrusted_proposal(response_text)
+        # A model proposal is never itself a routing decision.  The system keeps
+        # only enum-bounded candidate metadata and refuses model-directed SKIP.
+        destination = proposal.destination
+        if destination is RoutingDestination.SKIP:
+            destination = RoutingDestination.WORLD_MODEL
         return RoutingDecision(
-            destination=data.get("destination", "world_model"),
-            engine=data.get("engine"),
-            confidence=float(data.get("confidence", 0.8)),
-            reason=data.get("reason", "LLM classification"),
-            source="llm",
-            metadata={"inference_time_ms": inference_time * 1000},
+            destination=destination.value,
+            engine=proposal.engine.value if proposal.engine else None,
+            confidence=0.0,
+            reason="validated model routing proposal",
+            source="model_proposal",
+            metadata={
+                "inference_time_ms": inference_time * 1000,
+                "proposal_provider": proposal.provider,
+                "proposal_confidence": proposal.provider_confidence,
+                "authority_source": "deterministic_policy",
+            },
         )
+
+    def _parse_untrusted_proposal(self, response: str) -> UntrustedRoutingProposal:
+        """Parse a model response as hostile input, rejecting ambiguity and authority fields."""
+        if not isinstance(response, str) or not response or len(response.encode("utf-8")) > _MAX_PROPOSAL_BYTES:
+            raise ValueError("routing proposal is empty or exceeds its size limit")
+        cleaned = response.strip()
+        fence = re.fullmatch(r"```(?:json)?\\s*\\n?(.+?)\\n?```", cleaned, re.DOTALL)
+        if fence:
+            cleaned = fence.group(1).strip()
+
+        def reject_duplicates(pairs: List[Tuple[str, Any]]) -> Dict[str, Any]:
+            data: Dict[str, Any] = {}
+            for key, value in pairs:
+                if key in data:
+                    raise ValueError("duplicate proposal field")
+                data[key] = value
+            return data
+
+        data = json.loads(cleaned, object_pairs_hook=reject_duplicates, parse_constant=lambda _: (_ for _ in ()).throw(ValueError("non-finite number")))
+        if not isinstance(data, dict) or set(data) - _PROPOSAL_FIELDS:
+            raise ValueError("routing proposal contains unknown or authority-bearing fields")
+        try:
+            destination = RoutingDestination(data["destination"])
+            engine = ReasoningEngine(data["engine"]) if data.get("engine") else None
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError("routing proposal has an unknown destination or engine") from exc
+        confidence = data.get("confidence")
+        if confidence is not None and (not isinstance(confidence, (int, float)) or isinstance(confidence, bool) or not 0.0 <= confidence <= 1.0):
+            raise ValueError("routing proposal confidence is invalid")
+        reason = data.get("reason", "")
+        if not isinstance(reason, str) or len(reason) > _MAX_PROPOSAL_REASON_CHARS:
+            raise ValueError("routing proposal reason is invalid")
+        return UntrustedRoutingProposal(destination, engine, float(confidence) if confidence is not None else None, reason)
     
     def _parse_json_response(self, response: str) -> Dict[str, Any]:
         """

@@ -262,12 +262,12 @@ COPY --from=builder /app/static ./static
 # Copy generated SBOM (optional)
 COPY --from=builder /app/sbom.json ./sbom.json
 
-# Create writable directories for self-improvement features and Vulcan Memory System
-# These directories need to be writable by the graphix user at runtime
-# Note: /app/src is intentionally writable to enable self-improvement features
-# For higher security deployments, consider mounting a separate volume for generated code
-RUN mkdir -p /app/data /app/data/backups /app/memory_store /app/cache && \
-    chown -R graphix:graphix /app/src /app/data /app/configs /app/config /app/memory_store /app/cache
+# Production runtime immutability: source, bundled policy/config, and model assets are read-only.
+# Only explicit state/cache directories are writable by the non-root runtime user.
+RUN mkdir -p /app/data /app/data/backups /app/memory_store /app/cache /tmp/vulcan /app/models && \
+    chown -R root:root /app/src /app/configs /app/config /app/models && \
+    chmod -R a-w /app/src /app/configs /app/config /app/models && \
+    chown -R graphix:graphix /app/data /app/memory_store /app/cache /tmp/vulcan
 
 # Add hardened entrypoint script
 # This updated script enforces:
@@ -281,6 +281,9 @@ RUN chmod 0555 /app/entrypoint.sh
 # Application database location environment variable example (SQLite default)
 ENV SQLALCHEMY_DATABASE_URI="sqlite:///graphix_api.db"
 ENV PYTHONPATH=/app
+ENV VULCAN_ENV=production
+ENV VULCAN_SAFETY_LEVEL=strict
+ENV VULCAN_ENABLE_SELF_IMPROVEMENT=false
 
 # Default port for containerized deployments (can be overridden via PORT env var)
 ENV PORT=8000

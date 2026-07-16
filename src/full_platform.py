@@ -528,6 +528,93 @@ class UnifiedPlatformSettings(BaseSettings):
 settings = UnifiedPlatformSettings()
 
 # =============================================================================
+# SERVING BOUNDARY SECURITY POLICY
+# =============================================================================
+PRODUCTION_PROFILES = {"production", "prod"}
+UNSAFE_PROFILES = {"development", "dev", "test", "testing"}
+PUBLIC_ROUTE_ALLOWLIST = frozenset({
+    ("GET", "/"),
+    ("GET", "/status"),
+    ("GET", "/health"),
+    ("GET", "/health/live"),
+    ("GET", "/health/ready"),
+    ("GET", "/health/startup"),
+    ("POST", "/auth/token"),
+    ("GET", "/vulcan_chat.html"),
+})
+PUBLIC_PATH_PREFIXES = ("/static/", "/demos/")
+MUTATION_PATH_PREFIXES = (
+    "/admin/", "/api/arena/", "/api/omega/", "/api/adversarial/run-test",
+    "/api/adversarial/check-query", "/v1/feedback", "/world-model/",
+    "/memory/", "/vulcan/admin", "/vulcan/v1/feedback",
+)
+PRODUCTION_DISABLED_MUTATION_PREFIXES = (
+    "/admin/services/", "/api/omega/", "/api/adversarial/run-test",
+    "/api/arena/tournament",
+)
+
+def _active_profile() -> str:
+    return (os.getenv("VULCAN_ENV") or os.getenv("VULCAN_PROFILE") or os.getenv("ENVIRONMENT") or "production").lower()
+
+def _is_production_profile() -> bool:
+    return _active_profile() in PRODUCTION_PROFILES
+
+def _route_disposition(method: str, path: str) -> Dict[str, Any]:
+    normalized = path.rstrip("/") or "/"
+    public = (method.upper(), normalized) in PUBLIC_ROUTE_ALLOWLIST or any(normalized.startswith(p) for p in PUBLIC_PATH_PREFIXES)
+    mutates = any(normalized.startswith(p) for p in MUTATION_PATH_PREFIXES)
+    disabled = _is_production_profile() and any(normalized.startswith(p) for p in PRODUCTION_DISABLED_MUTATION_PREFIXES)
+    return {
+        "method": method.upper(), "path": normalized,
+        "classification": "public" if public else "protected",
+        "authentication_required": not public,
+        "authorization": "admin_or_mutation:write" if mutates else "authenticated",
+        "mutates": mutates, "production_disabled": disabled,
+    }
+
+def generate_route_manifest() -> List[Dict[str, Any]]:
+    manifest = []
+    for route in app.routes:
+        methods = sorted(getattr(route, "methods", []) or ["MOUNT"])
+        path = getattr(route, "path", "")
+        for method in methods:
+            if method in {"HEAD", "OPTIONS"}:
+                continue
+            manifest.append(_route_disposition(method, path))
+    return sorted(manifest, key=lambda item: (item["path"], item["method"]))
+
+def _principal_has_mutation_role(principal: Dict[str, Any]) -> bool:
+    if principal.get("method") == "api_key":
+        return True
+    payload = principal.get("payload") or {}
+    roles = set(payload.get("roles") or payload.get("role") or []) if not isinstance(payload.get("role"), str) else {payload.get("role")}
+    caps = set(payload.get("capabilities") or payload.get("scp") or [])
+    return bool({"admin", "operator"} & roles or {"mutation:write", "admin"} & caps)
+
+
+def _mandatory_safety_usable() -> bool:
+    deployment = getattr(app.state, "deployment", None)
+    deps = None
+    if deployment is not None and hasattr(deployment, "collective"):
+        deps = getattr(deployment.collective, "deps", None)
+    validator = getattr(deps, "safety_validator", None) if deps is not None else None
+    return validator is not None and callable(getattr(validator, "validate_action", None))
+
+def validate_production_invariants() -> None:
+    profile = _active_profile()
+    if _is_production_profile():
+        if profile in UNSAFE_PROFILES or settings.auth_method == AuthMethod.NONE:
+            raise RuntimeError("Unsafe production configuration rejected")
+        if settings.auth_method == AuthMethod.JWT and (not JWT_AVAILABLE or not settings.jwt_secret):
+            raise RuntimeError("Production JWT authentication requires configured JWT support and secret")
+        if settings.auth_method == AuthMethod.API_KEY and not settings.api_key:
+            raise RuntimeError("Production API key authentication requires configured API_KEY")
+        if os.getenv("VULCAN_ENABLE_SELF_IMPROVEMENT", "false").lower() in ("1", "true", "yes"):
+            raise RuntimeError("Production self-improvement/mutation is disabled")
+        if os.getenv("VULCAN_SAFETY_LEVEL", "strict").lower() in ("off", "minimal", "disabled"):
+            raise RuntimeError("Production safety level below minimum rejected")
+
+# =============================================================================
 # FLASH MESSAGING SYSTEM
 # =============================================================================
 
@@ -1731,8 +1818,9 @@ async def _background_services_initialization(app: FastAPI, worker_id: int, logg
                 from vulcan.config import AgentConfig, get_config
                 from vulcan.orchestrator import ProductionDeployment
 
-                # Load configuration profile
-                vulcan_config = get_config("development")
+                # Load the explicit runtime profile once; production refuses unsafe profiles.
+                runtime_profile = _active_profile()
+                vulcan_config = get_config(runtime_profile)
                 if not isinstance(vulcan_config, AgentConfig):
                     logger.warning(
                         "get_config returned invalid type, creating default AgentConfig"
@@ -1895,10 +1983,10 @@ async def _background_services_initialization(app: FastAPI, worker_id: int, logg
 
                     # Initialize Safety subsystems
                     if (
-                        hasattr(vulcan_deployment.collective.deps, "safety")
-                        and vulcan_deployment.collective.deps.safety
+                        hasattr(vulcan_deployment.collective.deps, "safety_validator")
+                        and vulcan_deployment.collective.deps.safety_validator
                     ):
-                        safety_validator = vulcan_deployment.collective.deps.safety
+                        safety_validator = vulcan_deployment.collective.deps.safety_validator
                         if hasattr(safety_validator, "activate_all_constraints"):
                             try:
                                 safety_validator.activate_all_constraints()
@@ -2951,6 +3039,7 @@ async def lifespan(app: FastAPI):
     logger.info(f"Starting Unified Platform (Worker {worker_id})")
     logger.info("=" * 70)
     logger.info(f"🚀 Lifespan started at {_get_startup_elapsed():.2f}s since module load")
+    validate_production_invariants()
     logger.info("🚀 Server accepting connections - scheduling background initialization...")
     
     # Schedule background services initialization (NON-BLOCKING)
@@ -3066,6 +3155,30 @@ print(f"[STARTUP] FastAPI app created in {_get_startup_elapsed():.2f}s")
 # Register globals for route module access via src.platform.globals
 from src.platform.globals import init_app as _init_globals
 _init_globals(app, settings, service_manager)
+
+# Deny-by-default serving-boundary middleware. Mounted child apps cannot bypass this.
+@app.middleware("http")
+async def serving_boundary_middleware(request: Request, call_next):
+    disposition = _route_disposition(request.method, request.url.path)
+    request.state.route_disposition = disposition
+    if disposition["production_disabled"]:
+        logger.warning("security_event=production_disabled_mutation path=%s", request.url.path)
+        return JSONResponse(status_code=403, content={"error": "Capability unavailable in production"})
+    if not disposition["authentication_required"]:
+        return await call_next(request)
+    try:
+        principal = await verify_authentication(
+            api_key=request.headers.get("X-API-Key"),
+            bearer=await bearer_scheme(request),
+        )
+    except AuthenticationError:
+        logger.info("security_event=authentication_denied path=%s", request.url.path)
+        return JSONResponse(status_code=401, content={"error": "Authentication required"}, headers={"WWW-Authenticate": "Bearer"})
+    request.state.principal = principal
+    if disposition["mutates"] and not _principal_has_mutation_role(principal):
+        logger.info("security_event=authorization_denied path=%s", request.url.path)
+        return JSONResponse(status_code=403, content={"error": "Insufficient authorization"})
+    return await call_next(request)
 
 # Request size limiting middleware (header-based)
 @app.middleware("http")
@@ -3411,6 +3524,11 @@ async def health_live():
     return {"status": "alive", "timestamp": datetime.utcnow().isoformat()}
 
 
+@app.get("/health/startup", response_model=None)
+async def health_startup():
+    return {"status": "started" if _services_init_complete else "starting", "timestamp": datetime.utcnow().isoformat()}
+
+
 @app.get("/health/ready", response_model=None)
 async def health_ready():
     """
@@ -3452,10 +3570,16 @@ async def health_ready():
         else:
             status_note = None
         
-        # Ready if services init is complete (even if failed) OR we have at least one mounted service
-        # Note: We return 200 even if models aren't loaded yet, because
-        # the server can still handle basic requests.
-        if services_init_complete or mounted_services > 0:
+        auth_ready = settings.auth_method != AuthMethod.NONE or not _is_production_profile()
+        safety_ready = _mandatory_safety_usable() if _is_production_profile() else True
+        config_ready = True
+        try:
+            validate_production_invariants()
+        except Exception:
+            config_ready = False
+        mandatory_ready = services_init_complete and not services_init_failed and auth_ready and safety_ready and config_ready and total_services > 0
+        logger.info("readiness_state services_init_complete=%s services_init_failed=%s auth_ready=%s safety_ready=%s config_ready=%s", services_init_complete, services_init_failed, auth_ready, safety_ready, config_ready)
+        if mandatory_ready:
             return {
                 "status": "ready" if not services_init_failed else "degraded", 
                 "timestamp": datetime.utcnow().isoformat(),
@@ -3471,8 +3595,13 @@ async def health_ready():
                 status_code=503,
                 content={
                     "status": "not_ready", 
-                    "reason": "no_services_mounted",
-                    "total_services": total_services
+                    "reason": "mandatory_dependencies_not_ready",
+                    "total_services": total_services,
+                    "services_init_complete": services_init_complete,
+                    "services_init_failed": services_init_failed,
+                    "auth_ready": auth_ready,
+                    "safety_ready": safety_ready,
+                    "config_ready": config_ready
                 }
             )
     except Exception as e:

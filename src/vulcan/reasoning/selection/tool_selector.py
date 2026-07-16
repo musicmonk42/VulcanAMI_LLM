@@ -1288,6 +1288,10 @@ class ToolSelector:
                     classifier_tools = request.context.get('classifier_suggested_tools')
                 
                 classifier_category = request.context.get('classifier_category')
+                # Context may retain a model proposal for auditability, but it is
+                # not a selector input.  Candidates below are produced by the
+                # normal deterministic applicability and utility pipeline.
+                classifier_tools = None
                 
                 if classifier_tools and isinstance(classifier_tools, (list, tuple)) and len(classifier_tools) > 0:
                     logger.info(
@@ -1295,45 +1299,12 @@ class ToolSelector:
                         f"for category={classifier_category} (LLM understands query intent)"
                     )
                     
-                    # ================================================================
-                    # FIX (Jan 10 2026): Handle 'general' tool specially
-                    # ================================================================
-                    # 'general' is not a reasoning engine - it means "use LLM directly".
-                    # When classifier suggests ['general'], we should return immediately
-                    # with a high-confidence "skip reasoning" result. This fixes the bug
-                    # where CREATIVE queries with introspection themes (e.g., "write a 
-                    # poem about becoming self-aware") were being routed to symbolic
-                    # reasoning because 'general' is not in DEFAULT_AVAILABLE_TOOLS.
-                    # ================================================================
                     if classifier_tools == ['general'] and classifier_category in (
                         'CREATIVE', 'CONVERSATIONAL', 'FACTUAL', 'GREETING', 'CHITCHAT',
                         'creative', 'conversational', 'factual', 'greeting', 'chitchat',
                     ):
-                        logger.info(
-                            f"[ToolSelector] FIX: Classifier suggests ['general'] for "
-                            f"category={classifier_category} - returning early (no reasoning needed)"
-                        )
-                        # Return a result that indicates "use LLM directly, no reasoning"
-                        return SelectionResult(
-                            selected_tool='general',
-                            execution_result={
-                                'tool': 'general',
-                                'skip_reasoning': True,
-                                'result': None,  # No reasoning result - use LLM
-                            },
-                            confidence=0.85,
-                            calibrated_confidence=0.85,
-                            execution_time_ms=0.0,
-                            energy_used_mj=0.0,
-                            strategy_used=ExecutionStrategy.SINGLE,
-                            all_results={'general': {'skip_reasoning': True}},
-                            metadata={
-                                'classifier_category': classifier_category,
-                                'classifier_tools': classifier_tools,
-                                'skip_reasoning': True,
-                                'fast_path': True,
-                            },
-                        )
+                        logger.info("[ToolSelector] rejected model-proposed direct-answer tool")
+                        classifier_tools = []
                     
                     # Filter to only include available tools
                     available_tools = getattr(self, 'available_tools', None) or DEFAULT_AVAILABLE_TOOLS
@@ -1995,75 +1966,8 @@ class ToolSelector:
         """
         candidates = []
 
-        # ==============================================================================
-        # PHASE 1: Try LLM classification first (PRIMARY PATH)
-        # ==============================================================================
-        try:
-            # Extract query text from the problem
-            query_text = self._extract_query_text(request.problem)
-            
-            # Get LLM classification candidates
-            llm_candidates = self._get_llm_classification(query_text, safe_tools)
-            
-            if llm_candidates:
-                # LLM classification succeeded with high confidence
-                # Build candidate list using LLM-suggested tools
-                # 
-                # INDUSTRY-STANDARD FIX: Mark that LLM classification was authoritative
-                # This allows downstream components to trust the LLM's classification
-                # and skip redundant per-engine gate checks
-                llm_authoritative = True  # LLM confidence >= 0.8
-                
-                for tool_name in llm_candidates:
-                    cost_dist = self.cost_model.predict_cost(tool_name, features)
-                    
-                    time_budget = request.constraints.get("time_budget_ms", float("inf"))
-                    if tool_name == "multimodal":
-                        time_budget *= MULTIMODAL_TIME_BUDGET_MULTIPLIER
-                    
-                    if cost_dist["time"]["mean"] > time_budget:
-                        logger.debug(f"Tool {tool_name} filtered: cost > budget")
-                        continue
-                    if cost_dist["energy"]["mean"] > request.constraints.get("energy_budget_mj", float("inf")):
-                        continue
-                    
-                    # High quality estimate for LLM-selected tools
-                    quality_estimate = 0.9  # LLM has high confidence
-                    
-                    candidates.append({
-                        "tool": tool_name,
-                        "utility": self.utility_model.compute_utility(
-                            quality=quality_estimate,
-                            time=cost_dist["time"]["mean"],
-                            energy=cost_dist["energy"]["mean"],
-                            risk=0.1,  # Low risk for LLM-selected tools
-                            context={"mode": request.mode.value},
-                        ),
-                        "quality": quality_estimate,
-                        "cost": cost_dist,
-                        "prior": 0.9,  # High prior for LLM selection
-                        "source": "llm_classification",
-                        # INDUSTRY-STANDARD FIX: Add metadata for skip_gate_check
-                        "skip_gate_check": True,  # LLM was authoritative
-                        "llm_authoritative": True,
-                        "llm_confidence": 0.9,  # High confidence (>= 0.8)
-                    })
-                
-                if candidates:
-                    logger.info(
-                        f"[ToolSelector] Using {len(candidates)} LLM-classified candidates: "
-                        f"{[c['tool'] for c in candidates]}"
-                    )
-                    candidates.sort(key=lambda x: x["utility"], reverse=True)
-                    return candidates
-                else:
-                    logger.debug("[ToolSelector] LLM candidates filtered by budget, falling back")
-        except Exception as e:
-            logger.warning(f"[ToolSelector] LLM classification error: {e}, using fallback")
-
-        # ==============================================================================
-        # PHASE 2: Fallback to SemanticToolMatcher + BayesianMemoryPrior
-        # ==============================================================================
+        # Model proposals never create candidates here.  Every candidate and score
+        # originates in the selector's deterministic applicability/utility path.
         try:
             tool_priors = prior_dist.tool_probs if hasattr(prior_dist, 'tool_probs') and prior_dist.tool_probs else {}
             
