@@ -121,7 +121,9 @@ addopts = [
     "--disable-warnings",
 ]
 testpaths = ["tests", "src/vulcan/tests"]
-pythonpath = ["."]
+# Tests retain ``src.*`` compatibility imports while exercising the canonical
+# installed-package identity used by the container.
+pythonpath = [".", "src"]
 filterwarnings = [
     "ignore::coverage.exceptions.CoverageWarning",
 ]

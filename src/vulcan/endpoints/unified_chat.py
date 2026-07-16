@@ -457,8 +457,7 @@ async def _execute_with_enhanced_prompt(
     )
 
 
-@router.post("/v1/chat", response_model=None)
-async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, Any]:
+async def legacy_unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, Any]:
     """
     Unified chat endpoint that integrates the ENTIRE VulcanAMI platform.
 
@@ -2436,7 +2435,38 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
         }, {"source": "deterministic_error", "authority_source": "error"})
 
 
+@router.post("/v1/chat", response_model=None)
 @router.post("/v1/chat/orchestrated", response_model=None)
+async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, Any]:
+    """Compatibility transport alias for the canonical runtime kernel.
+
+    This router is retained for research/standalone users. Docker never mounts
+    it; deployed aliases are statically composed in ``vulcan.runtime.app``.
+    """
+    from vulcan.runtime.app import _runtime
+    from vulcan.runtime.case import CognitiveCase
+    from vulcan.runtime.kernel import KernelRequest
+
+    runtime = _runtime(request)
+    case = CognitiveCase.create(
+        request_id=getattr(request.state, "request_id", str(uuid.uuid4())),
+        conversation_id=body.conversation_id,
+        message=body.message,
+    )
+    result = await runtime.kernel.handle(
+        KernelRequest(message=body.message, conversation_id=body.conversation_id, payload=request), case
+    )
+    result.payload.setdefault("metadata", {}).update({
+        "case_id": case.case_id,
+        "runtime_id": runtime.runtime_id,
+        "state_snapshot_id": case.state_snapshot_id,
+    })
+    return result.payload
+
+
+# Retained solely as a research-only callable for existing experiments.  It is
+# deliberately not decorated as a production route; both supported route shapes
+# above enter the canonical kernel instead.
 async def orchestrated_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, Any]:
     """
     World Model Orchestrated Chat Endpoint.
