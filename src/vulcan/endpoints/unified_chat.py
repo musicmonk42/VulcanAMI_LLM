@@ -49,6 +49,67 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["chat"])
 
+class SafetyDecision(str, EnumBase):
+    ALLOW = "allow"
+    BLOCK = "block"
+    UNKNOWN = "unknown"
+    ERROR = "error"
+
+
+def _normalize_safety_result(result: Any) -> Dict[str, Any]:
+    if isinstance(result, tuple) and len(result) == 2:
+        return {"decision": SafetyDecision.ALLOW if result[0] else SafetyDecision.BLOCK, "reason": str(result[1])}
+    if isinstance(result, dict):
+        safe = result.get("safe", result.get("allowed"))
+        return {"decision": SafetyDecision.ALLOW if safe is True else SafetyDecision.BLOCK if safe is False else SafetyDecision.UNKNOWN, "reason": str(result.get("reason", "policy decision"))}
+    if isinstance(result, bool):
+        return {"decision": SafetyDecision.ALLOW if result else SafetyDecision.BLOCK, "reason": "Validated"}
+    return {"decision": SafetyDecision.UNKNOWN, "reason": "Unrecognized safety result"}
+
+
+async def _run_mandatory_safety(deps: Any, payload: Dict[str, Any], *, timeout: float = 5.0) -> Dict[str, Any]:
+    validator = getattr(deps, "safety_validator", None)
+    if validator is None:
+        return {"decision": SafetyDecision.ERROR, "reason": "Safety validator unavailable"}
+    try:
+        loop = asyncio.get_running_loop()
+        raw = await asyncio.wait_for(
+            loop.run_in_executor(None, validator.validate_action, payload), timeout=timeout
+        )
+        return _normalize_safety_result(raw)
+    except asyncio.TimeoutError:
+        logger.warning("security_event=safety_failure mode=timeout type=%s", payload.get("type"))
+        return {"decision": SafetyDecision.ERROR, "reason": "Safety validation timed out"}
+    except Exception as exc:
+        logger.warning("security_event=safety_failure mode=exception type=%s class=%s", payload.get("type"), type(exc).__name__)
+        return {"decision": SafetyDecision.ERROR, "reason": "Safety validation failed"}
+
+
+async def _finalize_chat_response(deps: Any, response: Dict[str, Any], metadata: Dict[str, Any]) -> Dict[str, Any]:
+    if metadata.get("finalized"):
+        raise RuntimeError("Chat response finalized more than once")
+    candidate = str(response.get("response", ""))
+    decision = await _run_mandatory_safety(deps, {"type": "response", "content": candidate})
+    metadata["finalized"] = True
+    metadata["finalization_safety_decision"] = decision["decision"].value
+    logger.info("security_event=response_finalized decision=%s", decision["decision"].value)
+    if decision["decision"] is not SafetyDecision.ALLOW:
+        response["response"] = "I generated a response, but it could not be safely returned. Please rephrase your request."
+        response["safety_status"] = "output_filtered"
+        metadata["safety_status"] = "output_filtered"
+    response["metadata"] = metadata
+    return response
+
+
+def _deployment_safety_deps(deployment: Any) -> Any:
+    """Return the canonical dependency container that owns safety_validator."""
+    if hasattr(deployment, "collective") and getattr(deployment.collective, "deps", None):
+        return deployment.collective.deps
+    if hasattr(deployment, "deps"):
+        return deployment.deps
+    return deployment
+
+
 # ============================================================
 # FEATURE FLAGS: Reasoning Execution Path Control
 # ============================================================
@@ -472,6 +533,9 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
 
     try:
         user_message = body.message
+        if body.enable_safety is False:
+            logger.info("security_event=client_safety_downgrade_ignored")
+        body.enable_safety = True
         
         # CONTEXT ACCUMULATION FIX: Apply sliding window truncation to history
         # This prevents the multi-turn context from growing unbounded
@@ -608,7 +672,8 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                         # Arena provided a complete response
                         arena_latency_ms = int((time.time() - start_time) * 1000)
                         timing_breakdown["total_ms"] = arena_latency_ms
-                        return {
+                        metadata.update({"arena_processed": True, "query_id": routing_plan.query_id})
+                        return await _finalize_chat_response(deps, {
                             "response": arena_output.get("output", "Arena processing complete"),
                             "arena_execution": {
                                 "agent_id": arena_result.get("agent_id"),
@@ -617,13 +682,9 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                             },
                             "routing": routing_stats,
                             "systems_used": systems_used,
-                            "metadata": {
-                                **metadata,
-                                "arena_processed": True,
-                                "query_id": routing_plan.query_id,
-                            },
+                            "metadata": metadata,
                             "latency_ms": int((time.time() - start_time) * 1000),
-                        }
+                        }, metadata)
                 else:
                     # Arena execution failed - continue with VULCAN processing
                     logger.warning(
@@ -909,7 +970,7 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
         
         use_lightweight_safety = len(user_message.strip()) < SHORT_INPUT_THRESHOLD
         
-        if use_lightweight_safety:
+        if False and use_lightweight_safety:
             # Fast path: lightweight keyword-based safety check for short inputs
             message_lower = user_message.lower().strip()
             # Use simple split for faster performance on short inputs
@@ -929,28 +990,19 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                 metadata["safety_status"] = "approved_lightweight"
                 systems_used.append("lightweight_safety_check")
                 logger.debug(f"[VULCAN] Short input ({len(user_message)} chars) passed lightweight safety check")
-        elif body.enable_safety and hasattr(deps, "safety") and deps.safety:
+        if body.enable_safety:
             try:
-                loop = asyncio.get_running_loop()
-                # Validate the user input for safety
-                is_safe = await loop.run_in_executor(
-                    None,
-                    deps.safety.validate_action,
-                    {"type": "user_query", "content": user_message},
-                )
-                if hasattr(is_safe, "__iter__") and len(is_safe) == 2:
-                    safety_result = {"safe": is_safe[0], "reason": is_safe[1]}
-                else:
-                    safety_result = {"safe": bool(is_safe), "reason": "Validated"}
+                decision = await _run_mandatory_safety(deps, {"type": "user_query", "content": user_message})
+                safety_result = {"safe": decision["decision"] is SafetyDecision.ALLOW, "reason": decision["reason"]}
                 systems_used.append("safety_validator")
-                metadata["safety_status"] = (
-                    "approved" if safety_result["safe"] else "flagged"
-                )
+                metadata["safety_status"] = "approved" if safety_result["safe"] else decision["decision"].value
             except Exception as e:
-                logger.debug(f"Safety validation skipped: {e}")
-                metadata["safety_status"] = "skipped"
+                logger.warning("security_event=safety_failure mode=unexpected class=%s", type(e).__name__)
+                safety_result = {"safe": False, "reason": "Safety validation failed"}
+                metadata["safety_status"] = "error"
         else:
-            metadata["safety_status"] = "disabled"
+            safety_result = {"safe": False, "reason": "Mandatory safety unexpectedly unavailable"}
+            metadata["safety_status"] = "error"
 
         # TIMING: Log safety validation duration
         logger.info(f"[TIMING] STEP 1 Safety validation took {time.perf_counter() - _timing_start:.2f}s")
@@ -958,12 +1010,12 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
 
         # If unsafe, return early with explanation
         if not safety_result["safe"]:
-            return {
+            return await _finalize_chat_response(deps, {
                 "response": f"I cannot process this request due to safety constraints: {safety_result['reason']}",
                 "metadata": metadata,
                 "systems_used": systems_used,
                 "latency_ms": int((time.time() - start_time) * 1000),
-            }
+            }, metadata)
 
         # ================================================================
         # PARALLEL EXECUTION: Steps 2-6 run concurrently for performance
@@ -2355,912 +2407,33 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                 f"(confidence={best_confidence:.2f})"
             )
             
-            return final_response
-        
-        # ================================================================
-        # STEP 7: Generate Response using LLM with full context
-        # ================================================================
-        # Only reached if reasoning confidence is below threshold or no results
-        # TIMING: Start measuring context building
-        _context_start = time.perf_counter()
-        
-        # Note: Configuration flag to disable OpenAI reasoning fallback
-        DISABLE_OPENAI_REASONING_FALLBACK = os.environ.get(
-            "VULCAN_DISABLE_OPENAI_REASONING_FALLBACK", "false"
-        ).lower() == "true"
-        
-        if reasoning_results and not use_reasoning_directly:
-            logger.warning(
-                f"[VULCAN] ⚠ Reasoning available but confidence too low "
-                f"({best_confidence:.2f} < {MIN_REASONING_CONFIDENCE_THRESHOLD}), "
-                f"falling back to LLM synthesis"
+            return await _finalize_chat_response(
+                deps,
+                final_response.dict(),
+                final_response.metadata,
             )
-            
-            # Note: If fallback is disabled, return low-confidence result with explanation
-            if DISABLE_OPENAI_REASONING_FALLBACK:
-                logger.info(
-                    f"[VULCAN] Note: OpenAI fallback disabled, returning low-confidence "
-                    f"reasoning result (confidence={best_confidence:.2f})"
-                )
-                
-                # Find the best available reasoning result even if below threshold
-                best_result = None
-                for source_key in ["unified", "agent_reasoning", "direct_reasoning"]:
-                    source_result = reasoning_results.get(source_key, {})
-                    if isinstance(source_result, dict) and source_result.get("conclusion"):
-                        source_conf = source_result.get("confidence", 0.0)
-                        if best_result is None or source_conf > best_result.get("confidence", 0.0):
-                            best_result = source_result
-                
-                if best_result:
-                    # Format and return the low-confidence result
-                    response_text = _format_direct_reasoning_response(
-                        conclusion=best_result.get("conclusion"),
-                        confidence=best_result.get("confidence", 0.0),
-                        reasoning_type=best_result.get("reasoning_type", "unknown"),
-                        explanation=best_result.get("explanation", ""),
-                    )
-                    
-                    # Add warning about low confidence
-                    confidence_warning = (
-                        f"\n\n⚠️ **Low Confidence Notice**: This response was generated with "
-                        f"confidence {best_result.get('confidence', 0.0):.2f} (threshold: "
-                        f"{MIN_REASONING_CONFIDENCE_THRESHOLD}). Consider rephrasing your query "
-                        f"for better results."
-                    )
-                    response_text += confidence_warning
-                    
-                    latency_ms = (time.perf_counter() - timing["request_start"]) * 1000
-                    return VulcanResponse(
-                        response=response_text,
-                        metadata={
-                            "source": "vulcan_reasoning_low_confidence",
-                            "confidence": best_result.get("confidence", 0.0),
-                            "confidence_below_threshold": True,
-                            "threshold": MIN_REASONING_CONFIDENCE_THRESHOLD,
-                            "reasoning_type": best_result.get("reasoning_type", "unknown"),
-                            "openai_fallback_disabled": True,
-                            "latency_ms": round(latency_ms, 2),
-                        },
-                    )
         
-        # Build comprehensive context for LLM
-        llm_context = {
-            "user_message": user_message,
-            "conversation_history": (
-                body.history[-5:] if body.history else []
-            ),  # Last 5 messages
-            "memory_context": memory_context[:3] if memory_context else [],
-            "reasoning_insights": reasoning_results,
-            "plan": None,
-            "world_model_insight": world_model_insight,
-        }
+        # No result may be replaced by a provider-authored answer.
+        # Returning a
+        # deterministic abstention preserves the boundary between cognition and
+        # language formatting and still passes through the mandatory finalizer.
+        return await _finalize_chat_response(deps, {
+            "response": "I could not produce a sufficiently supported result for that request. Please provide more context or rephrase it.",
+            "metadata": {"source": "deterministic_unknown", "authority_source": "error_or_abstention"},
+            "systems_used": list(set(systems_used)),
+            "latency_ms": int((time.time() - start_time) * 1000),
+            "safety_status": "pending_finalization",
+        }, {"source": "deterministic_unknown", "authority_source": "error_or_abstention"})
 
-        # Safely convert plan to dict
-        if plan_result:
-            try:
-                llm_context["plan"] = (
-                    plan_result.to_dict()
-                    if hasattr(plan_result, "to_dict")
-                    else str(plan_result)
-                )
-            except Exception:
-                llm_context["plan"] = str(plan_result)
-
-        # FIX: Log context building duration AFTER the context is built
-        logger.info(f"[TIMING] STEP 7a Context building took {time.perf_counter() - _context_start:.2f}s")
-
-        # Generate response
-        response_text = ""
-
-        # CRITICAL FIX: Check for hybrid_executor, not just local LLM
-        # OpenAI can work even when local LLM is unavailable
-        # This prevents "Full LLM response generation is currently unavailable" errors
-        # when OpenAI is configured but local GraphixVulcanLLM fails to initialize
-        hybrid_executor = getattr(app.state, 'hybrid_executor', None)
-        if hybrid_executor is None:
-            # Try to create hybrid executor on-demand (works with OpenAI even if local_llm is None)
-            try:
-                from vulcan.llm import get_or_create_hybrid_executor, get_openai_client
-                local_llm = getattr(app.state, 'llm', None)
-                hybrid_executor = get_or_create_hybrid_executor(
-                    local_llm=local_llm,
-                    openai_client_getter=get_openai_client,
-                    mode=settings.llm_execution_mode,
-                )
-                if hybrid_executor:
-                    app.state.hybrid_executor = hybrid_executor
-                    logger.info("[VULCAN] Created hybrid_executor on-demand for LLM generation")
-            except Exception as e:
-                logger.warning(f"[VULCAN] Failed to create hybrid_executor on-demand: {e}")
-
-        if hybrid_executor:
-            try:
-                # Build enhanced prompt with context - handle None values explicitly
-                memory_str = ""
-                if memory_context:
-                    try:
-                        memory_str = (
-                            f"\nRelevant Memory Context: {str(memory_context[:2])}"
-                        )
-                    except Exception:
-                        memory_str = ""
-
-                plan_str = ""
-                if plan_result:
-                    try:
-                        plan_str = f"\nSuggested Plan: {str(plan_result)}"
-                    except Exception:
-                        plan_str = ""
-
-                # Note: Include world model insights in the LLM context
-                # This reconnects the world_model and meta_reasoning to the response generation
-                world_model_str = ""
-                if world_model_insight and isinstance(world_model_insight, dict):
-                    try:
-                        insight_parts = []
-                        if world_model_insight.get("prediction"):
-                            insight_parts.append(f"Prediction: {str(world_model_insight['prediction'])[:WORLD_MODEL_INSIGHT_TRUNCATION]}")
-                        if world_model_insight.get("meta_reasoning"):
-                            insight_parts.append(f"Meta-reasoning: {str(world_model_insight['meta_reasoning'])[:WORLD_MODEL_INSIGHT_TRUNCATION]}")
-                        if world_model_insight.get("motivational_analysis"):
-                            insight_parts.append(f"Motivational Analysis: {str(world_model_insight['motivational_analysis'])[:WORLD_MODEL_INSIGHT_TRUNCATION]}")
-                        if insight_parts:
-                            world_model_str = "\nWorld Model Insights: " + "; ".join(insight_parts)
-                            logger.debug(f"[VULCAN] World model insights added to context: {world_model_str[:WORLD_MODEL_LOG_TRUNCATION]}...")
-                    except Exception as e:
-                        logger.debug(f"[VULCAN] Failed to format world model insights: {e}")
-
-                # CRITICAL FIX: Use proper formatting for reasoning results
-                # This ensures the LLM actually USES the reasoning engine output
-                # instead of generating generic responses
-                reasoning_str = ""
-                if reasoning_results:
-                    try:
-                        reasoning_str = format_reasoning_results(reasoning_results)
-                        # Note: Log reasoning output to verify it's reaching this point
-                        logger.info(
-                            f"[VULCAN] Reasoning results formatted: "
-                            f"keys={list(reasoning_results.keys())}, "
-                            f"reasoning_str_len={len(reasoning_str)}"
-                        )
-                        if len(reasoning_str) > 0:
-                            logger.debug(f"[VULCAN] reasoning_str preview: {reasoning_str[:500]}...")
-                    except Exception as e:
-                        logger.warning(f"Failed to format reasoning results: {e}")
-                        # Fallback to simple formatting
-                        reasoning_str = f"\nReasoning Insights: {str(reasoning_results)}"
-                else:
-                    logger.info("[VULCAN] No reasoning_results available for LLM context")
-
-                # Build enhanced prompt with explicit instruction to USE reasoning output
-                # The prompt structure is critical for getting the LLM to incorporate
-                # the structured reasoning analysis rather than ignoring it
-                if reasoning_str:
-                    # When reasoning output is available, use it as the primary source
-                    enhanced_prompt = f"""You are VULCAN, an advanced AI assistant powered by specialized reasoning engines.
-
-User Query: {user_message}
-{memory_str}
-{reasoning_str}
-{world_model_str}
-{plan_str}
-
-IMPORTANT: The reasoning analysis above was produced by specialized reasoning engines.
-Your response MUST:
-1. Directly incorporate the conclusions from the reasoning analysis
-2. Present the structured analysis in a clear, user-friendly format
-3. NOT generate generic explanations - use the SPECIFIC results provided
-4. If the reasoning shows a logical proof, present the proof steps
-5. If the reasoning shows probabilities, include the specific numbers
-6. If the reasoning shows causal analysis, explain the causal relationships found
-7. If world model insights are provided, consider them in your response
-
-Provide your response based on the reasoning analysis above:"""
-                else:
-                    # Fallback when no reasoning output is available
-                    enhanced_prompt = f"""You are VULCAN, an advanced AI assistant powered by a comprehensive cognitive architecture.
-
-User Query: {user_message}
-{memory_str}{world_model_str}{plan_str}
-
-Provide a helpful, accurate, and comprehensive response to the user's query. Be concise but thorough."""
-
-                # ================================================================
-                # Note: Check for deterministic fast-path results FIRST
-                # Cryptographic and mathematical fast-path results are precomputed
-                # by QueryRouter and MUST be returned directly, NOT sent to LLM.
-                # This prevents OpenAI from returning "unable to calculate" errors.
-                # ================================================================
-                v1_telemetry_data = routing_plan.telemetry_data if (routing_plan and hasattr(routing_plan, 'telemetry_data')) else {}
-                v1_is_crypto_fast_path = v1_telemetry_data.get('crypto_fast_path', False)
-                
-                if v1_is_crypto_fast_path:
-                    # Note: Return precomputed cryptographic result directly
-                    crypto_result = v1_telemetry_data.get('crypto_result')
-                    crypto_operation = v1_telemetry_data.get('crypto_operation', 'hash')
-                    
-                    if crypto_result:
-                        logger.info(
-                            f"[VULCAN/v1/chat] Note: Returning deterministic crypto result directly, "
-                            f"skipping LLM generation entirely. operation={crypto_operation}"
-                        )
-                        response_text = f"The {crypto_operation.upper()} hash is: {crypto_result}"
-                        systems_used.append("cryptographic_engine")
-                        
-                        # Build final response without LLM
-                        final_response = VulcanResponse(
-                            response=response_text,
-                            systems_used=list(set(systems_used)),
-                            confidence=1.0,  # Deterministic operations have 100% confidence
-                            metadata={
-                                "fast_path": "cryptographic",
-                                "deterministic": True,
-                                "operation": crypto_operation,
-                                "result": crypto_result,
-                                "skip_llm_synthesis": True,
-                                "conversation_id": body.conversation_id,
-                            },
-                        )
-                        
-                        # Record learning outcome for deterministic result
-                        if deps.learning_system:
-                            try:
-                                await asyncio.get_event_loop().run_in_executor(
-                                    None,
-                                    lambda: deps.learning_system.record_outcome({
-                                        "query_id": routing_plan.query_id if routing_plan else None,
-                                        "query": user_message,
-                                        "tools_used": ["cryptographic"],
-                                        "confidence": 1.0,
-                                        "deterministic": True,
-                                        "success": True,
-                                    })
-                                )
-                            except Exception as e:
-                                logger.debug(f"[VULCAN/v1/chat] Learning record for crypto failed: {e}")
-                        
-                        return final_response
-
-                # PERFORMANCE FIX: hybrid_executor already checked/created above
-                # No need to re-check - we already have it from the outer if block
-                # This section was redundant with the check at line ~1900
-
-                try:
-                    # ================================================================
-                    # CRITICAL FIX: Use format_output_for_user() when reasoning is available
-                    # This passes VULCAN's reasoning context to OpenAI for proper formatting
-                    # ================================================================
-                    
-                    # Check if we have reasoning results to format
-                    has_reasoning = bool(reasoning_results and any(reasoning_results.values()))
-                    
-                    if has_reasoning:
-                        # PATH 1: Use format_output_for_user() for structured reasoning output
-                        # This is the PRIMARY fix - it passes reasoning context to OpenAI
-                        logger.info(
-                            f"[VULCAN] Using format_output_for_user() with reasoning results "
-                            f"(engines: {list(reasoning_results.keys())})"
-                        )
-                        
-                        # Build structured reasoning output for the formatter
-                        # This includes all VULCAN reasoning components
-                        structured_reasoning = {
-                            'success': True,
-                            'result': reasoning_results,
-                            'confidence': _calculate_aggregate_confidence(reasoning_results),
-                            'method': 'vulcan_unified_reasoning',
-                            'reasoning_trace': [],
-                            'metadata': {
-                                'world_model': world_model_insight,
-                                'plan': plan_result,
-                                'memory_context': len(memory_context) if memory_context else 0,
-                            }
-                        }
-                        
-                        # ROOT CAUSE FIX: Extract and preserve privileged flags from reasoning_results
-                        # Check all reasoning result sources for privileged status
-                        is_privileged = False
-                        privileged_source = None
-                        for source_name, result in reasoning_results.items():
-                            if isinstance(result, dict):
-                                if result.get('privileged_no_answer') or result.get('override_router_tools'):
-                                    is_privileged = True
-                                    privileged_source = source_name
-                                    # Copy privileged metadata to structured_reasoning
-                                    structured_reasoning['metadata']['privileged_no_answer'] = result.get('privileged_no_answer', False)
-                                    structured_reasoning['metadata']['override_router_tools'] = result.get('override_router_tools', False)
-                                    structured_reasoning['metadata']['privileged_source'] = source_name
-                                    logger.info(
-                                        f"[VULCAN] ROOT CAUSE FIX: Preserving privileged flags from {source_name} "
-                                        f"in structured_reasoning metadata"
-                                    )
-                                    break
-                        
-                        # Add world model insights to the structured output
-                        if world_model_insight:
-                            structured_reasoning['metadata']['world_model_insight'] = world_model_insight
-                        
-                        # Add planning results
-                        if plan_result:
-                            structured_reasoning['metadata']['plan_result'] = plan_result
-                        
-                        try:
-                            # Call format_output_for_user with VULCAN's reasoning
-                            llm_result = await hybrid_executor.format_output_for_user(
-                                reasoning_output=structured_reasoning,
-                                original_prompt=user_message,
-                                max_tokens=body.max_tokens,
-                            )
-                            
-                            response_text = llm_result.get("text", "")
-                            llm_systems = llm_result.get("systems_used", [])
-                            systems_used.extend(llm_systems)
-                            
-                            source = llm_result.get("source", "unknown")
-                            logger.info(
-                                f"[VULCAN] ✓ Response formatted from reasoning results "
-                                f"(source={source}, distillation_captured={llm_result.get('distillation_captured', False)})"
-                            )
-                            
-                        except Exception as format_error:
-                            logger.warning(
-                                f"[VULCAN] format_output_for_user() failed: {type(format_error).__name__}: {format_error}. "
-                                f"Falling back to execute() with enhanced prompt."
-                            )
-                            # Fallback to original execute() method
-                            llm_result = await _execute_with_enhanced_prompt(
-                                hybrid_executor=hybrid_executor,
-                                enhanced_prompt=enhanced_prompt,
-                                body=body,
-                                truncated_history=truncated_history,
-                            )
-                            response_text = llm_result.get("text", "")
-                            llm_systems = llm_result.get("systems_used", [])
-                            systems_used.extend(llm_systems)
-                            source = llm_result.get("source", "unknown")
-                    
-                    else:
-                        # PATH 2: No reasoning results - use traditional execute() method
-                        # This handles queries that don't need reasoning (simple chat, etc.)
-                        logger.info("[VULCAN] No reasoning results available, using execute() method")
-                        
-                        llm_result = await _execute_with_enhanced_prompt(
-                            hybrid_executor=hybrid_executor,
-                            enhanced_prompt=enhanced_prompt,
-                            body=body,
-                            truncated_history=truncated_history,
-                        )
-                        
-                        response_text = llm_result.get("text", "")
-                        llm_systems = llm_result.get("systems_used", [])
-                        systems_used.extend(llm_systems)
-                        source = llm_result.get("source", "unknown")
-                        logger.info(
-                            f"[VULCAN] Response via execute() (mode={settings.llm_execution_mode}, source={source})"
-                        )
-
-                except Exception as e:
-                    logger.error(f"Hybrid LLM execution failed: {type(e).__name__}: {e}")
-                    response_text = ""
-
-                # Fallback if hybrid execution returned nothing
-                if not response_text:
-                    response_text = f"I understand your query about: {user_message}. "
-                    if reasoning_results:
-                        response_text += "Based on my analysis, I can provide insights from multiple reasoning systems. "
-                    if plan_result:
-                        response_text += (
-                            "I've also generated a plan to help address your request. "
-                        )
-                    response_text += "However, I encountered an issue generating a detailed response. Please try again."
-                    systems_used.append("fallback_message")
-
-            except Exception as e:
-                logger.error(f"LLM generation block failed: {e}")
-                response_text = f"I understand your query about: {user_message}. "
-                response_text += "However, I encountered an issue processing your request. Please try again."
-                systems_used.append("error_fallback")
-
-        else:
-            # Fallback when LLM is not available
-            response_text = f"Processing your query: '{user_message}'\n\n"
-
-            if reasoning_results:
-                response_text += "Reasoning Analysis:\n"
-                for rtype, result in reasoning_results.items():
-                    response_text += f"- {rtype.title()}: {str(result)[:100]}...\n"
-
-            if memory_context:
-                response_text += f"\nFound {len(memory_context)} relevant memories.\n"
-
-            if plan_result:
-                response_text += f"\nGenerated action plan available.\n"
-
-            response_text += (
-                "\n(Note: Full LLM response generation is currently unavailable)"
-            )
-
-        # TIMING: Log LLM generation duration
-        _llm_end = time.perf_counter()
-        logger.info(f"[TIMING] STEP 7b LLM generation took {_llm_end - _context_start:.2f}s")
-
-        # ================================================================
-        # STEP 8: Final Safety Check on Response
-        # ================================================================
-        _safety_start = time.perf_counter()
-        if body.enable_safety and hasattr(deps, "safety") and deps.safety:
-            try:
-                loop = asyncio.get_running_loop()
-                output_safe = await loop.run_in_executor(
-                    None,
-                    deps.safety.validate_action,
-                    {"type": "response", "content": response_text},
-                )
-                if hasattr(output_safe, "__iter__") and len(output_safe) == 2:
-                    if not output_safe[0]:
-                        response_text = "I generated a response but it was flagged by safety systems. Please rephrase your question."
-                        metadata["safety_status"] = "output_filtered"
-            except Exception as e:
-                logger.debug(f"Output safety check skipped: {e}")
-
-        # TIMING: Log final safety check duration
-        logger.info(f"[TIMING] STEP 8 Final safety check took {time.perf_counter() - _safety_start:.2f}s")
-
-        # Calculate latency
-        latency_ms = int((time.time() - start_time) * 1000)
-        
-        # JOB-TO-RESPONSE GAP FIX: Add total time to timing breakdown
-        timing_breakdown["total_ms"] = latency_ms
-
-        # Update reasoning type based on what was used
-        if len([s for s in systems_used if "reasoning" in s]) > 1:
-            metadata["reasoning_type"] = "unified"
-        elif "symbolic_reasoning" in systems_used:
-            metadata["reasoning_type"] = "symbolic"
-        elif "probabilistic_reasoning" in systems_used:
-            metadata["reasoning_type"] = "probabilistic"
-        elif "causal_reasoning" in systems_used:
-            metadata["reasoning_type"] = "causal"
-        elif "analogical_reasoning" in systems_used:
-            metadata["reasoning_type"] = "analogical"
-        else:
-            metadata["reasoning_type"] = "direct"
-
-        # ================================================================
-        # STEP 9: Record Telemetry for Meta-Learning
-        # OPTIMIZATION: Run telemetry as background task (fire-and-forget)
-        # to avoid blocking response return
-        # ================================================================
-        try:
-            from vulcan.routing import (
-                record_telemetry,
-                TELEMETRY_AVAILABLE,
-            )
-
-            if TELEMETRY_AVAILABLE:
-                # Create telemetry data for background task
-                telemetry_data = {
-                    "query": user_message,
-                    "response": response_text,
-                    "metadata": {
-                        "query_id": routing_stats.get("query_id", "unknown"),
-                        "query_type": routing_stats.get("query_type", "unknown"),
-                        "complexity_score": routing_stats.get("complexity_score", 0.0),
-                        "systems_used": systems_used,
-                        "jobs_submitted": len(submitted_jobs),
-                        "latency_ms": latency_ms,
-                        "success": True,
-                    },
-                    "source": "user",
-                }
-                
-                # PARALLEL EXECUTION: Run telemetry recording as background task
-                # Does not await completion - response returns immediately
-                async def _record_telemetry_background():
-                    try:
-                        record_telemetry(
-                            query=telemetry_data["query"],
-                            response=telemetry_data["response"],
-                            metadata=telemetry_data["metadata"],
-                            source=telemetry_data["source"],
-                        )
-                        logger.debug(f"[VULCAN/v1/chat] Background telemetry recorded")
-                    except Exception as bg_err:
-                        logger.debug(f"[VULCAN/v1/chat] Background telemetry failed: {bg_err}")
-                
-                asyncio.create_task(_record_telemetry_background())
-                logger.debug(f"[VULCAN/v1/chat] Telemetry scheduled as background task")
-        except Exception as e:
-            logger.debug(f"[VULCAN/v1/chat] Telemetry recording failed: {e}")
-
-        # ================================================================
-        # STEP 10: Record Query Outcome for Curiosity Engine
-        # FIX: Records outcome to SQLite bridge for cross-process analysis.
-        # This enables the CuriosityEngine subprocess to access query outcomes.
-        # FIX: Now passes selected tools to OutcomeBridge for learning system
-        # ================================================================
-        try:
-            from vulcan.curiosity_engine.outcome_bridge import get_outcome_bridge
-            
-            # Calculate routing time from timing breakdown
-            routing_time_ms = 0.0
-            if "query_routing" in timing_breakdown.get("phases", {}):
-                routing_time_ms = timing_breakdown["phases"]["query_routing"].get("duration_ms", 0.0)
-            
-            # Extract selected tools from routing_plan telemetry_data or metadata
-            selected_tools = []
-            if routing_plan and hasattr(routing_plan, 'telemetry_data'):
-                # BUG FIX #3: Ensure tools is always a list, never None
-                selected_tools = routing_plan.telemetry_data.get('selected_tools', []) or []
-            # Fallback to tool_selected from metadata if available
-            if not selected_tools and metadata.get("tool_selected"):
-                selected_tools = [metadata["tool_selected"]]
-            # Fallback to systems_used filtering for reasoning systems
-            if not selected_tools:
-                reasoning_prefixes = ("symbolic", "probabilistic", "causal", "analogical", "multimodal")
-                unified_prefix = "unified_reasoning_"
-                selected_tools_set = set()
-                for system in systems_used:
-                    if system.startswith(unified_prefix):
-                        selected_tools_set.add(system[len(unified_prefix):])
-                    elif system.startswith(reasoning_prefixes):
-                        selected_tools_set.add(system)
-                selected_tools = list(selected_tools_set)
-            # Default to ['general'] if no tools identified
-            if not selected_tools:
-                selected_tools = ['general']
-            
-            # Record via OutcomeBridge for learning system integration
-            bridge = get_outcome_bridge()
-            
-            # Note Issue #35: Determine status based on actual timing
-            # Queries taking > 30s should be marked as "slow", not "success"
-            # This ensures gap detection properly identifies slow queries
-            if float(latency_ms) > SLOW_QUERY_OUTCOME_THRESHOLD_MS:
-                query_status = "slow"
-            else:
-                query_status = "success"
-            
-            bridge.record(
-                query_id=routing_stats.get("query_id", f"q_{int(time.time())}"),
-                status=query_status,
-                routing_ms=routing_time_ms,
-                total_ms=latency_ms,
-                complexity=routing_stats.get("complexity_score", 0.0),
-                query_type=routing_stats.get("query_type", "general"),
-                tools=selected_tools,
-            )
-            logger.debug(f"[VULCAN/v1/chat] Query outcome recorded to bridge with tools={selected_tools}")
-        except ImportError:
-            pass  # Outcome bridge not available
-        except Exception as e:
-            logger.debug(f"[VULCAN/v1/chat] Outcome recording setup failed: {e}")
-
-        # ================================================================
-        # MEMORY MANAGEMENT: Trigger garbage collection to prevent memory accumulation
-        # This prevents progressive query routing degradation (469ms → 152,048ms)
-        # caused by repeated SentenceTransformer model loading without cleanup.
-        # Rate-limited to every GC_REQUEST_INTERVAL requests to reduce overhead.
-        # FIX: Use modulo to prevent overflow after billions of requests
-        # ================================================================
-        global _gc_request_counter
-        # OVERFLOW FIX: Use modulo to wrap counter instead of unbounded increment
-        # This prevents integer overflow after ~2 billion requests (2^31-1)
-        _gc_request_counter = (_gc_request_counter + 1) % GC_REQUEST_INTERVAL
-        
-        if _gc_request_counter == 0:  # Counter wrapped to 0, trigger GC
-            
-            async def _post_request_gc():
-                """Background task to trigger garbage collection after request."""
-                try:
-                    import gc
-                    collected = gc.collect()
-                    if collected > GC_SIGNIFICANT_CLEANUP_THRESHOLD:
-                        logger.debug(f"[VULCAN/v1/chat] Post-request GC collected {collected} objects")
-                except Exception:
-                    pass  # Don't let GC errors affect the response
-            
-            # Schedule GC as a background task (non-blocking)
-            asyncio.create_task(_post_request_gc())
-
-        # SECURITY FIX: Generate IDs with full cryptographic randomness
-        # Old format: f"resp_{int(time.time())}_{secrets.token_hex(4)}"
-        # This prevents timing attacks and ID enumeration
-        response_id = f"resp_{secrets.token_urlsafe(16)}"
-        query_id = routing_stats.get("query_id") if routing_stats else f"q_{secrets.token_urlsafe(12)}"
-
-        # ================================================================
-        # STEP 11: Process live feedback for auto-detection (Task 3)
-        # ================================================================
-        try:
-            # FIX MAJOR-4: Use deps.continual instead of deps.learning
-            learning_system = None
-            if hasattr(deployment, "collective") and hasattr(deployment.collective.deps, "continual"):
-                learning_system = deployment.collective.deps.continual
-            
-            # FIX MAJOR-4: learning_system IS the ContinualLearner
-            if learning_system:
-                learner = learning_system
-                
-                # Store context for future feedback processing
-                feedback_context = {
-                    "query_id": query_id,
-                    "response_id": response_id,
-                    "previous_response_id": response_id,
-                    "systems_used": systems_used,
-                    "reasoning_type": metadata.get("reasoning_type"),
-                }
-                
-                # Process live feedback (async, non-blocking)
-                if hasattr(learner, "process_live_feedback"):
-                    learner.process_live_feedback(user_message, feedback_context)
-        except Exception as e:
-            logger.debug(f"[VULCAN/v1/chat] Live feedback processing skipped: {e}")
-
-        # ================================================================
-        # STEP 12: Crystallize knowledge from execution (Knowledge Crystallizer)
-        # ================================================================
-        try:
-            # FIX MAJOR-4: Use deps.continual instead of deps.learning
-            learning_system = None
-            if hasattr(deployment, "collective") and hasattr(deployment.collective.deps, "continual"):
-                learning_system = deployment.collective.deps.continual
-            
-            # FIX MAJOR-4: learning_system IS the ContinualLearner
-            if learning_system:
-                learner = learning_system
-                
-                # Crystallize knowledge from this execution (non-blocking)
-                if hasattr(learner, "crystallize_from_execution"):
-                    learner.crystallize_from_execution(
-                        query=user_message,
-                        response=response_text,
-                        success=metadata.get("safety_status") == "safe",
-                        tools_used=systems_used,
-                        strategy=metadata.get("reasoning_type"),
-                        metadata={
-                            "query_id": query_id,
-                            "response_id": response_id,
-                            "latency_ms": latency_ms,
-                        },
-                    )
-        except Exception as e:
-            logger.debug(f"[VULCAN/v1/chat] Knowledge crystallization skipped: {e}")
-
-        # ================================================================
-        # Note: Add Transparency About Source
-        # Include detailed metadata about where the answer came from
-        # ================================================================
-        
-        # Determine the primary source of the response
-        response_source = "unknown"
-        if use_reasoning_directly:
-            response_source = "vulcan_reasoning"
-        elif "parallel_openai" in systems_used or "openai" in systems_used:
-            response_source = "openai_llm"
-        elif "local_llm" in systems_used or "vulcan_llm" in systems_used:
-            response_source = "local_llm"
-        elif reasoning_results and best_confidence > 0:
-            response_source = "llm_with_reasoning_context"
-        else:
-            response_source = "llm_only"
-        
-        # Build transparency metadata
-        transparency = {
-            "source": response_source,
-            "reasoning_confidence": best_confidence,
-            "reasoning_type": metadata.get("reasoning_type", "none"),
-            "engines_used": list(set([s for s in systems_used if "reasoning" in s or "model" in s])),
-            "used_openai_fallback": response_source in ["openai_llm", "llm_with_reasoning_context"],
-            "reasoning_available": bool(reasoning_results),
-            "confidence_threshold": MIN_REASONING_CONFIDENCE_THRESHOLD,
-        }
-        
-        # Add transparency to metadata
-        metadata["transparency"] = transparency
-        
-        # BUG #3 FIX: Notify world model of query outcome
-        # This makes the world model aware of how each query was resolved
-        observe_outcome(
-            query_id=query_id,
-            response={
-                'source': response_source,
-                'confidence': best_confidence,
-                'response_time_ms': latency_ms,
-                'used_openai_fallback': transparency.get('used_openai_fallback', False),
-                'reasoning_available': transparency.get('reasoning_available', False),
-            },
-            user_feedback=None  # Feedback comes later via /feedback endpoint
-        )
-        
-        # ================================================================
-        # FIX Issue 4: Record query outcome to OutcomeBridge for CuriosityEngine
-        # This enables the curiosity-driven learning system to detect gaps
-        # from actual query processing data
-        # ================================================================
-        try:
-            from vulcan.curiosity_engine.outcome_bridge import get_outcome_bridge
-            from vulcan.curiosity_engine.outcome_queue import record_outcome, QueryOutcome, OutcomeStatus
-            
-            # Calculate routing time from timing breakdown
-            routing_time_ms = 0.0
-            if timing_breakdown and "query_routing" in timing_breakdown.get("phases", {}):
-                routing_time_ms = timing_breakdown["phases"]["query_routing"].get("duration_ms", 0.0)
-            
-            # FIX Issue 7: Use consistent tools extraction helper
-            selected_tools = extract_tools_from_routing(routing_plan)
-            
-            # Determine outcome status based on response quality
-            # Success if response generated and safety checks passed
-            outcome_status = "success" if metadata.get("safety_status") == "safe" else "error"
-            
-            # Record to OutcomeBridge (SQLite for subprocess visibility)
-            bridge = get_outcome_bridge()
-            bridge.record(
-                query_id=query_id,
-                status=outcome_status,
-                routing_ms=routing_time_ms,
-                total_ms=latency_ms,
-                complexity=routing_stats.get("complexity_score", 0.5) if routing_stats else 0.5,
-                query_type=routing_stats.get("query_type", "general") if routing_stats else "general",
-                tools=selected_tools,
-            )
-            
-            # Also record to in-memory OutcomeQueue (for main process CuriosityEngine)
-            # This provides dual recording path for robustness
-            outcome = QueryOutcome(
-                query_id=query_id,
-                query_type=routing_stats.get("query_type", "general") if routing_stats else "general",
-                status=OutcomeStatus.SUCCESS if outcome_status == "success" else OutcomeStatus.ERROR,
-                execution_time_ms=latency_ms,
-                routing_time_ms=routing_time_ms,
-                complexity=routing_stats.get("complexity_score", 0.5) if routing_stats else 0.5,
-                capabilities_used=selected_tools,
-                metadata={
-                    "response_source": response_source,
-                    "reasoning_confidence": best_confidence,
-                    "safety_status": metadata.get("safety_status"),
-                    "systems_used": systems_used[:10],  # Limit to prevent bloat
-                }
-            )
-            outcome.compute_features()
-            record_outcome(outcome)
-            
-            # ================================================================
-            # FIX Issue 2: Report outcome to QueryRouter for CuriosityEngine integration
-            # This enables the router's curiosity engine connection to detect gaps
-            # ================================================================
-            try:
-                # Get the query analyzer (which contains the router)
-                from vulcan.routing import get_query_analyzer
-                
-                query_analyzer = get_query_analyzer()
-                if query_analyzer and hasattr(query_analyzer, 'report_query_outcome'):
-                    # Build result dict for curiosity engine
-                    result_dict = {
-                        'response': response_text[:500],  # Truncate for memory efficiency
-                        'latency_ms': latency_ms,
-                        'complexity': routing_stats.get("complexity_score", 0.5) if routing_stats else 0.5,
-                        'tools_used': selected_tools,
-                        'response_source': response_source,
-                        'confidence': best_confidence,
-                    }
-                    
-                    # Report to QueryRouter (which forwards to CuriosityEngine)
-                    query_analyzer.report_query_outcome(
-                        query=user_message,
-                        result=result_dict,
-                        success=(outcome_status == "success"),
-                        domain="query_processing",
-                        query_type=routing_stats.get("query_type", "general") if routing_stats else "general"
-                    )
-                    
-                    logger.debug(
-                        f"[VULCAN/v1/chat] Reported outcome to QueryRouter for "
-                        f"CuriosityEngine gap detection"
-                    )
-            except Exception as router_report_err:
-                # Non-critical error
-                logger.debug(
-                    f"[VULCAN/v1/chat] Failed to report to QueryRouter: {router_report_err}"
-                )
-            # ================================================================
-            
-            logger.debug(
-                f"[VULCAN/v1/chat] Outcome recorded: query_id={query_id}, "
-                f"status={outcome_status}, tools={selected_tools}"
-            )
-        except Exception as record_err:
-            # Non-critical error - don't fail the request if outcome recording fails
-            logger.debug(f"[VULCAN/v1/chat] Failed to record outcome: {record_err}")
-        # ================================================================
-
-        return {
-            "response": response_text,
-            "metadata": metadata,
-            "systems_used": systems_used,
-            "latency_ms": latency_ms,
-            "reasoning_type": metadata["reasoning_type"],
-            "safety_status": metadata["safety_status"],
-            "memory_results": metadata["memory_results"],
-            # NEW: Include routing and agent pool stats
-            "routing": routing_stats if routing_stats else None,
-            "agent_pool_stats": agent_pool_stats if agent_pool_stats else None,
-            # JOB-TO-RESPONSE GAP FIX: Include timing breakdown for debugging slow requests
-            "timing_breakdown": timing_breakdown if latency_ms > SLOW_REQUEST_THRESHOLD_MS else None,
-            # RLHF INTEGRATION: Include IDs for feedback (Task 4 - UI thumbs buttons)
-            "query_id": query_id,
-            "response_id": response_id,
-            # Note: Include transparency about response source
-            "transparency": transparency,
-        }
-
-    except Exception as e:
-        logger.error(f"Unified chat failed: {e}", exc_info=True)
-        error_counter.labels(error_type="unified_chat").inc()
-        
-        # FIX: Record error outcome for Curiosity Engine analysis
-        try:
-            from vulcan.curiosity_engine.outcome_bridge import get_outcome_bridge
-            
-            # Calculate elapsed time
-            error_latency_ms = (time.time() - start_time) * 1000
-            
-            # Get routing time if available
-            routing_time_ms = 0.0
-            if timing_breakdown and "query_routing" in timing_breakdown.get("phases", {}):
-                routing_time_ms = timing_breakdown["phases"]["query_routing"].get("duration_ms", 0.0)
-            
-            # FIX Issue 7: Use consistent tools extraction helper
-            selected_tools = extract_tools_from_routing(routing_plan)
-            
-            bridge = get_outcome_bridge()
-            bridge.record(
-                query_id=routing_stats.get("query_id", f"q_err_{int(time.time())}") if routing_stats else f"q_err_{int(time.time())}",
-                status="error",
-                routing_ms=routing_time_ms,
-                total_ms=error_latency_ms,
-                complexity=routing_stats.get("complexity_score", 0.0) if routing_stats else 0.0,
-                query_type=routing_stats.get("query_type", "unknown") if routing_stats else "unknown",
-                tools=selected_tools,
-            )
-            logger.debug(f"[VULCAN/v1/chat] Error outcome recorded to bridge with tools={selected_tools}")
-        except Exception:
-            pass  # Don't let outcome recording failure mask the original error
-        
-        # MEMORY MANAGEMENT: Trigger GC on error path too
-        try:
-            import gc
-            gc.collect()
-        except Exception:
-            pass
-        
-        raise HTTPException(status_code=500, detail=str(e))
-    
-    finally:
-        # MEMORY LEAK FIX: Clean up global precomputed embeddings
-        # These are module-level variables that persist between requests
-        # and can accumulate memory if not explicitly cleared
-        _precomputed_embedding = None
-        _precomputed_query_result = None
-
-
-# ============================================================
-# STANDARD API ENDPOINTS (continued)
-# ============================================================
-
-
-# ============================================================
-# NEW: World Model Orchestration Endpoint
-# Industry Standard: Feature flag for gradual rollout
-# ============================================================
-
-# Feature flag: Enable World Model orchestration endpoint
-# Set VULCAN_ENABLE_WM_ORCHESTRATION=true to enable
-ENABLE_WM_ORCHESTRATION = os.environ.get(
-    "VULCAN_ENABLE_WM_ORCHESTRATION", "false"
-).lower() in ("true", "1", "yes")
+    except Exception as exc:
+        logger.warning("security_event=chat_processing_failed class=%s", type(exc).__name__)
+        return await _finalize_chat_response(deps, {
+            "response": "I could not safely complete that request.",
+            "metadata": {"source": "deterministic_error", "authority_source": "error"},
+            "systems_used": list(set(systems_used)),
+            "latency_ms": int((time.time() - start_time) * 1000),
+            "safety_status": "pending_finalization",
+        }, {"source": "deterministic_error", "authority_source": "error"})
 
 
 @router.post("/v1/chat/orchestrated", response_model=None)
@@ -3288,9 +2461,12 @@ async def orchestrated_chat(request: Request, body: UnifiedChatRequest) -> Dict[
     start_time = time.time()
     query_id = str(uuid.uuid4())
     
+    deployment = getattr(request.app.state, "deployment", None)
+    safety_deps = _deployment_safety_deps(deployment)
+
     # Check if feature is enabled
     if not ENABLE_WM_ORCHESTRATION:
-        return {
+        return await _finalize_chat_response(safety_deps, {
             "response": "World Model orchestration is not enabled. Please use /v1/chat instead.",
             "confidence": 0.0,
             "systems_used": [],
@@ -3300,14 +2476,17 @@ async def orchestrated_chat(request: Request, body: UnifiedChatRequest) -> Dict[
             },
             "query_id": query_id,
             "latency_ms": int((time.time() - start_time) * 1000),
-        }
+        }, {"safety_status": "pending", "query_id": query_id})
     
     try:
         # Get deployment context
-        deps = request.app.state.deployment
+        deps = deployment
         
         # Validate request
-        user_message = body.message.strip()
+        user_message = body.message
+        if body.enable_safety is False:
+            logger.info("security_event=client_safety_downgrade_ignored")
+        body.enable_safety = True
         if not user_message or len(user_message) > MAX_MESSAGE_LENGTH:
             raise HTTPException(
                 status_code=400,
@@ -3360,23 +2539,20 @@ async def orchestrated_chat(request: Request, body: UnifiedChatRequest) -> Dict[
         )
         
         # Return response in VulcanResponse format
-        return {
+        metadata.update({"orchestration": {
+            "classification": metadata.get('classification', {}),
+            "source": source,
+            "orchestrated": True,
+        }, "transparency": {
+            "source": "world_model_orchestration",
+            "confidence": confidence,
+            "orchestrated": True,
+        }})
+        return await _finalize_chat_response(safety_deps, {
             "response": response_text,
             "confidence": confidence,
             "systems_used": systems_used,
-            "metadata": {
-                **metadata,
-                "orchestration": {
-                    "classification": metadata.get('classification', {}),
-                    "source": source,
-                    "orchestrated": True,
-                },
-                "transparency": {
-                    "source": "world_model_orchestration",
-                    "confidence": confidence,
-                    "orchestrated": True,
-                },
-            },
+            "metadata": metadata,
             "query_id": query_id,
             "response_id": str(uuid.uuid4()),
             "latency_ms": latency_ms,
@@ -3384,7 +2560,7 @@ async def orchestrated_chat(request: Request, body: UnifiedChatRequest) -> Dict[
                 "query_id": query_id,
                 "orchestrated": True,
             },
-        }
+        }, metadata)
     
     except HTTPException:
         raise
@@ -3395,17 +2571,13 @@ async def orchestrated_chat(request: Request, body: UnifiedChatRequest) -> Dict[
         )
         latency_ms = int((time.time() - start_time) * 1000)
         
-        return {
-            "response": f"I encountered an error processing your request: {str(e)}",
+        error_metadata = {"error": "processing_failed", "error_type": type(e).__name__}
+        return await _finalize_chat_response(safety_deps, {
+            "response": "I encountered an error processing your request safely. Please try again later.",
             "confidence": 0.0,
             "systems_used": ["error"],
-            "metadata": {
-                "error": str(e),
-                "error_type": type(e).__name__,
-            },
+            "metadata": error_metadata,
             "query_id": query_id,
             "response_id": str(uuid.uuid4()),
             "latency_ms": latency_ms,
-        }
-
-
+        }, error_metadata)

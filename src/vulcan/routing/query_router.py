@@ -2948,7 +2948,17 @@ class QueryAnalyzer:
                             source="safety_net_math_override"
                         )
             
-            # If classifier says skip reasoning (greetings, chitchat, simple factual)
+            # Only deterministic conversational categories may use the lightweight
+            # path.  A model classification is a proposal, not permission for a
+            # factual/reasoning answer without an engine result.
+            if classification.category == "FACTUAL":
+                classification = type(classification)(
+                    category="UNKNOWN", complexity=max(0.3, classification.complexity),
+                    confidence=0.0, skip_reasoning=False, suggested_tools=[],
+                    source="policy_rejected_model_factual_fast_path"
+                )
+
+            # If classifier says skip reasoning (greetings and chitchat only)
             # return a fast-path plan immediately
             if classification.skip_reasoning and classification.complexity < 0.3:
                 # Determine learning mode
@@ -3016,29 +3026,6 @@ class QueryAnalyzer:
                 else:
                     tools_to_use = classification.suggested_tools or ["general"]
                 
-                # ===================================================================
-                # MULTI-LAYER GATE CHECK FIX - Part 1: Set skip_gate_checks flag
-                # ===================================================================
-                # When LLM classifier has high confidence (≥0.8), reasoning engines
-                # should trust the LLM's classification and skip their own gate checks.
-                # This prevents the multi-layer gate check failure where:
-                # 1. Router LLM correctly classifies query (MATHEMATICAL/PROBABILISTIC)
-                # 2. Reasoning engine's gate check rejects it
-                # 3. Result: low-confidence "not applicable" even though LLM was confident
-                #
-                # Note: skip_gate_checks is set equal to llm_authoritative for semantic clarity.
-                # llm_authoritative indicates the LLM had high confidence in its classification,
-                # and skip_gate_checks is the instruction to reasoning engines. Using both names
-                # makes the code more self-documenting and helps maintain the distinction between
-                # the reason (LLM is authoritative) and the action (skip gate checks).
-                # ===================================================================
-                llm_authoritative = classification.confidence >= 0.8
-                skip_gate_checks = llm_authoritative  # Semantic clarity: action follows from reason
-                
-                logger.info(
-                    f"[QueryRouter] {query_id}: LLM confidence={classification.confidence:.2f}, "
-                    f"llm_authoritative={llm_authoritative}, skip_gate_checks={skip_gate_checks}"
-                )
                 
                 # ISSUE #1 FIX: Map classification category to reasoning_type for command pattern
                 reasoning_type = self._map_category_to_reasoning_type(classification.category)
@@ -3065,10 +3052,7 @@ class QueryAnalyzer:
                             "skip_arena": True,
                             "tools": tools_to_use,
                             "response_type": "conversational",
-                            # MULTI-LAYER GATE CHECK FIX: Propagate flags to reasoning engines
-                            "skip_gate_checks": skip_gate_checks,
-                            "llm_authoritative": llm_authoritative,
-                            "router_confidence": classification.confidence,
+                            "router_proposal_category": classification.category,
                             "llm_classification": classification.category,
                         },
                     )
@@ -3076,10 +3060,8 @@ class QueryAnalyzer:
                 
                 plan.telemetry_data["selected_tools"] = tools_to_use
                 plan.telemetry_data["reasoning_strategy"] = f"classifier_{classification.category.lower()}"
-                # MULTI-LAYER GATE CHECK FIX: Record in telemetry
-                plan.telemetry_data["llm_authoritative"] = llm_authoritative
-                plan.telemetry_data["skip_gate_checks"] = skip_gate_checks
-                plan.telemetry_data["router_confidence"] = classification.confidence
+                plan.telemetry_data["authority_source"] = "deterministic_policy"
+                plan.telemetry_data["router_proposal_confidence"] = classification.confidence
                 
                 # ARCHITECTURE: Set LLM mode based on query characteristics
                 plan.llm_mode = self._determine_llm_mode(
@@ -3095,24 +3077,10 @@ class QueryAnalyzer:
                 )
                 return plan
                 
-        except ImportError as e:
-            logger.error(
-                f"[QueryRouter] CRITICAL: LLM router unavailable: {e}. "
-                "LLM router is required for semantic query classification."
-            )
-            raise RuntimeError(
-                "LLM router is required for query routing. "
-                "Ensure vulcan.routing.llm_router is properly installed."
-            ) from e
-            
-        except Exception as e:
-            logger.error(f"[QueryRouter] LLM routing failed: {e}")
-            # Re-raise - don't silently degrade to regex fallback
-            # LLM router is the single source of truth for classification
-            raise RuntimeError(
-                f"LLM routing failed: {e}. "
-                "Cannot fall back to regex classification (removed for reliability)."
-            ) from e
+        except (ImportError, ValueError, RuntimeError) as e:
+            # Provider classification failure reduces capability; deterministic
+            # routing below remains available and never asks a model to answer.
+            logger.warning("[QueryRouter] model proposal unavailable; using deterministic routing (%s)", type(e).__name__)
         
         # =================================================================
         # CONTINUE WITH LLM CLASSIFICATION RESULT

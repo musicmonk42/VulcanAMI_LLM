@@ -1277,16 +1277,7 @@ class HybridLLMExecutor:
         # - llm_mode=ENHANCE (simple response enhancement)
         #
         # NOTE: We only apply this check when llm_mode=None (legacy) or FORMAT_ONLY
-        should_check_reasoning_bypass = (
-            skip_reasoning is not True and  # NEW: Trust router's skip_reasoning flag
-            (llm_mode is None or
-             (LLM_MODE_AVAILABLE and 
-              isinstance(llm_mode, str) and 
-              llm_mode.upper() == "FORMAT_ONLY") or
-             (LLM_MODE_AVAILABLE and 
-              hasattr(llm_mode, 'value') and 
-              llm_mode == LLMMode.FORMAT_ONLY if LLM_MODE_AVAILABLE else False))
-        )
+        should_check_reasoning_bypass = True
         
         # NEW: Only check the USER QUERY (prompt), not system_prompt
         # This prevents false positives from system instructions containing
@@ -1308,8 +1299,8 @@ class HybridLLMExecutor:
                 f"the router should pass skip_reasoning=True or llm_mode=LLMMode.GENERATE."
             )
         
-        # ARCHITECTURE: Respect llm_mode from caller (router)
-        # Industry Standard: Single source of truth - router decides, executor executes
+        # Only formatting is a production provider capability.  Legacy generate and
+        # enhance modes would turn a raw request into an unmediated answer.
         if llm_mode is not None:
             # Convert string to LLMMode enum if needed
             if LLM_MODE_AVAILABLE and isinstance(llm_mode, str):
@@ -1324,12 +1315,8 @@ class HybridLLMExecutor:
                 if llm_mode == LLMMode.FORMAT_ONLY:
                     # Format only: Minimal LLM usage, just format output
                     effective_mode = "local_first"
-                elif llm_mode == LLMMode.GENERATE:
-                    # Generate: LLM creates content (creative queries)
-                    effective_mode = "openai_first" if self._has_openai_key() else "local_first"
-                elif llm_mode == LLMMode.ENHANCE:
-                    # Enhance: LLM enhances simple responses
-                    effective_mode = "openai_first" if self._has_openai_key() else "local_first"
+                elif llm_mode in (LLMMode.GENERATE, LLMMode.ENHANCE):
+                    raise NotReasoningEngineError("direct provider generation is disabled; use bounded formatting")
                 else:
                     effective_mode = self.mode
                     
@@ -1386,10 +1373,7 @@ class HybridLLMExecutor:
                 loop, prompt, max_tokens, temperature, effective_system_prompt, conversation_history
             )
         else:
-            self.logger.warning(f"Unknown mode '{effective_mode}', defaulting to openai_first")
-            result = await self._execute_openai_first(
-                loop, prompt, max_tokens, temperature, effective_system_prompt, conversation_history
-            )
+            raise ValueError(f"prohibited or unknown provider mode: {effective_mode}")
 
         # Update statistics
         self._update_stats(result)
@@ -3324,9 +3308,8 @@ You receive JSON containing:
 
 Make this human-readable. Nothing more."""
 
-        # Issue #7 FIX: Check reasoning confidence BEFORE sending to OpenAI
-        # BUT: Don't block OpenAI if reasoning engine says "not_applicable"
-        # When engine declines (not_applicable=True), we should let OpenAI try
+        # A formatter may only receive a usable engine result.  An engine decline
+        # is not permission for a provider to independently answer the request.
         # FIX (Jan 18 2026): Lowered from 0.5 to 0.01 to ensure reasoning results pass through
         # Industry Standard: Use module-level configuration to avoid repeated parsing
         MIN_REASONING_CONFIDENCE = HYBRID_MIN_REASONING_CONFIDENCE
@@ -3349,8 +3332,6 @@ Make this human-readable. Nothing more."""
                 f"confidence={reasoning_confidence:.2f}, threshold={MIN_REASONING_CONFIDENCE:.2f}"
             )
         
-        # Issue #7 FIX: Check if reasoning engine declined the query (not_applicable)
-        # If so, don't treat this as a failure - let OpenAI attempt it
         is_not_applicable = False
         if hasattr(reasoning_output, 'to_dict'):
             try:
@@ -3362,9 +3343,7 @@ Make this human-readable. Nothing more."""
             except Exception:
                 pass
         
-        # Issue #7 FIX: Only block OpenAI if reasoning truly attempted but failed
-        # Don't block if engine declined (not_applicable) - that means try another approach
-        if reasoning_confidence < MIN_REASONING_CONFIDENCE and not is_not_applicable:
+        if is_not_applicable or reasoning_confidence < MIN_REASONING_CONFIDENCE:
             self.logger.warning(
                 f"[HybridExecutor] Note: Reasoning confidence ({reasoning_confidence:.2f}) < "
                 f"threshold ({MIN_REASONING_CONFIDENCE}). Returning failure message instead of "
@@ -3375,12 +3354,6 @@ Make this human-readable. Nothing more."""
                 f"The reasoning engine returned confidence {reasoning_confidence:.2f}. "
                 f"Please try rephrasing your question or providing more context."
             )
-        elif is_not_applicable:
-            self.logger.info(
-                f"[HybridExecutor] Issue #7 FIX: Reasoning engine declined query "
-                f"(not_applicable=True). Allowing OpenAI to attempt the query."
-            )
-
         # Build the user prompt with VULCAN's structured output
         # Note: Do NOT include original_query to prevent OpenAI from solving independently
         output_dict = None
