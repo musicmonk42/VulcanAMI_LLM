@@ -280,7 +280,9 @@ RUN chmod 0555 /app/entrypoint.sh
 
 # Application database location environment variable example (SQLite default)
 ENV SQLALCHEMY_DATABASE_URI="sqlite:///graphix_api.db"
-ENV PYTHONPATH=/app
+# Production imports one package identity only.  Do not add /app here: doing so
+# makes the same VULCAN source importable as both ``src.vulcan`` and ``vulcan``.
+ENV PYTHONPATH=/app/src
 ENV VULCAN_ENV=production
 ENV VULCAN_SAFETY_LEVEL=strict
 ENV VULCAN_ENABLE_SELF_IMPROVEMENT=false
@@ -308,11 +310,8 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=600s --retries=3 \
 # Entrypoint ensures runtime secrets are provided securely
 ENTRYPOINT ["/app/entrypoint.sh"]
 
-# Default command - runs the full platform which includes:
-# - Graphix Registry API
-# - VULCAN cognitive platform with /vulcan/v1/chat endpoint
-# - All 71+ services integrated behind the chat interface
+# Default command - runs the single statically composed VULCAN runtime.
 # Note: The PORT environment variable is used for flexibility (default 8000)
 # PRODUCTION MODE: --workers 1 ensures singleton process (no split-brain)
 # DO NOT use --reload in production as it spawns a parent watcher + child worker
-CMD ["sh", "-c", "uvicorn src.full_platform:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"]
+CMD ["sh", "-c", "uvicorn vulcan.runtime.app:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"]
