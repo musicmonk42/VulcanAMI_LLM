@@ -5,6 +5,7 @@ from __future__ import annotations
 import inspect
 from dataclasses import dataclass
 from typing import Any
+from vulcan.memory.governed import DisabledMemoryService, GovernedMemoryService, compose_governed_memory
 from uuid import uuid4
 
 from .kernel import CognitiveKernel
@@ -18,7 +19,7 @@ class RuntimeContainer:
     world_state: Any
     kernel: CognitiveKernel
     safety: Any
-    memory: Any | None
+    memory: GovernedMemoryService | DisabledMemoryService
     closed: bool = False
 
     async def close(self) -> None:
@@ -26,6 +27,7 @@ class RuntimeContainer:
         if self.closed:
             return
         self.closed = True
+        self.memory.close()
         shutdown = getattr(self.deployment, "shutdown", None)
         if shutdown is not None:
             result = shutdown()
@@ -41,6 +43,8 @@ class RuntimeContainer:
         safety = getattr(deps, "safety_validator", None)
         if safety is None:
             raise RuntimeError("required safety finalization service is unavailable")
-        kernel = CognitiveKernel(state_authority=world_state, finalizer=SafetyResponseFinalizer(safety))
+        memory = compose_governed_memory()
+        memory.readiness()
+        kernel = CognitiveKernel(state_authority=world_state, finalizer=SafetyResponseFinalizer(safety), memory=memory)
         return cls(runtime_id=str(uuid4()), deployment=deployment, world_state=world_state,
-                   kernel=kernel, safety=safety, memory=getattr(deps, "memory", None))
+                   kernel=kernel, safety=safety, memory=memory)

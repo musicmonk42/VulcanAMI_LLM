@@ -19,8 +19,10 @@ class KernelResult:
     def transport(self, *, case_id: str, runtime_id: str, snapshot_id: str | None) -> dict[str, object]:
         return {"response": self.response, "metadata": {"case_id":case_id,"runtime_id":runtime_id,"state_snapshot_id":snapshot_id,"semantic_schema_version":self.response_ir.schema_version,"finalized":True,"finalization_safety_decision":self.finalization}}
 class CognitiveKernel:
-    def __init__(self, *, state_authority: Any, finalizer: ResponseFinalizerPort, language_input: LanguageInputPort | None = None) -> None:
-        self._state_authority=state_authority; self._finalizer=finalizer; self._language_input=language_input or DeterministicLanguageInput(); self.calls=0
+    def __init__(self, *, state_authority: Any, finalizer: ResponseFinalizerPort, language_input: LanguageInputPort | None = None, memory: Any | None = None) -> None:
+        # The kernel owns the only memory port exposed to the production path.
+        # It deliberately does not turn retrieved text into executable semantics.
+        self._state_authority=state_authority; self._finalizer=finalizer; self._language_input=language_input or DeterministicLanguageInput(); self._memory=memory; self.calls=0
     async def handle(self, request: KernelRequest, case: CognitiveCase) -> KernelResult:
         if case.terminal_status is not CognitiveCaseStatus.OPEN: raise RuntimeError("kernel received a closed cognitive case")
         if request.utterance.digest != case.input_hash or request.conversation_id != case.conversation_id: raise ValueError("request/case correlation mismatch")
