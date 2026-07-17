@@ -25,6 +25,9 @@ class CognitiveKernel:
         # The kernel owns the only memory port exposed to the production path.
         # It deliberately does not turn retrieved text into executable semantics.
         self._state_authority=state_authority; self._finalizer=finalizer; self._language_input=language_input or DeterministicLanguageInput(); self._language_output=language_output or DeterministicLanguageOutput(); self._memory=memory; self.calls=0
+    def capabilities(self) -> tuple[str, ...]:
+        """Capabilities implemented by this composed kernel, not marketing text."""
+        return ("bounded-arithmetic",)
     async def handle(self, request: KernelRequest, case: CognitiveCase) -> KernelResult:
         if case.terminal_status is not CognitiveCaseStatus.OPEN: raise RuntimeError("kernel received a closed cognitive case")
         if request.utterance.digest != case.input_hash or request.conversation_id != case.conversation_id: raise ValueError("request/case correlation mismatch")

@@ -41,16 +41,75 @@ class RuntimeContainer:
     closed: bool = False
 
     async def close(self) -> None:
-        """Release each owned resource once, in reverse construction order."""
+        """Release every owned resource once, preserving the first failure.
+
+        Shutdown is deliberately best-effort across the complete composed graph:
+        one broken legacy dependency must not leak the remaining owned handles.
+        The first error is re-raised *after* every close hook has been offered a
+        chance to run.
+        """
         if self.closed:
             return
         self.closed = True
-        for resource in (self.language_output, self.language_input, self.memory, self.deployment):
+        first_error: BaseException | None = None
+        seen: set[int] = set()
+        for resource in (
+            self.language_output,
+            self.language_input,
+            self.memory,
+            self.kernel,
+            self.safety,
+            self.world_state,
+            self.deployment,
+        ):
+            if id(resource) in seen:
+                continue
+            seen.add(id(resource))
             shutdown = getattr(resource, "close", None) or getattr(resource, "shutdown", None)
             if shutdown is not None:
-                result = shutdown()
+                try:
+                    result = shutdown()
+                    if inspect.isawaitable(result):
+                        await result
+                except BaseException as exc:  # continue closing all remaining owners
+                    if first_error is None:
+                        first_error = exc
+        if first_error is not None:
+            raise first_error
+
+    async def readiness(self) -> None:
+        """Verify the actual object graph rather than a route-local flag."""
+        if self.closed:
+            raise RuntimeError("canonical runtime is closed")
+        required = {
+            "deployment": self.deployment,
+            "world_state": self.world_state,
+            "kernel": self.kernel,
+            "safety": self.safety,
+            "memory": self.memory,
+            "language_input": self.language_input,
+            "language_output": self.language_output,
+        }
+        for name, owner in required.items():
+            if owner is None:
+                raise RuntimeError(f"required canonical {name} is unavailable")
+            check = getattr(owner, "readiness", None) or getattr(owner, "healthcheck", None)
+            if check is not None:
+                result = check()
                 if inspect.isawaitable(result):
-                    await result
+                    result = await result
+                if result is False:
+                    raise RuntimeError(f"required canonical {name} is unhealthy")
+
+    def capabilities(self) -> tuple[str, ...]:
+        """Return only capabilities supplied by the composed kernel object."""
+        advertised = getattr(self.kernel, "capabilities", None)
+        if not callable(advertised):
+            raise RuntimeError("canonical kernel does not expose its capabilities")
+        result = advertised()
+        if not isinstance(result, tuple) or not all(isinstance(value, str) for value in result):
+            raise RuntimeError("canonical kernel returned an invalid capability list")
+        return result
 
     @classmethod
     def new(cls, *, deployment: Any, language_config: LanguageRuntimeConfig | None = None) -> "RuntimeContainer":
