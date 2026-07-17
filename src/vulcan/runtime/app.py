@@ -36,16 +36,28 @@ async def lifespan(app: FastAPI):
     # until all required services form one RuntimeContainer.
     app.state.ready = False
     app.state.runtime = None
+    runtime = None
     try:
         runtime = await asyncio.to_thread(compose_runtime)
+        await runtime.readiness()
         app.state.runtime = runtime
         app.state.ready = True
         yield
+    except BaseException:
+        # Composition can succeed while a subsequent graph health check fails.
+        # Do not leak that partially composed owner graph or publish readiness.
+        if runtime is not None:
+            try:
+                await runtime.close()
+            except BaseException:
+                pass
+        app.state.runtime = None
+        raise
     finally:
         app.state.ready = False
-        runtime = getattr(app.state, "runtime", None)
-        if runtime is not None:
-            await runtime.close()
+        active_runtime = getattr(app.state, "runtime", None)
+        if active_runtime is not None:
+            await active_runtime.close()
         app.state.runtime = None
 
 
@@ -115,7 +127,14 @@ def create_app() -> FastAPI:
         runtime = getattr(request.app.state, "runtime", None)
         if not getattr(request.app.state, "ready", False) or runtime is None:
             return JSONResponse(status_code=503, content={"status": "not_ready"})
-        return {"status": "ready", "runtime_id": runtime.runtime_id, "capabilities": ["bounded-arithmetic"]}
+        try:
+            await runtime.readiness()
+            capabilities = runtime.capabilities()
+        except Exception:
+            app = request.app
+            app.state.ready = False
+            return JSONResponse(status_code=503, content={"status": "not_ready"})
+        return {"status": "ready", "runtime_id": runtime.runtime_id, "capabilities": list(capabilities)}
 
     async def chat_handler(request: Request, body: UnifiedChatRequest):
         runtime = _runtime(request)

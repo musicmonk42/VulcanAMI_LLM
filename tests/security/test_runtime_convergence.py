@@ -58,6 +58,39 @@ def test_container_fails_closed_without_canonical_world_state():
         RuntimeContainer.new(deployment=_deployment(world=None))
 
 
+@pytest.mark.asyncio
+async def test_readiness_fails_when_an_owned_port_reports_unhealthy():
+    runtime = RuntimeContainer.new(deployment=_deployment())
+    runtime.memory.readiness = lambda: False
+    with pytest.raises(RuntimeError, match="memory is unhealthy"):
+        await runtime.readiness()
+
+
+@pytest.mark.asyncio
+async def test_close_attempts_every_owner_after_a_close_failure():
+    closed: list[str] = []
+
+    class _Resource:
+        def __init__(self, name: str, broken: bool = False):
+            self.name, self.broken = name, broken
+        def close(self):
+            closed.append(self.name)
+            if self.broken:
+                raise RuntimeError(self.name)
+
+    runtime = RuntimeContainer.new(deployment=_deployment())
+    runtime.language_output = _Resource("output", broken=True)
+    runtime.language_input = _Resource("input")
+    runtime.memory = _Resource("memory")
+    runtime.kernel = _Resource("kernel")
+    runtime.safety = _Resource("safety")
+    runtime.world_state = _Resource("world")
+    runtime.deployment = _Resource("deployment")
+    with pytest.raises(RuntimeError, match="output"):
+        await runtime.close()
+    assert closed == ["output", "input", "memory", "kernel", "safety", "world", "deployment"]
+
+
 def test_production_docker_uses_canonical_package_identity():
     dockerfile = open("Dockerfile", encoding="utf-8").read()
     assert "uvicorn vulcan.runtime.app:app" in dockerfile
