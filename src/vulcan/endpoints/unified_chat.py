@@ -2435,8 +2435,6 @@ async def legacy_unified_chat(request: Request, body: UnifiedChatRequest) -> Dic
         }, {"source": "deterministic_error", "authority_source": "error"})
 
 
-@router.post("/v1/chat", response_model=None)
-@router.post("/v1/chat/orchestrated", response_model=None)
 async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, Any]:
     """Compatibility transport alias for the canonical runtime kernel.
 
@@ -2446,22 +2444,17 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
     from vulcan.runtime.app import _runtime
     from vulcan.runtime.case import CognitiveCase
     from vulcan.runtime.kernel import KernelRequest
+    from vulcan.runtime.semantic import Utterance
 
     runtime = _runtime(request)
+    utterance = Utterance.from_text(body.message)
     case = CognitiveCase.create(
         request_id=getattr(request.state, "request_id", str(uuid.uuid4())),
         conversation_id=body.conversation_id,
-        message=body.message,
+        input_digest=utterance.digest,
     )
-    result = await runtime.kernel.handle(
-        KernelRequest(message=body.message, conversation_id=body.conversation_id, payload=request), case
-    )
-    result.payload.setdefault("metadata", {}).update({
-        "case_id": case.case_id,
-        "runtime_id": runtime.runtime_id,
-        "state_snapshot_id": case.state_snapshot_id,
-    })
-    return result.payload
+    result = await runtime.kernel.handle(KernelRequest(utterance, body.conversation_id), case)
+    return result.transport(case_id=case.case_id, runtime_id=runtime.runtime_id, snapshot_id=case.state_snapshot_id)
 
 
 # Retained solely as a research-only callable for existing experiments.  It is

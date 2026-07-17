@@ -1,111 +1,245 @@
-"""Framework-independent, closed semantic contracts for the canonical runtime."""
-from __future__ import annotations
-import ast, hashlib, html, json, math, operator, unicodedata
-from dataclasses import dataclass
-from datetime import datetime
-from enum import Enum
-from typing import Protocol
+"""Closed semantic contracts for the canonical runtime.
 
-SCHEMA_VERSION = "semantic-ingress/2"; LEDGER_VERSION = "semantic-ledger/1"; RESPONSE_IR_VERSION = "response-ir/2"
-MAX_UTTERANCE_CHARS = 10_000; MAX_CANDIDATES = 4; MAX_REFERENCE = 512; MAX_TRACE = 1024
+Language ports may suggest spans only.  The server reconstructs executable
+arithmetic from those spans before a request can reach the evaluator.
+"""
+from __future__ import annotations
+import ast
+import hashlib
+import html
+import json
+import math
+import operator
+import re
+import unicodedata
+from dataclasses import asdict, dataclass, is_dataclass
+from datetime import datetime, timezone
+from enum import Enum
+from fractions import Fraction
+from typing import Any, Protocol
+from uuid import uuid4
+
+SCHEMA_VERSION = "semantic-ingress/2"
+LEDGER_VERSION = "semantic-ledger/2"
+RESPONSE_IR_VERSION = "response-ir/3"
+MAX_UTTERANCE_CHARS = 10_000
+MAX_CANDIDATES = 4
+MAX_REFERENCE = 512
+MAX_TRACE = 1024
+MAX_AST_NODES = 64
+MAX_AST_DEPTH = 16
+MAX_INTEGER_BITS = 256
+MAX_EXPONENT = 32
+
 class EpistemicStatus(str, Enum):
     PROVEN="proven"; COMPUTED="computed"; OBSERVED="observed"; RETRIEVED="retrieved"; ASSUMED="assumed"; HYPOTHESIS="hypothesis"; CONTESTED="contested"; UNKNOWN="unknown"; ERROR="error"
 class EvidenceKind(str, Enum):
     SOURCE_DOCUMENT="source_document"; SOURCE_EXCERPT="source_excerpt"; OBSERVATION="observation"; TOOL_OUTPUT="tool_output"; RETRIEVED_RECORD="retrieved_record"; FORMAL_PREMISE="formal_premise"; USER_ASSERTION="user_assertion"; POLICY_FACT="policy_fact"; STATE_SNAPSHOT="state_snapshot"
 class ExecutionStatus(str, Enum): SUCCESS="success"; PARTIAL="partial"; NOT_APPLICABLE="not_applicable"; UNKNOWN="unknown"; ERROR="error"; CANCELLED="cancelled"
-class ResponseMode(str, Enum): STRICT="strict"; CLARIFICATION="clarification"; PARTIAL="partial"; UNKNOWN="unknown"; ERROR="error"
+class ResponseMode(str, Enum): STRICT="strict"; CLARIFICATION="clarification"; PARTIAL="partial"; UNKNOWN="unknown"; ERROR="error"; ACTION_CONFIRMATION="action_confirmation"
+
 @dataclass(frozen=True)
 class Utterance:
-    text:str; digest:str; locale:str="und"; normalization:str="NFC"
+    text: str
+    digest: str
+    locale: str = "und"
+    normalization: str = "NFC"
     @classmethod
-    def from_text(cls,text:str,locale:str="und")->"Utterance":
-        if not isinstance(text,str) or not text or len(text)>MAX_UTTERANCE_CHARS: raise ValueError("utterance must be bounded")
-        text=unicodedata.normalize("NFC",text); return cls(text,hashlib.sha256(text.encode()).hexdigest(),locale)
+    def from_text(cls, text: str, locale: str = "und") -> "Utterance":
+        if not isinstance(text, str) or not text or len(text) > MAX_UTTERANCE_CHARS:
+            raise ValueError("utterance must be a non-empty bounded string")
+        normalized = unicodedata.normalize("NFC", text)
+        if not re.fullmatch(r"[A-Za-z0-9_-]{2,35}", locale):
+            raise ValueError("invalid locale")
+        return cls(normalized, hashlib.sha256(normalized.encode("utf-8")).hexdigest(), locale)
+
 @dataclass(frozen=True)
 class SourceSpan:
-    start:int; end:int; unit:str="unicode-codepoint"
-    def resolve(self,u:Utterance)->str:
-        if self.unit!="unicode-codepoint" or self.start<0 or self.end<=self.start or self.end>len(u.text): raise ValueError("invalid source span")
-        return u.text[self.start:self.end]
+    start: int
+    end: int
+    unit: str = "unicode-codepoint"
+    def resolve(self, utterance: Utterance) -> str:
+        if self.unit != "unicode-codepoint" or self.start < 0 or self.end <= self.start or self.end > len(utterance.text):
+            raise ValueError("invalid source span")
+        return utterance.text[self.start:self.end]
+
 @dataclass(frozen=True)
-class ProposedCandidate: operation:str; expression:str; span:SourceSpan; diagnostic_confidence:float|None=None
+class ProposedCandidate:
+    operation: str
+    expression: str
+    span: SourceSpan
+    diagnostic_confidence: float | None = None
+
 @dataclass(frozen=True)
-class InterpretationProposal: schema_version:str; candidates:tuple[ProposedCandidate,...]; parser_identity:str
+class InterpretationProposal:
+    schema_version: str
+    candidates: tuple[ProposedCandidate, ...]
+    parser_identity: str
+
 class LanguageInputPort(Protocol):
-    async def propose(self, utterance:Utterance)->InterpretationProposal: ...
+    async def propose(self, utterance: Utterance) -> InterpretationProposal: ...
+
 @dataclass(frozen=True)
-class InterpretationBundle: schema_version:str; ontology_version:str; input_digest:str; candidates:tuple[ProposedCandidate,...]; diagnostics:tuple[str,...]
+class InterpretationBundle:
+    schema_version: str
+    ontology_version: str
+    input_digest: str
+    candidates: tuple[ProposedCandidate, ...]
+    diagnostics: tuple[str, ...]
+    parser_identity: str = "unknown"
+
 @dataclass(frozen=True)
-class AcceptedInterpretation: candidate_index:int; operation:str; expression:str; assumptions:tuple[str,...]=()
+class AcceptedInterpretation:
+    candidate_index: int
+    operation: str
+    expression: str
+    interpretation_id: str = ""
+    assumptions: tuple[str, ...] = ()
+
 @dataclass(frozen=True)
-class ClarificationRequest: field:str; question:str
+class ClarificationRequest:
+    field: str
+    question: str
+    clarification_id: str = ""
+
 @dataclass(frozen=True)
 class EvidenceArtifact:
-    artifact_id:str; kind:EvidenceKind; content_digest:str; reference:str; origin:str; acquisition_method:str; case_id:str; schema_version:str=LEDGER_VERSION; state_snapshot_id:str|None=None; observed_at:datetime|None=None; valid_until:datetime|None=None; scope:str="request"; locale:str="und"; privacy_class:str="request-confidential"; source_integrity:str="not-applicable"; trust_policy:str="not-evaluated"; citation:str|None=None; supporting_span:SourceSpan|None=None; contradicts:tuple[str,...]=(); supersedes:tuple[str,...]=(); limitations:tuple[str,...]=(); adapter_identity:str="kernel"; adapter_version:str="1"
+    artifact_id: str; kind: EvidenceKind; content_digest: str; reference: str; origin: str; acquisition_method: str; case_id: str
+    schema_version: str = LEDGER_VERSION; state_snapshot_id: str | None = None; observed_at: datetime | None = None; valid_until: datetime | None = None
+    scope: str = "request"; locale: str = "und"; privacy_class: str = "request-confidential"; source_integrity: str = "not-applicable"; trust_policy: str = "not-evaluated"; citation: str | None = None; supporting_span: SourceSpan | None = None; contradicts: tuple[str, ...] = (); supersedes: tuple[str, ...] = (); limitations: tuple[str, ...] = (); adapter_identity: str = "kernel"; adapter_version: str = "1"
 @dataclass(frozen=True)
 class Derivation:
-    derivation_id:str; method:str; method_version:str; inputs:tuple[str,...]; output_claim_id:str; assumptions:tuple[str,...]; parameters:tuple[tuple[str,str],...]; deterministic:bool; status:ExecutionStatus; trace_digest:str; error_detail:str|None=None
+    derivation_id: str; method: str; method_version: str; inputs: tuple[str, ...]; output_claim_id: str; assumptions: tuple[str, ...]; parameters: tuple[tuple[str,str], ...]; deterministic: bool; status: ExecutionStatus; trace_digest: str; error_detail: str | None = None
 @dataclass(frozen=True)
-class Proposition: subject:str; predicate:str; object:str; expression:str|None=None; units:str|None=None; negated:bool=False; modality:str="assertive"; quantifier:str="specific"
+class Proposition:
+    subject: str; predicate: str; object: str; expression: str | None = None; units: str | None = None; negated: bool = False; modality: str = "assertive"; quantifier: str = "specific"
 @dataclass(frozen=True)
 class Claim:
-    claim_id:str; proposition:Proposition; status:EpistemicStatus; evidence_ids:tuple[str,...]=(); derivation_ids:tuple[str,...]=(); assumptions:tuple[str,...]=(); contradictions:tuple[str,...]=(); citation_ids:tuple[str,...]=(); scope:str="request"; temporal_validity:str|None=None; uncertainty:str|None=None; caveat:str|None=None
+    claim_id: str; proposition: Proposition; status: EpistemicStatus; evidence_ids: tuple[str, ...] = (); derivation_ids: tuple[str, ...] = (); assumptions: tuple[str, ...] = (); contradictions: tuple[str, ...] = (); citation_ids: tuple[str, ...] = (); scope: str = "request"; temporal_validity: str | None = None; uncertainty: str | None = None; caveat: str | None = None
+    @property
+    def derivation_id(self) -> str | None:  # temporary compatibility for callers that read singular result derivations
+        return self.derivation_ids[0] if len(self.derivation_ids) == 1 else None
 @dataclass(frozen=True)
 class ResponseIR:
-    schema_version:str; response_id:str; case_id:str; accepted_interpretation_id:str|None; state_snapshot_id:str|None; mode:ResponseMode; required_claim_ids:tuple[str,...]; optional_claim_ids:tuple[str,...]=(); locale:str="und"; style:str="strict"; max_chars:int=4000; literals:tuple[str,...]=()
+    schema_version: str; response_id: str; case_id: str; accepted_interpretation_id: str | None; state_snapshot_id: str | None; mode: ResponseMode; required_claim_ids: tuple[str, ...]; optional_claim_ids: tuple[str, ...] = (); locale: str = "und"; style: str = "strict"; max_chars: int = 4000; literals: tuple[str, ...] = ()
 @dataclass(frozen=True)
-class RenderArtifact: text:str; renderer:str; renderer_version:str; ir_digest:str; claim_ids:tuple[str,...]; citation_ids:tuple[str,...]; locale:str; diagnostics:tuple[str,...]=()
+class RenderArtifact:
+    text: str; renderer: str; renderer_version: str; ir_digest: str; claim_ids: tuple[str, ...]; citation_ids: tuple[str, ...]; locale: str; diagnostics: tuple[str, ...] = ()
 @dataclass(frozen=True)
-class UntrustedRenderDraft: text:str
+class UntrustedRenderDraft: text: str
 class LanguageOutputPort(Protocol):
-    async def render(self, response_ir:ResponseIR, style:str, locale:str, max_chars:int)->UntrustedRenderDraft: ...
+    async def render(self, response_ir: ResponseIR, style: str, locale: str, max_chars: int) -> UntrustedRenderDraft: ...
+
+_ARITHMETIC = re.compile(r"^[\s0-9+*/%().-]+$")
 class DeterministicLanguageInput:
-    async def propose(self,u:Utterance)->InterpretationProposal:
-        return InterpretationProposal(SCHEMA_VERSION,(ProposedCandidate("arithmetic",u.text.strip(),SourceSpan(0,len(u.text))),),"deterministic-arithmetic/1")
-def validate_proposal(u:Utterance,p:InterpretationProposal)->InterpretationBundle:
-    if p.schema_version!=SCHEMA_VERSION or not p.candidates or len(p.candidates)>MAX_CANDIDATES: raise ValueError("unsupported interpretation proposal")
-    for c in p.candidates:
-        if c.operation!="arithmetic" or c.span.resolve(u)!=u.text or (c.diagnostic_confidence is not None and not math.isfinite(c.diagnostic_confidence)): raise ValueError("invalid proposal")
-    return InterpretationBundle(SCHEMA_VERSION,"formal-arithmetic/1",u.digest,p.candidates,())
-def accept(b:InterpretationBundle)->AcceptedInterpretation|ClarificationRequest:
-    return AcceptedInterpretation(0,b.candidates[0].operation,b.candidates[0].expression) if len(b.candidates)==1 else ClarificationRequest("interpretation","Please choose one unambiguous supported request.")
-_BIN={ast.Add:operator.add,ast.Sub:operator.sub,ast.Mult:operator.mul,ast.Div:operator.truediv,ast.Pow:operator.pow,ast.Mod:operator.mod}; _UN={ast.UAdd:operator.pos,ast.USub:operator.neg}
-def _evaluate(n:ast.AST)->int|float:
-    if isinstance(n,ast.Constant) and type(n.value) in (int,float) and math.isfinite(n.value): return n.value
-    if isinstance(n,ast.UnaryOp) and type(n.op) in _UN:return _UN[type(n.op)](_evaluate(n.operand))
-    if isinstance(n,ast.BinOp) and type(n.op) in _BIN:
-        v=_BIN[type(n.op)](_evaluate(n.left),_evaluate(n.right))
-        if not math.isfinite(v) or abs(v)>10**100: raise ValueError("bounds")
-        return v
-    raise ValueError("unsupported")
-def execute(a:AcceptedInterpretation)->tuple[Claim,Derivation]:
+    async def propose(self, utterance: Utterance) -> InterpretationProposal:
+        text = utterance.text.strip()
+        offset = utterance.text.index(text)
+        operation = "arithmetic" if _ARITHMETIC.fullmatch(text) else "unsupported"
+        return InterpretationProposal(SCHEMA_VERSION, (ProposedCandidate(operation, text, SourceSpan(offset, offset + len(text))),), "deterministic-parser/2")
+
+def _valid_text(value: str, maximum: int = MAX_REFERENCE) -> bool:
+    return isinstance(value, str) and bool(value) and len(value) <= maximum
+
+def validate_proposal(utterance: Utterance, proposal: InterpretationProposal) -> InterpretationBundle:
+    if proposal.schema_version != SCHEMA_VERSION or not _valid_text(proposal.parser_identity) or not proposal.candidates or len(proposal.candidates) > MAX_CANDIDATES:
+        raise ValueError("unsupported interpretation proposal")
+    validated: list[ProposedCandidate] = []
+    for candidate in proposal.candidates:
+        if candidate.operation not in {"arithmetic", "unsupported"} or not _valid_text(candidate.expression):
+            raise ValueError("unsupported proposal operation")
+        if candidate.diagnostic_confidence is not None and (not isinstance(candidate.diagnostic_confidence, float) or not math.isfinite(candidate.diagnostic_confidence)):
+            raise ValueError("invalid proposal confidence")
+        source = candidate.span.resolve(utterance).strip()
+        # Crucially the expression is reconstructed from the span; a provider cannot substitute tokens.
+        if candidate.expression != source:
+            raise ValueError("proposal expression is not grounded to its source span")
+        if candidate.operation == "arithmetic" and not _ARITHMETIC.fullmatch(source):
+            raise ValueError("arithmetic proposal contains unsupported tokens")
+        validated.append(candidate)
+    return InterpretationBundle(SCHEMA_VERSION, "formal-arithmetic/2", utterance.digest, tuple(validated), (), proposal.parser_identity)
+
+def accept(bundle: InterpretationBundle) -> AcceptedInterpretation | ClarificationRequest:
+    if len(bundle.candidates) != 1:
+        return ClarificationRequest("interpretation", "Please provide one supported, unambiguous request.", f"clarification-{uuid4().hex}")
+    candidate = bundle.candidates[0]
+    return AcceptedInterpretation(0, candidate.operation, candidate.expression, f"accepted-{uuid4().hex}")
+
+_BIN = {ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul, ast.Div: operator.truediv, ast.Mod: operator.mod, ast.Pow: operator.pow}
+_UN = {ast.UAdd: operator.pos, ast.USub: operator.neg}
+def _budget(node: ast.AST, depth: int = 1) -> int:
+    if depth > MAX_AST_DEPTH: raise ValueError("expression nesting exceeds budget")
+    count = 1
+    for child in ast.iter_child_nodes(node): count += _budget(child, depth + 1)
+    if count > MAX_AST_NODES: raise ValueError("expression node budget exceeded")
+    return count
+def _evaluate(node: ast.AST) -> Fraction:
+    if isinstance(node, ast.Constant) and type(node.value) is int:
+        if node.value.bit_length() > MAX_INTEGER_BITS: raise ValueError("integer exceeds bit budget")
+        return Fraction(node.value)
+    if isinstance(node, ast.UnaryOp) and type(node.op) in _UN: return _UN[type(node.op)](_evaluate(node.operand))
+    if isinstance(node, ast.BinOp) and type(node.op) in _BIN:
+        left, right = _evaluate(node.left), _evaluate(node.right)
+        if isinstance(node.op, ast.Pow):
+            if right.denominator != 1 or abs(right.numerator) > MAX_EXPONENT: raise ValueError("exponent exceeds budget")
+        try: value = _BIN[type(node.op)](left, right)
+        except ZeroDivisionError: raise ValueError("division by zero") from None
+        if value.numerator.bit_length() > MAX_INTEGER_BITS or value.denominator.bit_length() > MAX_INTEGER_BITS: raise ValueError("result exceeds bit budget")
+        return value
+    raise ValueError("unsupported expression")
+def _format_fraction(value: Fraction) -> str: return str(value.numerator) if value.denominator == 1 else f"{value.numerator}/{value.denominator}"
+def execute(accepted: AcceptedInterpretation, *, case_id: str = "case") -> tuple[Claim, Derivation]:
+    cid, did = f"claim-{uuid4().hex}", f"derivation-{uuid4().hex}"
     try:
-        value=str(_evaluate(ast.parse(a.expression,mode="eval").body)); cid="claim-1"; d=Derivation("derivation-1","restricted-python-ast","1",(),cid,a.assumptions,(("precision","exact-integer-or-ieee-float"),),True,ExecutionStatus.SUCCESS,canonical_digest(a.expression))
-        return Claim(cid,Proposition(a.expression,"evaluates_to",value,expression=a.expression),EpistemicStatus.COMPUTED,derivation_ids=(d.derivation_id,),assumptions=a.assumptions),d
-    except (SyntaxError,ValueError,ZeroDivisionError,OverflowError):
-        return Claim("claim-1",Proposition("request","support","unsupported"),EpistemicStatus.UNKNOWN,caveat="No factual result was inferred."),Derivation("derivation-1","restricted-python-ast","1",(),"claim-1",(),(),True,ExecutionStatus.NOT_APPLICABLE,"", "unsupported syntax")
-def validate_ledger(evidence:tuple[EvidenceArtifact,...], derivations:tuple[Derivation,...], claims:tuple[Claim,...])->None:
-    eids={e.artifact_id for e in evidence}; dids={d.derivation_id for d in derivations}; cids={c.claim_id for c in claims}
-    if len(eids)!=len(evidence) or len(dids)!=len(derivations) or len(cids)!=len(claims): raise ValueError("duplicate ledger id")
-    for c in claims:
-        if not set(c.evidence_ids)<=eids or not set(c.derivation_ids)<=dids or not set(c.contradictions)<=cids: raise ValueError("dangling ledger reference")
-        if c.status is EpistemicStatus.COMPUTED and not any(d.status is ExecutionStatus.SUCCESS and d.output_claim_id==c.claim_id for d in derivations): raise ValueError("computed claim lacks successful derivation")
-        if c.status is EpistemicStatus.PROVEN and (not c.evidence_ids or not any(d.status is ExecutionStatus.SUCCESS and d.output_claim_id==c.claim_id for d in derivations)): raise ValueError("proven claim lacks proof inputs")
-        if c.status is EpistemicStatus.OBSERVED and not any(e.kind is EvidenceKind.OBSERVATION for e in evidence if e.artifact_id in c.evidence_ids): raise ValueError("observed claim lacks observation")
-        if c.status is EpistemicStatus.RETRIEVED and not c.evidence_ids: raise ValueError("retrieved claim lacks artifact")
-        if c.status is EpistemicStatus.ASSUMED and not c.assumptions: raise ValueError("assumption not visible")
-def render_strict(ir:ResponseIR, claims:tuple[Claim,...])->RenderArtifact:
-    byid={c.claim_id:c for c in claims}; validate_ledger((),(),tuple(c for c in claims if not c.derivation_ids)) if False else None
-    if not set(ir.required_claim_ids)<=set(byid): raise ValueError("IR references unknown claim")
-    parts=[]
-    for cid in ir.required_claim_ids:
-        c=byid[cid]; p=c.proposition
-        if c.status is EpistemicStatus.COMPUTED: text=f"The computed result is {p.object}."
-        elif c.status is EpistemicStatus.UNKNOWN: text="This request is not supported by the deterministic interpreter."
-        else: text=f"{c.status.value.capitalize()}: {p.subject} {p.predicate} {p.object}."
-        if c.caveat:text+=f" Caveat: {c.caveat}"
-        parts.append(html.escape(text,quote=False))
-    text="\n".join(parts)
-    if len(text)>ir.max_chars: raise ValueError("render bound")
-    return RenderArtifact(text,"strict-template","1",canonical_digest(ir),ir.required_claim_ids,(),ir.locale)
-def canonical_digest(value:object)->str:return hashlib.sha256(json.dumps(value,default=str,sort_keys=True,separators=(",",":"),allow_nan=False).encode()).hexdigest()
+        if accepted.operation != "arithmetic": raise ValueError("unsupported operation")
+        parsed = ast.parse(accepted.expression, mode="eval")
+        _budget(parsed)
+        value = _format_fraction(_evaluate(parsed.body))
+        derivation = Derivation(did, "bounded-arithmetic-ast", "2", (), cid, accepted.assumptions, (("precision", "exact-rational"),), True, ExecutionStatus.SUCCESS, canonical_digest(accepted.expression))
+        return Claim(cid, Proposition(accepted.expression, "evaluates_to", value, expression=accepted.expression), EpistemicStatus.COMPUTED, derivation_ids=(did,), assumptions=accepted.assumptions), derivation
+    except (SyntaxError, ValueError, OverflowError):
+        derivation = Derivation(did, "bounded-arithmetic-ast", "2", (), cid, (), (), True, ExecutionStatus.NOT_APPLICABLE, "", "unsupported or bounded expression")
+        return Claim(cid, Proposition("request", "support", "unsupported"), EpistemicStatus.UNKNOWN, caveat="No factual result was inferred."), derivation
+
+def validate_ledger(evidence: tuple[EvidenceArtifact, ...], derivations: tuple[Derivation, ...], claims: tuple[Claim, ...]) -> None:
+    eids, dids, cids = {e.artifact_id for e in evidence}, {d.derivation_id for d in derivations}, {c.claim_id for c in claims}
+    if len(eids) != len(evidence) or len(dids) != len(derivations) or len(cids) != len(claims): raise ValueError("duplicate ledger id")
+    for derivation in derivations:
+        if derivation.output_claim_id not in cids or len(derivation.trace_digest) > MAX_TRACE: raise ValueError("invalid derivation reference")
+    for claim in claims:
+        if not set(claim.evidence_ids) <= eids or not set(claim.derivation_ids) <= dids or not set(claim.contradictions) <= cids or not set(claim.citation_ids) <= eids: raise ValueError("dangling ledger reference")
+        output = [d for d in derivations if d.output_claim_id == claim.claim_id and d.status is ExecutionStatus.SUCCESS]
+        if claim.status is EpistemicStatus.COMPUTED and not output: raise ValueError("computed claim lacks successful derivation")
+        if claim.status is EpistemicStatus.PROVEN and (not output or not any(e.kind is EvidenceKind.FORMAL_PREMISE for e in evidence if e.artifact_id in claim.evidence_ids)): raise ValueError("proven claim lacks formal evidence")
+        if claim.status is EpistemicStatus.OBSERVED and not any(e.kind is EvidenceKind.OBSERVATION for e in evidence if e.artifact_id in claim.evidence_ids): raise ValueError("observed claim lacks observation")
+        if claim.status is EpistemicStatus.RETRIEVED and not any(e.kind is EvidenceKind.RETRIEVED_RECORD for e in evidence if e.artifact_id in claim.evidence_ids): raise ValueError("retrieved claim lacks retrieved evidence")
+        if claim.status is EpistemicStatus.ASSUMED and not claim.assumptions: raise ValueError("assumption not visible")
+
+def render_strict(ir: ResponseIR, claims: tuple[Claim, ...], derivations: tuple[Derivation, ...] = (), evidence: tuple[EvidenceArtifact, ...] = ()) -> RenderArtifact:
+    if ir.schema_version != RESPONSE_IR_VERSION or ir.literals or ir.max_chars <= 0: raise ValueError("invalid response IR")
+    validate_ledger(evidence, derivations, claims)
+    by_id = {claim.claim_id: claim for claim in claims}
+    if not set(ir.required_claim_ids) <= set(by_id) or set(ir.required_claim_ids) & set(ir.optional_claim_ids): raise ValueError("IR references unknown or duplicate claim")
+    parts: list[str] = []
+    for claim_id in ir.required_claim_ids:
+        claim = by_id[claim_id]; proposition = claim.proposition
+        if claim.status is EpistemicStatus.COMPUTED: text = f"The computed result is {proposition.object}."
+        elif claim.status is EpistemicStatus.UNKNOWN: text = "This request is not supported by the deterministic interpreter."
+        elif claim.status is EpistemicStatus.ERROR: text = "The deterministic interpreter could not complete this request."
+        else: text = f"{claim.status.value.capitalize()}: {proposition.subject} {proposition.predicate} {proposition.object}."
+        if claim.caveat: text += f" Caveat: {claim.caveat}"
+        parts.append(html.escape(text, quote=False))
+    text = "\n".join(parts)
+    if len(text) > ir.max_chars: raise ValueError("render bound")
+    return RenderArtifact(text, "strict-template", "2", canonical_digest(ir), ir.required_claim_ids, (), ir.locale)
+
+def _canonical(value: Any) -> Any:
+    if is_dataclass(value): return _canonical(asdict(value))
+    if isinstance(value, Enum): return value.value
+    if isinstance(value, datetime): return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    if isinstance(value, tuple): return [_canonical(v) for v in value]
+    if isinstance(value, dict): return {str(k): _canonical(v) for k, v in sorted(value.items())}
+    if isinstance(value, (str, int, bool)) or value is None: return value
+    raise TypeError(f"unsupported canonical type: {type(value).__name__}")
+def canonical_digest(value: object) -> str:
+    return hashlib.sha256(json.dumps(_canonical(value), ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")).hexdigest()

@@ -346,98 +346,24 @@ class ThumbsFeedbackRequest(BaseModel):
 
 
 class UnifiedChatRequest(BaseModel):
-    """
-    Standard request model for all chat endpoints.
-    
-    This is the canonical request model that supports all features.
-    Legacy ChatRequest is deprecated and redirects here.
-    
-    This endpoint orchestrates the entire VulcanAMI platform, providing access to:
-    - Multi-modal processing and understanding
-    - Long-term and episodic memory systems
-    - Safety validation and governance
-    - Multiple reasoning engines (symbolic, probabilistic, causal, analogical)
-    - Planning and goal management systems
-    - World model predictions and simulations
-    
-    Attributes:
-        message: The user's message/prompt (required)
-        max_tokens: Maximum tokens in the response (default: 2000)
-        history: Conversation history as list of {"role": "...", "content": "..."} dicts
-        conversation_id: Optional conversation identifier for context continuity.
-            If None, a new conversation ID will be auto-generated.
-        enable_reasoning: Enable advanced reasoning engines (default: True)
-        enable_memory: Enable long-term memory search and retrieval (default: True)
-        enable_safety: Enable safety validation and compliance checking (default: True)
-        enable_planning: Enable hierarchical planning systems (default: True)
-        enable_causal: Enable causal reasoning and inference (default: True)
-        
-    Example:
-        >>> request = UnifiedChatRequest(
-        ...     message="Explain quantum entanglement",
-        ...     max_tokens=1500,
-        ...     history=[{"role": "user", "content": "Hi"}],
-        ...     conversation_id="conv_12345"
-        ... )
-        
-    Note:
-        Feature toggles (enable_*) allow fine-grained control over platform
-        capabilities for performance tuning or specialized use cases.
-    """
-    message: str = Field(
-        ...,
-        description="The user's message/prompt",
-        min_length=1,
-        max_length=10000
-    )
-    max_tokens: int = Field(
-        default=2000,
-        ge=1,
-        le=32000,
-        description="Maximum tokens in response (increased from 8000 to 32000 to support longer responses)"
-    )
-    history: List[ChatHistoryMessage] = Field(
-        default_factory=list,
-        description="Conversation history for context",
-        max_length=100
-    )
-    conversation_id: Optional[str] = Field(
-        default=None,
-        description="Optional conversation ID for tracking",
-        max_length=256
-    )
-    # Feature toggles for fine-grained control
-    enable_reasoning: bool = Field(
-        default=True,
-        description="Enable advanced reasoning engines"
-    )
-    enable_memory: bool = Field(
-        default=True,
-        description="Enable long-term memory search and retrieval"
-    )
-    enable_safety: bool = Field(
-        default=True,
-        description="Enable safety validation and compliance checking"
-    )
-    enable_planning: bool = Field(
-        default=True,
-        description="Enable hierarchical planning systems"
-    )
-    enable_causal: bool = Field(
-        default=True,
-        description="Enable causal reasoning and inference"
-    )
+    """Canonical runtime request: bounded arithmetic only.
 
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "message": "Explain quantum entanglement",
-                "max_tokens": 2000,
-                "history": [],
-                "enable_reasoning": True
-            }
-        }
-    )
+    The Docker-selected runtime deliberately does not support history, memory,
+    planning, causal/general reasoning, or multimodal processing.  The legacy
+    fields remain parseable for an explicit 422 capability error rather than
+    being silently ignored.  ``enable_safety`` is compatibility metadata only:
+    mandatory finalization cannot be disabled.
+    """
+    message: str = Field(..., description="Bounded arithmetic source text", min_length=1, max_length=10000)
+    max_tokens: int = Field(default=2000, ge=1, le=32000, description="Compatibility output limit; strict renderer owns output bounds")
+    history: List[ChatHistoryMessage] = Field(default_factory=list, description="Unsupported by canonical runtime", max_length=100)
+    conversation_id: Optional[str] = Field(default=None, description="Request correlation identifier; no durable history", max_length=256)
+    enable_reasoning: bool = Field(default=False, description="Unsupported on canonical runtime")
+    enable_memory: bool = Field(default=False, description="Unsupported on canonical runtime")
+    enable_safety: bool = Field(default=True, description="Cannot disable mandatory finalization")
+    enable_planning: bool = Field(default=False, description="Unsupported on canonical runtime")
+    enable_causal: bool = Field(default=False, description="Unsupported on canonical runtime")
+    model_config = ConfigDict(json_schema_extra={"example": {"message": "2 + 2", "conversation_id": "request-123"}})
 
 
 # ============================================================

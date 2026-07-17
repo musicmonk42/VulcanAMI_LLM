@@ -43,14 +43,15 @@ class CognitiveCase:
     interpretation: "InterpretationBundle | None" = None
     accepted_interpretation: "AcceptedInterpretation | None" = None
     clarification: "ClarificationRequest | None" = None
-    evidence: list["EvidenceArtifact"] = field(default_factory=list)
-    claims: list["Claim"] = field(default_factory=list)
-    derivations: list["Derivation"] = field(default_factory=list)
+    _evidence: list["EvidenceArtifact"] = field(default_factory=list, repr=False)
+    _claims: list["Claim"] = field(default_factory=list, repr=False)
+    _derivations: list["Derivation"] = field(default_factory=list, repr=False)
     response_ir: "ResponseIR | None" = None
     selected_components: tuple[str, ...] = ()
     terminal_status: CognitiveCaseStatus = CognitiveCaseStatus.OPEN
     failure_kind: str | None = None
     finalization_status: str | None = None
+    render_artifact: object | None = field(default=None, repr=False)
     events: list[CaseEvent] = field(default_factory=list)
 
     @classmethod
@@ -71,21 +72,38 @@ class CognitiveCase:
             raise RuntimeError("cannot append an event after a cognitive case is closed")
         self.events.append(CaseEvent(stage, datetime.now(timezone.utc), detail))
 
+    @property
+    def evidence(self) -> tuple["EvidenceArtifact", ...]:
+        return tuple(self._evidence)
+
+    @property
+    def claims(self) -> tuple["Claim", ...]:
+        return tuple(self._claims)
+
+    @property
+    def derivations(self) -> tuple["Derivation", ...]:
+        return tuple(self._derivations)
+
     def append_ledger(self, *, claim: "Claim", derivation: "Derivation", evidence: tuple["EvidenceArtifact", ...] = ()) -> None:
-        """The kernel is the sole writer of accepted request-local ledger records."""
+        """Atomically validate and commit one request-local ledger transaction."""
         if self.terminal_status is not CognitiveCaseStatus.OPEN:
             raise RuntimeError("cannot mutate a closed case ledger")
-        known = {item.claim_id for item in self.claims}
-        if claim.claim_id in known or derivation.derivation_id in {item.derivation_id for item in self.derivations}:
-            raise ValueError("duplicate ledger record")
-        self.evidence.extend(evidence)
-        self.derivations.append(derivation)
-        self.claims.append(claim)
+        from .semantic import validate_ledger
+        proposed_evidence = (*self._evidence, *evidence)
+        proposed_derivations = (*self._derivations, derivation)
+        proposed_claims = (*self._claims, claim)
+        validate_ledger(proposed_evidence, proposed_derivations, proposed_claims)
+        self._evidence.extend(evidence)
+        self._derivations.append(derivation)
+        self._claims.append(claim)
 
     def record_finalization(self, decision: str) -> None:
+        if self.terminal_status is not CognitiveCaseStatus.OPEN:
+            raise RuntimeError("cannot finalize a closed cognitive case")
         if self.finalization_status is not None:
             raise RuntimeError("response finalized more than once")
         self.finalization_status = decision
+        self.record("finalized", decision)
 
     def close(self, status: CognitiveCaseStatus, failure_kind: str | None = None) -> None:
         if self.terminal_status is not CognitiveCaseStatus.OPEN:

@@ -8,6 +8,7 @@ from typing import Any
 from uuid import uuid4
 
 from .kernel import CognitiveKernel
+from .finalization import SafetyResponseFinalizer
 
 
 @dataclass
@@ -32,7 +33,7 @@ class RuntimeContainer:
                 await result
 
     @classmethod
-    def new(cls, *, deployment: Any, executor: Any | None = None) -> "RuntimeContainer":
+    def new(cls, *, deployment: Any) -> "RuntimeContainer":
         deps = getattr(getattr(deployment, "collective", None), "deps", None)
         world_state = getattr(deps, "world_model", None)
         if world_state is None:
@@ -40,6 +41,6 @@ class RuntimeContainer:
         safety = getattr(deps, "safety_validator", None)
         if safety is None:
             raise RuntimeError("required safety finalization service is unavailable")
-        kernel = CognitiveKernel(state_authority=world_state)
+        kernel = CognitiveKernel(state_authority=world_state, finalizer=SafetyResponseFinalizer(safety))
         return cls(runtime_id=str(uuid4()), deployment=deployment, world_state=world_state,
                    kernel=kernel, safety=safety, memory=getattr(deps, "memory", None))
