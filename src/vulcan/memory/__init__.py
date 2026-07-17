@@ -1,112 +1,50 @@
-"""
-VULCAN-AGI Memory Module
-Hierarchical, distributed memory with multiple specialized types
+"""Canonical governed memory exports.
+
+Historical memory implementations remain importable by their explicit module
+paths for research and migration tooling, but are intentionally not initialized
+when the package is imported by the serving runtime.
 """
 
-from .base import (
-    Memory,
-    MemoryConfig,
-    MemoryException,
-    MemoryQuery,
-    MemoryStats,
-    MemoryType,
-    MemoryUsageMonitor,
+from .governed import (
+    DisabledMemoryService,
+    DefaultMemoryPolicy,
+    DeletionReceipt,
+    DeletionState,
+    GovernedMemoryService,
+    MemoryActor,
+    MemoryCommitResult,
+    MemoryKind,
+    MemoryReadRequest,
+    MemoryPolicyPort,
+    MemoryReason,
+    MemoryWriteProposal,
+    SQLiteMemoryRepository,
+    compose_governed_memory,
 )
-from .consolidation import (
-    ConsolidationStrategy,
-    GPUAcceleratedClustering,
-    MemoryConsolidator,
-    MemoryOptimizer,
-)
-from .distributed import (
-    ConnectionPool,
-    ConsistencyLevel,
-    DistributedCheckpoint,
-    DistributedMemory,
-    MemoryFederation,
-    MemoryNode,
-)
-from .hierarchical import EmbeddingMigration, HierarchicalMemory, MemoryLevel
-from .learning_persistence import LearningStatePersistence
-from .persistence import (
-    CompressionStats,
-    CompressionType,
-    MemoryPersistence,
-    MemoryVersionControl,
-)
-from .retrieval import (
-    AttentionMechanism,
-    MemoryIndex,
-    MemoryPrefetcher,
-    MemorySearch,
-    QueryPlanner,
-    RetrievalResult,
-    ShardedMemoryIndex,
-)
-from .specialized import (
-    Concept,
-    Episode,
-    EpisodicMemory,
-    ProceduralMemory,
-    SemanticMemory,
-    Skill,
-    WorkingMemory,
-    WorkingMemoryBuffer,
-)
-
-# Alias for API Gateway compatibility
-VectorMemoryStore = MemoryIndex
 
 __all__ = [
-    # Base
-    "MemoryType",
-    "Memory",
-    "MemoryQuery",
-    "MemoryConfig",
-    "MemoryStats",
-    "MemoryException",
-    "MemoryUsageMonitor",
-    # Hierarchical
-    "HierarchicalMemory",
-    "MemoryLevel",
-    "EmbeddingMigration",
-    # Distributed
-    "DistributedMemory",
-    "MemoryFederation",
-    "MemoryNode",
-    "ConsistencyLevel",
-    "ConnectionPool",
-    "DistributedCheckpoint",
-    # Persistence
-    "MemoryPersistence",
-    "MemoryVersionControl",
-    "CompressionType",
-    "CompressionStats",
-    "LearningStatePersistence",
-    # Retrieval
-    "MemoryIndex",
-    "MemorySearch",
-    "AttentionMechanism",
-    "RetrievalResult",
-    "VectorMemoryStore",  # Added - Alias for MemoryIndex
-    "ShardedMemoryIndex",
-    "MemoryPrefetcher",
-    "QueryPlanner",
-    # Consolidation
-    "MemoryConsolidator",
-    "ConsolidationStrategy",
-    "MemoryOptimizer",
-    "GPUAcceleratedClustering",
-    # Specialized
-    "EpisodicMemory",
-    "SemanticMemory",
-    "ProceduralMemory",
-    "WorkingMemory",
-    "Episode",
-    "Concept",
-    "Skill",
-    "WorkingMemoryBuffer",
+    "DisabledMemoryService", "DefaultMemoryPolicy", "DeletionReceipt", "DeletionState", "GovernedMemoryService", "MemoryActor",
+    "MemoryCommitResult", "MemoryKind", "MemoryPolicyPort", "MemoryReadRequest", "MemoryReason",
+    "MemoryWriteProposal", "SQLiteMemoryRepository", "compose_governed_memory",
 ]
 
-# Version info
-__version__ = "1.0.0"
+# Compatibility is deliberately lazy: importing the canonical authority must
+# not construct or import any legacy store, while explicit research callers
+# keep their historical symbols when optional dependencies are installed.
+_LEGACY_MODULES = {
+    "Memory": ".base", "MemoryConfig": ".base", "MemoryException": ".base",
+    "MemoryQuery": ".base", "MemoryStats": ".base", "MemoryType": ".base",
+    "MemoryUsageMonitor": ".base", "HierarchicalMemory": ".hierarchical",
+    "MemoryLevel": ".hierarchical", "MemoryPersistence": ".persistence",
+    "MemoryIndex": ".retrieval", "EpisodicMemory": ".specialized",
+    "SemanticMemory": ".specialized", "ProceduralMemory": ".specialized",
+    "WorkingMemory": ".specialized", "LearningStatePersistence": ".learning_persistence",
+}
+
+
+def __getattr__(name: str):
+    module_name = _LEGACY_MODULES.get(name)
+    if module_name is None:
+        raise AttributeError(name)
+    from importlib import import_module
+    return getattr(import_module(module_name, __name__), name)
