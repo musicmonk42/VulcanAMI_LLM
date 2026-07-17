@@ -13,6 +13,7 @@ from vulcan.api.models import UnifiedChatRequest
 from .case import CognitiveCase
 from .composition import compose_runtime
 from .kernel import KernelRequest
+from .semantic import Utterance
 
 
 def _runtime(request: Request):
@@ -57,14 +58,25 @@ def create_app() -> FastAPI:
 
     async def chat_handler(request: Request, body: UnifiedChatRequest):
         runtime = _runtime(request)
+        utterance = Utterance.from_text(body.message)
         case = CognitiveCase.create(request_id=request.headers.get("X-Request-ID", str(uuid4())),
-                                    conversation_id=body.conversation_id, message=body.message)
-        command = KernelRequest(message=body.message, conversation_id=body.conversation_id, payload=request)
-        result = await runtime.kernel.handle(command, case)
-        result.payload.setdefault("metadata", {}).update({"case_id": case.case_id,
-                                                             "runtime_id": runtime.runtime_id,
-                                                             "state_snapshot_id": case.state_snapshot_id})
-        return result.payload
+                                    conversation_id=body.conversation_id, input_digest=utterance.digest)
+        result = await runtime.kernel.handle(KernelRequest(utterance, body.conversation_id), case)
+        transport = result.transport(case_id=case.case_id, runtime_id=runtime.runtime_id,
+                                     snapshot_id=case.state_snapshot_id)
+        safety_payload = {"type": "response", "content": result.response}
+        try:
+            decision = await asyncio.to_thread(runtime.safety.validate_action, safety_payload)
+            allowed = decision[0] if isinstance(decision, tuple) else (decision if isinstance(decision, bool) else False)
+        except Exception:
+            allowed = False
+        transport["metadata"]["finalized"] = True
+        transport["metadata"]["finalization_safety_decision"] = "allow" if allowed else "block"
+        if not allowed:
+            transport["response"] = "I generated a response, but it could not be safely returned. Please rephrase your request."
+            transport["safety_status"] = "output_filtered"
+        case.record_finalization(transport["metadata"]["finalization_safety_decision"])
+        return transport
 
     # Compatibility aliases deliberately reference the same callable.
     app.post("/v1/chat", response_model=None)(chat_handler)
