@@ -7,6 +7,7 @@ from vulcan.memory.governed import GovernedMemoryPort
 from .case import CognitiveCase, CognitiveCaseStatus
 from .finalization import ResponseFinalizerPort
 from .semantic import (ClarificationRequest, DeterministicLanguageInput, LanguageInputPort, RESPONSE_IR_VERSION, ResponseIR, ResponseMode, Utterance, accept, execute, render_strict, validate_proposal)
+from .output import DeterministicLanguageOutput, LanguageOutputPort, SemanticFirewall, project
 @dataclass(frozen=True)
 class KernelRequest:
     utterance: Utterance
@@ -20,16 +21,25 @@ class KernelResult:
     def transport(self, *, case_id: str, runtime_id: str, snapshot_id: str | None) -> dict[str, object]:
         return {"response": self.response, "metadata": {"case_id":case_id,"runtime_id":runtime_id,"state_snapshot_id":snapshot_id,"semantic_schema_version":self.response_ir.schema_version,"finalized":True,"finalization_safety_decision":self.finalization}}
 class CognitiveKernel:
-    def __init__(self, *, state_authority: Any, finalizer: ResponseFinalizerPort, language_input: LanguageInputPort | None = None, memory: GovernedMemoryPort | None = None) -> None:
+    def __init__(self, *, state_authority: Any, finalizer: ResponseFinalizerPort, language_input: LanguageInputPort | None = None, language_output: LanguageOutputPort | None = None, memory: GovernedMemoryPort | None = None) -> None:
         # The kernel owns the only memory port exposed to the production path.
         # It deliberately does not turn retrieved text into executable semantics.
-        self._state_authority=state_authority; self._finalizer=finalizer; self._language_input=language_input or DeterministicLanguageInput(); self._memory=memory; self.calls=0
+        self._state_authority=state_authority; self._finalizer=finalizer; self._language_input=language_input or DeterministicLanguageInput(); self._language_output=language_output or DeterministicLanguageOutput(); self._memory=memory; self.calls=0
     async def handle(self, request: KernelRequest, case: CognitiveCase) -> KernelResult:
         if case.terminal_status is not CognitiveCaseStatus.OPEN: raise RuntimeError("kernel received a closed cognitive case")
         if request.utterance.digest != case.input_hash or request.conversation_id != case.conversation_id: raise ValueError("request/case correlation mismatch")
         self.calls += 1; case.state_snapshot_id=self._snapshot_id(); case.record("semantic_ingress")
         try:
-            proposal=await self._language_input.propose(request.utterance); bundle=validate_proposal(request.utterance,proposal); case.interpretation=bundle; selection=accept(bundle)
+            try:
+                proposal=await self._language_input.propose(request.utterance)
+                bundle=validate_proposal(request.utterance,proposal)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                # A proposer can never turn an error into a provider answer.
+                case.record("input_proposal_unavailable")
+                bundle=validate_proposal(request.utterance, await DeterministicLanguageInput().propose(request.utterance))
+            case.interpretation=bundle; selection=accept(bundle)
             if isinstance(selection, ClarificationRequest):
                 case.clarification=selection
                 # A clarification is an explicit unknown claim, not an evaluation side effect.
@@ -39,7 +49,21 @@ class CognitiveKernel:
                 case.accepted_interpretation=selection; claim,derivation=execute(selection,case_id=case.case_id); case.append_ledger(claim=claim,derivation=derivation)
                 mode=ResponseMode.STRICT if claim.status.value=="computed" else ResponseMode.UNKNOWN; status=CognitiveCaseStatus.SUCCESS if mode is ResponseMode.STRICT else CognitiveCaseStatus.ABSTAINED; accepted_id=selection.interpretation_id
             response_ir=ResponseIR(RESPONSE_IR_VERSION,f"response-{case.case_id}",case.case_id,accepted_id,case.state_snapshot_id,mode,(claim.claim_id,))
-            case.response_ir=response_ir; artifact=render_strict(response_ir,case.claims,case.derivations,case.evidence); case.render_artifact=artifact; case.record("strict_rendered")
+            case.response_ir=response_ir
+            # The adapter sees only the projection; firewall rejection is always strict fallback.
+            projection=project(response_ir, case.claims)
+            try:
+                draft=await self._language_output.render(projection)
+                if SemanticFirewall().validate(projection, draft).accepted:
+                    case.record("output_draft_validated")
+                else:
+                    case.record("output_draft_rejected")
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                # Provider/adapter failures are diagnostics only; strict rendering remains authoritative.
+                case.record("output_draft_unavailable")
+            artifact=render_strict(response_ir,case.claims,case.derivations,case.evidence); case.render_artifact=artifact; case.record("strict_rendered")
             finalization=await self._finalizer.finalize(artifact); case.record_finalization(finalization.decision.value); case.close(status)
             return KernelResult(finalization.public_text,response_ir,status,finalization.decision.value)
         except asyncio.CancelledError:
