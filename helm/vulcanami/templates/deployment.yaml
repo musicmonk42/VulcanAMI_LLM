@@ -445,7 +445,27 @@ spec:
           value: {{ .Values.llm.classification.model | default "gpt-4o-mini" | quote }}
         {{- end }}
         {{- end }}
+        # The canonical governed store is isolated from legacy memorySystem.
+        {{- if .Values.governedMemory.enabled }}
+        - name: VULCAN_MEMORY_ENABLED
+          value: "1"
+        - name: VULCAN_MEMORY_SQLITE_PATH
+          value: {{ .Values.governedMemory.sqlitePath | quote }}
+        - name: VULCAN_MEMORY_DURABLE_ROOT
+          value: {{ .Values.governedMemory.durableRoot | quote }}
+        - name: VULCAN_RUNTIME_REPLICAS
+          value: {{ .Values.governedMemory.replicas | quote }}
+        - name: VULCAN_MEMORY_BACKEND
+          value: {{ .Values.governedMemory.backend | quote }}
+        - name: VULCAN_MEMORY_POLICY_VERSION
+          value: {{ .Values.governedMemory.policyVersion | quote }}
+        {{- else }}
+        - name: VULCAN_MEMORY_ENABLED
+          value: "0"
+        {{- end }}
         {{- if .Values.memorySystem.enabled }}
+        # Legacy memorySystem is quarantined and must not be enabled with governed memory.
+        {{- if .Values.governedMemory.enabled }}{{ fail "memorySystem and governedMemory cannot both be enabled" }}{{ end }}
         # Vulcan Memory System v46 AWS credentials
         {{- if .Values.secrets.awsAccessKeyId }}
         - name: AWS_ACCESS_KEY_ID

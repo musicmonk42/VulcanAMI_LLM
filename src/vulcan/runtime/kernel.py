@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 from typing import Any
+from vulcan.memory.governed import GovernedMemoryPort
 from .case import CognitiveCase, CognitiveCaseStatus
 from .finalization import ResponseFinalizerPort
 from .semantic import (ClarificationRequest, DeterministicLanguageInput, LanguageInputPort, RESPONSE_IR_VERSION, ResponseIR, ResponseMode, Utterance, accept, execute, render_strict, validate_proposal)
@@ -19,7 +20,7 @@ class KernelResult:
     def transport(self, *, case_id: str, runtime_id: str, snapshot_id: str | None) -> dict[str, object]:
         return {"response": self.response, "metadata": {"case_id":case_id,"runtime_id":runtime_id,"state_snapshot_id":snapshot_id,"semantic_schema_version":self.response_ir.schema_version,"finalized":True,"finalization_safety_decision":self.finalization}}
 class CognitiveKernel:
-    def __init__(self, *, state_authority: Any, finalizer: ResponseFinalizerPort, language_input: LanguageInputPort | None = None, memory: Any | None = None) -> None:
+    def __init__(self, *, state_authority: Any, finalizer: ResponseFinalizerPort, language_input: LanguageInputPort | None = None, memory: GovernedMemoryPort | None = None) -> None:
         # The kernel owns the only memory port exposed to the production path.
         # It deliberately does not turn retrieved text into executable semantics.
         self._state_authority=state_authority; self._finalizer=finalizer; self._language_input=language_input or DeterministicLanguageInput(); self._memory=memory; self.calls=0

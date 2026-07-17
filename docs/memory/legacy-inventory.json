@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "serving_policy": "Only vulcan.memory.governed is canonical. Every other entry is frozen and cannot be constructed by vulcan.runtime.",
+  "entries": [
+    {"path":"src/vulcan/memory/governed.py","disposition":"canonical authority"},
+    {"path":"src/vulcan/memory/base.py","disposition":"research-only quarantined"},
+    {"path":"src/vulcan/memory/hierarchical.py","disposition":"research-only quarantined"},
+    {"path":"src/vulcan/memory/persistence.py","disposition":"research-only quarantined"},
+    {"path":"src/vulcan/memory/retrieval.py","disposition":"research-only quarantined"},
+    {"path":"src/vulcan/memory/specialized.py","disposition":"research-only quarantined"},
+    {"path":"src/vulcan/memory/consolidation.py","disposition":"research-only quarantined"},
+    {"path":"src/vulcan/memory/learning_persistence.py","disposition":"research-only quarantined"},
+    {"path":"src/persistant_memory_v46","disposition":"research-only quarantined"},
+    {"path":"src/integration/memory_bridge.py","disposition":"research-only quarantined"},
+    {"path":"src/vulcan/endpoints/memory.py","disposition":"removed"},
+    {"path":"helm/vulcanami/templates/configmap-memory.yaml","disposition":"research-only quarantined"},
+    {"path":"helm/vulcanami/values.yaml#memorySystem","disposition":"research-only quarantined"},
+    {"path":"checkpoints/backups","disposition":"read-only migration source"}
+  ],
+  "migration": {"supported": false, "reason":"No legacy source carries the required trusted tenant, subject, purpose, policy decision, and typed provenance fields.", "rule":"Do not unpickle or import legacy data in a serving process; quarantine it for an approved offline migration."}
+}

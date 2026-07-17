@@ -28,3 +28,11 @@ This decision establishes neither HA/multi-writer support, backup media purge,
 key management, semantic/vector retrieval, legacy-data migration, nor legal or
 privacy compliance.  Enabling durable memory requires a maintenance-owned path
 and a single runtime replica; other topology values fail composition.
+
+## Current operational boundary
+
+The canonical configuration has no derived projection/outbox and no supported
+legacy migration or arbitrary backup restore. The inventory at
+`docs/memory/legacy-inventory.json` freezes legacy writers as research-only or
+read-only migration sources. The operational semantics and limits are recorded
+in `docs/memory/governed-memory-operations.md`.
