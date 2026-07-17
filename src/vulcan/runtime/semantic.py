@@ -125,18 +125,19 @@ class ResponseIR:
 @dataclass(frozen=True)
 class RenderArtifact:
     text: str; renderer: str; renderer_version: str; ir_digest: str; claim_ids: tuple[str, ...]; citation_ids: tuple[str, ...]; locale: str; diagnostics: tuple[str, ...] = ()
-@dataclass(frozen=True)
-class UntrustedRenderDraft: text: str
-class LanguageOutputPort(Protocol):
-    async def render(self, response_ir: ResponseIR, style: str, locale: str, max_chars: int) -> UntrustedRenderDraft: ...
-
 _ARITHMETIC = re.compile(r"^[\s0-9+*/%().-]+$")
 class DeterministicLanguageInput:
+    """Permanent bounded parser baseline; no model, files, or network."""
+    identity = "deterministic-parser/2"
+
     async def propose(self, utterance: Utterance) -> InterpretationProposal:
         text = utterance.text.strip()
         offset = utterance.text.index(text)
         operation = "arithmetic" if _ARITHMETIC.fullmatch(text) else "unsupported"
-        return InterpretationProposal(SCHEMA_VERSION, (ProposedCandidate(operation, text, SourceSpan(offset, offset + len(text))),), "deterministic-parser/2")
+        return InterpretationProposal(SCHEMA_VERSION, (ProposedCandidate(operation, text, SourceSpan(offset, offset + len(text))),), self.identity)
+
+    def close(self) -> None:
+        return None
 
 def _valid_text(value: str, maximum: int = MAX_REFERENCE) -> bool:
     return isinstance(value, str) and bool(value) and len(value) <= maximum
