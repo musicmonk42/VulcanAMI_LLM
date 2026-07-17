@@ -11,6 +11,11 @@ from .governed import (
     DeletionReceipt,
     DeletionState,
     GovernedMemoryService,
+    GovernedMemoryPort,
+    MemoryActorContext,
+    MemoryOperation,
+    MemoryRuntimeConfig,
+    MemoryPolicyResult,
     MemoryActor,
     MemoryCommitResult,
     MemoryKind,
@@ -23,7 +28,7 @@ from .governed import (
 )
 
 __all__ = [
-    "DisabledMemoryService", "DefaultMemoryPolicy", "DeletionReceipt", "DeletionState", "GovernedMemoryService", "MemoryActor",
+    "DisabledMemoryService", "DefaultMemoryPolicy", "DeletionReceipt", "DeletionState", "GovernedMemoryService", "GovernedMemoryPort", "MemoryActor", "MemoryActorContext", "MemoryOperation", "MemoryRuntimeConfig", "MemoryPolicyResult",
     "MemoryCommitResult", "MemoryKind", "MemoryPolicyPort", "MemoryReadRequest", "MemoryReason",
     "MemoryWriteProposal", "SQLiteMemoryRepository", "compose_governed_memory",
 ]

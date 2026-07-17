@@ -5,7 +5,7 @@ from __future__ import annotations
 import inspect
 from dataclasses import dataclass
 from typing import Any
-from vulcan.memory.governed import DisabledMemoryService, GovernedMemoryService, compose_governed_memory
+from vulcan.memory.governed import GovernedMemoryPort, compose_governed_memory
 from uuid import uuid4
 
 from .kernel import CognitiveKernel
@@ -19,7 +19,7 @@ class RuntimeContainer:
     world_state: Any
     kernel: CognitiveKernel
     safety: Any
-    memory: GovernedMemoryService | DisabledMemoryService
+    memory: GovernedMemoryPort
     closed: bool = False
 
     async def close(self) -> None:

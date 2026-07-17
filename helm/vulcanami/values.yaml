@@ -86,7 +86,8 @@ resources:
     memory: 1Gi
 
 autoscaling:
-  enabled: true
+  # SQLite governed memory is single-writer; horizontal scaling is incompatible.
+  enabled: false
   # CRITICAL: Set minReplicas to 1 to allow deployment to succeed with a single healthy replica
   # The HPA will scale up as needed. Setting minReplicas: 2 causes deployment failures
   # when one replica cannot start within the healthcheck timeout window.
@@ -156,6 +157,16 @@ config:
   environment: production
   logLevel: INFO
   pythonUnbuffered: "1"
+
+# Canonical governed durable-memory configuration. Disabled unless an operator
+# supplies a single-writer PVC-backed root and an absolute database path.
+governedMemory:
+  enabled: false
+  durableRoot: /var/lib/vulcan-governed-memory
+  sqlitePath: /var/lib/vulcan-governed-memory/preferences.sqlite
+  replicas: 1
+  backend: sqlite
+  policyVersion: memory-policy/2
 
 # LLM Configuration (CRITICAL for chat features)
 llm:
@@ -342,7 +353,8 @@ minio:
 
 # Vulcan Memory System v46 Configuration
 memorySystem:
-  enabled: true
+  # Legacy system is quarantined; canonical runtime must not construct it.
+  enabled: false
   # Milvus vector database configuration
   milvus:
     host: milvus-service
