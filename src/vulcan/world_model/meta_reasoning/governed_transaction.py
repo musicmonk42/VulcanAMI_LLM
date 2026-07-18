@@ -152,27 +152,36 @@ class TrustedApprovalPrincipal:
     principal_id: str
     scopes: Tuple[str, ...]
     expires_at: float
+    approval_id: str = ""
+    proposal_digest: str = ""
+    policy_digest: str = ""
+    original_source_digest: str = ""
 
-class ApprovalAuthorityPort:
+class ApprovalVerifierPort:
     def is_authorized(self, principal: TrustedApprovalPrincipal, bindings: Mapping[str, str]) -> bool:
         raise NotImplementedError
 
-class ClosedApprovalAuthority(ApprovalAuthorityPort):
-    def __init__(self, principals: Mapping[str, TrustedApprovalPrincipal] = None):
-        self._principals = dict(principals or {})
-    def issue_principal(self, principal_id: str, scopes: Sequence[str], ttl_seconds: float = 3600.0) -> TrustedApprovalPrincipal:
+class ApprovalIssuer:
+    def issue_principal(self, principal_id: str, scopes: Sequence[str], *, bindings: Mapping[str, str], ttl_seconds: float = 3600.0) -> TrustedApprovalPrincipal:
         if not isinstance(principal_id, str) or not principal_id or len(principal_id) > 128:
             raise TransactionError("bad principal")
-        p = TrustedApprovalPrincipal(principal_id, tuple(str(s) for s in scopes), time.time()+float(ttl_seconds))
-        self._principals[principal_id] = p
-        return p
+        required=("approval_id","proposal_digest","policy_digest","original_source_digest")
+        if any(not isinstance(bindings.get(k), str) or not bindings.get(k) for k in required):
+            raise TransactionError("bad approval bindings")
+        return TrustedApprovalPrincipal(principal_id, tuple(str(s) for s in scopes), time.time()+float(ttl_seconds), *(str(bindings[k]) for k in required))
+
+class ClosedApprovalVerifier(ApprovalVerifierPort):
+    def __init__(self, principals: Mapping[str, TrustedApprovalPrincipal] = None):
+        self._principals = dict(principals or {})
     def is_authorized(self, principal: TrustedApprovalPrincipal, bindings: Mapping[str, str]) -> bool:
         if not isinstance(principal, TrustedApprovalPrincipal): return False
         stored = self._principals.get(principal.principal_id)
         if stored != principal or principal.expires_at < time.time(): return False
         required = str(bindings.get("required_scope", "self_improvement.approve"))
         if required not in principal.scopes: return False
-        return all(isinstance(bindings.get(k), str) and bindings.get(k) for k in ("approval_id","proposal_digest","policy_digest","original_source_digest"))
+        return all(getattr(principal,k)==bindings.get(k) for k in ("approval_id","proposal_digest","policy_digest","original_source_digest"))
+
+ClosedApprovalAuthority = ClosedApprovalVerifier
 
 @dataclass(frozen=True)
 class ApprovalRecord:
@@ -221,62 +230,102 @@ class TransactionResult:
 class ApprovalStore:
     def __init__(self, path: Path):
         self.path = Path(path)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
     def _check_paths(self) -> None:
         lock = self.path.with_suffix(self.path.suffix + ".lock")
         if self.path.is_symlink() or lock.is_symlink(): raise TransactionError("symlinked approval store or lock")
-
-    def load(self, approval_id: str) -> ApprovalRecord:
-        self._check_paths()
-        try:
-            doc = json.loads(self.path.read_text(encoding="utf-8"))
-        except Exception as exc:
-            raise TransactionError("approval store unavailable or corrupt") from exc
-        rec = doc.get(approval_id)
-        if not isinstance(rec, dict):
-            raise TransactionError("approval not found")
-        return ApprovalRecord(**rec)
-    def _strict_record(self, record: ApprovalRecord) -> None:
-        import re
-        for n in ("proposal_digest","policy_digest","original_source_digest"):
-            if not re.fullmatch(r"[0-9a-f]{64}", getattr(record,n)): raise TransactionError("bad approval digest")
-
-    def save(self, record: ApprovalRecord) -> None:
-        self._check_paths(); self._strict_record(record)
-        try:
-            doc = json.loads(self.path.read_text(encoding="utf-8")) if self.path.exists() else {}
-        except Exception as exc:
-            raise TransactionError("approval store unavailable or corrupt") from exc
-        if record.approval_id in doc:
-            raise TransactionError("approval already exists")
-        doc[record.approval_id] = record.__dict__.copy()
-        _atomic_write(self.path, json.dumps(doc, sort_keys=True).encode(), 0o600)
-    def claim(self, approval_id: str, proposal_digest: str) -> ApprovalRecord:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+    def _lock_fd(self):
         self._check_paths()
         lock = self.path.with_suffix(self.path.suffix + ".lock")
         fd = os.open(lock, os.O_CREAT|os.O_RDWR, 0o600)
+        self._check_paths()
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        self._check_paths()
+        return fd
+    @staticmethod
+    def _loads(text: str) -> Dict[str, Any]:
+        def pairs_hook(pairs: List[Tuple[str, Any]]) -> Dict[str, Any]:
+            out: Dict[str, Any] = {}
+            for k,v in pairs:
+                if k in out: raise TransactionError("duplicate approval store key")
+                out[k]=v
+            return out
         try:
-            fcntl.flock(fd, fcntl.LOCK_EX)
-            doc = json.loads(self.path.read_text(encoding="utf-8")) if self.path.exists() else {}
+            doc=json.loads(text, object_pairs_hook=pairs_hook, parse_constant=lambda x: (_ for _ in ()).throw(TransactionError("non-finite approval store number")))
+        except TransactionError:
+            raise
+        except Exception as exc:
+            raise TransactionError("approval store unavailable or corrupt") from exc
+        if not isinstance(doc, dict): raise TransactionError("approval store schema invalid")
+        for k,v in doc.items():
+            if not isinstance(k,str) or not isinstance(v,dict): raise TransactionError("approval store schema invalid")
+            rec=ApprovalRecord(**v); ApprovalStore._strict_record_static(rec)
+        return doc
+    @staticmethod
+    def _strict_record_static(record: ApprovalRecord) -> None:
+        import re
+        for n in ("proposal_digest","policy_digest","original_source_digest"):
+            if not re.fullmatch(r"[0-9a-f]{64}", getattr(record,n)): raise TransactionError("bad approval digest")
+        if record.state in {"approved","claimed"} and record.expires_at < time.time(): raise TransactionError("approval expired")
+    def _read_doc_locked(self) -> Dict[str, Any]:
+        self._check_paths()
+        if not self.path.exists(): return {}
+        return self._loads(self.path.read_text(encoding="utf-8"))
+    def _write_doc_locked(self, doc: Dict[str, Any]) -> None:
+        self._check_paths()
+        _atomic_write(self.path, json.dumps(doc, sort_keys=True, allow_nan=False, separators=(",", ":")).encode(), 0o600)
+        self._check_paths()
+
+    def load(self, approval_id: str) -> ApprovalRecord:
+        fd=self._lock_fd()
+        try:
+            doc=self._read_doc_locked(); rec=doc.get(approval_id)
+            if not isinstance(rec, dict): raise TransactionError("approval not found")
+            return ApprovalRecord(**rec)
+        finally:
+            try: fcntl.flock(fd, fcntl.LOCK_UN)
+            finally: os.close(fd)
+    def _strict_record(self, record: ApprovalRecord) -> None:
+        self._strict_record_static(record)
+
+    def save(self, record: ApprovalRecord) -> None:
+        self._strict_record(record); fd=self._lock_fd()
+        try:
+            doc=self._read_doc_locked()
+            if record.approval_id in doc: raise TransactionError("approval already exists")
+            doc[record.approval_id]=record.__dict__.copy(); self._write_doc_locked(doc)
+        finally:
+            try: fcntl.flock(fd, fcntl.LOCK_UN)
+            finally: os.close(fd)
+    def claim(self, approval_id: str, proposal_digest: str) -> ApprovalRecord:
+        fd = self._lock_fd()
+        try:
+            doc = self._read_doc_locked()
             recd = doc.get(approval_id)
             if not isinstance(recd, dict): raise TransactionError("approval not found")
             rec = ApprovalRecord(**recd)
-            if rec.used or rec.state != "approved" or rec.proposal_digest != proposal_digest: raise TransactionError("approval already consumed or not claimable")
+            self._strict_record(rec)
+            if rec.used or rec.state != "approved" or rec.proposal_digest != proposal_digest or rec.expires_at < time.time(): raise TransactionError("approval already consumed or not claimable")
             recd["state"] = "claimed"; doc[approval_id] = recd
-            _atomic_write(self.path, json.dumps(doc, sort_keys=True).encode(), 0o600)
+            self._write_doc_locked(doc)
             return ApprovalRecord(**recd)
         finally:
             try: fcntl.flock(fd, fcntl.LOCK_UN)
             finally: os.close(fd)
     def terminalize(self, approval_id: str, state: str) -> None:
-        self._check_paths()
         if state not in {"consumed","rejected","expired","verification_failed","aborted","manual_recovery_required"}:
             raise TransactionError("bad terminal approval state")
-        doc = json.loads(self.path.read_text(encoding="utf-8")) if self.path.exists() else {}
-        if approval_id not in doc: raise TransactionError("approval not found")
-        if doc[approval_id].get("state") in {"consumed","rejected","expired","verification_failed","aborted"}: raise TransactionError("approval already terminal")
-        doc[approval_id]["used"] = True; doc[approval_id]["state"] = state
-        _atomic_write(self.path, json.dumps(doc, sort_keys=True).encode(), 0o600)
+        fd=self._lock_fd()
+        try:
+            doc=self._read_doc_locked()
+            if approval_id not in doc: raise TransactionError("approval not found")
+            rec=ApprovalRecord(**doc[approval_id]); self._strict_record(rec)
+            if rec.state in {"consumed","rejected","expired","verification_failed","aborted","manual_recovery_required"}: raise TransactionError("approval already terminal")
+            doc[approval_id]["used"] = True; doc[approval_id]["state"] = state
+            self._write_doc_locked(doc)
+        finally:
+            try: fcntl.flock(fd, fcntl.LOCK_UN)
+            finally: os.close(fd)
     def mark_used(self, approval_id: str) -> None:
         self.terminalize(approval_id, "consumed")
 
