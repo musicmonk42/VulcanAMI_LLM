@@ -3,7 +3,7 @@ import json, threading, sys, subprocess, os
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 import pytest
-from vulcan.world_model.meta_reasoning.csiu_enforcement import CSIUEnforcement, CSIUEnforcementConfig, CSIUValidationError
+from vulcan.world_model.meta_reasoning.csiu_enforcement import CSIUEnforcement, CSIUEnforcementConfig, CSIUValidationError, CSIUMetricSnapshot, METRIC_ORDER
 
 class Clock:
     def __init__(self): self.t=datetime(2026,1,1,tzinfo=timezone.utc)
@@ -16,8 +16,11 @@ def cfg(path, clock, hist=True):
 
 def plan(): return {"objective_weights":{"a":1.0},"id":"p"}
 
+def snap(enf):
+    now=enf._clock()
+    return CSIUMetricSnapshot(metrics={k:.5 for k in METRIC_ORDER}, window_start=(now-timedelta(minutes=5)).isoformat().replace("+00:00","Z"), window_end=now.isoformat().replace("+00:00","Z"), sample_count=30, aggregation_method="mean", metric_definition_version=enf.policy.metric_definition_version, provider_id="p", provenance_digest=(str(len(enf._seen_snapshot_digests)%10))*64, policy_digest=enf.policy.policy_digest)
 def apply(enf):
-    return enf.apply_regularization_with_enforcement(plan(), 0.05, {}, plan_id="p")
+    return enf.apply_regularization_with_enforcement(plan(), 0.05, {}, plan_id="p", snapshot=snap(enf))
 
 def test_dependency_light_direct_imports_from_tmp():
     code='import sys; import vulcan.world_model.meta_reasoning.csiu_enforcement; import vulcan.world_model.meta_reasoning.self_improvement_drive; print(sorted({"numpy","torch","fastapi","aiohttp","networkx"}&set(sys.modules)))'
@@ -57,6 +60,6 @@ def test_actual_effect_over_pressure_rejected(tmp_path):
     c=Clock(); store=tmp_path/'c.jsonl'; e=CSIUEnforcement(cfg(store,c))
     # Pressure above single cap is capped and actual influence is defined as the larger
     # conservative reserved/validated effect that is accounted durably.
-    _, d=e.apply_regularization_with_enforcement(plan(), 9.0, {})
+    _, d=e.apply_regularization_with_enforcement(plan(), 9.0, {}, snapshot=snap(e))
     assert d.actual_effect <= e.config.max_single_influence
     assert e.check_cumulative_influence()['cumulative_influence']==pytest.approx(0.05)
