@@ -39,7 +39,7 @@ def test_restart_spanning_budget_and_history_display_off(tmp_path):
     unchanged, dec=apply(e2)
     assert isinstance(unchanged, dict)
     c.advance(3601); assert e2.check_cumulative_influence()['cumulative_influence']==0
-    apply(e2); assert e2.check_cumulative_influence()['cumulative_influence']>=0
+    apply(e2); assert e2.check_cumulative_influence()['cumulative_influence'] == pytest.approx(0.05, abs=0.05)
 
 def test_corruption_symlink_and_second_writer_rejected(tmp_path):
     c=Clock(); store=tmp_path/'c.jsonl'; e=CSIUEnforcement(cfg(store,c)); apply(e)
@@ -51,14 +51,19 @@ def test_corruption_symlink_and_second_writer_rejected(tmp_path):
 
 def test_concurrent_remaining_budget_race(tmp_path):
     c=Clock(); store=tmp_path/'c.jsonl'; e=CSIUEnforcement(cfg(store,c)); apply(e)
+    first=e.check_cumulative_influence()['cumulative_influence']
+    object.__setattr__(e.config, 'max_cumulative_influence_window', first * 2.1)
+    c.advance(360)
     barrier=threading.Barrier(2); results=[]
     def worker():
         barrier.wait(); results.append(apply(e))
     ts=[threading.Thread(target=worker) for _ in range(2)]
     [t.start() for t in ts]; [t.join() for t in ts]
     applied=sum(1 for _,d in results if d.applied); blocked=sum(1 for _,d in results if d.blocked)
-    assert applied + blocked == 2
-    assert e.check_cumulative_influence()['cumulative_influence']>=0
+    assert applied == 1
+    assert blocked == 1
+    expected = first + abs(results[0][1].pressure or results[1][1].pressure)
+    assert e.check_cumulative_influence()['cumulative_influence'] == pytest.approx(expected)
 
 def test_actual_effect_over_pressure_rejected(tmp_path):
     c=Clock(); store=tmp_path/'c.jsonl'; e=CSIUEnforcement(cfg(store,c))

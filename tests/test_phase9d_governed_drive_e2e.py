@@ -12,6 +12,10 @@ from vulcan.world_model.meta_reasoning.governed_transaction import (
 
 def sha(s): return hashlib.sha256(s.encode()).hexdigest()
 
+class TrustedAuthority:
+    def is_authorized(self, principal, approval_id):
+        return principal == "independent-reviewer" and bool(approval_id)
+
 class AuditAdapter:
     def __init__(self, path):
         self.path=path; self.owner_id=f"runtime-audit-adapter:{path}"; path.write_text("")
@@ -29,7 +33,7 @@ def mk_drive(tmp_path, gate):
     snap=inspect_repository(repo,('src/*.py',))
     prop=ImprovementProposal(SCHEMA_VERSION,'prop-1','bugfix','src/t.py',sha('X=1\n'),'X=1\n','X=2\n',sha('X=2\n'),snap.digest,'deterministic','rel','proof',pol.digest,'')
     drive=SelfImprovementDrive(config_path=cfg(), state_path=str(tmp_path/'state.json'))
-    drive.improvement_policy=pol; drive.approval_store=ApprovalStore(tmp_path/'approvals.json'); drive.audit_owner=AuditAdapter(tmp_path/'audit.jsonl'); drive._auto_apply_enabled=True
+    drive.improvement_policy=pol; drive.approval_store=ApprovalStore(tmp_path/'approvals.json'); drive.approval_authority=TrustedAuthority(); drive.audit_owner=AuditAdapter(tmp_path/'audit.jsonl'); drive._auto_apply_enabled=True
     obj=drive.objectives[0]
     drive.should_trigger=lambda ctx: True
     drive.select_objective=lambda: obj

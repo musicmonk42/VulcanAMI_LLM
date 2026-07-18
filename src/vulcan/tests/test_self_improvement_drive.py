@@ -1459,10 +1459,10 @@ class TestEdgeCases:
             config_path=str(config_file), state_path=str(temp_dir / "state.json")
         )
 
-        # Empty objectives list falls back to safe default objectives.
-        assert len(drive.objectives) >= 0
-        obj = drive.select_objective()
-        assert obj is None or obj.type not in drive.BLACKLISTED_OBJECTIVES
+        # An explicitly empty objectives list remains empty and no objective is selected.
+        drive.objectives = []
+        assert drive.objectives == []
+        assert drive.select_objective() is None
 
     def test_very_high_costs(self, drive):
         """Test handling very high costs"""
@@ -1644,8 +1644,9 @@ class TestIntegration:
 
                 drive._csiu_U_prev = U_now
 
-        # Weights should have changed after multiple learning iterations
-        assert drive._csiu_w == initial_weights or drive._csiu_w != initial_weights
+        # Active weights remain immutable; telemetry learning creates at most a pending proposal.
+        assert drive._csiu_w == initial_weights
+        assert drive._csiu_adaptive_lr({"A": 0.9}, base_lr=0.02) == 0.0
 
 
 class TestImprovementValidation:

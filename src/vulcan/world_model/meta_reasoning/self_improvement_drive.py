@@ -2843,7 +2843,10 @@ class SelfImprovementDrive:
         except Exception as e:
             return {"status": "rejected", "plan_id": plan.get("id"), "reason": f"governed approval queue failed: {type(e).__name__}"}
 
-    def approve_governed_pending(self, approval_id: str, approver_identity: str, *, ttl_seconds: float = 3600.0) -> bool:
+    def approve_governed_pending(self, approval_id: str, approver_identity: str = "", *, ttl_seconds: float = 3600.0, authority_context: Any = None) -> bool:
+        authority = getattr(self, "approval_authority", None) or authority_context
+        if authority is None or not getattr(authority, "is_authorized", lambda *_: False)(approver_identity, approval_id):
+            return False
         if approver_identity in {"", "self-improvement-drive", "drive", "system"}:
             return False
         if ApprovalRecord is None or not getattr(self, "approval_store", None):
