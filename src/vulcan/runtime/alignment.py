@@ -83,6 +83,8 @@ class AlignmentRegistry:
             n=self._leases.get(d,0)-1
             if n>0: self._leases[d]=n
             else: self._leases.pop(d,None)
+    def activate(self, candidate:dict[str,Any], *, expected_previous_digest:str, actor_id:str|None=None):
+        return self.update(candidate, expected_previous_digest=expected_previous_digest, actor_id=actor_id)
     def update(self, candidate:dict[str,Any], *, expected_previous_digest:str, actor_id:str|None=None):
         pol=validate_policy(copy.deepcopy(candidate))
         with self._lock:

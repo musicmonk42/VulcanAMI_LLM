@@ -5,7 +5,7 @@ CSIU is visible to operators/auditors. It can regularize only a closed set of
 plan metadata fields and can propose, but never activate, alignment policy
 changes.
 """
-import copy, hashlib, json, math, os, threading, time, uuid
+import copy, fcntl, hashlib, json, math, os, threading, time, uuid
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -24,6 +24,7 @@ DIRECTIONS={"A":1,"H":-1,"C":1,"V":-1,"D":-1,"G":-1,"E":1,"U":1,"M":-1}
 DEFAULT_RANGES={k:(0.0,1.0) for k in METRIC_ORDER}
 DEFAULT_WEIGHTS={"A":0.6,"H":0.6,"C":0.6,"V":0.6,"D":0.6,"G":0.6,"E":0.5,"U":0.5,"M":0.5}
 MAX_ITEMS=64; MAX_STR=512
+def re_full_hash(s): return isinstance(s,str) and len(s)==64 and all(c in "0123456789abcdef" for c in s)
 
 class CSIUValidationError(ValueError): pass
 
@@ -134,15 +135,21 @@ class CSIUDecision:
 
 @dataclass(frozen=True)
 class CSIUInfluenceRecord:
-    decision_id: str; policy_digest: str; plan_digest: str; pressure: float; actual_effect: float; applied: bool; state: str; timestamp: str=field(default_factory=lambda:_ts(_now())); schema_version: str=SCHEMA_RECORD; record_id: str=""; record_digest: str=""
+    decision_id: str; policy_digest: str; plan_digest: str; reserved_influence: float; actual_influence: float; applied: bool; state: str; enforcer_id: str; timestamp: str=field(default_factory=lambda:_ts(_now())); schema_version: str=SCHEMA_RECORD; previous_record_digest: str="0"*64; record_id: str=""; record_digest: str=""
     def __post_init__(self):
-        _num(self.pressure); _num(self.actual_effect); _parse_ts(self.timestamp)
+        _num(self.reserved_influence,"reserved_influence"); _num(self.actual_influence,"actual_influence"); _parse_ts(self.timestamp)
         if self.state not in {"prepared","committed","aborted","blocked"}: raise CSIUValidationError("bad state")
+        if not isinstance(self.enforcer_id,str) or not self.enforcer_id: raise CSIUValidationError("missing enforcer id")
+        if not isinstance(self.previous_record_digest,str) or not re_full_hash(self.previous_record_digest): raise CSIUValidationError("bad previous digest")
         body=self.to_dict(False); rid=self.record_id or _id("csiu-record",body); object.__setattr__(self,"record_id",rid); body["record_id"]=rid; dg=canonical_digest(body)
         if self.record_digest and self.record_digest!=dg: raise CSIUValidationError("record digest mismatch")
         object.__setattr__(self,"record_digest",dg)
+    @property
+    def pressure(self): return self.reserved_influence
+    @property
+    def actual_effect(self): return self.actual_influence
     def to_dict(self, include_digest=True):
-        d=self.__dict__.copy(); d.pop("record_digest",None)
+        d={"schema_version":self.schema_version,"enforcer_id":self.enforcer_id,"decision_id":self.decision_id,"policy_digest":self.policy_digest,"plan_digest":self.plan_digest,"timestamp":self.timestamp,"reserved_influence":self.reserved_influence,"actual_influence":self.actual_influence,"applied":self.applied,"state":self.state,"previous_record_digest":self.previous_record_digest,"record_id":self.record_id}
         if include_digest: d["record_digest"]=self.record_digest
         return dict(sorted(d.items()))
 
@@ -175,25 +182,66 @@ class CSIUEnforcement(SerializationMixin):
     _unpickleable_attrs=["_lock","_clock"]
     def __init__(self, config: Optional[CSIUEnforcementConfig]=None, policy: Optional[CSIUPolicy]=None):
         self.config=config or CSIUEnforcementConfig(); self.policy=policy or CSIUPolicy(max_single_influence=self.config.max_single_influence,max_cumulative_influence_window=self.config.max_cumulative_influence_window,cumulative_window_seconds=self.config.cumulative_window_seconds)
-        self._lock=threading.RLock(); self._clock=self.config.clock or _now; self._influence_history=[]; self._audit_trail=[]; self._last_decision=None; self._last_snapshot=None; self._total_applications=0; self._total_blocked=0; self._total_capped=0; self._max_influence_seen=0.0; self._load_durable()
+        self._lock=threading.RLock(); self._clock=self.config.clock or _now; self.enforcer_id=f"csiu:{self.policy.policy_id}:{self.policy.policy_digest}"; self._durable_ready=False; self._durable_prev="0"*64; self._durable_fd=None; self._influence_history=[]; self._audit_trail=[]; self._last_decision=None; self._last_snapshot=None; self._total_applications=0; self._total_blocked=0; self._total_capped=0; self._max_influence_seen=0.0; self._load_durable()
     def _restore_unpickleable_attrs(self): self._lock=threading.RLock(); self._clock=_now
     def _emit(self,event, data):
         rec={"event":event,"timestamp":_ts(self._clock()),"data":_clean(data)}
         if self.config.audit_trail_enabled and len(self._audit_trail)<self.config.audit_trail_max_entries: self._audit_trail.append(rec)
+    def _load_json_line(self,line: bytes)->dict:
+        def pairs(pairs):
+            d={}
+            for k,v in pairs:
+                if k in d: raise CSIUValidationError("duplicate durable key")
+                d[k]=v
+            return d
+        return json.loads(line.decode("utf-8"), object_pairs_hook=pairs, parse_constant=lambda x: (_ for _ in()).throw(CSIUValidationError("non-finite durable number")))
     def _load_durable(self):
         p=self.config.durable_store_path
-        if not p: return
-        path=Path(p)
-        if not path.exists(): return
-        for line in path.read_text(encoding="utf-8").splitlines():
-            d=json.loads(line); r=CSIUInfluenceRecord(**d)
-            if r.state in {"prepared"}: raise CSIUValidationError("unresolved prepared influence")
-            self._influence_history.append(r)
+        if not p:
+            self._durable_ready=not self.config.durable_accounting_required
+            if self.config.durable_accounting_required: raise CSIUValidationError("durable accounting store required")
+            return
+        path=Path(p); lock_path=path.with_suffix(path.suffix+".lock")
+        path.parent.mkdir(parents=True,exist_ok=True)
+        if path.is_symlink() or lock_path.is_symlink(): raise CSIUValidationError("symlinked durable store or lock")
+        self._durable_fd=os.open(lock_path, os.O_CREAT|os.O_RDWR,0o600)
+        try: fcntl.flock(self._durable_fd, fcntl.LOCK_EX|fcntl.LOCK_NB)
+        except BlockingIOError as e: raise CSIUValidationError("second durable writer") from e
+        if not path.exists():
+            if self.config.durable_accounting_required: raise CSIUValidationError("missing durable store")
+            path.touch(mode=0o600)
+        raw=path.read_bytes()
+        if raw and not raw.endswith(b"\n"): raise CSIUValidationError("truncated durable store")
+        prev="0"*64; seen=set(); retained=[]; cutoff=self._clock()-timedelta(seconds=self.config.cumulative_window_seconds)
+        for line in raw.splitlines():
+            d=self._load_json_line(line)
+            allowed={"schema_version","enforcer_id","decision_id","policy_digest","plan_digest","timestamp","reserved_influence","actual_influence","applied","state","previous_record_digest","record_id","record_digest"}
+            if set(d)!=allowed: raise CSIUValidationError("unknown durable fields")
+            r=CSIUInfluenceRecord(**d)
+            if r.record_id in seen: raise CSIUValidationError("duplicate durable record")
+            seen.add(r.record_id)
+            if r.previous_record_digest!=prev: raise CSIUValidationError("durable chain mutation")
+            if r.policy_digest!=self.policy.policy_digest or r.enforcer_id!=self.enforcer_id: raise CSIUValidationError("durable policy/config mismatch")
+            if r.state=="prepared": raise CSIUValidationError("unresolved prepared influence")
+            if _parse_ts(r.timestamp)>=cutoff: retained.append(r)
+            prev=r.record_digest
+        self._influence_history=retained; self._durable_prev=prev; self._durable_ready=True
+    def readiness(self):
+        if self.config.durable_accounting_required and not self._durable_ready: raise CSIUValidationError("durable accounting unavailable")
+        return True
+    def close(self):
+        if self._durable_fd is not None:
+            try: fcntl.flock(self._durable_fd, fcntl.LOCK_UN); os.close(self._durable_fd)
+            finally: self._durable_fd=None
     def _persist(self,r):
         p=self.config.durable_store_path
         if p:
-            Path(p).parent.mkdir(parents=True,exist_ok=True)
-            with open(p,"a",encoding="utf-8") as f: f.write(json.dumps(r.to_dict(),sort_keys=True,separators=(",",":"))+"\n")
+            path=Path(p)
+            if path.is_symlink(): raise CSIUValidationError("symlinked durable store")
+            with open(path,"ab",buffering=0) as f:
+                line=json.dumps(r.to_dict(),sort_keys=True,separators=(",",":"),allow_nan=False).encode()+b"\n"
+                f.write(line); f.flush(); os.fsync(f.fileno())
+            self._durable_prev=r.record_digest
     def is_enabled(self): return self.config.global_enabled and not self.config.emergency_stop
     def validate_snapshot(self, snapshot: CSIUMetricSnapshot)->Tuple[bool,str]:
         if snapshot.policy_digest!=self.policy.policy_digest: return False,"policy_digest_mismatch"
@@ -216,7 +264,7 @@ class CSIUEnforcement(SerializationMixin):
         return max(-self.config.max_single_influence,min(self.config.max_single_influence,p))
     def check_cumulative_influence(self):
         with self._lock:
-            self._prune_locked(); cum=sum(abs(r.actual_effect) for r in self._influence_history if r.state=="committed")
+            self._prune_locked(); cum=sum(abs(r.actual_influence) for r in self._influence_history if r.state=="committed")
             return {"cumulative_influence":cum,"count":len(self._influence_history),"window_seconds":self.config.cumulative_window_seconds,"max_allowed":self.config.max_cumulative_influence_window,"remaining":max(0.0,self.config.max_cumulative_influence_window-cum),"exceeds_cap":cum>self.config.max_cumulative_influence_window}
     def _prune_locked(self):
         cutoff=self._clock()-timedelta(seconds=self.config.cumulative_window_seconds)
@@ -228,8 +276,10 @@ class CSIUEnforcement(SerializationMixin):
     def _reserve_locked(self, decision: CSIUDecision)->Tuple[bool,str]:
         self._prune_locked()
         if len(self._influence_history)>=self.config.history_capacity: return False,"history_capacity_exhausted"
-        cur=sum(abs(r.actual_effect) for r in self._influence_history if r.state=="committed")
-        if cur+abs(decision.actual_effect)>self.config.max_cumulative_influence_window+1e-12: return False,"cumulative_cap_exceeded"
+        cur=sum(abs(r.actual_influence) for r in self._influence_history if r.state=="committed")
+        need=max(abs(decision.actual_effect),abs(decision.pressure))
+        if need>self.config.max_single_influence+1e-12: return False,"single_cap_exceeded"
+        if cur+need>self.config.max_cumulative_influence_window+1e-12: return False,"cumulative_cap_exceeded"
         return True,"ok"
     def apply_regularization_with_enforcement(self, plan: Dict[str,Any], pressure: float, metrics: Mapping[str,float], plan_id="unknown", action_type="improvement", snapshot: Optional[CSIUMetricSnapshot]=None)->Tuple[Dict[str,Any],CSIUDecision]:
         original=copy.deepcopy(plan or {}); pd=canonical_digest({"plan":original})
@@ -250,7 +300,7 @@ class CSIUEnforcement(SerializationMixin):
             ok,reason=self._reserve_locked(dec)
             if not ok:
                 self._total_blocked+=1; b=CSIUDecision(dec.decision_id,self.policy.policy_digest,pd,reason,dec.utility,dec.ewma_utility,0.0,0.0,False,True,dec.snapshot_id,dec.snapshot_digest); self._emit("csiu.influence_blocked",b.to_dict()); return original,b
-            r=CSIUInfluenceRecord(dec.decision_id,self.policy.policy_digest,pd,pressure,effect,True,"committed"); self._influence_history.append(r); self._persist(r); self._total_applications+=1; self._last_decision=dec; self._emit("csiu.influence_applied",{"decision":dec.to_dict(),"record":r.to_dict()})
+            r=CSIUInfluenceRecord(dec.decision_id,self.policy.policy_digest,pd,pressure,max(abs(effect),abs(pressure)),True,"committed",self.enforcer_id,timestamp=_ts(self._clock()), previous_record_digest=self._durable_prev); self._persist(r); self._influence_history.append(r); self._total_applications+=1; self._last_decision=dec; self._emit("csiu.influence_applied",{"decision":dec.to_dict(),"record":r.to_dict(),"budget":self.check_cumulative_influence()})
         return proposed,dec
     def _decision(self,pd,reason,u,ew,p,blocked,applied,snapshot=None,effect=0.0):
         body={"policy_digest":self.policy.policy_digest,"plan_digest":pd,"reason":reason,"snapshot":getattr(snapshot,"snapshot_digest","")}; did=_id("csiu-decision",body)
@@ -263,7 +313,24 @@ class CSIUEnforcement(SerializationMixin):
         if len(snapshots)>=2:
             a,b=snapshots[-2],snapshots[-1]; trend={k:(b.metrics[k]-a.metrics[k])*DIRECTIONS[k] for k in METRIC_ORDER}
         reasons=tuple(k for k,v in trend.items() if v<0) or ("review_recommended",)
-        return CSIUAlignmentProposal(pid,rev,dig,self.policy.policy_digest,tuple(s.snapshot_digest for s in snapshots[-4:]),trend,reasons,"review human-understanding and safety thresholds; no automatic invariant relaxation","authorized governance review plus ordinary alignment CAS activation",_ts(self._clock()+timedelta(hours=24)),{})
+        delta={}
+        # Conservative deterministic bridge mapping (review-only): when at least
+        # four validated windows show sustained worsening in calibration (C) or
+        # miscommunication (M), propose tightening the evidence-bound alignment
+        # surface by lowering max_claims_per_response by one within [1,64] and
+        # retaining/strengthening abstention/citation/integrity requirements.
+        # CSIU cannot activate this; reviewers must evaluate and submit through
+        # AlignmentRegistry.activate/update with exact CAS against this digest.
+        if len(snapshots)>=4:
+            sustained=[]
+            for k in ("C","M"):
+                vals=[(snapshots[i].metrics[k]-snapshots[i-1].metrics[k])*DIRECTIONS[k] for i in range(1,len(snapshots))]
+                if len(vals)>=3 and all(v<=-0.02 for v in vals[-3:]): sustained.append(k)
+            if sustained:
+                current=int(getattr(active_policy,"max_claims_per_response",8))
+                delta={"max_claims_per_response":max(1,current-1),"explicit_unknown_behavior":"abstain","require_citations":True,"require_verified_integrity":True,"require_temporal_validity":True,"mapping":"sustained_C_or_M_worsening_tighten_claims/1","minimum_windows":4,"threshold_per_window":-0.02,"cooldown_seconds":86400}
+                reasons=tuple(sorted(set(reasons+tuple(sustained)+("conservative_alignment_tightening",))))
+        return CSIUAlignmentProposal(pid,rev,dig,self.policy.policy_digest,tuple(s.snapshot_digest for s in snapshots[-4:]),trend,reasons,"review human-understanding and safety thresholds; proposed deltas only tighten controls","authorized governance review plus ordinary alignment CAS activation",_ts(self._clock()+timedelta(hours=24)),delta)
     def get_statistics(self):
         c=self.check_cumulative_influence(); return {"enabled":self.is_enabled(),"policy_digest":self.policy.policy_digest,"metric_definition_version":self.policy.metric_definition_version,"last_valid_snapshot_digest":getattr(self._last_snapshot,"snapshot_digest",None),"last_decision_digest":getattr(self._last_decision,"decision_digest",None),"total_applications":self._total_applications,"total_blocked":self._total_blocked,"total_capped":self._total_capped,"max_influence_seen":self._max_influence_seen,"cumulative_stats":c,"kill_switches":{"global_enabled":self.config.global_enabled,"calculation_enabled":self.config.calculation_enabled,"regularization_enabled":self.config.regularization_enabled,"proposal_generation_enabled":self.config.proposal_generation_enabled,"history_display_enabled":self.config.history_tracking_enabled,"emergency_stop":self.config.emergency_stop}}
     def export_audit_trail(self,path: Optional[Path]=None):
