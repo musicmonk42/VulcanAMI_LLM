@@ -116,6 +116,7 @@ ObjectiveNegotiator = None
 ValidationTracker = None
 TransparencyInterface = None
 SelfImprovementDrive = None
+compose_self_improvement_drive = None
 TriggerType = None
 ImprovementObjective = None
 # Note: Add missing meta-reasoning components for full integration
@@ -294,7 +295,7 @@ from .self_improvement import CodeLLMClient
 
 
 def _lazy_import_meta_reasoning():
-    global MotivationalIntrospection, ObjectiveHierarchy, CounterfactualObjectiveReasoner, GoalConflictDetector, ObjectiveNegotiator, ValidationTracker, TransparencyInterface, SelfImprovementDrive, TriggerType, ImprovementObjective, InternalCritic, CuriosityRewardShaper, EthicalBoundaryMonitor, PreferenceLearner, ValueEvolutionTracker
+    global MotivationalIntrospection, ObjectiveHierarchy, CounterfactualObjectiveReasoner, GoalConflictDetector, ObjectiveNegotiator, ValidationTracker, TransparencyInterface, SelfImprovementDrive, compose_self_improvement_drive, TriggerType, ImprovementObjective, InternalCritic, CuriosityRewardShaper, EthicalBoundaryMonitor, PreferenceLearner, ValueEvolutionTracker
     if MotivationalIntrospection is None:
         try:
             from .meta_reasoning import (
@@ -305,6 +306,7 @@ def _lazy_import_meta_reasoning():
                 ObjectiveHierarchy,
                 ObjectiveNegotiator,
                 SelfImprovementDrive,
+                compose_self_improvement_drive,
                 TransparencyInterface,
                 TriggerType,
                 ValidationTracker,
@@ -816,7 +818,7 @@ class WorldModel:
                     hasattr(self, "_check_improvement_approval"),
                 )
 
-                self.self_improvement_drive = SelfImprovementDrive(
+                self.self_improvement_drive = compose_self_improvement_drive(
                     world_model=self,
                     config_path=config.get(
                         "self_improvement_config", "configs/intrinsic_drives.json"

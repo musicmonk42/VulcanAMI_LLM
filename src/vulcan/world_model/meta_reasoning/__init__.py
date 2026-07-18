@@ -8,6 +8,7 @@ _LAZY = {
     "FailureType": ".self_improvement_drive",
     "ImprovementObjective": ".self_improvement_drive",
     "SelfImprovementState": ".self_improvement_drive",
+    "compose_self_improvement_drive": ".self_improvement_drive",
     "CodeIntrospector": ".self_improvement_drive",
     "LogAnalyzer": ".self_improvement_drive",
     "CodeKnowledgeStore": ".self_improvement_drive",

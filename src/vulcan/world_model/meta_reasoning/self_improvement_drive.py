@@ -61,15 +61,35 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 # Initialize logger early - before it's used in import blocks
 logger = logging.getLogger(__name__)
 
+class AutoApplyStatus(str, Enum):
+    NOT_ATTEMPTED = "not_attempted"
+    UNAVAILABLE = "unavailable"
+    MISSING_GOVERNED_PROPOSAL = "missing_governed_proposal"
+    CONFIGURATION_MISSING = "configuration_missing"
+    GOVERNED_EXCEPTION = "governed_exception"
+    QUEUED = "queued"
+    APPLIED_AND_VERIFIED = "applied_and_verified"
+    REJECTED_BEFORE_INSTALLATION = "rejected_before_installation"
+    VERIFICATION_FAILED_ROLLBACK_SUCCEEDED = "verification_failed_rollback_succeeded"
+    VERIFICATION_FAILED_ROLLBACK_FAILED = "verification_failed_rollback_failed"
+    EXTERNAL_MUTATION_PREVENTED_ROLLBACK = "external_mutation_prevented_rollback"
+
 @dataclass(frozen=True)
 class AutoApplyResult:
     applied: bool
-    status: str
+    status: AutoApplyStatus
     reason: str
     approval_required: bool
     terminal: bool
     rollback_succeeded: bool = False
     manual_recovery_required: bool = False
+    transaction_result: Any = None
+    def __post_init__(self):
+        if isinstance(self.status, str):
+            object.__setattr__(self, "status", AutoApplyStatus(self.status))
+    @property
+    def status_code(self) -> str:
+        return self.status.value
 
 # ==========================================================================
 # CONSTANTS
@@ -934,6 +954,14 @@ class SelfImprovementDrive:
         state_path: str = "data/agent_state.json",
         alert_callback: Optional[Callable[[str, Dict[str, Any]], None]] = None,
         approval_checker: Optional[Callable[[str], Optional[str]]] = None,
+        csiu_enforcer: Any = None,
+        improvement_policy: Any = None,
+        approval_store: Any = None,
+        approval_verifier: Any = None,
+        audit_owner: Any = None,
+        owns_csiu_enforcer: bool = True,
+        owns_approval_store: bool = False,
+        owns_audit_owner: bool = False,
     ):
         """
         Initialize self-improvement drive.
@@ -950,6 +978,15 @@ class SelfImprovementDrive:
         self.alert_callback = alert_callback
         self.approval_checker = approval_checker
         self._lock = threading.RLock()
+        self._closed = False
+        self._owns_csiu_enforcer = bool(owns_csiu_enforcer and csiu_enforcer is None)
+        self._owns_approval_store = bool(owns_approval_store)
+        self._owns_audit_owner = bool(owns_audit_owner)
+        self.improvement_policy = improvement_policy
+        self.approval_store = approval_store
+        self.approval_verifier = approval_verifier
+        self.audit_owner = audit_owner
+        self._last_governed_transaction_result = None
         
         # FIX Issue 5: Track if blacklisted objectives have been logged (only log once)
         self._blacklist_logged = False
@@ -1033,13 +1070,15 @@ class SelfImprovementDrive:
         self._metrics_cache: Dict[str, Any] = {}
 
         # CSIU: Initialize enforcer with kill switches from environment
-        self._csiu_enforcer = None
-        if get_csiu_enforcer is not None and self._csiu_enabled:
+        self._csiu_enforcer = csiu_enforcer
+        if self._csiu_enforcer is None and get_csiu_enforcer is not None and self._csiu_enabled:
             enforcer_config = CSIUEnforcementConfig(
                 global_enabled=self._csiu_enabled,
                 calculation_enabled=self._csiu_calc_enabled,
                 regularization_enabled=self._csiu_regs_enabled,
                 history_tracking_enabled=self._csiu_hist_enabled,
+                durable_accounting_required=bool(self.config.get("constraints", {}).get("csiu_durable_accounting_required", False)),
+                durable_store_path=self.config.get("constraints", {}).get("csiu_durable_store_path"),
             )
             self._csiu_enforcer = get_csiu_enforcer(enforcer_config)
             logger.info("CSIU enforcement module initialized with safety controls")
@@ -1077,10 +1116,11 @@ class SelfImprovementDrive:
             logger.debug(f"Operation failed: {e}")
 
         self._auto_apply_policy = load_policy(policy_path)
-        self._auto_apply_enabled = bool(
-            self._auto_apply_policy.enabled
-            and not getattr(self, "require_human_approval", True)
-        )
+        constraints = self.config.get("constraints", {}) if isinstance(self.config, dict) else {}
+        self._governed_transactions_enabled = bool(constraints.get("governed_transactions_enabled", True))
+        self._unattended_application_permitted = bool(constraints.get("unattended_application_permitted", not self.require_human_approval))
+        self._independent_approval_required = bool(constraints.get("independent_approval_required", self.require_human_approval))
+        self._auto_apply_enabled = bool(self._auto_apply_policy.enabled and self._governed_transactions_enabled and (self._unattended_application_permitted or self._independent_approval_required))
 
         # PRIORITY 1: Safe Execution Module Integration
         # Initialize safe executor for sandboxed improvement execution
@@ -1152,6 +1192,31 @@ class SelfImprovementDrive:
         """
         self.__dict__.update(state)
         self._lock = threading.RLock()
+
+    def readiness(self) -> Tuple[bool, str]:
+        if self._closed:
+            return False, "self-improvement drive closed"
+        if self._csiu_enabled and self._csiu_enforcer is not None:
+            try:
+                self._csiu_enforcer.readiness()
+            except Exception as exc:
+                return False, f"csiu unavailable: {exc}"
+        if self._governed_transactions_enabled:
+            if self.improvement_policy is None or self.audit_owner is None:
+                return False, "governed improvement policy or audit owner missing"
+            if self._independent_approval_required and self.approval_store is None:
+                return False, "approval store missing"
+        return True, "ready"
+
+    def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        for owner, owned in ((getattr(self, "_csiu_enforcer", None), self._owns_csiu_enforcer), (getattr(self, "approval_store", None), self._owns_approval_store), (getattr(self, "audit_owner", None), self._owns_audit_owner)):
+            if owned and owner is not None:
+                close = getattr(owner, "close", None)
+                if callable(close):
+                    close()
 
     # ---------- Helper Methods ----------
 
@@ -2810,6 +2875,9 @@ class SelfImprovementDrive:
         with self._lock:
             for approval in self.state.pending_approvals:
                 if approval["id"] == approval_id:
+                    if approval.get("status") == "pending_governed_approval" or "proposal_digest" in approval:
+                        logger.warning("Legacy approve_pending rejects governed approval records; use approve_governed_pending")
+                        return False
                     approval["status"] = "approved"
                     approval["approved_at"] = time.time()
                     self._save_state()
@@ -2893,7 +2961,13 @@ class SelfImprovementDrive:
                     if not verifier.is_authorized(principal, bindings):
                         return False
                     pid = principal.principal_id
-                    rec = ApprovalRecord(approval_id, approval["proposal_digest"], approval["policy_digest"], approval["original_source_digest"], pid, time.time(), time.time()+ttl_seconds)
+                    now = time.time()
+                    if isinstance(ttl_seconds, bool) or not isinstance(ttl_seconds, (int, float)) or not math.isfinite(float(ttl_seconds)) or float(ttl_seconds) <= 0:
+                        return False
+                    expires = min(principal.expires_at, now + min(float(ttl_seconds), 3600.0))
+                    if expires <= now:
+                        return False
+                    rec = ApprovalRecord(approval_id, approval["proposal_digest"], approval["policy_digest"], approval["original_source_digest"], pid, now, expires)
                     self.approval_store.save(rec)
                     approval["status"] = "independently_approved"; approval["approved_at"] = rec.approved_at; approval["approver_identity"] = pid
                     self._save_state(); return True
@@ -2910,8 +2984,8 @@ class SelfImprovementDrive:
         plan = {"id": pending.get("id"), "governed_proposal": proposal_map}
         auto_result = self._maybe_auto_apply(plan)
         applied, reason = auto_result.applied, auto_result.reason
-        result = getattr(self, "_last_governed_transaction_result", None)
-        status = result.status_code if result is not None else ("applied" if applied else reason)
+        result = auto_result.transaction_result
+        status = result.status_code if result is not None else auto_result.status_code
         with self._lock:
             pending["status"] = "applied" if applied else status
             pending["transaction_status"] = status
@@ -2937,16 +3011,16 @@ class SelfImprovementDrive:
     def _maybe_auto_apply(self, plan: Dict[str, Any]) -> AutoApplyResult:
         """Auto-apply only through GovernedSelfImprovementTransaction."""
         if not self._auto_apply_enabled:
-            return AutoApplyResult(False,"not_attempted","auto-apply disabled",True,False)
+            return AutoApplyResult(False,AutoApplyStatus.NOT_ATTEMPTED,"auto-apply disabled",True,False)
         if GovernedSelfImprovementTransaction is None or ImprovementProposal is None or inspect_repository is None:
-            return AutoApplyResult(False,"unavailable","governed transaction unavailable",True,False)
+            return AutoApplyResult(False,AutoApplyStatus.UNAVAILABLE,"governed transaction unavailable",True,False)
         proposal_map = plan.get("governed_proposal") or plan.get("improvement_proposal")
         policy = getattr(self, "improvement_policy", None) or getattr(self, "governed_improvement_policy", None)
         audit_owner = getattr(self, "audit_owner", None) or getattr(self, "audit", None)
         if not isinstance(proposal_map, dict):
-            return AutoApplyResult(False,"missing_governed_proposal","missing governed improvement proposal",True,False)
+            return AutoApplyResult(False,AutoApplyStatus.MISSING_GOVERNED_PROPOSAL,"missing governed improvement proposal",True,False)
         if policy is None or audit_owner is None:
-            return AutoApplyResult(False,"configuration_missing","governed transaction policy or audit owner missing",True,False)
+            return AutoApplyResult(False,AutoApplyStatus.CONFIGURATION_MISSING,"governed transaction policy or audit owner missing",True,False)
         try:
             proposal = ImprovementProposal.from_mapping(proposal_map)
             snapshot = inspect_repository(policy.repo_root, policy.permitted_path_globs, max_files=policy.max_files)
@@ -2954,13 +3028,13 @@ class SelfImprovementDrive:
             result = tx.apply(proposal, snapshot, actor="self-improvement-drive")
             self._last_governed_transaction_result = result
             if result.verified_success:
-                return AutoApplyResult(True,result.status_code,result.status_code,False,True)
+                return AutoApplyResult(True,AutoApplyStatus(result.status_code),result.status_code,False,True, transaction_result=result)
             if result.status_code == "rejected_before_installation" and result.failure_category == "approval required":
-                return AutoApplyResult(False,result.status_code,result.failure_category,True,False)
+                return AutoApplyResult(False,AutoApplyStatus(result.status_code),result.failure_category,True,False, transaction_result=result)
             manual = result.status_code in {"external_mutation_prevented_rollback","verification_failed_rollback_failed"}
-            return AutoApplyResult(False,result.status_code,result.failure_category or result.status_code,False,True,result.status_code=="verification_failed_rollback_succeeded",manual)
+            return AutoApplyResult(False,AutoApplyStatus(result.status_code),result.failure_category or result.status_code,False,True,result.status_code=="verification_failed_rollback_succeeded",manual,result)
         except Exception as e:
-            return AutoApplyResult(False,"governed_exception",f"governed transaction failed: {type(e).__name__}",False,True)
+            return AutoApplyResult(False,AutoApplyStatus.GOVERNED_EXCEPTION,f"governed transaction failed: {type(e).__name__}",False,True)
 
     # Where improvements are processed, insert a call to _maybe_auto_apply before queueing/approval
     def process_plan(self, plan: Dict[str, Any]) -> Dict[str, Any]:
@@ -2968,21 +3042,21 @@ class SelfImprovementDrive:
         Process a single improvement plan. Auto-apply if policy allows, otherwise queue for approval.
         """
         # ... any existing validation ...
-        result = AutoApplyResult(False,"queued","queued",True,False)
+        result = AutoApplyResult(False,AutoApplyStatus.QUEUED,"queued",True,False)
         if self._auto_apply_enabled:
             result = self._maybe_auto_apply(plan)
 
         if result.applied:
-            status = {"status": "applied", "plan_id": plan.get("id"), "reason": result.reason, "transaction_status": result.status}
+            status = {"status": "applied", "plan_id": plan.get("id"), "reason": result.reason, "transaction_status": result.status_code}
             logger.info(f"Auto-applied plan {plan.get('id')}")
             # Potentially call record_outcome here or let external orchestrator do it
         else:
             if self._auto_apply_enabled and result.terminal:
-                status = {"status": result.status, "plan_id": plan.get("id"), "reason": result.reason, "terminal": True, "rollback_succeeded": result.rollback_succeeded, "manual_recovery_required": result.manual_recovery_required}
+                status = {"status": result.status_code, "plan_id": plan.get("id"), "reason": result.reason, "terminal": True, "rollback_succeeded": result.rollback_succeeded, "manual_recovery_required": result.manual_recovery_required}
             elif result.approval_required:
                 status = self._queue_governed_approval(plan, result.reason)
             else:
-                status = {"status": result.status, "plan_id": plan.get("id"), "reason": result.reason}
+                status = {"status": result.status_code, "plan_id": plan.get("id"), "reason": result.reason}
 
         # Update state if your class tracks it
         try:
@@ -4563,3 +4637,13 @@ Output the complete modified file content.
             )
         
         return boosted_objectives
+
+
+def compose_self_improvement_drive(*, world_model: Any = None, config_path: Any = "configs/intrinsic_drives.json", state_path: str = "data/agent_state.json", alert_callback: Any = None, approval_checker: Any = None, csiu_enforcer: Any = None, improvement_policy: Any = None, approval_store: Any = None, approval_verifier: Any = None, audit_owner: Any = None) -> SelfImprovementDrive:
+    """Canonical public composition path for the governed CSIU drive.
+
+    The drive receives shared owners explicitly.  The drive closes only the CSIU
+    owner it creates itself; supplied owners remain the caller/container's close
+    responsibility.
+    """
+    return SelfImprovementDrive(world_model=world_model, config_path=config_path, state_path=state_path, alert_callback=alert_callback, approval_checker=approval_checker, csiu_enforcer=csiu_enforcer, improvement_policy=improvement_policy, approval_store=approval_store, approval_verifier=approval_verifier, audit_owner=audit_owner, owns_csiu_enforcer=(csiu_enforcer is None), owns_approval_store=False, owns_audit_owner=False)

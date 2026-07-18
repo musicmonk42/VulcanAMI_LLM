@@ -204,6 +204,8 @@ class ApprovalRecord:
         if not all(isinstance(x,(int,float)) and math.isfinite(float(x)) for x in (self.approved_at,self.expires_at)): raise TransactionError("bad approval timestamp")
         if self.expires_at <= self.approved_at: raise TransactionError("bad approval expiry")
         if self.state not in {"approved","claimed","consumed","rejected","expired","verification_failed","aborted","manual_recovery_required"}: raise TransactionError("bad approval state")
+        if self.used and self.state in {"approved","claimed"}: raise TransactionError("bad approval used state")
+        if (not self.used) and self.state in {"consumed","rejected","verification_failed","aborted","manual_recovery_required"}: raise TransactionError("bad approval terminal state")
 
 @dataclass
 class TransactionResult:
@@ -259,14 +261,16 @@ class ApprovalStore:
         if not isinstance(doc, dict): raise TransactionError("approval store schema invalid")
         for k,v in doc.items():
             if not isinstance(k,str) or not isinstance(v,dict): raise TransactionError("approval store schema invalid")
-            rec=ApprovalRecord(**v); ApprovalStore._strict_record_static(rec)
+            rec=ApprovalRecord(**v)
+            if k != rec.approval_id: raise TransactionError("approval store key mismatch")
+            ApprovalStore._strict_record_static(rec, allow_expired=True)
         return doc
     @staticmethod
-    def _strict_record_static(record: ApprovalRecord) -> None:
+    def _strict_record_static(record: ApprovalRecord, allow_expired: bool = False) -> None:
         import re
         for n in ("proposal_digest","policy_digest","original_source_digest"):
             if not re.fullmatch(r"[0-9a-f]{64}", getattr(record,n)): raise TransactionError("bad approval digest")
-        if record.state in {"approved","claimed"} and record.expires_at < time.time(): raise TransactionError("approval expired")
+        if not allow_expired and record.state in {"approved","claimed"} and record.expires_at < time.time(): raise TransactionError("approval expired")
     def _read_doc_locked(self) -> Dict[str, Any]:
         self._check_paths()
         if not self.path.exists(): return {}
@@ -319,7 +323,7 @@ class ApprovalStore:
         try:
             doc=self._read_doc_locked()
             if approval_id not in doc: raise TransactionError("approval not found")
-            rec=ApprovalRecord(**doc[approval_id]); self._strict_record(rec)
+            rec=ApprovalRecord(**doc[approval_id]); self._strict_record_static(rec, allow_expired=(state=="expired"))
             if rec.state in {"consumed","rejected","expired","verification_failed","aborted","manual_recovery_required"}: raise TransactionError("approval already terminal")
             doc[approval_id]["used"] = True; doc[approval_id]["state"] = state
             self._write_doc_locked(doc)

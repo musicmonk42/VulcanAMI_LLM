@@ -812,8 +812,8 @@ def get_self_improvement_drive(config_path: Optional[str] = None, state_path: Op
         
         logger.info("[Singletons] Creating global SelfImprovementDrive (ONCE)")
         try:
-            from vulcan.world_model.meta_reasoning.self_improvement_drive import SelfImprovementDrive
-            _self_improvement_drive = SelfImprovementDrive(
+            from vulcan.world_model.meta_reasoning.self_improvement_drive import compose_self_improvement_drive
+            _self_improvement_drive = compose_self_improvement_drive(
                 config_path=config_path,
                 state_path=state_path
             )
