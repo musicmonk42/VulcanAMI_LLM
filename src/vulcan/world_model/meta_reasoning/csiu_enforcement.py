@@ -73,7 +73,7 @@ class CSIUPolicy:
     max_cumulative_influence_window: float = 0.10
     cumulative_window_seconds: float = 3600.0
     policy_id: str = "csiu-policy-default"
-    created_at: str = "1970-01-01T00:00:00Z"
+    created_at: str = field(default_factory=lambda:_ts(_now()))
     policy_digest: str = ""
     def __post_init__(self):
         w={k:_num(self.weights.get(k),f"weight {k}") for k in METRIC_ORDER}
@@ -191,7 +191,7 @@ class CSIUEnforcementConfig:
 class CSIUEnforcement(SerializationMixin):
     _unpickleable_attrs=["_lock","_clock"]
     def __init__(self, config: Optional[CSIUEnforcementConfig]=None, policy: Optional[CSIUPolicy]=None):
-        self.config=config or CSIUEnforcementConfig(); self.policy=policy or CSIUPolicy(max_single_influence=self.config.max_single_influence,max_cumulative_influence_window=self.config.max_cumulative_influence_window,cumulative_window_seconds=self.config.cumulative_window_seconds)
+        self.config=config or CSIUEnforcementConfig(); self._explicit_policy = policy is not None; self.policy=policy or CSIUPolicy(max_single_influence=self.config.max_single_influence,max_cumulative_influence_window=self.config.max_cumulative_influence_window,cumulative_window_seconds=self.config.cumulative_window_seconds)
         self._lock=threading.RLock(); self._clock=self.config.clock or _now; self.enforcer_id=f"csiu:{self.policy.policy_id}:{self.policy.policy_digest}"; self._durable_ready=False; self._durable_prev="0"*64; self._durable_fd=None; self._influence_history=[]; self._audit_trail=[]; self._last_decision=None; self._last_snapshot=None; self._last_ewma=0.0; self._closed=False; self._seen_snapshot_digests=set(); self._total_applications=0; self._total_blocked=0; self._total_capped=0; self._max_influence_seen=0.0; self._last_snapshot_digest=""
         try: self._load_durable()
         except Exception:
@@ -237,10 +237,13 @@ class CSIUEnforcement(SerializationMixin):
         hd=header.pop("header_digest")
         if canonical_digest(header)!=hd: raise CSIUValidationError("durable policy header digest mismatch")
         stored_policy=CSIUPolicy(**header["policy"])
-        if self.policy.policy_digest!=stored_policy.policy_digest: raise CSIUValidationError("durable policy/config mismatch")
+        if self._explicit_policy and self.policy.policy_digest!=stored_policy.policy_digest: raise CSIUValidationError("durable policy/config mismatch")
+        if not self._explicit_policy:
+            self.policy = stored_policy
+            self.enforcer_id=f"csiu:{self.policy.policy_id}:{self.policy.policy_digest}"
         cfgdoc=header["config"]
-        for k in ("max_single_influence","max_cumulative_influence_window","cumulative_window_seconds"):
-            if float(cfgdoc.get(k)) != float(getattr(self.config,k)): raise CSIUValidationError("durable policy/config mismatch")
+        expected=self._config_binding()
+        if cfgdoc != expected: raise CSIUValidationError("durable policy/config mismatch")
         prev="0"*64; seen=set(); retained=[]; cutoff=self._clock()-timedelta(seconds=self.config.cumulative_window_seconds)
         required=set(CSIUInfluenceRecord("0"*64,self.policy.policy_digest,"0"*64,"bootstrap","","","0"*64,0.0,0.0,0.0,0.0,0.0,0.0,False,True,"telemetry",self.enforcer_id).to_dict().keys())
         for line in lines[1:]:
@@ -266,8 +269,24 @@ class CSIUEnforcement(SerializationMixin):
             try: fcntl.flock(self._durable_fd, fcntl.LOCK_UN); os.close(self._durable_fd)
             finally: self._durable_fd=None
         self._durable_ready=False; self._closed=True
+
+    def _config_binding(self):
+        return {
+            "max_single_influence": float(self.config.max_single_influence),
+            "max_cumulative_influence_window": float(self.config.max_cumulative_influence_window),
+            "cumulative_window_seconds": float(self.config.cumulative_window_seconds),
+            "history_capacity": int(self.config.history_capacity),
+            "global_enabled": bool(self.config.global_enabled),
+            "calculation_enabled": bool(self.config.calculation_enabled),
+            "regularization_enabled": bool(self.config.regularization_enabled),
+            "proposal_generation_enabled": bool(self.config.proposal_generation_enabled),
+            "emergency_stop": bool(self.config.emergency_stop),
+            "audit_trail_enabled": bool(self.config.audit_trail_enabled),
+            "audit_trail_max_entries": int(self.config.audit_trail_max_entries),
+            "durable_accounting_required": bool(self.config.durable_accounting_required),
+        }
     def _write_header(self, path: Path):
-        doc={"schema_version":SCHEMA_STORE_HEADER,"policy":self.policy.to_dict(),"config":{"max_single_influence":self.config.max_single_influence,"max_cumulative_influence_window":self.config.max_cumulative_influence_window,"cumulative_window_seconds":self.config.cumulative_window_seconds}}
+        doc={"schema_version":SCHEMA_STORE_HEADER,"policy":self.policy.to_dict(),"config":self._config_binding()}
         doc["header_digest"]=canonical_digest(doc)
         with open(path,"ab",buffering=0) as f:
             f.write(json.dumps(doc,sort_keys=True,separators=(",",":"),allow_nan=False).encode()+b"\n"); f.flush(); os.fsync(f.fileno())
@@ -377,9 +396,10 @@ class CSIUEnforcement(SerializationMixin):
             if current is not None:
                 ok,reason=self.validate_snapshot(current)
                 if ok:
-                    self._last_snapshot=current; self._last_snapshot_digest=current.snapshot_digest; self._seen_snapshot_digests.add(current.snapshot_digest)
                     reason="baseline_established"
-                    dec=self._decision(canonical_digest({"plan":original}),reason,0,0,0,True,False,current); self._persist_terminal_decision(dec,"","telemetry"); return original,dec
+                    dec=self._decision(canonical_digest({"plan":original}),reason,0,0,0,True,False,current); self._persist_terminal_decision(dec,"","telemetry")
+                    self._last_snapshot=current; self._last_snapshot_digest=current.snapshot_digest; self._seen_snapshot_digests.add(current.snapshot_digest)
+                    return original,dec
                 return original,self._decision(canonical_digest({"plan":original}),reason,0,0,0,True,False,current)
             return original,self._decision(canonical_digest({"plan":original}),"missing_snapshot",0,0,0,True,False,current)
         expected=getattr(self,"_last_snapshot_digest",getattr(self._last_snapshot,"snapshot_digest",None))

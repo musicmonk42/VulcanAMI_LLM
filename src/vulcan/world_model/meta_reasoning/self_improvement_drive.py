@@ -1252,7 +1252,7 @@ class SelfImprovementDrive:
         merged_config.update(drive_config)
         
         # Ensure required nested fields exist
-        if "objectives" not in merged_config or not merged_config["objectives"]:
+        if "objectives" not in drive_config:
             merged_config["objectives"] = defaults["objectives"]
         if "constraints" not in merged_config or not merged_config["constraints"]:
             merged_config["constraints"] = defaults["constraints"]
@@ -1713,6 +1713,20 @@ class SelfImprovementDrive:
         except Exception as e:
             self._csiu_audit_status("snapshot_rejected", reason_code=type(e).__name__)
             return {}
+
+    def observe_csiu_telemetry(self):
+        """Public boundary to accept aggregate CSIU telemetry without proposing source changes."""
+        cur = self._collect_telemetry_snapshot()
+        snap = getattr(self, "_csiu_last_snapshot", None) if cur else None
+        if not self._csiu_enforcer or snap is None:
+            return getattr(self, "_csiu_last_decision", None)
+        prev = getattr(self, "_csiu_previous_snapshot", None)
+        _, decision = self._csiu_enforcer.apply_regularization_from_snapshots({}, prev, snap, plan_id="telemetry-observation", action_type="telemetry")
+        self._csiu_last_decision = decision
+        if decision.reason_code == "baseline_established" or decision.applied or decision.reason_code in {"zero_pressure","disabled"}:
+            self._csiu_previous_snapshot = snap
+        self._csiu_audit_status("telemetry_observed", decision_id=decision.decision_id, decision_digest=decision.decision_digest, reason_code=decision.reason_code, applied=decision.applied)
+        return decision
 
     def _csiu_utility(self, prev: Dict[str, float], cur: Dict[str, float]) -> float:
         if not self._csiu_enabled or not self._csiu_calc_enabled or not prev or not cur:
@@ -2843,20 +2857,32 @@ class SelfImprovementDrive:
         except Exception as e:
             return {"status": "rejected", "plan_id": plan.get("id"), "reason": f"governed approval queue failed: {type(e).__name__}"}
 
-    def approve_governed_pending(self, approval_id: str, approver_identity: str = "", *, ttl_seconds: float = 3600.0, authority_context: Any = None) -> bool:
-        authority = getattr(self, "approval_authority", None) or authority_context
-        if authority is None or not getattr(authority, "is_authorized", lambda *_: False)(approver_identity, approval_id):
+    def approve_governed_pending(self, approval_id: str, principal: Any, *, ttl_seconds: float = 3600.0) -> bool:
+        authority = getattr(self, "approval_authority", None)
+        if authority is None or principal is None:
             return False
-        if approver_identity in {"", "self-improvement-drive", "drive", "system"}:
+        legacy_string = isinstance(principal, str) and hasattr(authority, "is_authorized") and not authority.__class__.__module__.startswith("vulcan")
+        if isinstance(principal, (str, bytes)) and not legacy_string:
+            return False
+        if not hasattr(authority, "is_authorized"):
             return False
         if ApprovalRecord is None or not getattr(self, "approval_store", None):
             return False
         with self._lock:
             for approval in self.state.pending_approvals:
                 if approval.get("approval_id") == approval_id and approval.get("status") == "pending_governed_approval":
-                    rec = ApprovalRecord(approval_id, approval["proposal_digest"], approval["policy_digest"], approval["original_source_digest"], approver_identity, time.time(), time.time()+ttl_seconds)
+                    bindings = {"approval_id": approval_id, "proposal_digest": approval["proposal_digest"], "policy_digest": approval["policy_digest"], "original_source_digest": approval["original_source_digest"], "required_scope": "self_improvement.approve"}
+                    if legacy_string:
+                        if not authority.is_authorized(principal, approval_id):
+                            return False
+                        pid = principal
+                    else:
+                        if not authority.is_authorized(principal, bindings):
+                            return False
+                        pid = getattr(principal, "principal_id", "")
+                    rec = ApprovalRecord(approval_id, approval["proposal_digest"], approval["policy_digest"], approval["original_source_digest"], pid, time.time(), time.time()+ttl_seconds)
                     self.approval_store.save(rec)
-                    approval["status"] = "independently_approved"; approval["approved_at"] = rec.approved_at; approval["approver_identity"] = approver_identity
+                    approval["status"] = "independently_approved"; approval["approved_at"] = rec.approved_at; approval["approver_identity"] = pid
                     self._save_state(); return True
         return False
 
@@ -2935,7 +2961,11 @@ class SelfImprovementDrive:
             logger.info(f"Auto-applied plan {plan.get('id')}")
             # Potentially call record_outcome here or let external orchestrator do it
         else:
-            status = self._queue_governed_approval(plan, reason)
+            terminal_markers = ("malformed", "stale", "policy mismatch", "policy_digest", "expired", "consumed", "audit", "gate", "rollback", "external", "manual_recovery", "verification_failed", "external_mutation")
+            if self._auto_apply_enabled and any(m in str(reason) for m in terminal_markers):
+                status = {"status": "terminal", "plan_id": plan.get("id"), "reason": reason}
+            else:
+                status = self._queue_governed_approval(plan, reason)
 
         # Update state if your class tracks it
         try:

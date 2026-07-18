@@ -146,6 +146,34 @@ class ImprovementProposal:
         data = {k: getattr(self, k) for k in sorted(self.__dataclass_fields__) if k != "approval_id"}
         return _sha256(json.dumps(data, sort_keys=True, separators=(",", ":")).encode())
 
+
+@dataclass(frozen=True)
+class TrustedApprovalPrincipal:
+    principal_id: str
+    scopes: Tuple[str, ...]
+    expires_at: float
+
+class ApprovalAuthorityPort:
+    def is_authorized(self, principal: TrustedApprovalPrincipal, bindings: Mapping[str, str]) -> bool:
+        raise NotImplementedError
+
+class ClosedApprovalAuthority(ApprovalAuthorityPort):
+    def __init__(self, principals: Mapping[str, TrustedApprovalPrincipal] = None):
+        self._principals = dict(principals or {})
+    def issue_principal(self, principal_id: str, scopes: Sequence[str], ttl_seconds: float = 3600.0) -> TrustedApprovalPrincipal:
+        if not isinstance(principal_id, str) or not principal_id or len(principal_id) > 128:
+            raise TransactionError("bad principal")
+        p = TrustedApprovalPrincipal(principal_id, tuple(str(s) for s in scopes), time.time()+float(ttl_seconds))
+        self._principals[principal_id] = p
+        return p
+    def is_authorized(self, principal: TrustedApprovalPrincipal, bindings: Mapping[str, str]) -> bool:
+        if not isinstance(principal, TrustedApprovalPrincipal): return False
+        stored = self._principals.get(principal.principal_id)
+        if stored != principal or principal.expires_at < time.time(): return False
+        required = str(bindings.get("required_scope", "self_improvement.approve"))
+        if required not in principal.scopes: return False
+        return all(isinstance(bindings.get(k), str) and bindings.get(k) for k in ("approval_id","proposal_digest","policy_digest","original_source_digest"))
+
 @dataclass(frozen=True)
 class ApprovalRecord:
     approval_id: str
@@ -157,6 +185,16 @@ class ApprovalRecord:
     expires_at: float
     state: str = "approved"
     used: bool = False
+    def __post_init__(self):
+        import math, re
+        for n in ("approval_id","approver_identity"):
+            v=getattr(self,n)
+            if not isinstance(v,str) or not v or len(v)>128 or any(ord(c)<32 for c in v): raise TransactionError("bad approval identifier")
+        for n in ("proposal_digest","policy_digest","original_source_digest"):
+            if not isinstance(getattr(self,n),str) or len(getattr(self,n))>128 or any(ord(c)<32 for c in getattr(self,n)): raise TransactionError("bad approval digest")
+        if not all(isinstance(x,(int,float)) and math.isfinite(float(x)) for x in (self.approved_at,self.expires_at)): raise TransactionError("bad approval timestamp")
+        if self.expires_at <= self.approved_at: raise TransactionError("bad approval expiry")
+        if self.state not in {"approved","claimed","consumed","rejected","expired","verification_failed","aborted","manual_recovery_required"}: raise TransactionError("bad approval state")
 
 @dataclass
 class TransactionResult:
@@ -183,7 +221,12 @@ class TransactionResult:
 class ApprovalStore:
     def __init__(self, path: Path):
         self.path = Path(path)
+    def _check_paths(self) -> None:
+        lock = self.path.with_suffix(self.path.suffix + ".lock")
+        if self.path.is_symlink() or lock.is_symlink(): raise TransactionError("symlinked approval store or lock")
+
     def load(self, approval_id: str) -> ApprovalRecord:
+        self._check_paths()
         try:
             doc = json.loads(self.path.read_text(encoding="utf-8"))
         except Exception as exc:
@@ -192,7 +235,13 @@ class ApprovalStore:
         if not isinstance(rec, dict):
             raise TransactionError("approval not found")
         return ApprovalRecord(**rec)
+    def _strict_record(self, record: ApprovalRecord) -> None:
+        import re
+        for n in ("proposal_digest","policy_digest","original_source_digest"):
+            if not re.fullmatch(r"[0-9a-f]{64}", getattr(record,n)): raise TransactionError("bad approval digest")
+
     def save(self, record: ApprovalRecord) -> None:
+        self._check_paths(); self._strict_record(record)
         try:
             doc = json.loads(self.path.read_text(encoding="utf-8")) if self.path.exists() else {}
         except Exception as exc:
@@ -203,6 +252,7 @@ class ApprovalStore:
         _atomic_write(self.path, json.dumps(doc, sort_keys=True).encode(), 0o600)
     def claim(self, approval_id: str, proposal_digest: str) -> ApprovalRecord:
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._check_paths()
         lock = self.path.with_suffix(self.path.suffix + ".lock")
         fd = os.open(lock, os.O_CREAT|os.O_RDWR, 0o600)
         try:
@@ -219,7 +269,8 @@ class ApprovalStore:
             try: fcntl.flock(fd, fcntl.LOCK_UN)
             finally: os.close(fd)
     def terminalize(self, approval_id: str, state: str) -> None:
-        if state not in {"consumed","rejected","expired","verification_failed","aborted"}:
+        self._check_paths()
+        if state not in {"consumed","rejected","expired","verification_failed","aborted","manual_recovery_required"}:
             raise TransactionError("bad terminal approval state")
         doc = json.loads(self.path.read_text(encoding="utf-8")) if self.path.exists() else {}
         if approval_id not in doc: raise TransactionError("approval not found")
