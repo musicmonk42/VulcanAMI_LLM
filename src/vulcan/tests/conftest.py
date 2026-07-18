@@ -15,7 +15,10 @@ import uuid
 import warnings
 from unittest.mock import Mock
 
-import numpy as np
+try:
+    import numpy as np
+except ImportError:
+    np = None
 import pytest
 
 # Add src directory to Python path
@@ -77,7 +80,8 @@ THREAD_LEAK_TOLERANCE = 2
 @pytest.fixture(autouse=True)
 def reset_random_state():
     """Ensure each test starts with a fresh random state."""
-    np.random.seed(12345)
+    if np is not None:
+        np.random.seed(12345)
     yield
 
 

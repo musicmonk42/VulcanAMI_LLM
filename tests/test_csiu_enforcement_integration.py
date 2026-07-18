@@ -123,11 +123,11 @@ class TestCSIUEnforcementIntegration:
         metrics = {"H": 0.05, "C": 0.88}
         regularized = drive._csiu_regularize_plan(plan, 0.10, metrics)
 
-        # Check that internal metadata records the capping
-        assert "_internal_metadata" in regularized
-        assert regularized["_internal_metadata"]["csiu_capped"] is True
-        assert regularized["_internal_metadata"]["csiu_pressure"] == 0.05  # Capped
-        assert regularized["_internal_metadata"]["csiu_pressure_original"] == 0.10
+        # Repaired semantics: capping is exposed through bounded audit/decision status,
+        # not hidden plan metadata.
+        assert "_internal_metadata" not in regularized
+        assert "csiu_regularization" in regularized
+        assert drive._csiu_enforcer._last_decision.pressure == 0.05  # Capped
 
     def test_cumulative_influence_blocking(self, temp_config, temp_state_path):
         """Test that cumulative influence is tracked and blocked when exceeded"""
