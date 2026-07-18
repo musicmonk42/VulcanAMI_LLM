@@ -103,7 +103,7 @@ class CognitiveKernel:
             if self._audit: self._audit.append("case.finalized", {"case_id":case.case_id,"request_id":case.request_id,"request_digest":case.input_hash,"finalization":finalization.decision.value,"rendered_response_digest":artifact.ir_digest})
             case.close(status)
             if self._audit: self._audit.append("case.completed" if status is CognitiveCaseStatus.SUCCESS else "case.abstained", {"case_id":case.case_id,"request_id":case.request_id,"request_digest":case.input_hash,"status":status.value,"rendered_response_digest":artifact.ir_digest})
-            return KernelResult(finalization.public_text if status is CognitiveCaseStatus.SUCCESS else "I cannot complete this request with the available verified evidence.",response_ir,status,finalization.decision.value)
+            return KernelResult(finalization.public_text,response_ir,status,finalization.decision.value)
         except asyncio.CancelledError:
             if case.terminal_status is CognitiveCaseStatus.OPEN: case.close(CognitiveCaseStatus.CANCELLED,"cancelled")
             raise

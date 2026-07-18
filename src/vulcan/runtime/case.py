@@ -40,13 +40,13 @@ class CognitiveCase:
     schema_version: str = "1"
     privacy_classification: str = "request-confidential"
     state_snapshot_id: str | None = None
-    interpretation: "InterpretationBundle | None" = None
-    accepted_interpretation: "AcceptedInterpretation | None" = None
-    clarification: "ClarificationRequest | None" = None
+    interpretation: "InterpretationBundle | None" = field(default=None, repr=False)
+    accepted_interpretation: "AcceptedInterpretation | None" = field(default=None, repr=False)
+    clarification: "ClarificationRequest | None" = field(default=None, repr=False)
     _evidence: list["EvidenceArtifact"] = field(default_factory=list, repr=False)
     _claims: list["Claim"] = field(default_factory=list, repr=False)
     _derivations: list["Derivation"] = field(default_factory=list, repr=False)
-    response_ir: "ResponseIR | None" = None
+    response_ir: "ResponseIR | None" = field(default=None, repr=False)
     selected_components: tuple[str, ...] = ()
     terminal_status: CognitiveCaseStatus = CognitiveCaseStatus.OPEN
     failure_kind: str | None = None
