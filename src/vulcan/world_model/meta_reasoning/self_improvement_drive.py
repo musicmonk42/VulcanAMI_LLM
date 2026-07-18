@@ -1780,14 +1780,13 @@ class SelfImprovementDrive:
             return original
         try:
             snapshot = self._csiu_last_snapshot
-            if snapshot is None:
-                from datetime import datetime, timezone, timedelta
-                from vulcan.world_model.meta_reasoning.csiu_enforcement import CSIUMetricSnapshot, METRIC_ORDER
-                now = datetime.now(timezone.utc)
-                vals = {k: float(cur.get(k, 0.5)) if isinstance(cur, dict) and k in cur else 0.5 for k in METRIC_ORDER}
-                snapshot = CSIUMetricSnapshot(metrics=vals, window_start=(now-timedelta(minutes=5)).isoformat().replace("+00:00","Z"), window_end=now.isoformat().replace("+00:00","Z"), sample_count=30, aggregation_method="mean", metric_definition_version=self._csiu_enforcer.policy.metric_definition_version, provider_id="drive-aggregate", provenance_digest=("d"*64), policy_digest=self._csiu_enforcer.policy.policy_digest)
-            regularized, decision = self._csiu_enforcer.apply_regularization_with_enforcement(
-                original, d, cur, plan_id=str(original.get("id", "unknown")), action_type=str(original.get("type", "improvement")), snapshot=snapshot
+            previous_snapshot = getattr(self, "_csiu_previous_snapshot", None)
+            if snapshot is None or previous_snapshot is None:
+                self._csiu_last_decision = None
+                self._csiu_audit_status("telemetry_unavailable", reason_code="telemetry_unavailable")
+                return original
+            regularized, decision = self._csiu_enforcer.apply_regularization_from_snapshots(
+                original, previous_snapshot, snapshot, plan_id=str(original.get("id", "unknown")), action_type=str(original.get("type", "improvement"))
             )
             self._csiu_last_decision = decision
             self._csiu_audit_status("decision", decision_id=decision.decision_id, decision_digest=decision.decision_digest, reason_code=decision.reason_code, pressure=decision.pressure, actual_effect=decision.actual_effect, applied=decision.applied)
@@ -2864,7 +2863,7 @@ class SelfImprovementDrive:
         if not pending:
             return {"status": "missing_approval", "approval_id": approval_id}
         if pending.get("status") != "independently_approved":
-            return {"status": pending.get("status", "pending_governed_approval"), "approval_id": approval_id}
+            return {"status": pending.get("status", "pending_governed_approval"), "approval_id": approval_id, "applied": False}
         proposal_map = copy.deepcopy(pending.get("proposal", {})); proposal_map["approval_id"] = approval_id
         plan = {"id": pending.get("id"), "governed_proposal": proposal_map}
         applied, reason = self._maybe_auto_apply(plan)
@@ -2875,8 +2874,12 @@ class SelfImprovementDrive:
             pending["transaction_status"] = status
             pending["completed_at"] = time.time()
             self._save_state()
-        if applied:
+        if applied and not pending.get("outcome_recorded"):
             self.state.improvements_this_session += 1
+            try: self.record_outcome(str(pending.get("objective_type", "governed")), True, {"governed": True, "approval_id": approval_id})
+            except Exception: pass
+            pending["outcome_recorded"] = True
+            self._save_state()
         return {"status": status, "approval_id": approval_id, "applied": applied, "reason": reason, "transaction_result": result}
 
     # ---------- Auto Apply Logic ----------
@@ -3019,7 +3022,7 @@ class SelfImprovementDrive:
                 return None  # Return None because the action was completed internally
 
             # If queued (either because auto-apply failed or wasn't enabled/triggered), proceed to return action for orchestrator
-            elif processed_status.get("status") == "queued":
+            elif processed_status.get("status") in {"queued", "pending_governed_approval"}:
                 # If approval is required and wasn't auto-approved, it needs external handling
                 if self.require_human_approval:
                     # Add approval info if it was queued because manual approval is needed
@@ -3045,6 +3048,10 @@ class SelfImprovementDrive:
                 logger.info(
                     f"🚀 Returning action for orchestrator: {objective.type} (Reason: {processed_status.get('reason')})"
                 )
+                improvement_action.update(processed_status)
+                if processed_status.get("status") == "pending_governed_approval":
+                    improvement_action["_wait_for_approval"] = True
+                    improvement_action["governed_pending_status"] = "pending_governed_approval"
                 return improvement_action  # Return the action for the external orchestrator/approval flow
 
             else:

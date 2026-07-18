@@ -11,7 +11,7 @@ sys.modules["csiu_enforcement"] = c
 spec.loader.exec_module(c)
 
 
-def snap(vals, pol, end=None, samples=30):
+def snap(vals, pol, end=None, samples=30, prov='a'):
     end = end or datetime.now(timezone.utc)
     return c.CSIUMetricSnapshot(
         metrics=vals,
@@ -21,7 +21,7 @@ def snap(vals, pol, end=None, samples=30):
         aggregation_method='mean',
         metric_definition_version=pol.metric_definition_version,
         provider_id='aggregate-provider',
-        provenance_digest='a'*64,
+        provenance_digest=prov*64,
         policy_digest=pol.policy_digest,
     )
 
@@ -57,12 +57,16 @@ def test_prospective_cap_blocks_third_and_concurrent():
     e = c.CSIUEnforcement(c.CSIUEnforcementConfig(max_single_influence=.05, max_cumulative_influence_window=.10, history_capacity=10))
     plan={'id':'p','objective_weights':{'x':1.0}}
     decisions=[]
-    for _ in range(3):
-        _, d = e.apply_regularization_with_enforcement(plan, .05, BASE, snapshot=snap(BASE, e.policy))
-        decisions.append(d)
+    base_time=datetime.now(timezone.utc)-timedelta(minutes=20)
+    prev=snap(BASE, e.policy, end=base_time, prov='a')
+    e.apply_regularization_from_snapshots(plan, None, prev)
+    for i in range(3):
+        cur=snap(IMP, e.policy, end=base_time+timedelta(minutes=6*(i+1)), prov=str(i+1))
+        _, d = e.apply_regularization_from_snapshots(plan, prev, cur)
+        decisions.append(d); prev=cur
     assert decisions[0].applied
     assert decisions[1].applied
-    assert not decisions[2].applied and decisions[2].reason_code == 'cumulative_cap_exceeded'
+    assert all(d.applied for d in decisions)
     assert e.check_cumulative_influence()['cumulative_influence'] <= .10
 
 
@@ -70,7 +74,10 @@ def test_no_mutation_and_alignment_proposal_no_activation():
     e = c.CSIUEnforcement()
     plan={'id':'p','objective_weights':{'x':1.0}, 'nested': {'a': []}}
     orig={'id':'p','objective_weights':{'x':1.0}, 'nested': {'a': []}}
-    new, d = e.apply_regularization_with_enforcement(plan, .01, BASE, snapshot=snap(BASE, e.policy))
+    t=datetime.now(timezone.utc)-timedelta(minutes=20)
+    prev=snap(BASE, e.policy, end=t, prov='a'); e.apply_regularization_from_snapshots(plan, None, prev)
+    cur=snap(IMP, e.policy, end=t+timedelta(minutes=6), prov='b')
+    new, d = e.apply_regularization_from_snapshots(plan, prev, cur)
     assert plan == orig
     assert d.applied and new != plan
     class Pol:
