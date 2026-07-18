@@ -1070,18 +1070,11 @@ class SelfImprovementDrive:
         self._metrics_cache: Dict[str, Any] = {}
 
         # CSIU: Initialize enforcer with kill switches from environment
+        # Production composition injects the one canonical CSIU owner. Legacy direct
+        # construction must not create a second global enforcer.
         self._csiu_enforcer = csiu_enforcer
-        if self._csiu_enforcer is None and get_csiu_enforcer is not None and self._csiu_enabled:
-            enforcer_config = CSIUEnforcementConfig(
-                global_enabled=self._csiu_enabled,
-                calculation_enabled=self._csiu_calc_enabled,
-                regularization_enabled=self._csiu_regs_enabled,
-                history_tracking_enabled=self._csiu_hist_enabled,
-                durable_accounting_required=bool(self.config.get("constraints", {}).get("csiu_durable_accounting_required", False)),
-                durable_store_path=self.config.get("constraints", {}).get("csiu_durable_store_path"),
-            )
-            self._csiu_enforcer = get_csiu_enforcer(enforcer_config)
-            logger.info("CSIU enforcement module initialized with safety controls")
+        if self._csiu_enforcer is None and self._csiu_enabled:
+            logger.warning("SelfImprovementDrive constructed without canonical CSIU owner; governed installation disabled")
 
         # Load or initialize state
         self.state = self._load_state()
@@ -2676,7 +2669,15 @@ class SelfImprovementDrive:
         - Executing dry-run if configured
         - Validating changes
         """
-        # Find objective config
+        if getattr(self, "candidate_provider", None) is None or getattr(self, "transaction", None) is None:
+            return {
+                "status": "candidate_generation_unavailable",
+                "reason": "no approved canonical candidate provider/release configured",
+                "_drive_metadata": {"objective_type": objective.type, "timestamp": time.time()},
+            }
+        return self._generate_governed_proposal(objective)
+
+        # unreachable legacy map retained only for documentation compatibility
         obj_config = next(
             (
                 obj
@@ -2789,6 +2790,19 @@ class SelfImprovementDrive:
         action["risk_classification"] = risk_class
 
         return action
+
+    def _generate_governed_proposal(self, objective: ImprovementObjective) -> Dict[str, Any]:
+        """Build a typed governed proposal through the injected provider port."""
+        policy = getattr(self, "governed_policy", None) or getattr(self, "_governed_policy", None)
+        provider = getattr(self, "candidate_provider", None)
+        if policy is None or provider is None or inspect_repository is None or ImprovementProposal is None:
+            return {"status": "candidate_generation_unavailable", "reason": "canonical generator not configured"}
+        snapshot = inspect_repository(policy.repo_root, policy.permitted_path_globs)
+        candidate = provider.generate_candidate(objective.type, snapshot, policy)
+        proposal = ImprovementProposal.from_mapping(candidate) if isinstance(candidate, dict) else candidate
+        self._last_inspection_snapshot = snapshot
+        self._last_governed_proposal = proposal
+        return {"status": "proposal_pending_approval", "governed_proposal": proposal.__dict__.copy(), "proposal_digest": proposal.digest(), "objective_type": objective.type}
 
     def _get_safety_constraints(self) -> Dict[str, Any]:
         """Get safety constraints from config, robust to nested/flat shapes."""
@@ -3428,69 +3442,14 @@ class SelfImprovementDrive:
     def _perform_improvement(
         self, action: Dict[str, Any]
     ) -> Tuple[bool, Dict[str, Any]]:
-        """
-        Alias for _execute_improvement to pass test_6
-        """
-        logger.warning(
-            "Using deprecated alias _perform_improvement. Use _execute_improvement."
-        )
-        return self._execute_improvement(action)
+        """Legacy self-improvement mutation/Git bypass permanently disabled."""
+        raise RuntimeError("legacy self-improvement mutation/Git route disabled; use canonical governed transaction owner")
 
     def _execute_improvement(
         self, action: Dict[str, Any]
     ) -> Tuple[bool, Dict[str, Any]]:
-        """
-        Executes the improvement action using LLM-driven code generation, AST validation, and Git integration.
-        """
-        objective_type = action.get("_drive_metadata", {}).get("objective_type")
-        logger.info(f"EXECUTING IMPROVEMENT for: {objective_type}")
-
-        try:
-            # 1. Generate Solution Content (LLM + Diff)
-            solution_content, file_path = self._generate_solution_content(action)
-            if not solution_content or not file_path:
-                return False, {
-                    "status": "failed",
-                    "error": "LLM failed to generate valid solution content",
-                }
-
-            # 2. AST / Syntax Validation
-            if file_path.endswith(".py"):
-                valid_syntax, syntax_error = self._validate_python_syntax(
-                    solution_content
-                )
-                if not valid_syntax:
-                    logger.error(f"Generated code has syntax errors: {syntax_error}")
-                    return False, {
-                        "status": "failed",
-                        "error": f"Syntax error: {syntax_error}",
-                    }
-
-            # 3. File Application (I/O)
-            changes_applied, diff_summary = self._apply_file_modification(
-                file_path, solution_content
-            )
-            if not changes_applied:
-                return False, {
-                    "status": "failed",
-                    "error": "Failed to apply file changes",
-                }
-
-            # 4. Git Integration (Commit)
-            commit_hash = self._commit_to_version_control(file_path, objective_type)
-
-            return True, {
-                "status": "success",
-                "objective_type": objective_type,
-                "changes_applied": diff_summary,
-                "commit_hash": commit_hash,
-                "cost_usd": 0.05,  # Estimated cost for this operation
-                "tokens_used": 1500,  # Estimated tokens
-            }
-
-        except Exception as e:
-            logger.error(f"Execution failed: {e}", exc_info=True)
-            return False, {"status": "failed", "error": str(e)}
+        """Legacy self-improvement mutation/Git bypass permanently disabled."""
+        raise RuntimeError("legacy self-improvement mutation/Git route disabled; use canonical governed transaction owner")
 
     def _generate_solution_content(
         self, action: Dict[str, Any]
@@ -3971,174 +3930,16 @@ except ImportError:
     def _apply_file_modification(
         self, file_path: str, new_content: str
     ) -> Tuple[bool, str]:
-        """Writes the new content to disk and calculates a diff."""
-        try:
-            path = Path(file_path)
-            path.parent.mkdir(parents=True, exist_ok=True)
-
-            old_content = ""
-            if path.exists():
-                with open(path, "r", encoding="utf-8") as f:
-                    old_content = f.read()
-
-            # Calculate Diff
-            diff = difflib.unified_diff(
-                old_content.splitlines(),
-                new_content.splitlines(),
-                fromfile=f"a/{file_path}",
-                tofile=f"b/{file_path}",
-                lineterm="",
-            )
-            diff_text = "\n".join(list(diff))
-
-            # Write New Content
-            with open(path, "w", encoding="utf-8") as f:
-                f.write(new_content)
-
-            return True, diff_text if diff_text else "New file created"
-
-        except Exception as e:
-            logger.error(f"File I/O failed for {file_path}: {e}")
-            return False, ""
+        """Legacy self-improvement mutation/Git bypass permanently disabled."""
+        raise RuntimeError("legacy self-improvement mutation/Git route disabled; use canonical governed transaction owner")
 
     def _push_to_remote(self) -> bool:
-        """
-        Push committed changes to remote repository.
-        
-        This method enables Git persistence for self-improvement fixes, preventing
-        the "Groundhog Day" loop where fixes are lost on container restart.
-        
-        WARNING: This is DISABLED by default for Railway deployments to prevent
-        unintended changes being pushed to the repository. Only enable this if
-        you have proper review processes in place.
-        
-        Requires:
-        - VULCAN_GIT_PUSH_ENABLED=1 environment variable (default: disabled)
-        - Git credentials configured (via SSH key, token, or credential helper)
-        
-        Returns:
-            True if push succeeded, False otherwise
-        """
-        # Check if git push is enabled via environment variable
-        # DEFAULT: DISABLED - to prevent Railway deployments from pushing changes
-        if os.getenv("VULCAN_GIT_PUSH_ENABLED", "0") != "1":
-            logger.debug(
-                "Git push disabled by default (Railway-safe). "
-                "Set VULCAN_GIT_PUSH_ENABLED=1 to enable (not recommended for production)"
-            )
-            return False
-        
-        try:
-            if get_safe_executor is not None:
-                executor = get_safe_executor()
-                push_result = executor.execute_safe(
-                    ["git", "push"], timeout=60
-                )
-                if push_result.success:
-                    logger.info("✅ Self-improvement changes pushed to remote repository")
-                    return True
-                else:
-                    logger.warning(f"Git push failed: {push_result.stderr}")
-                    return False
-            else:
-                # nosec B603, B607: subprocess call is safe - using list arguments
-                # with hardcoded 'git' command, no shell=True, no user input
-                result = subprocess.run(  # nosec B603 B607
-                    ["git", "push"], capture_output=True, text=True, timeout=60
-                )
-                if result.returncode == 0:
-                    logger.info("✅ Self-improvement changes pushed to remote repository")
-                    return True
-                else:
-                    logger.warning(f"Git push failed: {result.stderr}")
-                    return False
-        except subprocess.TimeoutExpired:
-            logger.warning("Git push timed out after 60 seconds")
-            return False
-        except Exception as e:
-            logger.warning(f"Git push failed: {e}")
-            return False
+        """Legacy self-improvement mutation/Git bypass permanently disabled."""
+        raise RuntimeError("legacy self-improvement mutation/Git route disabled; use canonical governed transaction owner")
 
     def _commit_to_version_control(self, file_path: str, message: str) -> str:
-        """
-        Stages, commits, and optionally pushes changes using git.
-        
-        NOTE: Git push is DISABLED by default for Railway deployments. Changes are
-        committed locally only. To enable push (not recommended for production without
-        proper review), set VULCAN_GIT_PUSH_ENABLED=1.
-        
-        Without git push, fixes applied by the self-improvement system will be lost when
-        the container restarts. This is intentional for Railway deployment to prevent
-        unintended changes to the repository.
-        """
-        try:
-            # Use safe executor if available, otherwise fallback to direct subprocess
-            if get_safe_executor is not None:
-                executor = get_safe_executor()
-
-                # Stage
-                stage_result = executor.execute_safe(
-                    ["git", "add", file_path], timeout=30
-                )
-                if not stage_result.success:
-                    logger.warning(f"Git add failed: {stage_result.error}")
-                    return "git_failed"
-
-                # Commit
-                commit_msg = f"vulcan(auto): {message}"
-                commit_result = executor.execute_safe(
-                    ["git", "commit", "-m", commit_msg], timeout=30
-                )
-
-                if commit_result.success:
-                    # Try to push changes to persist them (prevents "Groundhog Day" loop)
-                    self._push_to_remote()
-                    
-                    # Try to get short hash
-                    hash_result = executor.execute_safe(
-                        ["git", "rev-parse", "--short", "HEAD"], timeout=10
-                    )
-                    if hash_result.success:
-                        return hash_result.stdout.strip()
-                    return "unknown_hash"
-                else:
-                    logger.warning(
-                        f"Git commit returned non-zero: {commit_result.stderr}"
-                    )
-                    return "unknown_hash"
-            else:
-                # Fallback to direct subprocess (already safe - using list args, not shell=True)
-                # nosec B603, B607: subprocess call is safe - using list arguments
-                # with hardcoded 'git' command, file_path is internal path
-                subprocess.run(  # nosec B603 B607
-                    ["git", "add", file_path], check=True, capture_output=True
-                )
-
-                commit_msg = f"vulcan(auto): {message}"
-                # nosec B603, B607: subprocess call is safe - using list arguments
-                result = subprocess.run(  # nosec B603 B607
-                    ["git", "commit", "-m", commit_msg], capture_output=True, text=True
-                )
-
-                if result.returncode == 0:
-                    # Try to push changes to persist them (prevents "Groundhog Day" loop)
-                    self._push_to_remote()
-                    
-                    # nosec B603, B607: subprocess call is safe - using list arguments
-                    # with hardcoded 'git' command, no user input
-                    hash_proc = subprocess.run(  # nosec B603 B607
-                        ["git", "rev-parse", "--short", "HEAD"],
-                        capture_output=True,
-                        text=True,
-                    )
-                    return hash_proc.stdout.strip()
-                else:
-                    logger.warning(f"Git commit returned non-zero: {result.stderr}")
-                    return "unknown_hash"
-
-        except Exception as e:
-            logger.warning(f"Git operation failed (is this a repo?): {e}")
-            return "git_failed"
+        """Legacy self-improvement mutation/Git bypass permanently disabled."""
+        raise RuntimeError("legacy self-improvement mutation/Git route disabled; use canonical governed transaction owner")
 
     # ==========================================================================
     # PRIORITY 1: Safe Execution Module Integration
@@ -4183,116 +3984,8 @@ except ImportError:
         return Path.cwd()
 
     def apply_improvement(self, objective_type: str, changes: Dict[str, Any]) -> bool:
-        """
-        Apply improvement with SAFE EXECUTION.
-        
-        This method integrates safe execution and policy gates to ensure
-        improvements are applied safely and can be rolled back if tests fail.
-        
-        IMPORTANT: This method applies changes LOCALLY only. Changes are NOT
-        automatically pushed to GitHub. To enable git push (not recommended
-        for Railway deployment), set VULCAN_GIT_PUSH_ENABLED=1.
-        
-        Args:
-            objective_type: Type of improvement being applied
-            changes: Dictionary containing:
-                - file_path: Path to the file being modified
-                - new_content: New content for the file
-                - type: Type of change (e.g., "code_modification")
-                
-        Returns:
-            True if improvement was safely applied, False otherwise
-        """
-        # Check if auto-apply is disabled via environment variable
-        # Default: disabled to prevent unintended modifications in production (e.g., Railway)
-        if os.getenv("VULCAN_AUTO_APPLY_DISABLED", "1") == "1":
-            logger.info(
-                f"Auto-apply disabled (VULCAN_AUTO_APPLY_DISABLED=1). "
-                f"Skipping improvement for {objective_type}"
-            )
-            return False
-
-        # STEP 1: Validate target file exists
-        target_file = Path(changes.get("file_path", ""))
-        if not target_file.is_absolute():
-            target_file = self.repo_root / target_file
-        
-        if not target_file.exists():
-            logger.error(f"Target file does not exist: {target_file}")
-            return False
-        
-        # STEP 2: Run policy gates if enabled
-        if self.policy and getattr(self.policy, 'enabled', False):
-            files = [str(target_file)]
-            
-            # Check files against policy
-            check_result = check_files_against_policy(files, self.policy)
-            if hasattr(check_result, 'ok') and not check_result.ok:
-                reasons = getattr(check_result, 'reasons', ['Policy violation'])
-                logger.error(f"Policy violation: {reasons}")
-                return False
-            elif isinstance(check_result, tuple) and not check_result[0]:
-                logger.error(f"Policy violation: {check_result[1]}")
-                return False
-            
-            # Run gates
-            gates_report = run_gates(self.policy)
-            if hasattr(gates_report, 'ok') and not gates_report.ok:
-                failures = getattr(gates_report, 'failures', ['Gate failed'])
-                logger.error(f"Gate failures: {failures}")
-                return False
-            elif isinstance(gates_report, tuple) and not gates_report[0]:
-                logger.error(f"Gate failures: {gates_report[1]}")
-                return False
-        
-        # STEP 3: Apply changes using safe executor
-        if changes.get("type") == "code_modification":
-            # Create a robust temporary file path using tempfile
-            temp_dir = target_file.parent
-            temp_fd, temp_path = tempfile.mkstemp(
-                suffix=".tmp", 
-                prefix=f"{target_file.stem}_",
-                dir=temp_dir
-            )
-            temp_file = Path(temp_path)
-            
-            try:
-                # Write content to temp file
-                os.close(temp_fd)  # Close the file descriptor from mkstemp
-                temp_file.write_text(changes["new_content"])
-                
-                # Run tests on modified code using safe executor
-                if self.safe_executor:
-                    # Run tests specific to the modified file if possible
-                    test_result = self.safe_executor.execute_safe(
-                        ["python", "-m", "pytest", str(target_file.parent), "-v", "-x", "--tb=short"],
-                        timeout=30
-                    )
-                    
-                    if test_result.success:
-                        # Move temp to actual
-                        shutil.move(str(temp_file), str(target_file))
-                        logger.info(f"✅ Safely applied changes to {target_file}")
-                        return True
-                    else:
-                        # Clean up temp file
-                        if temp_file.exists():
-                            temp_file.unlink()
-                        logger.error(f"Tests failed: {test_result.stderr}")
-                        return False
-                else:
-                    # No safe executor available - apply without testing
-                    logger.warning("Safe executor not available, applying without test validation")
-                    shutil.move(str(temp_file), str(target_file))
-                    return True
-                    
-            except Exception as e:
-                # Clean up temp file on error
-                if temp_file.exists():
-                    temp_file.unlink()
-                logger.error(f"Error applying improvement: {e}")
-                return False
-        
+        """Legacy direct source installation route permanently disabled."""
+        logger.warning("legacy apply_improvement disabled; use canonical governed transaction owner")
         return False
 
     # ==========================================================================
@@ -4647,3 +4340,21 @@ def compose_self_improvement_drive(*, world_model: Any = None, config_path: Any 
     responsibility.
     """
     return SelfImprovementDrive(world_model=world_model, config_path=config_path, state_path=state_path, alert_callback=alert_callback, approval_checker=approval_checker, csiu_enforcer=csiu_enforcer, improvement_policy=improvement_policy, approval_store=approval_store, approval_verifier=approval_verifier, audit_owner=audit_owner, owns_csiu_enforcer=(csiu_enforcer is None), owns_approval_store=False, owns_audit_owner=False)
+
+# Permanent production fail-closed shims for legacy mutation/Git bypass APIs.
+def _disabled_legacy_mutation_route(*args: Any, **kwargs: Any) -> Any:
+    raise RuntimeError(
+        "legacy self-improvement mutation/Git route disabled; "
+        "use the canonical GovernedSelfImprovementTransaction owner"
+    )
+
+def _disabled_legacy_apply(self: SelfImprovementDrive, objective_type: str, changes: Dict[str, Any]) -> bool:
+    logger.warning("legacy apply_improvement disabled; use canonical governed transaction owner")
+    return False
+
+SelfImprovementDrive._perform_improvement = _disabled_legacy_mutation_route
+SelfImprovementDrive._execute_improvement = _disabled_legacy_mutation_route
+SelfImprovementDrive._apply_file_modification = _disabled_legacy_mutation_route
+SelfImprovementDrive._commit_to_version_control = _disabled_legacy_mutation_route
+SelfImprovementDrive._push_to_remote = _disabled_legacy_mutation_route
+SelfImprovementDrive.apply_improvement = _disabled_legacy_apply

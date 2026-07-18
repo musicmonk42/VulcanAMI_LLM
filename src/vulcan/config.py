@@ -28,7 +28,17 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
-import yaml
+try:
+    import yaml
+except ImportError:  # pragma: no cover - dependency-light runtime smoke
+    class _YamlFallback:
+        @staticmethod
+        def safe_load(stream):
+            data = stream.read() if hasattr(stream, "read") else stream
+            if isinstance(data, bytes):
+                data = data.decode("utf-8")
+            return json.loads(data)
+    yaml = _YamlFallback()
 
 # Try to import validation libraries
 try:
