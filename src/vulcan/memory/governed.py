@@ -185,6 +185,7 @@ class SQLiteMemoryRepository:
             CREATE TABLE IF NOT EXISTS memory_heads(record_id TEXT PRIMARY KEY,tenant_id TEXT NOT NULL,subject_id TEXT NOT NULL,purpose TEXT NOT NULL,namespace TEXT NOT NULL,key_name TEXT NOT NULL,current_revision INTEGER NOT NULL,current_lifecycle TEXT NOT NULL CHECK(current_lifecycle IN ('active','tombstoned','purged')),deletion_epoch INTEGER NOT NULL,UNIQUE(tenant_id,subject_id,purpose,namespace,key_name),FOREIGN KEY(record_id,current_revision) REFERENCES memory_revisions(record_id,revision));
             CREATE TABLE IF NOT EXISTS memory_idempotency(tenant_id TEXT NOT NULL,subject_id TEXT NOT NULL,idempotency_key TEXT NOT NULL,operation TEXT NOT NULL,request_digest TEXT NOT NULL,record_id TEXT,PRIMARY KEY(tenant_id,subject_id,idempotency_key));
             CREATE TABLE IF NOT EXISTS memory_journal(sequence INTEGER PRIMARY KEY AUTOINCREMENT,operation TEXT NOT NULL,record_id TEXT NOT NULL,revision INTEGER NOT NULL,tenant_id TEXT NOT NULL,subject_id TEXT NOT NULL,request_digest TEXT NOT NULL,committed_at TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS memory_audit_outbox(operation_id TEXT PRIMARY KEY,event_type TEXT NOT NULL,operation TEXT NOT NULL,record_id TEXT NOT NULL,revision INTEGER NOT NULL,tenant_id TEXT NOT NULL,subject_id TEXT NOT NULL,purpose TEXT NOT NULL,namespace TEXT NOT NULL,key_name TEXT NOT NULL,prior_record_digest TEXT,new_record_digest TEXT NOT NULL,deletion_epoch INTEGER NOT NULL,request_digest TEXT NOT NULL,audit_complete INTEGER NOT NULL DEFAULT 0);
             """)
             versions=self._db.execute("SELECT version FROM memory_schema").fetchall()
             if not versions: self._db.execute("INSERT INTO memory_schema VALUES(?)",(SCHEMA_VERSION,))
@@ -199,6 +200,7 @@ class SQLiteMemoryRepository:
                 "memory_heads":{"record_id","tenant_id","subject_id","purpose","namespace","key_name","current_revision","current_lifecycle","deletion_epoch"},
                 "memory_idempotency":{"tenant_id","subject_id","idempotency_key","operation","request_digest","record_id"},
                 "memory_journal":{"sequence","operation","record_id","revision","tenant_id","subject_id","request_digest","committed_at"},
+                "memory_audit_outbox":{"operation_id","event_type","operation","record_id","revision","tenant_id","subject_id","purpose","namespace","key_name","prior_record_digest","new_record_digest","deletion_epoch","request_digest","audit_complete"},
             }
             tables={r[0] for r in self._db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")}
             if tables != set(expected): raise RuntimeError("memory schema table verification failed")
@@ -232,7 +234,7 @@ class SQLiteMemoryRepository:
                     if r[14]==prev_epoch+1 and r[10] not in (MemoryLifecycle.TOMBSTONED.value, MemoryLifecycle.PURGED.value): raise RuntimeError("memory deletion epoch changed outside deletion")
                     prev_epoch=r[14]
             heads=self._db.execute("SELECT record_id,tenant_id,subject_id,purpose,namespace,key_name,current_revision,current_lifecycle,deletion_epoch FROM memory_heads").fetchall()
-            if len(heads)!=len(groups): raise RuntimeError("memory head/history mismatch fails closed")
+            if len(heads)>len(groups): raise RuntimeError("memory head/history mismatch fails closed")
             for h in heads:
                 rs=groups.get(h[0]);
                 if not rs: raise RuntimeError("memory head orphan fails closed")
@@ -241,6 +243,9 @@ class SQLiteMemoryRepository:
                 if (h[1],h[2],h[3],h[4],h[6],h[7],h[8]) != (last[2],last[3],last[5],last[6],last[1],last[10],last[14]) or not head_key_ok: raise RuntimeError("memory head not latest fails closed")
             bad=self._db.execute("SELECT 1 FROM memory_idempotency i LEFT JOIN memory_revisions r ON i.record_id=r.record_id WHERE i.record_id IS NOT NULL AND r.record_id IS NULL LIMIT 1").fetchone()
             if bad: raise RuntimeError("memory idempotency orphan fails closed")
+            pending=self._db.execute("SELECT COUNT(*) FROM memory_audit_outbox WHERE audit_complete=0").fetchone()[0]
+            if pending and self._audit is None: raise RuntimeError("memory audit outbox pending without audit owner")
+            if pending: self.flush_outbox()
     def _record(self,row):
         data=list(row); data[9]=MemoryKind(data[9]); data[10]=MemoryLifecycle(data[10]); return MemoryRecord(*data)
     def _decision(self,op,actor,proposal=None): return self._policy.decide(op,actor,proposal)
@@ -249,6 +254,8 @@ class SQLiteMemoryRepository:
         row=self._db.execute("SELECT operation,request_digest,record_id FROM memory_idempotency WHERE tenant_id=? AND subject_id=? AND idempotency_key=?",(actor.tenant_id,actor.subject_id,key)).fetchone()
         if not row:return None
         if row[0]!=op.value or row[1]!=digest:return MemoryCommitResult(MemoryReason.IDEMPOTENCY_CONFLICT)
+        pending=self._db.execute("SELECT 1 FROM memory_audit_outbox WHERE operation_id=? AND audit_complete=0",(digest,)).fetchone()
+        if pending: self._db.execute("COMMIT"); self.flush_outbox(); self._db.execute("BEGIN IMMEDIATE")
         return self._current(actor,row[2]) if row[2] else MemoryCommitResult(MemoryReason.COMMITTED)
     def _current(self,actor,record_id):
         row=self._db.execute("SELECT r.record_id,r.revision,r.tenant_id,r.subject_id,r.actor_id,r.purpose,r.namespace,r.key_name,r.value,r.kind,r.lifecycle,r.policy_version,r.created_at,r.expires_at,r.deletion_epoch,r.digest,r.supersedes FROM memory_heads h JOIN memory_revisions r ON r.record_id=h.record_id AND r.revision=h.current_revision WHERE h.record_id=? AND h.tenant_id=? AND h.subject_id=? AND h.purpose=?",(record_id,actor.tenant_id,actor.subject_id,actor.purpose)).fetchone()
@@ -256,11 +263,32 @@ class SQLiteMemoryRepository:
     def _insert_revision(self,data):
         self._db.execute("INSERT INTO memory_revisions VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",tuple(data[k] for k in ("record_id","revision","tenant_id","subject_id","actor_id","purpose","namespace","key","value","kind","lifecycle","policy_version","created_at","expires_at","deletion_epoch","digest","supersedes")))
     def _journal(self,op,data,digest): self._db.execute("INSERT INTO memory_journal(operation,record_id,revision,tenant_id,subject_id,request_digest,committed_at) VALUES(?,?,?,?,?,?,?)",(op.value,data["record_id"],data["revision"],data["tenant_id"],data["subject_id"],digest,_time(self._clock)))
-    def _audit_event(self,event_type,actor,op,proposal=None,record=None,prior_digest=None,new_digest=None,deletion_epoch=0):
-        if not self._audit: return
+    def _audit_payload(self,event_type,op,row):
         h=lambda x: hashlib.sha256(str(x).encode()).hexdigest()[:32]
-        payload={"operation_type":op.value,"tenant_digest":h(actor.tenant_id),"subject_digest":h(actor.subject_id),"purpose":actor.purpose,"namespace":proposal.namespace if proposal else (record.namespace if record else "profile"),"key":proposal.key if proposal else (record.key if record else "unknown"),"record_id":record.record_id if record else "pending","revision":record.revision if record else 0,"prior_record_digest":prior_digest,"new_record_digest":new_digest,"policy_identity":self._policy.version,"policy_revision":self._policy.version,"deletion_epoch":deletion_epoch,"result_category":event_type.rsplit("_",1)[-1]}
-        self._audit.append(event_type,payload)
+        return {"operation_id":row[0],"operation_type":op,"tenant_digest":h(row[5]),"subject_digest":h(row[6]),"purpose":row[7],"namespace":row[8],"key":row[9],"record_id":row[3],"revision":row[4],"prior_record_digest":row[10],"new_record_digest":row[11],"policy_identity":self._policy.version,"policy_revision":self._policy.version,"deletion_epoch":row[12],"result_category":event_type.rsplit("_",1)[-1]}
+    def _audit_event(self,*a,**k): return None
+    def _outbox(self,event_type,op,data,digest,prior=None):
+        self._db.execute("INSERT OR IGNORE INTO memory_audit_outbox VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)",(digest,event_type,op.value,data["record_id"],data["revision"],data["tenant_id"],data["subject_id"],data["purpose"],data["namespace"],data["key"],prior,data["digest"],data["deletion_epoch"],digest))
+    def flush_outbox(self):
+        with self._lock:
+            rows=self._db.execute("SELECT operation_id,event_type,operation,record_id,revision,tenant_id,subject_id,purpose,namespace,key_name,prior_record_digest,new_record_digest,deletion_epoch,request_digest,audit_complete FROM memory_audit_outbox WHERE audit_complete=0 ORDER BY rowid").fetchall()
+            for row in rows:
+                if self._audit is not None:
+                    payload=self._audit_payload(row[1], row[2], row)
+                    self._audit.append('memory.write_prepared', {**payload, 'result_category':'prepared'})
+                    self._audit.append(row[1], payload)
+                self._db.execute("BEGIN IMMEDIATE")
+                try:
+                    if row[2]=='create':
+                        exists=self._db.execute("SELECT 1 FROM memory_heads WHERE record_id=?",(row[3],)).fetchone()
+                        if not exists: self._db.execute("INSERT INTO memory_heads SELECT record_id,tenant_id,subject_id,purpose,namespace,key_name,revision,lifecycle,deletion_epoch FROM memory_revisions WHERE record_id=? AND revision=?",(row[3],row[4]))
+                    else:
+                        self._db.execute("UPDATE memory_heads SET current_revision=?,current_lifecycle=(SELECT lifecycle FROM memory_revisions WHERE record_id=? AND revision=?),deletion_epoch=? WHERE record_id=?",(row[4],row[3],row[4],row[12],row[3]))
+                    self._db.execute("UPDATE memory_audit_outbox SET audit_complete=1 WHERE operation_id=?",(row[0],)); self._db.execute("COMMIT")
+                except Exception:
+                    try: self._db.execute("ROLLBACK")
+                    except Exception: pass
+                    raise
     def commit(self,actor,proposal):
         if self._decision(MemoryOperation.CREATE,actor,proposal).decision is PolicyDecision.REJECT:return MemoryCommitResult(MemoryReason.POLICY_REJECTED)
         digest=self._envelope(MemoryOperation.CREATE,actor,f"{proposal.namespace}:{proposal.key}",proposal)
@@ -274,7 +302,7 @@ class SQLiteMemoryRepository:
                 if exists and exists[1] in ("tombstoned","purged"):
                     self._db.execute("UPDATE memory_heads SET key_name=? WHERE record_id=?",(proposal.key+"#deleted"+str(exists[2]), exists[0]))
                 self._audit_event("memory.write_prepared", actor, MemoryOperation.CREATE, proposal, new_digest=digest)
-                now=_time(self._clock); rid="mem-"+uuid4().hex; data={"record_id":rid,"revision":1,"tenant_id":actor.tenant_id,"subject_id":actor.subject_id,"actor_id":actor.actor_id,"purpose":actor.purpose,"namespace":proposal.namespace,"key":proposal.key,"value":proposal.value,"kind":proposal.kind.value,"lifecycle":"active","policy_version":self._policy.version,"created_at":now,"expires_at":(datetime.fromisoformat(now.replace("Z","+00:00"))+self._policy.retention(actor,proposal)).isoformat().replace("+00:00","Z"),"deletion_epoch":0,"supersedes":None};data["digest"]=_digest(data);self._insert_revision(data);self._db.execute("INSERT INTO memory_heads VALUES(?,?,?,?,?,?,?,?,?)",(rid,actor.tenant_id,actor.subject_id,actor.purpose,proposal.namespace,proposal.key,1,"active",0));self._db.execute("INSERT INTO memory_idempotency VALUES(?,?,?,?,?,?)",(actor.tenant_id,actor.subject_id,proposal.idempotency_key,"create",digest,rid));self._journal(MemoryOperation.CREATE,data,digest);self._db.execute("COMMIT");rec=self._record(tuple(data[k] for k in ("record_id","revision","tenant_id","subject_id","actor_id","purpose","namespace","key","value","kind","lifecycle","policy_version","created_at","expires_at","deletion_epoch","digest","supersedes")));self._audit_event("memory.write_committed", actor, MemoryOperation.CREATE, proposal, rec, new_digest=rec.digest);return MemoryCommitResult(MemoryReason.COMMITTED,rec)
+                now=_time(self._clock); rid="mem-"+uuid4().hex; data={"record_id":rid,"revision":1,"tenant_id":actor.tenant_id,"subject_id":actor.subject_id,"actor_id":actor.actor_id,"purpose":actor.purpose,"namespace":proposal.namespace,"key":proposal.key,"value":proposal.value,"kind":proposal.kind.value,"lifecycle":"active","policy_version":self._policy.version,"created_at":now,"expires_at":(datetime.fromisoformat(now.replace("Z","+00:00"))+self._policy.retention(actor,proposal)).isoformat().replace("+00:00","Z"),"deletion_epoch":0,"supersedes":None};data["digest"]=_digest(data);self._insert_revision(data);self._outbox("memory.write_committed", MemoryOperation.CREATE, data, digest);self._db.execute("INSERT INTO memory_idempotency VALUES(?,?,?,?,?,?)",(actor.tenant_id,actor.subject_id,proposal.idempotency_key,"create",digest,rid));self._journal(MemoryOperation.CREATE,data,digest);self._db.execute("COMMIT");self.flush_outbox();rec=self._record(tuple(data[k] for k in ("record_id","revision","tenant_id","subject_id","actor_id","purpose","namespace","key","value","kind","lifecycle","policy_version","created_at","expires_at","deletion_epoch","digest","supersedes")));return MemoryCommitResult(MemoryReason.COMMITTED,rec)
             except Exception:
                 try: self._db.execute("ROLLBACK")
                 except Exception: pass
@@ -309,10 +337,9 @@ class SQLiteMemoryRepository:
                         rd={"record_id":rr[0],"revision":rr[1],"tenant_id":rr[2],"subject_id":rr[3],"actor_id":rr[4],"purpose":rr[5],"namespace":rr[6],"key":rr[7],"value":rr[8],"kind":rr[9],"lifecycle":rr[10],"policy_version":rr[11],"created_at":rr[12],"expires_at":rr[13],"deletion_epoch":rr[14],"supersedes":rr[15]}
                         self._db.execute("UPDATE memory_revisions SET digest=? WHERE record_id=? AND revision=?",(_digest(rd),rid,rr[1]))
                     data["value"]=None; data["digest"]=_digest(data)
-                self._db.execute("UPDATE memory_heads SET current_revision=?,current_lifecycle=?,deletion_epoch=? WHERE record_id=?",(base+1,lifecycle,deletion,rid));self._db.execute("INSERT INTO memory_idempotency VALUES(?,?,?,?,?,?)",(actor.tenant_id,actor.subject_id,key,op.value,digest,rid));self._journal(op,data,digest);self._db.execute("COMMIT")
+                self._outbox("memory.write_committed", op, data, digest, old.digest);self._db.execute("INSERT INTO memory_idempotency VALUES(?,?,?,?,?,?)",(actor.tenant_id,actor.subject_id,key,op.value,digest,rid));self._journal(op,data,digest);self._db.execute("COMMIT"); self.flush_outbox()
                 rec=self._record(tuple(data[k] for k in ("record_id","revision","tenant_id","subject_id","actor_id","purpose","namespace","key","value","kind","lifecycle","policy_version","created_at","expires_at","deletion_epoch","digest","supersedes")))
                 receipt=None if op is not MemoryOperation.FORGET else DeletionReceipt("del-"+uuid4().hex,DeletionState.COMPLETED,rid,base+1,deletion,self._policy.version,("sqlite_payloads","canonical_head"),("sqlite_payloads","canonical_head"))
-                self._audit_event("memory.write_committed", actor, op, proposal, rec, prior_digest=old.digest, new_digest=rec.digest, deletion_epoch=deletion)
                 return MemoryCommitResult(MemoryReason.COMMITTED,rec,False,receipt)
             except Exception:
                 try: self._db.execute("ROLLBACK")
