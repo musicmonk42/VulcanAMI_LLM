@@ -7,6 +7,7 @@ commits, pushes, evaluates plan callables, or executes model supplied commands.
 from __future__ import annotations
 
 import ast
+import fcntl
 import difflib
 import hashlib
 import json
@@ -137,7 +138,7 @@ class ImprovementProposal:
         return cls(**{k: vals[k] for k in cls.__dataclass_fields__})
 
     def digest(self) -> str:
-        data = {k: getattr(self, k) for k in sorted(self.__dataclass_fields__)}
+        data = {k: getattr(self, k) for k in sorted(self.__dataclass_fields__) if k != "approval_id"}
         return _sha256(json.dumps(data, sort_keys=True, separators=(",", ":")).encode())
 
 @dataclass(frozen=True)
@@ -195,9 +196,27 @@ class ApprovalStore:
             raise TransactionError("approval already exists")
         doc[record.approval_id] = record.__dict__.copy()
         _atomic_write(self.path, json.dumps(doc, sort_keys=True).encode(), 0o600)
+    def claim(self, approval_id: str, proposal_digest: str) -> ApprovalRecord:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        lock = self.path.with_suffix(self.path.suffix + ".lock")
+        fd = os.open(lock, os.O_CREAT|os.O_RDWR, 0o600)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX)
+            doc = json.loads(self.path.read_text(encoding="utf-8")) if self.path.exists() else {}
+            recd = doc.get(approval_id)
+            if not isinstance(recd, dict): raise TransactionError("approval not found")
+            rec = ApprovalRecord(**recd)
+            if rec.used or rec.state != "approved" or rec.proposal_digest != proposal_digest: raise TransactionError("approval already consumed or not claimable")
+            recd["state"] = "claimed"; doc[approval_id] = recd
+            _atomic_write(self.path, json.dumps(doc, sort_keys=True).encode(), 0o600)
+            return ApprovalRecord(**recd)
+        finally:
+            try: fcntl.flock(fd, fcntl.LOCK_UN)
+            finally: os.close(fd)
     def mark_used(self, approval_id: str) -> None:
         doc = json.loads(self.path.read_text(encoding="utf-8"))
-        doc[approval_id]["used"] = True
+        if doc[approval_id].get("used") or doc[approval_id].get("state") == "consumed": raise TransactionError("approval already consumed")
+        doc[approval_id]["used"] = True; doc[approval_id]["state"] = "consumed"
         _atomic_write(self.path, json.dumps(doc, sort_keys=True).encode(), 0o600)
 
 def _sha256(b: bytes) -> str:
@@ -343,8 +362,8 @@ class GovernedSelfImprovementTransaction:
     def _require_approval(self, policy: ImprovementPolicy, p: ImprovementProposal, pd: str) -> ApprovalRecord:
         if not policy.approval_required: return ApprovalRecord("not-required", pd, policy.digest, p.expected_original_sha256, "policy", time.time(), time.time()+1)
         if not self.approval_store or not p.approval_id: raise TransactionError("approval required")
-        rec = self.approval_store.load(p.approval_id)
-        if rec.used or rec.state != "approved" or rec.expires_at < time.time() or rec.proposal_digest != pd or rec.policy_digest != policy.digest or rec.original_source_digest != p.expected_original_sha256:
+        rec = self.approval_store.claim(p.approval_id, pd) if hasattr(self.approval_store, "claim") else self.approval_store.load(p.approval_id)
+        if rec.used or rec.state not in {"approved","claimed"} or rec.expires_at < time.time() or rec.proposal_digest != pd or rec.policy_digest != policy.digest or rec.original_source_digest != p.expected_original_sha256:
             raise TransactionError("approval binding invalid")
         return rec
     def _run_gate(self, gate: VerificationGate, repo: Path, policy: ImprovementPolicy) -> Dict[str, Any]:

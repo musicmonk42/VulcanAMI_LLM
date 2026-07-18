@@ -58,7 +58,7 @@ def test_prospective_cap_blocks_third_and_concurrent():
     plan={'id':'p','objective_weights':{'x':1.0}}
     decisions=[]
     for _ in range(3):
-        _, d = e.apply_regularization_with_enforcement(plan, .05, BASE)
+        _, d = e.apply_regularization_with_enforcement(plan, .05, BASE, snapshot=snap(BASE, e.policy))
         decisions.append(d)
     assert decisions[0].applied
     assert decisions[1].applied
@@ -70,7 +70,7 @@ def test_no_mutation_and_alignment_proposal_no_activation():
     e = c.CSIUEnforcement()
     plan={'id':'p','objective_weights':{'x':1.0}, 'nested': {'a': []}}
     orig={'id':'p','objective_weights':{'x':1.0}, 'nested': {'a': []}}
-    new, d = e.apply_regularization_with_enforcement(plan, .01, BASE)
+    new, d = e.apply_regularization_with_enforcement(plan, .01, BASE, snapshot=snap(BASE, e.policy))
     assert plan == orig
     assert d.applied and new != plan
     class Pol:

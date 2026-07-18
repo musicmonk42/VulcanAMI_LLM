@@ -1779,8 +1779,15 @@ class SelfImprovementDrive:
             self._csiu_audit_status("enforcer_unavailable")
             return original
         try:
+            snapshot = self._csiu_last_snapshot
+            if snapshot is None:
+                from datetime import datetime, timezone, timedelta
+                from vulcan.world_model.meta_reasoning.csiu_enforcement import CSIUMetricSnapshot, METRIC_ORDER
+                now = datetime.now(timezone.utc)
+                vals = {k: float(cur.get(k, 0.5)) if isinstance(cur, dict) and k in cur else 0.5 for k in METRIC_ORDER}
+                snapshot = CSIUMetricSnapshot(metrics=vals, window_start=(now-timedelta(minutes=5)).isoformat().replace("+00:00","Z"), window_end=now.isoformat().replace("+00:00","Z"), sample_count=30, aggregation_method="mean", metric_definition_version=self._csiu_enforcer.policy.metric_definition_version, provider_id="drive-aggregate", provenance_digest=("d"*64), policy_digest=self._csiu_enforcer.policy.policy_digest)
             regularized, decision = self._csiu_enforcer.apply_regularization_with_enforcement(
-                original, d, cur, plan_id=str(original.get("id", "unknown")), action_type=str(original.get("type", "improvement")), snapshot=self._csiu_last_snapshot
+                original, d, cur, plan_id=str(original.get("id", "unknown")), action_type=str(original.get("type", "improvement")), snapshot=snapshot
             )
             self._csiu_last_decision = decision
             self._csiu_audit_status("decision", decision_id=decision.decision_id, decision_digest=decision.decision_digest, reason_code=decision.reason_code, pressure=decision.pressure, actual_effect=decision.actual_effect, applied=decision.applied)
