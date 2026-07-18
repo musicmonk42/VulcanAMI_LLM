@@ -533,3 +533,14 @@ def pytest_sessionfinish(session, exitstatus):
     os.environ["PYTEST_CLEANUP_DONE"] = "1"
 
     print(f"[conftest] Test session finished with exit status {exitstatus}")
+
+# Dependency-light asyncio marker support when pytest-asyncio is unavailable.
+def pytest_pyfunc_call(pyfuncitem):
+    if pyfuncitem.get_closest_marker("asyncio") is not None:
+        import asyncio, inspect
+        testfunction = pyfuncitem.obj
+        if inspect.iscoroutinefunction(testfunction):
+            kwargs = {name: pyfuncitem.funcargs[name] for name in pyfuncitem._fixtureinfo.argnames}
+            asyncio.run(testfunction(**kwargs))
+            return True
+    return None

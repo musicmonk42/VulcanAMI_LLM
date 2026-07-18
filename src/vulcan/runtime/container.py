@@ -16,17 +16,24 @@ from .kernel import CognitiveKernel
 from .output import DeterministicLanguageOutput, LanguageOutputPort
 from .semantic import DeterministicLanguageInput, LanguageInputPort
 
-LanguageMode = Literal["disabled", "deterministic_only"]
+
+LanguageMode = Literal["disabled", "deterministic_only", "transformer_proposal"]
 
 
 @dataclass(frozen=True)
 class LanguageRuntimeConfig:
     """Closed deployment selection; local/provider modes are not yet selectable."""
     mode: LanguageMode = "deterministic_only"
+    release_path: str | None = None
+    provider_factory: Any = None
 
     def validated(self) -> "LanguageRuntimeConfig":
-        if self.mode not in {"disabled", "deterministic_only"}:
+        if self.mode not in {"disabled", "deterministic_only", "transformer_proposal"}:
             raise RuntimeError("unapproved language-interface mode")
+        if self.mode == "transformer_proposal":
+            from pathlib import Path
+            if not self.release_path or not Path(self.release_path).is_absolute():
+                raise RuntimeError("transformer mode requires an absolute approved release path")
         return self
 
 
@@ -119,6 +126,13 @@ class RuntimeContainer:
         if not callable(advertised):
             raise RuntimeError("canonical kernel does not expose its capabilities")
         result = advertised()
+        if self.language_config.mode == "transformer_proposal":
+            try:
+                meta = self.language_input.readiness()
+                abi = meta["runtime_abi"]
+                result = tuple(dict.fromkeys((*result, "verified-transformer-span", f"language-abi:{abi}")))
+            except Exception:
+                pass
         if not isinstance(result, tuple) or not all(isinstance(value, str) for value in result):
             raise RuntimeError("canonical kernel returned an invalid capability list")
         return result
@@ -133,11 +147,16 @@ class RuntimeContainer:
         if safety is None:
             raise RuntimeError("required safety finalization service is unavailable")
         config = (language_config or LanguageRuntimeConfig()).validated()
-        # Both supported modes intentionally construct only deterministic, no-model ports.
+        # Deterministic remains default/fallback; transformer mode is admitted only after strict release verification.
         language_input: LanguageInputPort = DeterministicLanguageInput()
+        if config.mode == "transformer_proposal":
+            if config.provider_factory is None:
+                raise RuntimeError("verified transformer release present but no safe provider factory is configured")
+            from vulcan.local_language import build_verified_adapter
+            language_input = build_verified_adapter(release_root=config.release_path or "", provider_factory=config.provider_factory)
         language_output: LanguageOutputPort = DeterministicLanguageOutput()
         memory = compose_governed_memory()
-        root = getattr(deployment, "runtime_root", None) or getattr(deployment, "data_dir", None) or "/tmp/vulcan-runtime"
+        root = getattr(deployment, "runtime_root", None) or getattr(deployment, "data_dir", None) or f"/tmp/vulcan-runtime-{uuid4().hex}"
         audit = alignment = domain_registry = None
         try:
             memory.readiness()
