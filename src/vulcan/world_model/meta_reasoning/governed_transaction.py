@@ -16,6 +16,7 @@ import subprocess
 import tempfile
 import time
 from dataclasses import dataclass, field
+from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
@@ -34,6 +35,22 @@ _DENY_PREFIXES = (
 )
 _DENY_NAMES = {".env", "auto_apply_policy.yaml"}
 _TERMINAL = {"applied", "rejected", "aborted", "verification_failed"}
+
+class TransactionStatus(str, Enum):
+    APPLIED_AND_VERIFIED = "applied_and_verified"
+    REJECTED_BEFORE_INSTALLATION = "rejected_before_installation"
+    VERIFICATION_FAILED_ROLLBACK_SUCCEEDED = "verification_failed_rollback_succeeded"
+    VERIFICATION_FAILED_ROLLBACK_FAILED = "verification_failed_rollback_failed"
+    EXTERNAL_MUTATION_PREVENTED_ROLLBACK = "external_mutation_prevented_rollback"
+
+    @property
+    def verified_success(self) -> bool:
+        return self is TransactionStatus.APPLIED_AND_VERIFIED
+
+    @property
+    def rollback_succeeded(self) -> bool:
+        return self is TransactionStatus.VERIFICATION_FAILED_ROLLBACK_SUCCEEDED
+
 
 class TransactionError(Exception):
     """Fail-closed transaction validation/application error."""
@@ -137,13 +154,25 @@ class ApprovalRecord:
 
 @dataclass
 class TransactionResult:
-    status: str
+    status: TransactionStatus | str
     state: str
     proposal_digest: str = ""
     target_path: str = ""
     failure_category: str = ""
     gate_results: List[Dict[str, Any]] = field(default_factory=list)
     rollback_digest: str = ""
+
+    def __post_init__(self) -> None:
+        if isinstance(self.status, str):
+            self.status = TransactionStatus(self.status)
+
+    @property
+    def verified_success(self) -> bool:
+        return self.status.verified_success
+
+    @property
+    def status_code(self) -> str:
+        return self.status.value
 
 class ApprovalStore:
     def __init__(self, path: Path):
@@ -157,6 +186,15 @@ class ApprovalStore:
         if not isinstance(rec, dict):
             raise TransactionError("approval not found")
         return ApprovalRecord(**rec)
+    def save(self, record: ApprovalRecord) -> None:
+        try:
+            doc = json.loads(self.path.read_text(encoding="utf-8")) if self.path.exists() else {}
+        except Exception as exc:
+            raise TransactionError("approval store unavailable or corrupt") from exc
+        if record.approval_id in doc:
+            raise TransactionError("approval already exists")
+        doc[record.approval_id] = record.__dict__.copy()
+        _atomic_write(self.path, json.dumps(doc, sort_keys=True).encode(), 0o600)
     def mark_used(self, approval_id: str) -> None:
         doc = json.loads(self.path.read_text(encoding="utf-8"))
         doc[approval_id]["used"] = True
@@ -278,13 +316,13 @@ class GovernedSelfImprovementTransaction:
             self._unresolved = False
             if self.approval_store and proposal.approval_id: self.approval_store.mark_used(proposal.approval_id)
             self._audit("improvement.applied", proposal, pd, actor, result_digest=proposal.candidate_sha256)
-            return TransactionResult("applied_and_verified", "applied", pd, proposal.target_path, gate_results=gate_results)
+            return TransactionResult(TransactionStatus.APPLIED_AND_VERIFIED, "applied", pd, proposal.target_path, gate_results=gate_results)
         except GateFailure as exc:
             return self._rollback(proposal, pd, target, original, safe_mode, exc.gate_results, str(exc))
         except Exception as exc:
             try: self._audit("improvement.aborted", proposal, pd, actor, failure_category=str(exc)[:200], state="aborted")
             except Exception: pass
-            return TransactionResult("rejected_before_installation", "rejected", pd, proposal.target_path, str(exc)[:200])
+            return TransactionResult(TransactionStatus.REJECTED_BEFORE_INSTALLATION, "rejected", pd, proposal.target_path, str(exc)[:200])
     def _validate(self, policy: ImprovementPolicy, p: ImprovementProposal, snapshot: InspectionSnapshot, target: Path) -> None:
         if p.schema_version != SCHEMA_VERSION: raise TransactionError("bad schema")
         if p.objective_type not in policy.permitted_objectives: raise TransactionError("unknown objective")
@@ -323,18 +361,18 @@ class GovernedSelfImprovementTransaction:
             if _sha256(target.read_bytes()) != p.candidate_sha256:
                 self._audit("improvement.manual_recovery_required", p, pd, "system", failure_category="external mutation prevented rollback")
                 self._unresolved = False
-                return TransactionResult("external_mutation_prevented_rollback", "verification_failed", pd, p.target_path, why, gate_results)
+                return TransactionResult(TransactionStatus.EXTERNAL_MUTATION_PREVENTED_ROLLBACK, "verification_failed", pd, p.target_path, why, gate_results)
             _atomic_write(target, original, mode)
             rd = _sha256(target.read_bytes())
             if rd != p.expected_original_sha256: raise TransactionError("rollback digest mismatch")
             self._audit("improvement.rollback_completed", p, pd, "system", rollback_digest=rd)
             self._unresolved = False
-            return TransactionResult("verification_failed_rollback_succeeded", "verification_failed", pd, p.target_path, why, gate_results, rd)
+            return TransactionResult(TransactionStatus.VERIFICATION_FAILED_ROLLBACK_SUCCEEDED, "verification_failed", pd, p.target_path, why, gate_results, rd)
         except Exception as exc:
             self._unresolved = False
             try: self._audit("improvement.manual_recovery_required", p, pd, "system", failure_category=str(exc)[:200])
             except Exception: pass
-            return TransactionResult("verification_failed_rollback_failed", "verification_failed", pd, p.target_path, str(exc)[:200], gate_results)
+            return TransactionResult(TransactionStatus.VERIFICATION_FAILED_ROLLBACK_FAILED, "verification_failed", pd, p.target_path, str(exc)[:200], gate_results)
     def _audit(self, event: str, p: ImprovementProposal, pd: str, actor: str, **meta: Any) -> None:
         if not self.audit: raise TransactionError("audit owner unavailable")
         payload = {"event": event, "proposal_digest": pd, "policy_digest": self.policy.digest if self.policy else "", "original_digest": p.expected_original_sha256, "candidate_digest": p.candidate_sha256, "target_path": p.target_path, "objective_type": p.objective_type, "actor": actor, "timestamp": time.time()}
