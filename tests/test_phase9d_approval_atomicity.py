@@ -1,6 +1,7 @@
 import hashlib,json,os,time,threading
 from pathlib import Path
 from vulcan.world_model.meta_reasoning.governed_transaction import *
+from vulcan.world_model.meta_reasoning.self_improvement_drive import SelfImprovementDrive
 
 def sha(s): return hashlib.sha256(s.encode()).hexdigest()
 class Audit:
@@ -36,3 +37,34 @@ def test_concurrent_claim_exactly_one(tmp_path, monkeypatch):
     ts=[threading.Thread(target=worker) for _ in range(2)]
     [t.start() for t in ts]; [t.join() for t in ts]
     assert res.count(TransactionStatus.APPLIED_AND_VERIFIED)==1
+
+def test_trusted_approval_principal_only_and_bound(tmp_path):
+    d=SelfImprovementDrive(config_path={"drives":{"self_improvement":{"enabled":True,"objectives":[{"type":"bugfix","weight":1.0}],"constraints":{},"triggers":[],"resource_limits":{}}}}, state_path=str(tmp_path/"s.json"))
+    d.approval_store=ApprovalStore(tmp_path/"approvals.json")
+    p_digest=sha("proposal"); pol_digest=sha("policy"); src_digest=sha("source"); aid="a"
+    d.state.pending_approvals.append({"approval_id":aid,"status":"pending_governed_approval","proposal_digest":p_digest,"policy_digest":pol_digest,"original_source_digest":src_digest})
+    bindings={"approval_id":aid,"proposal_digest":p_digest,"policy_digest":pol_digest,"original_source_digest":src_digest,"required_scope":"self_improvement.approve"}
+    issuer=ApprovalIssuer()
+    good=issuer.issue_principal("reviewer",("self_improvement.approve",),bindings=bindings,ttl_seconds=60)
+    d.approval_verifier=ClosedApprovalVerifier({good.principal_id:good})
+    assert not d.approve_governed_pending(aid,"reviewer")
+    assert not d.approve_governed_pending(aid,b"reviewer")
+    assert not d.approve_governed_pending(aid,{"principal_id":"reviewer"})
+    class Duck:
+        principal_id="reviewer"; scopes=("self_improvement.approve",); expires_at=time.time()+60
+    assert not d.approve_governed_pending(aid,Duck())
+    class Attacker:
+        def is_authorized(self,*a): return True
+    d.approval_verifier=Attacker()
+    assert not d.approve_governed_pending(aid,good)
+    d.approval_verifier=ClosedApprovalVerifier({good.principal_id:good})
+    wrong_scope=issuer.issue_principal("wrong",("other",),bindings=bindings,ttl_seconds=60)
+    d.approval_verifier=ClosedApprovalVerifier({"wrong":wrong_scope}); assert not d.approve_governed_pending(aid,wrong_scope)
+    expired=issuer.issue_principal("expired",("self_improvement.approve",),bindings=bindings,ttl_seconds=-1)
+    d.approval_verifier=ClosedApprovalVerifier({"expired":expired}); assert not d.approve_governed_pending(aid,expired)
+    altered=issuer.issue_principal("altered",("self_improvement.approve",),bindings={**bindings,"proposal_digest":sha("altered")},ttl_seconds=60)
+    d.approval_verifier=ClosedApprovalVerifier({"altered":altered}); assert not d.approve_governed_pending(aid,altered)
+    d.approval_verifier=ClosedApprovalVerifier({good.principal_id:good})
+    assert not any(hasattr(d.approval_verifier,n) for n in ("issue_principal","register_principal"))
+    assert not any(hasattr(d,n) for n in ("issue_principal","register_principal"))
+    assert d.approve_governed_pending(aid,good)

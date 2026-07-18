@@ -1,6 +1,6 @@
 """Dependency-light append-only canonical audit owner (vulcan-audit/1)."""
 from __future__ import annotations
-import copy, fcntl, hashlib, json, os, re, threading, unicodedata
+import copy, fcntl, hashlib, json, math, os, re, threading, unicodedata
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -33,7 +33,9 @@ def _bound(v, depth=0):
         if len(n)>MAX_STRING or any(ord(c)<32 for c in n): raise AuditError("invalid string")
         return n
     if type(v) in (int,bool) or v is None: return v
-    if isinstance(v,float): raise AuditError("non-finite number")
+    if isinstance(v,float):
+        if not math.isfinite(v): raise AuditError("non-finite number")
+        return v
     if isinstance(v,dict):
         if len(v)>MAX_ITEMS: raise AuditError("object bound")
         return { _bound(str(k),depth+1): _bound(val,depth+1) for k,val in sorted(v.items()) }

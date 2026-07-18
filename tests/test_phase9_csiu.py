@@ -82,7 +82,9 @@ def test_no_mutation_and_alignment_proposal_no_activation():
     assert d.applied and new != plan
     class Pol:
         policy_digest='b'*64; revision=3; policy_id='canonical-evidence-bound'
-    prop = e.propose_alignment_policy(Pol(), [snap(BASE, e.policy), snap(BAD, e.policy)])
+    e2 = c.CSIUEnforcement()
+    ats=[snap({**BASE,"G":0.20+i*0.03}, e2.policy, end=t+timedelta(minutes=i*6), prov=str(i)) for i in range(4)]
+    prop = e2.propose_alignment_policy(Pol(), ats)
     assert prop.active_alignment_digest == 'b'*64
     assert prop.approval_state == 'pending_review'
 

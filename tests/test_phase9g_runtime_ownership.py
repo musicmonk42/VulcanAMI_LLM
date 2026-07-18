@@ -8,7 +8,7 @@ from vulcan.world_model.meta_reasoning.csiu_enforcement import (
     CSIUEnforcement, CSIUEnforcementConfig, CSIUPolicy, CSIUMetricSnapshot, METRIC_ORDER, CSIUValidationError
 )
 from vulcan.world_model.meta_reasoning.self_improvement_drive import SelfImprovementDrive
-from vulcan.world_model.meta_reasoning.governed_transaction import ClosedApprovalAuthority, ApprovalRecord, ApprovalStore, TransactionError
+from vulcan.world_model.meta_reasoning.governed_transaction import ClosedApprovalAuthority, ApprovalIssuer, ApprovalRecord, ApprovalStore, TransactionError
 
 
 def _snap(enf, end, vals=None, prov="a"):
@@ -70,9 +70,9 @@ def test_public_csiu_observation_accepts_baseline(tmp_path, monkeypatch):
 
 def test_closed_approval_authority_accepts_only_trusted_principal(tmp_path):
     store=ApprovalStore(tmp_path/'a.json')
-    auth=ClosedApprovalAuthority()
-    p=auth.issue_principal('reviewer', ['self_improvement.approve'], 60)
     b={'approval_id':'a','proposal_digest':'1'*64,'policy_digest':'2'*64,'original_source_digest':'3'*64,'required_scope':'self_improvement.approve'}
+    p=ApprovalIssuer().issue_principal('reviewer', ['self_improvement.approve'], bindings=b, ttl_seconds=60)
+    auth=ClosedApprovalAuthority({'reviewer':p})
     assert not auth.is_authorized('reviewer', b)
     assert auth.is_authorized(p, b)
     store.save(ApprovalRecord('a','1'*64,'2'*64,'3'*64,'reviewer',time.time(),time.time()+60))

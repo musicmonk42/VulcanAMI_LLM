@@ -358,6 +358,52 @@ class CSIUEnforcement(SerializationMixin):
             r=self._record_for_decision(dec,state,previous_snapshot_digest,dec.actual_effect,0.0 if not dec.applied else max(abs(dec.actual_effect),abs(dec.pressure)))
             self._persist(r)
 
+    def observe_telemetry_snapshots(self, previous: Optional[CSIUMetricSnapshot], current: Optional[CSIUMetricSnapshot], *, observation_id: str = "telemetry-observation") -> CSIUDecision:
+        """Accept typed telemetry for accounting/cursor state without plan influence.
+
+        This public operation is intentionally evaluation-only: it never builds a
+        regularized plan, never reserves or charges influence capacity, and never
+        increments applied-influence counters or emits ``csiu.influence_applied``.
+        """
+        if self._closed:
+            raise CSIUValidationError("csiu enforcer closed")
+        plan_digest=canonical_digest({"telemetry_observation": str(observation_id)})
+        if current is None:
+            return self._decision(plan_digest,"missing_snapshot",0,0,0,True,False,None)
+        if previous is None:
+            ok,reason=self.validate_snapshot(current)
+            if not ok:
+                return self._decision(plan_digest,reason,0,0,0,True,False,current)
+            dec=self._decision(plan_digest,"baseline_established",0,self._last_ewma,0,True,False,current)
+            with self._lock:
+                self._persist_terminal_decision(dec,"","telemetry")
+                self._last_snapshot=current; self._last_snapshot_digest=current.snapshot_digest
+                self._seen_snapshot_digests.add(current.snapshot_digest); self._last_decision=dec
+            return dec
+        expected=getattr(self,"_last_snapshot_digest",getattr(self._last_snapshot,"snapshot_digest",None))
+        if expected and previous.snapshot_digest!=expected:
+            return self._decision(plan_digest,"previous_snapshot_digest_mismatch",0,self._last_ewma,0,True,False,current)
+        if previous.policy_digest!=self.policy.policy_digest or current.policy_digest!=self.policy.policy_digest:
+            return self._decision(plan_digest,"policy_digest_mismatch",0,self._last_ewma,0,True,False,current)
+        if current.snapshot_digest in self._seen_snapshot_digests:
+            return self._decision(plan_digest,"replayed_snapshot",0,self._last_ewma,0,True,False,current)
+        ok,reason=self.validate_snapshot(current)
+        if not ok:
+            return self._decision(plan_digest,reason,0,self._last_ewma,0,True,False,current)
+        if _parse_ts(previous.window_end)>_parse_ts(current.window_start):
+            return self._decision(plan_digest,"overlapping_or_reordered_window",0,self._last_ewma,0,True,False,current)
+        if previous.provider_id!=current.provider_id or previous.privacy_cohort!=current.privacy_cohort:
+            return self._decision(plan_digest,"provider_or_provenance_incompatible",0,self._last_ewma,0,True,False,current)
+        u=self.compute_utility(previous,current)
+        ew=self.policy.ewma_alpha*u + (1-self.policy.ewma_alpha)*self._last_ewma
+        reason="zero_pressure" if self.pressure_from_utility(ew)==0 else "telemetry_observed"
+        dec=self._decision(plan_digest,reason,u,ew,0,True,False,current)
+        with self._lock:
+            self._persist_terminal_decision(dec, previous.snapshot_digest, "telemetry")
+            self._last_snapshot=current; self._last_snapshot_digest=current.snapshot_digest
+            self._seen_snapshot_digests.add(current.snapshot_digest); self._last_ewma=ew; self._last_decision=dec
+        return dec
+
     def _apply_regularization_with_enforcement(self, plan: Dict[str,Any], pressure: float, metrics: Mapping[str,float], plan_id="unknown", action_type="improvement", snapshot: Optional[CSIUMetricSnapshot]=None, *, _utility: float=0.0, _ewma: float=0.0, _previous_snapshot_digest: str="")->Tuple[Dict[str,Any],CSIUDecision]:
         if snapshot is None:
             raise CSIUValidationError("typed snapshot decision required")
@@ -449,6 +495,30 @@ class CSIUEnforcement(SerializationMixin):
         return {"schema_version":"vulcan-csiu-weight-proposal/1","active_policy_digest":self.policy.policy_digest,"proposed_weights":dict(self.policy.weights),"supporting_snapshot_digests":[s.snapshot_digest for s in snapshots],"approval_state":"pending_review","proposal_digest":canonical_digest({"active_policy_digest":self.policy.policy_digest,"weights":dict(self.policy.weights)})}
     def propose_alignment_policy(self, active_policy: Any, snapshots: List[CSIUMetricSnapshot])->CSIUAlignmentProposal:
         dig=getattr(active_policy,"policy_digest",""); rev=int(getattr(active_policy,"revision",0)); pid=getattr(active_policy,"policy_id","vulcan-alignment/1")
+        if not (dig and rev >= 1):
+            raise CSIUValidationError("active alignment policy required")
+        if len(snapshots) < 4:
+            raise CSIUValidationError("insufficient alignment evidence")
+        ordered=sorted(snapshots, key=lambda s: _parse_ts(s.window_start))
+        if list(snapshots) != ordered or len({s.snapshot_digest for s in snapshots}) != len(snapshots):
+            raise CSIUValidationError("alignment evidence windows must be ordered and unique")
+        provider=snapshots[0].provider_id; cohort=snapshots[0].privacy_cohort; last_end=None
+        for s in snapshots:
+            ok,reason=self.validate_snapshot(s) if s.snapshot_digest not in self._seen_snapshot_digests else (s.policy_digest==self.policy.policy_digest and s.metric_definition_version==self.policy.metric_definition_version and s.sample_count>=self.policy.min_sample_count, "ok")
+            if not ok:
+                raise CSIUValidationError(f"invalid alignment evidence: {reason}")
+            if s.policy_digest != self.policy.policy_digest:
+                raise CSIUValidationError("mixed CSIU policy evidence")
+            if s.provider_id != provider or s.privacy_cohort != cohort:
+                raise CSIUValidationError("mixed provider or cohort evidence")
+            ws,we=_parse_ts(s.window_start),_parse_ts(s.window_end)
+            if last_end is not None and ws < last_end:
+                raise CSIUValidationError("overlapping alignment evidence")
+            last_end=we
+        evidence=tuple(s.snapshot_digest for s in snapshots[-4:])
+        evidence_id=canonical_digest({"active_alignment_digest":dig,"active_alignment_revision":rev,"csiu_policy_digest":self.policy.policy_digest,"evidence":list(evidence)})
+        if getattr(self,"_alignment_cooldown_evidence_id",None)==evidence_id and self._clock() < getattr(self,"_alignment_cooldown_until",datetime.min.replace(tzinfo=UTC)):
+            raise CSIUValidationError("alignment evidence cooldown")
         trend={k:0.0 for k in METRIC_ORDER}
         if len(snapshots)>=2:
             a,b=snapshots[-2],snapshots[-1]; trend={k:(b.metrics[k]-a.metrics[k])*DIRECTIONS[k] for k in METRIC_ORDER}
@@ -463,14 +533,17 @@ class CSIUEnforcement(SerializationMixin):
         # AlignmentRegistry.activate/update with exact CAS against this digest.
         if len(snapshots)>=4:
             sustained=[]
-            for k in ("C","M"):
+            for k in ("G","M"):
                 vals=[(snapshots[i].metrics[k]-snapshots[i-1].metrics[k])*DIRECTIONS[k] for i in range(1,len(snapshots))]
                 if len(vals)>=3 and all(v<=-0.02 for v in vals[-3:]): sustained.append(k)
             if sustained:
                 current=int(getattr(active_policy,"max_claims_per_response",8))
                 delta={"max_claims_per_response":max(1,current-1),"explicit_unknown_behavior":"abstain","require_citations":True,"require_verified_integrity":True,"require_temporal_validity":True}
                 reasons=tuple(sorted(set(reasons+tuple(sustained)+("conservative_alignment_tightening",))))
-        return CSIUAlignmentProposal(pid,rev,dig,self.policy.policy_digest,tuple(s.snapshot_digest for s in snapshots[-4:]),trend,reasons,"review human-understanding and safety thresholds; proposed deltas only tighten controls","authorized governance review plus ordinary alignment CAS activation",_ts(self._clock()+timedelta(hours=24)),delta)
+        prop=CSIUAlignmentProposal(pid,rev,dig,self.policy.policy_digest,evidence,trend,reasons,"review human-understanding and safety thresholds; proposed deltas only tighten controls","authorized governance review plus ordinary alignment CAS activation",_ts(self._clock()+timedelta(hours=24)),delta)
+        if delta:
+            self._alignment_cooldown_evidence_id=evidence_id; self._alignment_cooldown_until=self._clock()+timedelta(hours=1)
+        return prop
     def get_statistics(self):
         c=self.check_cumulative_influence(); return {"enabled":self.is_enabled(),"policy_digest":self.policy.policy_digest,"metric_definition_version":self.policy.metric_definition_version,"last_valid_snapshot_digest":getattr(self._last_snapshot,"snapshot_digest",None),"last_decision_digest":getattr(self._last_decision,"decision_digest",None),"total_applications":self._total_applications,"total_blocked":self._total_blocked,"total_capped":self._total_capped,"max_influence_seen":self._max_influence_seen,"cumulative_stats":c,"kill_switches":{"global_enabled":self.config.global_enabled,"calculation_enabled":self.config.calculation_enabled,"regularization_enabled":self.config.regularization_enabled,"proposal_generation_enabled":self.config.proposal_generation_enabled,"history_display_enabled":self.config.history_tracking_enabled,"emergency_stop":self.config.emergency_stop}}
     def export_audit_trail(self,path: Optional[Path]=None):

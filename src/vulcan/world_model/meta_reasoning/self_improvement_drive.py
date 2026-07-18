@@ -61,6 +61,16 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 # Initialize logger early - before it's used in import blocks
 logger = logging.getLogger(__name__)
 
+@dataclass(frozen=True)
+class AutoApplyResult:
+    applied: bool
+    status: str
+    reason: str
+    approval_required: bool
+    terminal: bool
+    rollback_succeeded: bool = False
+    manual_recovery_required: bool = False
+
 # ==========================================================================
 # CONSTANTS
 # ==========================================================================
@@ -1721,9 +1731,13 @@ class SelfImprovementDrive:
         if not self._csiu_enforcer or snap is None:
             return getattr(self, "_csiu_last_decision", None)
         prev = getattr(self, "_csiu_previous_snapshot", None)
-        _, decision = self._csiu_enforcer.apply_regularization_from_snapshots({}, prev, snap, plan_id="telemetry-observation", action_type="telemetry")
+        decision = self._csiu_enforcer.observe_telemetry_snapshots(prev, snap, observation_id="drive-telemetry")
         self._csiu_last_decision = decision
-        if decision.reason_code == "baseline_established" or decision.applied or decision.reason_code in {"zero_pressure","disabled"}:
+        terminal_acceptance = {
+            "baseline_established", "telemetry_observed", "zero_pressure",
+            "disabled", "cumulative_cap_exceeded",
+        }
+        if decision.reason_code in terminal_acceptance or decision.applied:
             self._csiu_previous_snapshot = snap
         self._csiu_audit_status("telemetry_observed", decision_id=decision.decision_id, decision_digest=decision.decision_digest, reason_code=decision.reason_code, applied=decision.applied)
         return decision
@@ -1804,6 +1818,8 @@ class SelfImprovementDrive:
             )
             self._csiu_last_decision = decision
             self._csiu_audit_status("decision", decision_id=decision.decision_id, decision_digest=decision.decision_digest, reason_code=decision.reason_code, pressure=decision.pressure, actual_effect=decision.actual_effect, applied=decision.applied)
+            if decision.reason_code in {"applied","zero_pressure","disabled","cumulative_cap_exceeded"}:
+                self._csiu_previous_snapshot = snapshot
             return regularized if decision.applied else original
         except Exception as e:
             self._csiu_audit_status("decision_aborted", reason_code=type(e).__name__)
@@ -2858,13 +2874,15 @@ class SelfImprovementDrive:
             return {"status": "rejected", "plan_id": plan.get("id"), "reason": f"governed approval queue failed: {type(e).__name__}"}
 
     def approve_governed_pending(self, approval_id: str, principal: Any, *, ttl_seconds: float = 3600.0) -> bool:
-        authority = getattr(self, "approval_authority", None)
-        if authority is None or principal is None:
+        from .governed_transaction import TrustedApprovalPrincipal, ApprovalVerifierPort
+        verifier = getattr(self, "approval_verifier", None) or getattr(self, "approval_authority", None)
+        if verifier is None or not isinstance(principal, TrustedApprovalPrincipal):
             return False
-        legacy_string = isinstance(principal, str) and hasattr(authority, "is_authorized") and not authority.__class__.__module__.startswith("vulcan")
-        if isinstance(principal, (str, bytes)) and not legacy_string:
+        if not isinstance(verifier, ApprovalVerifierPort):
             return False
-        if not hasattr(authority, "is_authorized"):
+        if any(hasattr(verifier, name) for name in ("issue_principal","register_principal")):
+            return False
+        if not hasattr(verifier, "is_authorized"):
             return False
         if ApprovalRecord is None or not getattr(self, "approval_store", None):
             return False
@@ -2872,14 +2890,9 @@ class SelfImprovementDrive:
             for approval in self.state.pending_approvals:
                 if approval.get("approval_id") == approval_id and approval.get("status") == "pending_governed_approval":
                     bindings = {"approval_id": approval_id, "proposal_digest": approval["proposal_digest"], "policy_digest": approval["policy_digest"], "original_source_digest": approval["original_source_digest"], "required_scope": "self_improvement.approve"}
-                    if legacy_string:
-                        if not authority.is_authorized(principal, approval_id):
-                            return False
-                        pid = principal
-                    else:
-                        if not authority.is_authorized(principal, bindings):
-                            return False
-                        pid = getattr(principal, "principal_id", "")
+                    if not verifier.is_authorized(principal, bindings):
+                        return False
+                    pid = principal.principal_id
                     rec = ApprovalRecord(approval_id, approval["proposal_digest"], approval["policy_digest"], approval["original_source_digest"], pid, time.time(), time.time()+ttl_seconds)
                     self.approval_store.save(rec)
                     approval["status"] = "independently_approved"; approval["approved_at"] = rec.approved_at; approval["approver_identity"] = pid
@@ -2895,7 +2908,8 @@ class SelfImprovementDrive:
             return {"status": pending.get("status", "pending_governed_approval"), "approval_id": approval_id, "applied": False}
         proposal_map = copy.deepcopy(pending.get("proposal", {})); proposal_map["approval_id"] = approval_id
         plan = {"id": pending.get("id"), "governed_proposal": proposal_map}
-        applied, reason = self._maybe_auto_apply(plan)
+        auto_result = self._maybe_auto_apply(plan)
+        applied, reason = auto_result.applied, auto_result.reason
         result = getattr(self, "_last_governed_transaction_result", None)
         status = result.status_code if result is not None else ("applied" if applied else reason)
         with self._lock:
@@ -2920,19 +2934,19 @@ class SelfImprovementDrive:
     #   "diff_loc": 12,
     #   "apply": callable_that_performs_change_or_patch
     # }
-    def _maybe_auto_apply(self, plan: Dict[str, Any]) -> Tuple[bool, str]:
+    def _maybe_auto_apply(self, plan: Dict[str, Any]) -> AutoApplyResult:
         """Auto-apply only through GovernedSelfImprovementTransaction."""
         if not self._auto_apply_enabled:
-            return False, "auto-apply disabled"
+            return AutoApplyResult(False,"not_attempted","auto-apply disabled",True,False)
         if GovernedSelfImprovementTransaction is None or ImprovementProposal is None or inspect_repository is None:
-            return False, "governed transaction unavailable"
+            return AutoApplyResult(False,"unavailable","governed transaction unavailable",True,False)
         proposal_map = plan.get("governed_proposal") or plan.get("improvement_proposal")
         policy = getattr(self, "improvement_policy", None) or getattr(self, "governed_improvement_policy", None)
         audit_owner = getattr(self, "audit_owner", None) or getattr(self, "audit", None)
         if not isinstance(proposal_map, dict):
-            return False, "missing governed improvement proposal"
+            return AutoApplyResult(False,"missing_governed_proposal","missing governed improvement proposal",True,False)
         if policy is None or audit_owner is None:
-            return False, "governed transaction policy or audit owner missing"
+            return AutoApplyResult(False,"configuration_missing","governed transaction policy or audit owner missing",True,False)
         try:
             proposal = ImprovementProposal.from_mapping(proposal_map)
             snapshot = inspect_repository(policy.repo_root, policy.permitted_path_globs, max_files=policy.max_files)
@@ -2940,10 +2954,13 @@ class SelfImprovementDrive:
             result = tx.apply(proposal, snapshot, actor="self-improvement-drive")
             self._last_governed_transaction_result = result
             if result.verified_success:
-                return True, result.status_code
-            return False, result.status_code + (f":{result.failure_category}" if result.failure_category else "")
+                return AutoApplyResult(True,result.status_code,result.status_code,False,True)
+            if result.status_code == "rejected_before_installation" and result.failure_category == "approval required":
+                return AutoApplyResult(False,result.status_code,result.failure_category,True,False)
+            manual = result.status_code in {"external_mutation_prevented_rollback","verification_failed_rollback_failed"}
+            return AutoApplyResult(False,result.status_code,result.failure_category or result.status_code,False,True,result.status_code=="verification_failed_rollback_succeeded",manual)
         except Exception as e:
-            return False, f"governed transaction failed: {type(e).__name__}"
+            return AutoApplyResult(False,"governed_exception",f"governed transaction failed: {type(e).__name__}",False,True)
 
     # Where improvements are processed, insert a call to _maybe_auto_apply before queueing/approval
     def process_plan(self, plan: Dict[str, Any]) -> Dict[str, Any]:
@@ -2951,21 +2968,21 @@ class SelfImprovementDrive:
         Process a single improvement plan. Auto-apply if policy allows, otherwise queue for approval.
         """
         # ... any existing validation ...
-        applied = False
-        reason = "queued"
+        result = AutoApplyResult(False,"queued","queued",True,False)
         if self._auto_apply_enabled:
-            applied, reason = self._maybe_auto_apply(plan)
+            result = self._maybe_auto_apply(plan)
 
-        if applied:
-            status = {"status": "applied", "plan_id": plan.get("id"), "reason": reason}
+        if result.applied:
+            status = {"status": "applied", "plan_id": plan.get("id"), "reason": result.reason, "transaction_status": result.status}
             logger.info(f"Auto-applied plan {plan.get('id')}")
             # Potentially call record_outcome here or let external orchestrator do it
         else:
-            terminal_markers = ("malformed", "stale", "policy mismatch", "policy_digest", "expired", "consumed", "audit", "gate", "rollback", "external", "manual_recovery", "verification_failed", "external_mutation")
-            if self._auto_apply_enabled and any(m in str(reason) for m in terminal_markers):
-                status = {"status": "terminal", "plan_id": plan.get("id"), "reason": reason}
+            if self._auto_apply_enabled and result.terminal:
+                status = {"status": result.status, "plan_id": plan.get("id"), "reason": result.reason, "terminal": True, "rollback_succeeded": result.rollback_succeeded, "manual_recovery_required": result.manual_recovery_required}
+            elif result.approval_required:
+                status = self._queue_governed_approval(plan, result.reason)
             else:
-                status = self._queue_governed_approval(plan, reason)
+                status = {"status": result.status, "plan_id": plan.get("id"), "reason": result.reason}
 
         # Update state if your class tracks it
         try:

@@ -9,15 +9,15 @@ def digest(d):
     x=dict(d); x.pop('policy_digest',None)
     return hashlib.sha256(json.dumps(x,ensure_ascii=False,sort_keys=True,separators=(',',':'),allow_nan=False).encode()).hexdigest()
 
-def snap(enf, t, c, m):
-    metrics={k:0.5 for k in ('A','H','C','V','D','G','E','U','M')}; metrics['C']=c; metrics['M']=m
-    return CSIUMetricSnapshot(metrics=metrics, window_start=(t-timedelta(minutes=5)).isoformat().replace('+00:00','Z'), window_end=t.isoformat().replace('+00:00','Z'), sample_count=30, aggregation_method='privacy_aggregate', metric_definition_version=enf.policy.metric_definition_version, provider_id='test', provenance_digest='a'*64, policy_digest=enf.policy.policy_digest)
+def snap(enf, t, g, m, i):
+    metrics={k:0.5 for k in ('A','H','C','V','D','G','E','U','M')}; metrics['G']=g; metrics['M']=m
+    return CSIUMetricSnapshot(metrics=metrics, window_start=(t-timedelta(minutes=5)).isoformat().replace('+00:00','Z'), window_end=t.isoformat().replace('+00:00','Z'), sample_count=30, aggregation_method='privacy_aggregate', metric_definition_version=enf.policy.metric_definition_version, provider_id='test', provenance_digest=format(i,'x')*64, policy_digest=enf.policy.policy_digest)
 
 def test_reviewed_alignment_proposal_cas_and_stable_lease(tmp_path):
     audit=CanonicalAudit(tmp_path/'a.jsonl'); reg=AlignmentRegistry(tmp_path/'p.json', audit=audit)
     active=reg.active(); lease=reg.lease(); enf=CSIUEnforcement()
-    base=datetime(2026,1,1,tzinfo=timezone.utc)
-    snaps=[snap(enf,base+timedelta(minutes=i*10),0.8-i*0.03,0.2+i*0.03) for i in range(4)]
+    base=datetime.now(timezone.utc)-timedelta(minutes=40)
+    snaps=[snap(enf,base+timedelta(minutes=i*10),0.2+i*0.03,0.2+i*0.03,i) for i in range(4)]
     prop=enf.propose_alignment_policy(active, snaps)
     assert prop.schema_version=='vulcan-csiu-alignment-proposal/1'
     assert prop.active_alignment_revision==1 and prop.active_alignment_digest==active.policy_digest
