@@ -5,6 +5,8 @@ import inspect
 from dataclasses import dataclass
 from typing import Any, Literal
 from uuid import uuid4
+from pathlib import Path
+import os
 
 from vulcan.memory.governed import GovernedMemoryPort, compose_governed_memory
 
@@ -15,6 +17,7 @@ from .finalization import SafetyResponseFinalizer
 from .kernel import CognitiveKernel
 from .output import DeterministicLanguageOutput, LanguageOutputPort
 from .semantic import DeterministicLanguageInput, LanguageInputPort
+from .self_improvement import SelfImprovementRuntime, compose_self_improvement_runtime
 
 
 LanguageMode = Literal["disabled", "deterministic_only", "transformer_proposal"]
@@ -36,6 +39,27 @@ class LanguageRuntimeConfig:
                 raise RuntimeError("transformer mode requires an absolute approved release path")
         return self
 
+def _validated_durable_root(value: object) -> str:
+    if not isinstance(value, str) or not value:
+        raise RuntimeError("VULCAN_RUNTIME_DURABLE_ROOT is required for persistent runtime capabilities")
+    p = Path(value)
+    if not p.is_absolute():
+        raise RuntimeError("durable root must be absolute")
+    resolved = p.resolve(strict=False)
+    repo = Path(__file__).resolve().parents[3]
+    forbidden = {Path('/'), Path('/tmp'), Path.home(), repo.resolve()}
+    if resolved in forbidden or str(resolved).startswith(str(repo.resolve()) + os.sep):
+        raise RuntimeError("unsafe durable root rejected")
+    cur = Path('/')
+    for part in resolved.parts[1:]:
+        cur = cur / part
+        if cur.exists() and cur.is_symlink():
+            raise RuntimeError("symlinked durable root component rejected")
+    resolved.mkdir(parents=True, exist_ok=True)
+    if resolved.is_symlink():
+        raise RuntimeError("symlinked durable root rejected")
+    return str(resolved)
+
 
 @dataclass
 class RuntimeContainer:
@@ -51,6 +75,8 @@ class RuntimeContainer:
     audit: CanonicalAudit | None = None
     alignment: AlignmentRegistry | None = None
     domain_registry: PersistentDomainRegistry | None = None
+    durable_root: Path | None = None
+    self_improvement: SelfImprovementRuntime | None = None
     closed: bool = False
 
     async def close(self) -> None:
@@ -72,6 +98,7 @@ class RuntimeContainer:
             self.memory,
             self.alignment,
             self.audit,
+            self.self_improvement,
             self.domain_registry,
             self.kernel,
             self.safety,
@@ -108,6 +135,8 @@ class RuntimeContainer:
             "audit": self.audit,
             "alignment": self.alignment,
             "domain_registry": self.domain_registry,
+            "durable_root": self.durable_root,
+            "self_improvement": self.self_improvement,
         }
         for name, owner in required.items():
             if owner is None:
@@ -133,6 +162,8 @@ class RuntimeContainer:
                 result = tuple(dict.fromkeys((*result, "verified-transformer-span", f"language-abi:{abi}")))
             except Exception:
                 pass
+        if self.self_improvement is not None:
+            result = tuple(dict.fromkeys((*result, *self.self_improvement.capabilities())))
         if not isinstance(result, tuple) or not all(isinstance(value, str) for value in result):
             raise RuntimeError("canonical kernel returned an invalid capability list")
         return result
@@ -156,20 +187,23 @@ class RuntimeContainer:
             language_input = build_verified_adapter(release_root=config.release_path or "", provider_factory=config.provider_factory)
         language_output: LanguageOutputPort = DeterministicLanguageOutput()
         memory = compose_governed_memory()
-        root = getattr(deployment, "runtime_root", None) or getattr(deployment, "data_dir", None) or f"/tmp/vulcan-runtime-{uuid4().hex}"
-        audit = alignment = domain_registry = None
+        root = _validated_durable_root(os.getenv("VULCAN_RUNTIME_DURABLE_ROOT") or getattr(deployment, "runtime_root", None) or getattr(deployment, "data_dir", None))
+        audit = alignment = domain_registry = self_improvement = None
         try:
             memory.readiness()
             audit = CanonicalAudit(f"{root}/audit/events.jsonl")
             alignment = AlignmentRegistry(f"{root}/alignment/active.json", audit=audit)
             domain_registry = PersistentDomainRegistry(f"{root}/domains", audit=audit)
+            self_improvement = compose_self_improvement_runtime(durable_root=Path(root), audit=audit, alignment=alignment, world_model=world_state)
             setattr(world_state, "domain", domain_registry)
+            setattr(world_state, "self_improvement_runtime", self_improvement)
+            setattr(world_state, "self_improvement_drive", self_improvement.drive)
             kernel = CognitiveKernel(state_authority=world_state, finalizer=SafetyResponseFinalizer(safety),
                                      language_input=language_input, language_output=language_output, memory=memory, audit=audit, alignment=alignment)
             return cls(str(uuid4()), deployment, world_state, kernel, safety, memory,
-                       language_input, language_output, config, audit, alignment, domain_registry)
+                       language_input, language_output, config, audit, alignment, domain_registry, Path(root), self_improvement)
         except Exception:
-            for r in (domain_registry, alignment, audit, memory, language_output, language_input):
+            for r in (self_improvement, domain_registry, alignment, audit, memory, language_output, language_input):
                 if r is not None:
                     close=getattr(r,"close",None)
                     if close: close()

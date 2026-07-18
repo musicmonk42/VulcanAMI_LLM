@@ -116,7 +116,7 @@ class BundleBody(BaseModel):
     model_config=ConfigDict(extra='forbid', strict=True)
 
 def generate_route_manifest():
-    return tuple({'path':p,'method':m,'classification':'public' if p.startswith('/health/') else 'protected'} for p,m in [('/health/live','GET'),('/health/ready','GET'),('/v1/chat','POST'),('/v1/admin/domains','POST'),('/v1/admin/alignment','POST'),('/v1/audit/cases/{case_id}','GET'),('/v1/memory/preferences','POST'),('/v1/memory/preferences/{key}','GET'),('/v1/memory/preferences/{record_id}','PATCH'),('/v1/memory/preferences/{record_id}','DELETE')])
+    return tuple({'path':p,'method':m,'classification':'public' if p.startswith('/health/') else 'protected'} for p,m in [('/health/live','GET'),('/health/ready','GET'),('/v1/chat','POST'),('/v1/admin/domains','POST'),('/v1/admin/alignment','POST'),('/v1/audit/cases/{case_id}','GET'),('/v1/admin/improvements','GET'),('/v1/admin/improvements/{proposal_id}','GET'),('/v1/admin/improvements/{proposal_id}/approve','POST'),('/v1/admin/improvements/{proposal_id}/reject','POST'),('/v1/admin/improvements/{proposal_id}/resume','POST'),('/v1/admin/improvements/{proposal_id}/status','GET'),('/v1/audit/improvements/{proposal_digest}','GET'),('/v1/memory/preferences','POST'),('/v1/memory/preferences/{key}','GET'),('/v1/memory/preferences/{record_id}','PATCH'),('/v1/memory/preferences/{record_id}','DELETE')])
 
 def create_app()->FastAPI:
     app=FastAPI(title='VULCAN canonical runtime', version='7.0', lifespan=lifespan)
@@ -154,6 +154,51 @@ def create_app()->FastAPI:
         if not case_id.startswith('case-') or len(case_id)>128: raise HTTPException(404,'case not found')
         rows=rt.audit.case_events(case_id) if hasattr(rt.audit,'case_events') else []
         return {'case_id':case_id,'events':rows[:64]}
+    @app.get('/v1/admin/improvements')
+    async def improvements(request:Request):
+        _principal(request,'self_improvement:read'); rt=await _runtime(request)
+        return {'runtime_id':rt.runtime_id,'owner_id':getattr(rt.self_improvement.journal,'owner_id',''),'pending':list(getattr(rt.self_improvement.drive.state,'pending_approvals',[]))[:64]}
+    @app.get('/v1/admin/improvements/{proposal_id}')
+    async def improvement_detail(proposal_id:str, request:Request):
+        _principal(request,'self_improvement:read'); rt=await _runtime(request)
+        rows=[r for r in getattr(rt.self_improvement.drive.state,'pending_approvals',[]) if r.get('id')==proposal_id or r.get('proposal_id')==proposal_id]
+        if not rows: raise HTTPException(404,'proposal not found')
+        return rows[0]
+    @app.post('/v1/admin/improvements/{proposal_id}/approve')
+    async def improvement_approve(proposal_id:str, request:Request):
+        p=_principal(request,'self_improvement:approve'); rt=await _runtime(request)
+        etag=request.headers.get('if-match')
+        if etag is None: raise HTTPException(412,'If-Match required')
+        data=await _body(request); prop=data.get('proposal')
+        if not isinstance(prop,dict): raise HTTPException(400,'proposal required')
+        from vulcan.world_model.meta_reasoning.governed_transaction import ImprovementProposal
+        proposal=ImprovementProposal.from_mapping(prop)
+        rec=await asyncio.to_thread(rt.self_improvement.approval_authority.approve, proposal, rt.self_improvement.policy, p.subject)
+        return {'approval_id':rec.approval_id,'proposal_digest':rec.proposal_digest,'state':rec.state,'verifier_id':rt.self_improvement.approval_authority.verifier_id}
+    @app.post('/v1/admin/improvements/{proposal_id}/reject')
+    async def improvement_reject(proposal_id:str, request:Request):
+        _principal(request,'self_improvement:approve'); rt=await _runtime(request); data=await _body(request)
+        approval_id=str(data.get('approval_id') or proposal_id)
+        await asyncio.to_thread(rt.self_improvement.approval_authority.reject, approval_id)
+        return {'approval_id':approval_id,'state':'rejected'}
+    @app.post('/v1/admin/improvements/{proposal_id}/resume')
+    async def improvement_resume(proposal_id:str, request:Request):
+        p=_principal(request,'self_improvement:approve'); rt=await _runtime(request); data=await _body(request)
+        from vulcan.world_model.meta_reasoning.governed_transaction import ImprovementProposal, inspect_repository
+        prop=data.get('proposal')
+        if not isinstance(prop,dict): raise HTTPException(400,'proposal required')
+        proposal=ImprovementProposal.from_mapping(prop)
+        snapshot=inspect_repository(rt.self_improvement.policy.repo_root, rt.self_improvement.policy.permitted_path_globs)
+        res=await asyncio.to_thread(rt.self_improvement.transaction.apply, proposal, snapshot, p.subject)
+        return {'status':res.status_code,'state':res.state,'proposal_digest':res.proposal_digest}
+    @app.get('/v1/admin/improvements/{proposal_id}/status')
+    async def improvement_status(proposal_id:str, request:Request):
+        _principal(request,'self_improvement:read'); rt=await _runtime(request)
+        return {'proposal_id':proposal_id,'csiu':rt.self_improvement.status_port.status(),'journal_owner':rt.self_improvement.journal.owner_id}
+    @app.get('/v1/audit/improvements/{proposal_digest}')
+    async def audit_improvement(proposal_digest:str, request:Request):
+        _principal(request,'audit:read'); rt=await _runtime(request)
+        return {'proposal_digest':proposal_digest,'events':[e.__dict__ for e in rt.audit.events_for_proposal(proposal_digest)][:128]}
     @app.post('/v1/memory/preferences')
     async def mem_create(request:Request):
         p=_principal(request,'memory:write'); rt=await _runtime(request); body=MemoryWriteBody.model_validate(await _body(request)); res=await asyncio.to_thread(rt.memory.remember,_actor(p,'req-'+uuid4().hex),MemoryWriteProposal(MemoryKind.EXPLICIT_PREFERENCE,'profile',body.key,body.value,body.idempotency_key))
