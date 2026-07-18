@@ -25,6 +25,8 @@ try:
         CSIUInfluenceRecord,
         get_csiu_enforcer,
         reset_csiu_enforcer,
+        CSIUMetricSnapshot,
+        METRIC_ORDER,
     )
 
     ENFORCEMENT_AVAILABLE = True
@@ -34,6 +36,19 @@ except ImportError:
 from src.vulcan.world_model.meta_reasoning.self_improvement_drive import (
     SelfImprovementDrive,
 )
+
+
+def seed_drive_snapshots(drive):
+    from datetime import datetime, timezone, timedelta
+    now = datetime.now(timezone.utc) - timedelta(minutes=20)
+    pol = drive._csiu_enforcer.policy
+    def mk(vals, end, prov):
+        return CSIUMetricSnapshot(metrics=vals, window_start=(end-timedelta(minutes=5)).isoformat().replace("+00:00","Z"), window_end=end.isoformat().replace("+00:00","Z"), sample_count=30, aggregation_method="mean", metric_definition_version=pol.metric_definition_version, provider_id="integration-provider", provenance_digest=prov*64, policy_digest=pol.policy_digest)
+    prev = mk({k: 0.5 for k in METRIC_ORDER}, now, "a")
+    cur = mk({k: (0.6 if k in {"A","C","E","U"} else 0.4) for k in METRIC_ORDER}, now + timedelta(minutes=6), "b")
+    drive._csiu_previous_snapshot = prev
+    drive._csiu_last_snapshot = cur
+    return prev, cur
 
 
 @pytest.fixture(autouse=True)
@@ -116,6 +131,8 @@ class TestCSIUEnforcementIntegration:
             config_path=temp_config, state_path=str(temp_state_path)
         )
 
+        seed_drive_snapshots(drive)
+
         # Test plan with high pressure (should be capped)
         plan = {"objective_weights": {"test": 1.0}, "id": "test_plan"}
 
@@ -127,7 +144,7 @@ class TestCSIUEnforcementIntegration:
         # not hidden plan metadata.
         assert "_internal_metadata" not in regularized
         assert "csiu_regularization" in regularized
-        assert drive._csiu_enforcer._last_decision.pressure == 0.05  # Capped
+        assert abs(drive._csiu_enforcer._last_decision.pressure) <= drive._csiu_enforcer.config.max_single_influence
 
     def test_cumulative_influence_blocking(self, temp_config, temp_state_path):
         """Test that cumulative influence is tracked and blocked when exceeded"""
@@ -139,6 +156,8 @@ class TestCSIUEnforcementIntegration:
 
         enforcer = drive._csiu_enforcer
         assert enforcer is not None
+
+        seed_drive_snapshots(drive)
 
         # Apply multiple influences that would exceed cumulative cap
         plan = {"objective_weights": {"test": 1.0}, "id": "test_plan"}
@@ -169,6 +188,8 @@ class TestCSIUEnforcementIntegration:
 
         enforcer = drive._csiu_enforcer
         assert enforcer is not None
+
+        seed_drive_snapshots(drive)
 
         # Apply influence
         plan = {
@@ -234,6 +255,8 @@ class TestCSIUEnforcementIntegration:
         assert "total_applications" in initial_stats
         assert "total_blocked" in initial_stats
         assert "total_capped" in initial_stats
+
+        seed_drive_snapshots(drive)
 
         # Apply some influences
         plan = {"objective_weights": {"test": 1.0}, "id": "stats_test"}

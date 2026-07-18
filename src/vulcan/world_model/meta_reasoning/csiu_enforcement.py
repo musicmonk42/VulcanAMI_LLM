@@ -17,7 +17,7 @@ except Exception:
     class SerializationMixin:
         pass
 
-SCHEMA_SNAPSHOT="vulcan-csiu-metric-snapshot/1"; SCHEMA_POLICY="vulcan-csiu-policy/1"; SCHEMA_DECISION="vulcan-csiu-decision/1"; SCHEMA_RECORD="vulcan-csiu-influence-record/1"; SCHEMA_PROPOSAL="vulcan-csiu-alignment-proposal/1"
+SCHEMA_SNAPSHOT="vulcan-csiu-metric-snapshot/1"; SCHEMA_POLICY="vulcan-csiu-policy/1"; SCHEMA_DECISION="vulcan-csiu-decision/1"; SCHEMA_RECORD="vulcan-csiu-influence-record/2"; SCHEMA_PROPOSAL="vulcan-csiu-alignment-proposal/1"
 UTC=timezone.utc
 METRIC_ORDER=("A","H","C","V","D","G","E","U","M")
 DIRECTIONS={"A":1,"H":-1,"C":1,"V":-1,"D":-1,"G":-1,"E":1,"U":1,"M":-1}
@@ -45,7 +45,7 @@ def _clean(v: Any, depth=0)->Any:
     if v is None or isinstance(v,bool): return v
     if isinstance(v,(int,float)): return _num(v)
     if isinstance(v,str):
-        if len(v)>MAX_STR or any(ord(c)<32 for c in v): raise CSIUValidationError("invalid string")
+        if len(v)>MAX_STR or any((ord(c)<32 and c not in "\n\t\r") for c in v): raise CSIUValidationError("invalid string")
         return v
     if isinstance(v,Mapping):
         if len(v)>MAX_ITEMS: raise CSIUValidationError("object too large")
@@ -302,7 +302,10 @@ class CSIUEnforcement(SerializationMixin):
         if need>self.config.max_single_influence+1e-12: return False,"single_cap_exceeded"
         if cur+need>self.config.max_cumulative_influence_window+1e-12: return False,"cumulative_cap_exceeded"
         return True,"ok"
-    def apply_regularization_with_enforcement(self, plan: Dict[str,Any], pressure: float, metrics: Mapping[str,float], plan_id="unknown", action_type="improvement", snapshot: Optional[CSIUMetricSnapshot]=None, *, _utility: float=0.0, _ewma: float=0.0, _previous_snapshot_digest: str="")->Tuple[Dict[str,Any],CSIUDecision]:
+    def apply_regularization_with_enforcement(self, *args, **kwargs):
+        raise CSIUValidationError("public arbitrary pressure route removed; use apply_regularization_from_snapshots")
+
+    def _apply_regularization_with_enforcement(self, plan: Dict[str,Any], pressure: float, metrics: Mapping[str,float], plan_id="unknown", action_type="improvement", snapshot: Optional[CSIUMetricSnapshot]=None, *, _utility: float=0.0, _ewma: float=0.0, _previous_snapshot_digest: str="")->Tuple[Dict[str,Any],CSIUDecision]:
         if snapshot is None:
             raise CSIUValidationError("typed snapshot decision required")
         if self._closed: return copy.deepcopy(plan or {}), self._decision(canonical_digest({"plan":copy.deepcopy(plan or {})}),"enforcer_closed",0,0,0,True,False,snapshot)
@@ -356,9 +359,9 @@ class CSIUEnforcement(SerializationMixin):
         proposed,dec=self._apply_regularization_evaluated(original, pressure, current.metrics, plan_id, action_type, current, u, ew, previous.snapshot_digest)
         return proposed,dec
     def _apply_regularization_evaluated(self, plan, pressure, metrics, plan_id, action_type, snapshot, utility, ewma, previous_snapshot_digest):
-        proposed,dec=self.apply_regularization_with_enforcement(plan, pressure, metrics, plan_id, action_type, snapshot, _utility=utility, _ewma=ewma, _previous_snapshot_digest=previous_snapshot_digest)
-        if dec.applied:
-            self._last_snapshot=snapshot; self._last_snapshot_digest=snapshot.snapshot_digest; self._seen_snapshot_digests.add(snapshot.snapshot_digest)
+        proposed,dec=self._apply_regularization_with_enforcement(plan, pressure, metrics, plan_id, action_type, snapshot, _utility=utility, _ewma=ewma, _previous_snapshot_digest=previous_snapshot_digest)
+        if dec.reason_code not in {"policy_digest_mismatch","metric_definition_mismatch","insufficient_sample_count","stale_snapshot","overlapping_or_reordered_window","provider_or_provenance_incompatible","replayed_snapshot","previous_snapshot_digest_mismatch"}:
+            self._last_snapshot=snapshot; self._last_snapshot_digest=snapshot.snapshot_digest; self._seen_snapshot_digests.add(snapshot.snapshot_digest); self._last_ewma=ewma
         return proposed,dec
     def _measure_plan_effect(self, before, after):
         vals=[]

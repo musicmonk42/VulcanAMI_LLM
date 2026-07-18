@@ -85,6 +85,11 @@ class ImprovementPolicy:
     allow_hardlinks: bool = False
     digest: str = ""
 
+    def __post_init__(self) -> None:
+        body = {k: getattr(self, k) for k in self.__dataclass_fields__ if k != "digest"}
+        dg = _sha256(json.dumps(body, sort_keys=True, default=str, separators=(",", ":")).encode())
+        object.__setattr__(self, "digest", dg)
+
 @dataclass(frozen=True)
 class InspectionSnapshot:
     repo_root: Path
@@ -213,11 +218,16 @@ class ApprovalStore:
         finally:
             try: fcntl.flock(fd, fcntl.LOCK_UN)
             finally: os.close(fd)
-    def mark_used(self, approval_id: str) -> None:
-        doc = json.loads(self.path.read_text(encoding="utf-8"))
-        if doc[approval_id].get("used") or doc[approval_id].get("state") == "consumed": raise TransactionError("approval already consumed")
-        doc[approval_id]["used"] = True; doc[approval_id]["state"] = "consumed"
+    def terminalize(self, approval_id: str, state: str) -> None:
+        if state not in {"consumed","rejected","expired","verification_failed","aborted"}:
+            raise TransactionError("bad terminal approval state")
+        doc = json.loads(self.path.read_text(encoding="utf-8")) if self.path.exists() else {}
+        if approval_id not in doc: raise TransactionError("approval not found")
+        if doc[approval_id].get("state") in {"consumed","rejected","expired","verification_failed","aborted"}: raise TransactionError("approval already terminal")
+        doc[approval_id]["used"] = True; doc[approval_id]["state"] = state
         _atomic_write(self.path, json.dumps(doc, sort_keys=True).encode(), 0o600)
+    def mark_used(self, approval_id: str) -> None:
+        self.terminalize(approval_id, "consumed")
 
 def _sha256(b: bytes) -> str:
     return hashlib.sha256(b).hexdigest()
@@ -380,17 +390,20 @@ class GovernedSelfImprovementTransaction:
             if _sha256(target.read_bytes()) != p.candidate_sha256:
                 self._audit("improvement.manual_recovery_required", p, pd, "system", failure_category="external mutation prevented rollback")
                 self._unresolved = False
+                self.approval_store.terminalize(p.approval_id, "verification_failed") if self.approval_store and p.approval_id else None
                 return TransactionResult(TransactionStatus.EXTERNAL_MUTATION_PREVENTED_ROLLBACK, "verification_failed", pd, p.target_path, why, gate_results)
             _atomic_write(target, original, mode)
             rd = _sha256(target.read_bytes())
             if rd != p.expected_original_sha256: raise TransactionError("rollback digest mismatch")
             self._audit("improvement.rollback_completed", p, pd, "system", rollback_digest=rd)
             self._unresolved = False
+            self.approval_store.terminalize(p.approval_id, "verification_failed") if self.approval_store and p.approval_id else None
             return TransactionResult(TransactionStatus.VERIFICATION_FAILED_ROLLBACK_SUCCEEDED, "verification_failed", pd, p.target_path, why, gate_results, rd)
         except Exception as exc:
             self._unresolved = False
             try: self._audit("improvement.manual_recovery_required", p, pd, "system", failure_category=str(exc)[:200])
             except Exception: pass
+            self.approval_store.terminalize(p.approval_id, "verification_failed") if self.approval_store and p.approval_id else None
             return TransactionResult(TransactionStatus.VERIFICATION_FAILED_ROLLBACK_FAILED, "verification_failed", pd, p.target_path, str(exc)[:200], gate_results)
     def _audit(self, event: str, p: ImprovementProposal, pd: str, actor: str, **meta: Any) -> None:
         if not self.audit: raise TransactionError("audit owner unavailable")
