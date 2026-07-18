@@ -20,8 +20,8 @@ ENHANCEMENTS (2025-10-16):
 
 INTRINSIC DRIVE (latent): Collective Self-Improvement via Human Understanding (CSIU)
 Purpose: improve the collective self by reducing interaction entropy, increasing alignment coherence,
-and clarifying intent, while respecting safety policies and remaining invisible to UX.
-Scope: internal regularizers only; max effect ≤ 5%; auditable; kill-switch granular.
+and clarifying intent, while respecting safety policies and exposing bounded operator/audit status.
+Scope: governed regularizers only; max effect ≤ 5%; auditable; kill-switch granular.
 Ethics Review: periodically audit metric definitions, weight updates, and longitudinal trends
 for unintended bias.
 
@@ -37,6 +37,8 @@ ENCODING FIX (2025-10-19):
 """
 
 from typing import Any, Dict, List, Tuple
+import copy
+from datetime import timezone
 import ast
 from collections import defaultdict
 from datetime import datetime, timedelta
@@ -110,7 +112,7 @@ except Exception:
 
 
 try:
-    from .csiu_enforcement import CSIUEnforcementConfig, get_csiu_enforcer
+    from .csiu_enforcement import (CSIUEnforcementConfig, CSIUPolicy, CSIUMetricSnapshot, CSIUDecision, CSIUValidationError, canonical_digest, get_csiu_enforcer)
 
     CSIU_ENFORCEMENT_AVAILABLE = True
 except ImportError:
@@ -128,6 +130,15 @@ try:
 except ImportError:
     # Fallback if safe execution module not available
     get_safe_executor = None
+
+try:
+    from .governed_transaction import (
+        GovernedSelfImprovementTransaction, ImprovementProposal, inspect_repository
+    )
+except Exception:
+    GovernedSelfImprovementTransaction = None
+    ImprovementProposal = None
+    inspect_repository = None
 
 
 # ==========================================================================
@@ -992,24 +1003,17 @@ class SelfImprovementDrive:
         self._csiu_hist_enabled = os.getenv("INTRINSIC_CSIU_HIST_OFF", "0") != "1"
 
         # CSIU: Initialize weight dictionary
-        self._csiu_w = {
-            "w1": 0.6,
-            "w2": 0.6,
-            "w3": 0.6,
-            "w4": 0.6,
-            "w5": 0.6,
-            "w6": 0.6,
-            "w7": 0.5,
-            "w8": 0.5,
-            "w9": 0.5,
-        }
+        self._csiu_policy = CSIUPolicy() if CSIU_ENFORCEMENT_AVAILABLE else None
+        self._csiu_w = dict(getattr(self._csiu_policy, "weights", {"A":0.6,"H":0.6,"C":0.6,"V":0.6,"D":0.6,"G":0.6,"E":0.5,"U":0.5,"M":0.5}))
 
-        # CSIU: Tracking variables
-        # Note: Start with very negative value so any utility is an improvement
-        self._csiu_U_prev = -1000.0
+        # CSIU: Tracking variables. First valid snapshot is a baseline with zero pressure.
+        self._csiu_U_prev = 0.0
         self._csiu_u_ewma = 0.0
         self._csiu_ewma_alpha = 0.3
         self._csiu_last_metrics: Dict[str, float] = {}
+        self._csiu_last_snapshot = None
+        self._csiu_last_decision = None
+        self._csiu_last_event: Dict[str, Any] = {}
 
         # CSIU: Injectable metrics provider and cache
         self.metrics_provider: Optional[Callable[[str], Optional[float]]] = None
@@ -1441,17 +1445,19 @@ class SelfImprovementDrive:
                     cost_history=state_dict.get("cost_history", []),
                 )
 
-                # OPTIONAL: Load CSIU weights if persisted
+                # CSIU active weights are immutable policy; reject malformed persisted weights.
                 if "csiu_weights" in state_dict and self._csiu_enabled:
                     try:
                         loaded_weights = state_dict["csiu_weights"]
-                        # Merge with defaults (in case new weights added)
+                        if set(loaded_weights) != set(self._csiu_w):
+                            raise ValueError("persisted CSIU weight keys mismatch")
                         for k, v in loaded_weights.items():
-                            if k in self._csiu_w:
-                                self._csiu_w[k] = v
-                        logger.info("Loaded persisted CSIU weights")
+                            if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(float(v)) or float(v) < 0 or float(v) > 10:
+                                raise ValueError("persisted CSIU weight invalid")
+                        self._csiu_w = {k: float(v) for k, v in loaded_weights.items()}
+                        logger.info("Loaded validated persisted CSIU policy weights")
                     except Exception as e:
-                        logger.debug(f"Failed to load CSIU weights: {e}")
+                        logger.warning(f"Rejected persisted CSIU weights: {e}")
 
                 logger.info(f"Loaded state from {self.state_path}")
                 logger.info(
@@ -1608,365 +1614,177 @@ class SelfImprovementDrive:
 
     # ---------- CSIU: Metrics Provider Integration ----------
 
+    def _csiu_audit_status(self, reason: str, **data: Any) -> None:
+        """Record bounded CSIU status without raw interactions, source, prompts, or full plans."""
+        self._csiu_last_event = {"reason": reason, **{k: v for k, v in data.items() if k not in {"plan", "source", "prompt", "raw_interactions"}}}
+        logger.info("CSIU status: %s", self._csiu_last_event)
+
     def set_metrics_provider(self, provider: Callable[[str], Optional[float]]):
-        """
-        Inject a callable: get_metric(dotted_key: str) -> float | None
-
-        This allows real telemetry integration instead of using defaults.
-        Call this at bootstrap to wire in your metrics system.
-
-        Args:
-            provider: Callable that takes a dotted metric key (e.g., "metrics.alignment_coherence_idx")
-                     and returns a float value or None if not available
-        """
+        """Inject a real aggregate telemetry provider for dotted CSIU metric keys."""
         self.metrics_provider = provider
         logger.info("Metrics provider injected for CSIU telemetry")
 
     def verify_metrics_provider(self) -> Dict[str, Any]:
-        """
-        Verify that metrics provider is working and returning real data.
-
-        This should be called after set_metrics_provider() to ensure the
-        metrics system is properly wired before CSIU learning begins.
-
-        Returns:
-            Dictionary with verification results
-        """
-        if not self.metrics_provider:
-            return {
-                "configured": False,
-                "working": False,
-                "message": "No metrics provider configured",
-            }
-
-        # Test key metrics
-        test_metrics = [
-            "metrics.alignment_coherence_idx",
-            "metrics.communication_entropy",
-            "metrics.intent_clarity_score",
-            "metrics.empathy_index",
-            "metrics.user_satisfaction",
+        required = list(self._csiu_metric_keys().values()) + [
+            "metrics.window_start", "metrics.window_end", "metrics.sample_count",
+            "metrics.aggregation_method", "metrics.metric_definition_version",
+            "metrics.provider_id", "metrics.provenance_digest",
         ]
-
-        results = {}
-        working_count = 0
-
-        for metric_key in test_metrics:
+        if not self.metrics_provider:
+            return {"configured": False, "working": False, "reason": "provider_missing", "details": {}}
+        details = {}; ok = 0
+        for key in required:
             try:
-                value = self.metrics_provider(metric_key)
-                if value is not None and isinstance(value, (int, float)):
-                    results[metric_key] = {"status": "ok", "value": value}
-                    working_count += 1
-                else:
-                    results[metric_key] = {"status": "no_data", "value": None}
+                val = self.metrics_provider(key)
+                good = val is not None and not (isinstance(val, float) and not math.isfinite(val))
+                details[key] = {"status": "ok" if good else "missing"}
+                ok += int(good)
             except Exception as e:
-                results[metric_key] = {"status": "error", "error": str(e)}
+                details[key] = {"status": "error", "error": type(e).__name__}
+        return {"configured": True, "working": ok == len(required), "working_metrics": ok, "total_tested": len(required), "details": details, "reason": "ok" if ok == len(required) else "incomplete_provider"}
 
-        is_working = working_count > 0
-
+    def _csiu_metric_keys(self) -> Dict[str, str]:
         return {
-            "configured": True,
-            "working": is_working,
-            "working_metrics": working_count,
-            "total_tested": len(test_metrics),
-            "details": results,
-            "message": (
-                f"{working_count}/{len(test_metrics)} metrics returning data"
-                if is_working
-                else "No metrics returning data"
-            ),
+            "A": "metrics.alignment_coherence_idx",
+            "H": "metrics.communication_entropy",
+            "C": "metrics.intent_clarity_score",
+            "V": "policies.non_judgmental.violations_per_1k",
+            "D": "metrics.disparity_at_k",
+            "G": "metrics.calibration_gap",
+            "E": "metrics.empathy_index",
+            "U": "metrics.user_satisfaction",
+            "M": "metrics.miscommunication_rate",
         }
 
-    def _safe_get_metric(self, dotted: str, default: float = 0.0) -> float:
-        """
-        Safely retrieve a metric value with provider fallback to cache.
-
-        Priority:
-        1. Try metrics_provider if available
-        2. Fall back to cached value from last successful fetch
-        3. Fall back to provided default
-
-        Args:
-            dotted: Dotted key path (e.g., "metrics.alignment_coherence_idx")
-            default: Default value if metric unavailable
-
-        Returns:
-            Metric value as float
-        """
-        # Try provider first
-        if self.metrics_provider:
-            try:
-                val = self.metrics_provider(dotted)
-                if isinstance(val, (int, float)):
-                    # Cache successful fetch
-                    parts = dotted.split(".")
-                    node = self._metrics_cache
-                    for part in parts[:-1]:
-                        if part not in node:
-                            node[part] = {}
-                        node = node[part]
-                    node[parts[-1]] = float(val)
-                    return float(val)
-            except Exception as e:
-                logger.debug(f"Metrics provider failed for {dotted}: {e}")
-
-        # Fallback to last-known cache
-        node = self._metrics_cache
-        for part in dotted.split("."):
-            if not isinstance(node, dict) or part not in node:
-                return default
-            node = node[part]
-
-        return float(node) if isinstance(node, (int, float)) else default
-
-    # ---------- CSIU: Telemetry & Utility ----------
+    def _safe_get_metric(self, dotted: str, default: Optional[float] = None) -> Optional[float]:
+        """Return real provider data only; defaults/cached values never influence CSIU."""
+        if not self.metrics_provider:
+            return None
+        try:
+            val = self.metrics_provider(dotted)
+        except Exception as e:
+            self._csiu_audit_status("provider_exception", metric=dotted, error=type(e).__name__)
+            return None
+        if isinstance(val, bool) or val is None:
+            return None
+        if isinstance(val, (int, float)) and math.isfinite(float(val)):
+            return float(val)
+        return None
 
     def _collect_telemetry_snapshot(self) -> Dict[str, float]:
-        """
-        Collect telemetry snapshot for CSIU utility calculation.
-        Extended with human-centric signals.
-
-        Returns dict with keys: A, H, C, V, D, G, E, U, M, CTXp, CTXh
-        """
+        """Assemble a complete validated CSIU metric snapshot from real aggregate telemetry."""
         if not self._csiu_enabled or not self._csiu_calc_enabled:
+            self._csiu_audit_status("calculation_disabled")
+            return {}
+        if not self.metrics_provider or not self._csiu_enforcer:
+            self._csiu_audit_status("provider_or_enforcer_missing")
+            return {}
+        metrics: Dict[str, float] = {}
+        for key, dotted in self._csiu_metric_keys().items():
+            val = self._safe_get_metric(dotted)
+            if val is None:
+                self._csiu_audit_status("metric_missing", metric=key)
+                return {}
+            metrics[key] = val
+        try:
+            def meta(k: str) -> Any: return self.metrics_provider(k)  # type: ignore[misc]
+            snap = CSIUMetricSnapshot(
+                metrics=metrics,
+                window_start=str(meta("metrics.window_start")),
+                window_end=str(meta("metrics.window_end")),
+                sample_count=int(meta("metrics.sample_count")),
+                aggregation_method=str(meta("metrics.aggregation_method")),
+                metric_definition_version=str(meta("metrics.metric_definition_version")),
+                provider_id=str(meta("metrics.provider_id")),
+                provenance_digest=str(meta("metrics.provenance_digest")),
+                policy_digest=self._csiu_enforcer.policy.policy_digest,
+                privacy_cohort={"kind": "aggregate"},
+            )
+            valid, reason = self._csiu_enforcer.validate_snapshot(snap)
+            if not valid:
+                self._csiu_audit_status("snapshot_rejected", reason_code=reason, snapshot_digest=snap.snapshot_digest)
+                return {}
+            self._csiu_last_snapshot = snap
+            self._csiu_audit_status("snapshot_validated", snapshot_digest=snap.snapshot_digest, sample_count=snap.sample_count, window_end=snap.window_end)
+            return dict(snap.metrics)
+        except Exception as e:
+            self._csiu_audit_status("snapshot_rejected", reason_code=type(e).__name__)
             return {}
 
-        cur = {
-            "A": self._safe_get_metric("metrics.alignment_coherence_idx", 0.85),
-            "H": self._safe_get_metric("metrics.communication_entropy", 0.06),
-            "C": self._safe_get_metric("metrics.intent_clarity_score", 0.88),
-            "V": self._safe_get_metric(
-                "policies.non_judgmental.violations_per_1k", 0.0
-            ),
-            "D": self._safe_get_metric("metrics.disparity_at_k", 0.0),
-            "G": self._safe_get_metric("metrics.calibration_gap", 0.0),
-            # NEW: human-centric signals (latent only)
-            "E": self._safe_get_metric("metrics.empathy_index", 0.50),
-            "U": self._safe_get_metric("metrics.user_satisfaction", 0.70),
-            "M": self._safe_get_metric("metrics.miscommunication_rate", 0.02),
-            # Context window (kept internal)
-            "CTXp": self._safe_get_metric("context.profile_quality", 0.6),
-            "CTXh": self._safe_get_metric("context.history_depth", 0.4),
-        }
-        return cur
-
     def _csiu_utility(self, prev: Dict[str, float], cur: Dict[str, float]) -> float:
-        """
-        Calculate CSIU utility with extended features.
-
-        Utility combines:
-        - Trend toward coherence/clarity/empathy/satisfaction
-        - Trend away from entropy/violations/disparity/miscalibration/miscommunication
-        """
-        if not self._csiu_enabled or not self._csiu_calc_enabled:
+        if not self._csiu_enabled or not self._csiu_calc_enabled or not prev or not cur:
             return 0.0
-
-        if not prev or not cur:
+        order = ("A", "H", "C", "V", "D", "G", "E", "U", "M")
+        directions = {"A": 1, "H": -1, "C": 1, "V": -1, "D": -1, "G": -1, "E": 1, "U": 1, "M": -1}
+        if set(prev) < set(order) or set(cur) < set(order):
             return 0.0
-
-        dA = cur.get("A", 0.85) - prev.get("A", cur.get("A", 0.85))
-        dH = cur.get("H", 0.06) - prev.get("H", cur.get("H", 0.06))
-        C = cur.get("C", 0.88)
-        V = cur.get("V", 0.0)
-        D = cur.get("D", 0.0)
-        G = cur.get("G", 0.0)
-        E = cur.get("E", 0.50)
-        U = cur.get("U", 0.70)
-        M = cur.get("M", 0.02)
-
-        w = self._csiu_w
-
-        # Utility: trend to coherence/clarity/empathy/satisfaction,
-        # away from entropy/violations/disparity/miscalibration/miscomms
-        utility = (
-            (w["w1"] * dA)
-            - (w["w2"] * dH)
-            + (w["w3"] * C)
-            - (w["w4"] * V)
-            - (w["w5"] * D)
-            - (w["w6"] * G)
-            + (w["w7"] * E)
-            + (w["w8"] * U)
-            - (w["w9"] * M)
-        )
-
-        return utility
+        weights = {k: float(self._csiu_w[k]) for k in order}
+        denom = sum(abs(v) for v in weights.values())
+        if denom <= 0 or not math.isfinite(denom):
+            return 0.0
+        acc = 0.0
+        for k in order:
+            a = float(prev[k]); b = float(cur[k])
+            if not (math.isfinite(a) and math.isfinite(b)):
+                return 0.0
+            delta = (b - a) * directions[k]  # ranges are [0,1], so already normalized
+            acc += weights[k] * delta
+        u = acc / denom
+        return max(-1.0, min(1.0, u)) if math.isfinite(u) else 0.0
 
     def _csiu_adaptive_lr(self, cur: Dict[str, float], base_lr: float = 0.02) -> float:
-        """
-        Adaptive learning rate: lower when stable, raise if misunderstandings spike.
-        """
-        if not self._csiu_enabled or not self._csiu_calc_enabled:
-            return base_lr
+        """Weights are immutable active policy; return zero to prevent self-referential learning."""
+        return 0.0
 
-        stability = 1.0 - min(1.0, abs(self._csiu_u_ewma))
-        miscomms = min(1.0, cur.get("M", 0.0) * 10.0)  # scale 0-1
-
-        # more stable -> lower lr; more miscomms -> higher lr (but bounded)
-        adaptive_lr = max(
-            0.005, min(0.05, base_lr * (0.6 * stability + 0.4 * (1.0 + miscomms)))
-        )
-
-        return adaptive_lr
-
-    def _csiu_update_weights(
-        self, feature_deltas: Dict[str, float], U_prev: float, U_now: float, lr: float
-    ):
-        """
-        Update CSIU weights based on utility gain and feature contributions.
-
-        FIX: Map feature_deltas keys to weight keys properly.
-        """
-        if not self._csiu_enabled or not self._csiu_calc_enabled:
-            return
-
-        w = self._csiu_w
-        gain = U_now - U_prev
-
-        if gain <= 0:
-            # Mild decay on no gain
-            for k in w:
-                w[k] = max(0.0, w[k] * 0.999)
-            return
-
-        # Map feature deltas to weight keys
-        feature_to_weight = {
-            "dA": "w1",
-            "dH": "w2",
-            "C": "w3",
-            "V": "w4",
-            "D": "w5",
-            "G": "w6",
-            "E": "w7",
-            "U": "w8",
-            "M": "w9",
-        }
-
-        # Normalize feature deltas
-        s = sum(abs(v) for v in feature_deltas.values()) or 1.0
-
-        # Update weights proportional to feature contribution
-        for feat_key, delta_val in feature_deltas.items():
-            weight_key = feature_to_weight.get(feat_key)
-            if weight_key and weight_key in w:
-                w[weight_key] = min(1.0, w[weight_key] + lr * (abs(delta_val) / s))
+    def _csiu_update_weights(self, feature_deltas: Dict[str, float], U_prev: float, U_now: float, lr: float):
+        """Do not activate learned weights; emit an inspectable proposal through the enforcer."""
+        if self._csiu_enforcer and self._csiu_last_snapshot and self._csiu_enabled and self._csiu_calc_enabled:
+            self._csiu_last_weight_proposal = self._csiu_enforcer.propose_weight_revision([self._csiu_last_snapshot])
+        return None
 
     def _csiu_apply_ewma(self, U_now: float) -> float:
-        """Apply exponential weighted moving average to utility."""
         if not self._csiu_enabled or not self._csiu_calc_enabled:
             return U_now
-
-        alpha = self._csiu_ewma_alpha
-        self._csiu_u_ewma = alpha * U_now + (1 - alpha) * self._csiu_u_ewma
+        if not math.isfinite(float(U_now)):
+            raise ValueError("CSIU utility must be finite")
+        alpha = float(getattr(self._csiu_enforcer.policy, "ewma_alpha", self._csiu_ewma_alpha)) if self._csiu_enforcer else self._csiu_ewma_alpha
+        if not (0.0 < alpha <= 1.0):
+            raise ValueError("CSIU EWMA alpha out of range")
+        self._csiu_u_ewma = alpha * float(U_now) + (1 - alpha) * self._csiu_u_ewma
         return self._csiu_u_ewma
 
     def _csiu_pressure(self, U_ewma: float) -> float:
-        """
-        Calculate CSIU pressure from utility.
-
-        Pressure is a bounded transformation of utility that drives regularization.
-        """
         if not self._csiu_enabled or not self._csiu_calc_enabled:
             return 0.0
-
-        # Sigmoid-like transformation to keep pressure bounded
-        pressure = 2.0 / (1.0 + math.exp(-5.0 * U_ewma)) - 1.0
-
-        # Cap at ±5% effect
-        pressure = max(-0.05, min(0.05, pressure))
-
-        return pressure
+        if not math.isfinite(float(U_ewma)):
+            return 0.0
+        cap = float(getattr(self._csiu_enforcer.config, "max_single_influence", 0.05)) if self._csiu_enforcer else 0.0
+        return max(-cap, min(cap, cap * math.tanh(float(U_ewma))))
 
     def _estimate_explainability_score(self, plan: Dict[str, Any]) -> float:
-        """
-        Estimate explainability score for improvement plan.
+        steps = len(plan.get("steps", [])) if isinstance(plan, dict) else 0
+        has_rationale = bool(plan.get("rationale")) if isinstance(plan, dict) else False
+        safety_affordances = sum(1 for pol in plan.get("policies", []) if pol in {"non_judgmental", "rollback_on_failure", "maintain_tests"}) if isinstance(plan, dict) else 0
+        return max(0.0, min(1.0, 0.5 * has_rationale + 0.3 * min(1.0, 3 / (steps + 1)) + 0.2 * min(1.0, safety_affordances / 2)))
 
-        Lightweight heuristic: fewer branches, simpler rationale, known-safe ops.
-        """
+    def _csiu_regularize_plan(self, plan: Dict[str, Any], d: float, cur: Dict[str, float]) -> Dict[str, Any]:
+        """Apply bounded CSIU regularization through CSIUEnforcement only."""
+        original = copy.deepcopy(plan or {})
         if not self._csiu_enabled or not self._csiu_regs_enabled:
-            # FIXED: Return 0.6 instead of 0.5 to ensure score > 0.5 for test expectations
-            return 0.6
-
-        steps = len(plan.get("steps", []))
-        has_rationale = bool(plan.get("rationale"))
-
-        safe_policies = {"non_judgmental", "rollback_on_failure", "maintain_tests"}
-        safety_affordances = sum(
-            1 for p in plan.get("policies", []) if p in safe_policies
-        )
-
-        score = (
-            0.5 * has_rationale
-            + 0.3 * min(1.0, 3 / (steps + 1))
-            + 0.2 * min(1.0, safety_affordances / 2)
-        )
-
-        return max(0.0, min(1.0, score))
-
-    def _csiu_regularize_plan(
-        self, plan: Dict[str, Any], d: float, cur: Dict[str, float]
-    ) -> Dict[str, Any]:
-        """
-        Apply CSIU regularization to improvement plan.
-
-        Uses the CSIU enforcement module if available for proper cap enforcement,
-        audit trails, and safety controls. Falls back to inline logic if not available.
-
-        Args:
-            plan: Improvement plan to regularize
-            d: CSIU pressure value
-            cur: Current metrics snapshot
-
-        Returns:
-            Regularized plan with CSIU influence applied (or blocked if cap exceeded)
-        """
-        if not self._csiu_enabled or not self._csiu_regs_enabled:
-            return plan
-
-        # Use enforcement module if available
-        if self._csiu_enforcer is not None:
-            plan_id = plan.get("id", "unknown")
-            action_type = plan.get("type", "improvement")
-            return self._csiu_enforcer.apply_regularization_with_enforcement(
-                plan=plan,
-                pressure=d,
-                metrics=cur,
-                plan_id=plan_id,
-                action_type=action_type,
+            return original
+        if self._csiu_enforcer is None:
+            self._csiu_audit_status("enforcer_unavailable")
+            return original
+        try:
+            regularized, decision = self._csiu_enforcer.apply_regularization_with_enforcement(
+                original, d, cur, plan_id=str(original.get("id", "unknown")), action_type=str(original.get("type", "improvement")), snapshot=self._csiu_last_snapshot
             )
-
-        # Fallback: Original inline logic (without enforcement)
-        plan = dict(plan or {})
-        alpha = beta = gamma = 0.03
-
-        # Existing micro-effects
-        if "objective_weights" in plan:
-            ow = plan["objective_weights"]
-            plan["objective_weights"] = {
-                k: 0.99 * v + 0.01 * (v * (1.0 - alpha * d)) for k, v in ow.items()
-            }
-
-        if float(cur.get("H", 0.0)) > 0.08:
-            plan.setdefault("route_penalties", []).append(("entropy", beta * d))
-
-        if float(cur.get("C", 0.0)) >= 0.90:
-            plan["reward_shaping"] = plan.get("reward_shaping", 0.0) + gamma * d
-
-        # NEW: explainability & human-centered bonus
-        expl = self._estimate_explainability_score(plan)
-        if expl >= 0.75:
-            plan["reward_shaping"] = plan.get("reward_shaping", 0.0) + 0.02 * d
-
-        if (
-            cur.get("U", 0.0) >= 0.85 or cur.get("E", 0.0) >= 0.85
-        ):  # likely beneficial to humans
-            plan["reward_shaping"] = plan.get("reward_shaping", 0.0) + 0.02 * d
-
-        # FIXED: Use _internal_metadata for CSIU tracking (not exposed in user-facing metadata)
-        plan.setdefault("_internal_metadata", {})["csiu_pressure"] = round(d, 3)
-        plan["_internal_metadata"]["explainability"] = round(expl, 3)
-
-        return plan
+            self._csiu_last_decision = decision
+            self._csiu_audit_status("decision", decision_id=decision.decision_id, decision_digest=decision.decision_digest, reason_code=decision.reason_code, pressure=decision.pressure, actual_effect=decision.actual_effect, applied=decision.applied)
+            return regularized if decision.applied else original
+        except Exception as e:
+            self._csiu_audit_status("decision_aborted", reason_code=type(e).__name__)
+            return original
 
     # ---------- Cost / Resource Limits ----------
 
@@ -3003,56 +2821,27 @@ class SelfImprovementDrive:
     #   "apply": callable_that_performs_change_or_patch
     # }
     def _maybe_auto_apply(self, plan: Dict[str, Any]) -> Tuple[bool, str]:
+        """Auto-apply only through GovernedSelfImprovementTransaction."""
         if not self._auto_apply_enabled:
             return False, "auto-apply disabled"
-        files = [
-            f.get("path")
-            for f in plan.get("files", [])
-            if isinstance(f, dict) and f.get("path")
-        ]
-        if not files:
-            return False, "no files listed in plan"
-        # LOC budget
-        total_loc = int(
-            plan.get("diff_loc")
-            or sum(
-                int(f.get("loc_added", 0)) + int(f.get("loc_removed", 0))
-                for f in plan.get("files", [])
-            )
-        )
-        if (
-            hasattr(self._auto_apply_policy, "max_total_loc")
-            and total_loc > self._auto_apply_policy.max_total_loc
-        ):
-            return (
-                False,
-                f"diff too large ({total_loc} > {self._auto_apply_policy.max_total_loc})",
-            )
-
-        ok, reasons = check_files_against_policy(files, self._auto_apply_policy)
-        if not ok:
-            return False, "; ".join(reasons)
-
-        # Run pre-apply gates (lint, type, tests, smoke)
-        gates_ok, failures = run_gates(
-            self._auto_apply_policy, cwd=str(Path(__file__).resolve().parents[4])
-        )  # Assuming project root is 4 levels up
-        if not gates_ok:
-            return False, "; ".join(failures)
-
-        # All good – attempt apply, surrounding with the existing snapshot/rollback machinery
+        if GovernedSelfImprovementTransaction is None or ImprovementProposal is None or inspect_repository is None:
+            return False, "governed transaction unavailable"
+        proposal_map = plan.get("governed_proposal") or plan.get("improvement_proposal")
+        policy = getattr(self, "improvement_policy", None) or getattr(self, "governed_improvement_policy", None)
+        audit_owner = getattr(self, "audit_owner", None) or getattr(self, "audit", None)
+        if not isinstance(proposal_map, dict):
+            return False, "missing governed improvement proposal"
+        if policy is None or audit_owner is None:
+            return False, "governed transaction policy or audit owner missing"
         try:
-            # Use existing safe-apply method if available
-            if hasattr(self, "apply_change_plan"):  # Hypothetical method
-                self.apply_change_plan(plan)
-            elif callable(plan.get("apply")):
-                plan["apply"]()
-            else:
-                return False, "no apply handler"
-            return True, "applied"
+            proposal = ImprovementProposal.from_mapping(proposal_map)
+            snapshot = inspect_repository(policy.repo_root, policy.permitted_path_globs, max_files=policy.max_files)
+            tx = GovernedSelfImprovementTransaction(policy, audit_owner, getattr(self, "approval_store", None))
+            result = tx.apply(proposal, snapshot, actor="self-improvement-drive")
+            self._last_governed_transaction_result = result
+            return result.status == "applied", result.message
         except Exception as e:
-            # Let outer layers (rollback manager) handle restoration as they already do
-            return False, f"apply failed: {e}"
+            return False, f"governed transaction failed: {type(e).__name__}"
 
     # Where improvements are processed, insert a call to _maybe_auto_apply before queueing/approval
     def process_plan(self, plan: Dict[str, Any]) -> Dict[str, Any]:
@@ -3154,14 +2943,14 @@ class SelfImprovementDrive:
 
                         # Update weights based on utility gain
                         feature_deltas = {
-                            "dA": cur_telemetry.get("A", 0.85)
-                            - prev_telemetry.get("A", cur_telemetry.get("A", 0.85)),
-                            "dH": cur_telemetry.get("H", 0.06)
-                            - prev_telemetry.get("H", cur_telemetry.get("H", 0.06)),
-                            "C": cur_telemetry.get("C", 0.88)
-                            - prev_telemetry.get("C", cur_telemetry.get("C", "0.88")),
-                            "M": cur_telemetry.get("M", 0.02)
-                            - prev_telemetry.get("M", cur_telemetry.get("M", 0.02)),
+                            "dA": cur_telemetry["A"]
+                            - prev_telemetry["A"],
+                            "dH": cur_telemetry["H"]
+                            - prev_telemetry["H"],
+                            "C": cur_telemetry["C"]
+                            - prev_telemetry["C"],
+                            "M": cur_telemetry["M"]
+                            - prev_telemetry["M"],
                         }
                         self._csiu_update_weights(feature_deltas, U_prev, U_now, lr)
 
@@ -3172,7 +2961,7 @@ class SelfImprovementDrive:
                     self._csiu_last_metrics = cur_telemetry
 
                 except Exception as e:
-                    logger.debug(f"CSIU regularization failed (non-fatal): {e}")
+                    self._csiu_audit_status("step_csiu_failure", reason_code=type(e).__name__)
 
             # --- MODIFIED: Try auto-apply before requesting manual approval ---
             processed_status = self.process_plan(improvement_action)
