@@ -133,11 +133,14 @@ except ImportError:
 
 try:
     from .governed_transaction import (
-        GovernedSelfImprovementTransaction, ImprovementProposal, inspect_repository
+        GovernedSelfImprovementTransaction, ImprovementProposal, ApprovalRecord, TransactionResult, TransactionStatus, inspect_repository
     )
 except Exception:
     GovernedSelfImprovementTransaction = None
     ImprovementProposal = None
+    ApprovalRecord = None
+    TransactionResult = None
+    TransactionStatus = None
     inspect_repository = None
 
 
@@ -2811,6 +2814,64 @@ class SelfImprovementDrive:
 
         return None
 
+
+    def _queue_governed_approval(self, plan: Dict[str, Any], reason: str) -> Dict[str, Any]:
+        proposal_map = plan.get("governed_proposal") or plan.get("improvement_proposal")
+        policy = getattr(self, "improvement_policy", None) or getattr(self, "governed_improvement_policy", None)
+        if not (ImprovementProposal and isinstance(proposal_map, dict) and policy is not None):
+            approval_id = self.request_approval(plan)
+            return {"status": "queued", "plan_id": plan.get("id"), "reason": reason, "approval_id": approval_id}
+        try:
+            proposal = ImprovementProposal.from_mapping(proposal_map)
+            pending = {
+                "id": proposal.proposal_id, "approval_id": proposal.approval_id or proposal.proposal_id,
+                "status": "pending_governed_approval", "lifecycle": "pending governed approval",
+                "proposal": proposal_map, "proposal_digest": proposal.digest(),
+                "policy_digest": policy.digest, "original_source_digest": proposal.expected_original_sha256,
+                "inspected_source_digest": proposal.inspected_source_digest,
+                "provider_release_digest": proposal.provider_release_digest, "timestamp": time.time(),
+                "reason": reason,
+            }
+            self.state.pending_approvals.append(pending); self._save_state()
+            return {"status": "pending_governed_approval", "plan_id": plan.get("id"), "reason": reason, "approval_id": pending["approval_id"], "proposal_digest": pending["proposal_digest"]}
+        except Exception as e:
+            return {"status": "rejected", "plan_id": plan.get("id"), "reason": f"governed approval queue failed: {type(e).__name__}"}
+
+    def approve_governed_pending(self, approval_id: str, approver_identity: str, *, ttl_seconds: float = 3600.0) -> bool:
+        if approver_identity in {"", "self-improvement-drive", "drive", "system"}:
+            return False
+        if ApprovalRecord is None or not getattr(self, "approval_store", None):
+            return False
+        with self._lock:
+            for approval in self.state.pending_approvals:
+                if approval.get("approval_id") == approval_id and approval.get("status") == "pending_governed_approval":
+                    rec = ApprovalRecord(approval_id, approval["proposal_digest"], approval["policy_digest"], approval["original_source_digest"], approver_identity, time.time(), time.time()+ttl_seconds)
+                    self.approval_store.save(rec)
+                    approval["status"] = "independently_approved"; approval["approved_at"] = rec.approved_at; approval["approver_identity"] = approver_identity
+                    self._save_state(); return True
+        return False
+
+    def resume_governed_pending(self, approval_id: str) -> Dict[str, Any]:
+        with self._lock:
+            pending = next((a for a in self.state.pending_approvals if a.get("approval_id") == approval_id), None)
+        if not pending:
+            return {"status": "missing_approval", "approval_id": approval_id}
+        if pending.get("status") != "independently_approved":
+            return {"status": pending.get("status", "pending_governed_approval"), "approval_id": approval_id}
+        proposal_map = copy.deepcopy(pending.get("proposal", {})); proposal_map["approval_id"] = approval_id
+        plan = {"id": pending.get("id"), "governed_proposal": proposal_map}
+        applied, reason = self._maybe_auto_apply(plan)
+        result = getattr(self, "_last_governed_transaction_result", None)
+        status = result.status_code if result is not None else ("applied" if applied else reason)
+        with self._lock:
+            pending["status"] = "applied" if applied else status
+            pending["transaction_status"] = status
+            pending["completed_at"] = time.time()
+            self._save_state()
+        if applied:
+            self.state.improvements_this_session += 1
+        return {"status": status, "approval_id": approval_id, "applied": applied, "reason": reason, "transaction_result": result}
+
     # ---------- Auto Apply Logic ----------
     # Example change plan schema assumption:
     # plan = {
@@ -2839,7 +2900,9 @@ class SelfImprovementDrive:
             tx = GovernedSelfImprovementTransaction(policy, audit_owner, getattr(self, "approval_store", None))
             result = tx.apply(proposal, snapshot, actor="self-improvement-drive")
             self._last_governed_transaction_result = result
-            return result.status == "applied", result.message
+            if result.verified_success:
+                return True, result.status_code
+            return False, result.status_code + (f":{result.failure_category}" if result.failure_category else "")
         except Exception as e:
             return False, f"governed transaction failed: {type(e).__name__}"
 
@@ -2859,25 +2922,7 @@ class SelfImprovementDrive:
             logger.info(f"Auto-applied plan {plan.get('id')}")
             # Potentially call record_outcome here or let external orchestrator do it
         else:
-            # Fall back to your existing "queue for approval" path
-            if hasattr(self, "request_approval"):
-                approval_id = self.request_approval(
-                    plan
-                )  # Assuming request_approval queues it
-                status = {
-                    "status": "queued",
-                    "plan_id": plan.get("id"),
-                    "reason": reason,
-                    "approval_id": approval_id,
-                }
-            else:
-                # If no specific queuing method, just log and set status
-                logger.info(f"Plan {plan.get('id')} requires manual approval: {reason}")
-                status = {
-                    "status": "queued",
-                    "plan_id": plan.get("id"),
-                    "reason": reason,
-                }
+            status = self._queue_governed_approval(plan, reason)
 
         # Update state if your class tracks it
         try:
@@ -2924,40 +2969,23 @@ class SelfImprovementDrive:
                     prev_telemetry = self._csiu_last_metrics
                     cur_telemetry = self._collect_telemetry_snapshot()
 
-                    if prev_telemetry and cur_telemetry:
-                        # Calculate utility
-                        U_prev = self._csiu_U_prev
-                        U_now = self._csiu_utility(prev_telemetry, cur_telemetry)
-                        U_ewma = self._csiu_apply_ewma(U_now)
-
-                        # Calculate pressure (bounded ±5%)
-                        d = self._csiu_pressure(U_ewma)
-
-                        # Regularize plan (≤3% micro-effects)
-                        improvement_action = self._csiu_regularize_plan(
-                            improvement_action, d, cur_telemetry
+                    previous_snapshot = getattr(self, "_csiu_previous_snapshot", None)
+                    current_snapshot = getattr(self, "_csiu_last_snapshot", None) if cur_telemetry else None
+                    if self._csiu_enforcer is not None and current_snapshot is not None:
+                        improvement_action, decision = self._csiu_enforcer.apply_regularization_from_snapshots(
+                            improvement_action, previous_snapshot, current_snapshot,
+                            plan_id=str(improvement_action.get("id", "unknown")),
+                            action_type=str(improvement_action.get("type", "improvement")),
                         )
-
-                        # Adaptive learning rate
-                        lr = self._csiu_adaptive_lr(cur_telemetry)
-
-                        # Update weights based on utility gain
-                        feature_deltas = {
-                            "dA": cur_telemetry["A"]
-                            - prev_telemetry["A"],
-                            "dH": cur_telemetry["H"]
-                            - prev_telemetry["H"],
-                            "C": cur_telemetry["C"]
-                            - prev_telemetry["C"],
-                            "M": cur_telemetry["M"]
-                            - prev_telemetry["M"],
-                        }
-                        self._csiu_update_weights(feature_deltas, U_prev, U_now, lr)
-
-                        # Store for next iteration
-                        self._csiu_U_prev = U_now
-
-                    # Store current telemetry for next iteration
+                        self._csiu_last_decision = decision
+                        self._csiu_audit_status(
+                            "decision", decision_id=decision.decision_id,
+                            decision_digest=decision.decision_digest, reason_code=decision.reason_code,
+                            pressure=decision.pressure, actual_effect=decision.actual_effect,
+                            applied=decision.applied, authoritative="csiu_enforcement",
+                        )
+                        if decision.reason_code == "baseline_established" or decision.applied:
+                            self._csiu_previous_snapshot = current_snapshot
                     self._csiu_last_metrics = cur_telemetry
 
                 except Exception as e:
