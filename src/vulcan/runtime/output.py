@@ -74,6 +74,8 @@ def project(ir: ResponseIR, claims: tuple[Claim, ...]) -> ResponseIRProjection:
         claim = indexed[claim_id]
         if claim.status is EpistemicStatus.COMPUTED:
             selected.append(ProjectedClaim(claim_id, "computed", claim.proposition.object, claim.status, claim.caveat, claim.citation_ids))
+        elif claim.status is EpistemicStatus.RETRIEVED:
+            selected.append(ProjectedClaim(claim_id, "retrieved", claim.proposition.object, claim.status, claim.caveat, claim.citation_ids))
         elif claim.status in {EpistemicStatus.UNKNOWN, EpistemicStatus.ERROR}:
             selected.append(ProjectedClaim(claim_id, claim.status.value, None, claim.status, claim.caveat, claim.citation_ids))
         else:

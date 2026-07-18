@@ -8,6 +8,9 @@ from uuid import uuid4
 
 from vulcan.memory.governed import GovernedMemoryPort, compose_governed_memory
 
+from .alignment import AlignmentRegistry
+from .audit import CanonicalAudit
+from .domain_registry import PersistentDomainRegistry
 from .finalization import SafetyResponseFinalizer
 from .kernel import CognitiveKernel
 from .output import DeterministicLanguageOutput, LanguageOutputPort
@@ -38,6 +41,9 @@ class RuntimeContainer:
     language_input: LanguageInputPort
     language_output: LanguageOutputPort
     language_config: LanguageRuntimeConfig
+    audit: CanonicalAudit | None = None
+    alignment: AlignmentRegistry | None = None
+    domain_registry: PersistentDomainRegistry | None = None
     closed: bool = False
 
     async def close(self) -> None:
@@ -57,6 +63,9 @@ class RuntimeContainer:
             self.language_output,
             self.language_input,
             self.memory,
+            self.alignment,
+            self.audit,
+            self.domain_registry,
             self.kernel,
             self.safety,
             self.world_state,
@@ -89,6 +98,9 @@ class RuntimeContainer:
             "memory": self.memory,
             "language_input": self.language_input,
             "language_output": self.language_output,
+            "audit": self.audit,
+            "alignment": self.alignment,
+            "domain_registry": self.domain_registry,
         }
         for name, owner in required.items():
             if owner is None:
@@ -125,14 +137,21 @@ class RuntimeContainer:
         language_input: LanguageInputPort = DeterministicLanguageInput()
         language_output: LanguageOutputPort = DeterministicLanguageOutput()
         memory = compose_governed_memory()
+        root = getattr(deployment, "runtime_root", None) or getattr(deployment, "data_dir", None) or "/tmp/vulcan-runtime"
+        audit = alignment = domain_registry = None
         try:
             memory.readiness()
+            audit = CanonicalAudit(f"{root}/audit/events.jsonl")
+            alignment = AlignmentRegistry(f"{root}/alignment/active.json", audit=audit)
+            domain_registry = PersistentDomainRegistry(f"{root}/domains", audit=audit)
+            setattr(world_state, "domain", domain_registry)
             kernel = CognitiveKernel(state_authority=world_state, finalizer=SafetyResponseFinalizer(safety),
-                                     language_input=language_input, language_output=language_output, memory=memory)
+                                     language_input=language_input, language_output=language_output, memory=memory, audit=audit, alignment=alignment)
             return cls(str(uuid4()), deployment, world_state, kernel, safety, memory,
-                       language_input, language_output, config)
+                       language_input, language_output, config, audit, alignment, domain_registry)
         except Exception:
-            memory.close()
-            language_output.close()
-            language_input.close()
+            for r in (domain_registry, alignment, audit, memory, language_output, language_input):
+                if r is not None:
+                    close=getattr(r,"close",None)
+                    if close: close()
             raise

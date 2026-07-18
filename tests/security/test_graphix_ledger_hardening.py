@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 import pytest
 
 from vulcan.runtime.case import CognitiveCase
+from vulcan.runtime.domain_registry import DomainEvidenceSupport, DomainLookupResult
 from vulcan.runtime.semantic import (
     AcceptedInterpretation, Claim, CompiledGraphixPlan, Derivation, EpistemicStatus,
     EvidenceArtifact, EvidenceKind, ExecutionStatus, GraphixPlan, InterpretationProposal,
@@ -81,9 +82,12 @@ def test_arithmetic_precedence_and_resource_syntax_violations():
 
 
 def test_lookup_plan_executes_through_injected_domain_and_strict_rendering():
+    from datetime import datetime, timezone
     class Domain:
         domain_snapshot_id = "domain:1"
-        def lookup_exact(self, key): return ("Paris", "cities:paris")
+        def lookup_exact(self, key):
+            support = DomainEvidenceSupport("geo", 1, "fact-1", "ev-1", "cities:paris", canonical_digest("Paris"), datetime.now(timezone.utc), None, "exact-key", "test", ())
+            return DomainLookupResult("retrieved", key, "Paris", self.domain_snapshot_id, (support,), total_evidence=1)
     acc = AcceptedInterpretation(0, "lookup", "france.capital")
     plan = build_graphix_plan(acc, request_digest="r", state_snapshot_id="s", domain_snapshot_id="domain:1")
     claim, derivation, evidence = execute_graphix_plan(compile_graphix_plan(plan, request_digest="r", state_snapshot_id="s", domain_snapshot_id="domain:1"), request_digest="r", state_snapshot_id="s", domain_snapshot_id="domain:1", case_id="case", domain=Domain())
@@ -91,3 +95,15 @@ def test_lookup_plan_executes_through_injected_domain_and_strict_rendering():
     artifact = render_strict(ir, (claim,), (derivation,), evidence)
     assert "Paris" in artifact.text
     assert "cities:paris" not in artifact.text
+
+
+def test_tuple_only_lookup_provider_cannot_produce_positive_canonical_claim():
+    class LegacyDomain:
+        domain_snapshot_id = "domain:legacy"
+        def lookup_exact(self, key): return ("Paris", "cities:paris")
+    acc = AcceptedInterpretation(0, "lookup", "france.capital")
+    plan = build_graphix_plan(acc, request_digest="r", state_snapshot_id="s", domain_snapshot_id="domain:legacy")
+    compiled = compile_graphix_plan(plan, request_digest="r", state_snapshot_id="s", domain_snapshot_id="domain:legacy")
+    import pytest
+    with pytest.raises(ValueError, match="typed DomainLookupResult"):
+        execute_graphix_plan(compiled, request_digest="r", state_snapshot_id="s", domain_snapshot_id="domain:legacy", case_id="case", domain=LegacyDomain())
