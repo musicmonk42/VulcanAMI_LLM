@@ -92,7 +92,7 @@ class CognitiveCase:
         proposed_evidence = (*self._evidence, *evidence)
         proposed_derivations = (*self._derivations, derivation)
         proposed_claims = (*self._claims, claim)
-        validate_ledger(proposed_evidence, proposed_derivations, proposed_claims)
+        validate_ledger(proposed_evidence, proposed_derivations, proposed_claims, case_id=self.case_id)
         self._evidence.extend(evidence)
         self._derivations.append(derivation)
         self._claims.append(claim)

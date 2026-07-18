@@ -3,10 +3,12 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 from typing import Any
-from vulcan.memory.governed import GovernedMemoryPort
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from vulcan.memory.governed import GovernedMemoryPort
 from .case import CognitiveCase, CognitiveCaseStatus
 from .finalization import ResponseFinalizerPort
-from .semantic import (ClarificationRequest, DeterministicLanguageInput, LanguageInputPort, RESPONSE_IR_VERSION, ResponseIR, ResponseMode, Utterance, accept, execute, render_strict, validate_proposal)
+from .semantic import (ClarificationRequest, DeterministicLanguageInput, LanguageInputPort, RESPONSE_IR_VERSION, ResponseIR, ResponseMode, Utterance, accept, build_graphix_plan, compile_graphix_plan, execute, execute_graphix_plan, render_strict, validate_proposal)
 from .output import DeterministicLanguageOutput, LanguageOutputPort, SemanticFirewall, project
 @dataclass(frozen=True)
 class KernelRequest:
@@ -21,7 +23,7 @@ class KernelResult:
     def transport(self, *, case_id: str, runtime_id: str, snapshot_id: str | None) -> dict[str, object]:
         return {"response": self.response, "metadata": {"case_id":case_id,"runtime_id":runtime_id,"state_snapshot_id":snapshot_id,"semantic_schema_version":self.response_ir.schema_version,"finalized":True,"finalization_safety_decision":self.finalization}}
 class CognitiveKernel:
-    def __init__(self, *, state_authority: Any, finalizer: ResponseFinalizerPort, language_input: LanguageInputPort | None = None, language_output: LanguageOutputPort | None = None, memory: GovernedMemoryPort | None = None) -> None:
+    def __init__(self, *, state_authority: Any, finalizer: ResponseFinalizerPort, language_input: LanguageInputPort | None = None, language_output: LanguageOutputPort | None = None, memory: "GovernedMemoryPort | None" = None) -> None:
         # The kernel owns the only memory port exposed to the production path.
         # It deliberately does not turn retrieved text into executable semantics.
         self._state_authority=state_authority; self._finalizer=finalizer; self._language_input=language_input or DeterministicLanguageInput(); self._language_output=language_output or DeterministicLanguageOutput(); self._memory=memory; self.calls=0
@@ -49,8 +51,13 @@ class CognitiveKernel:
                 claim, derivation=execute(type("Unsupported", (), {"operation":"unsupported", "expression":"", "assumptions":()})())
                 case.append_ledger(claim=claim,derivation=derivation); mode=ResponseMode.CLARIFICATION; status=CognitiveCaseStatus.ABSTAINED; accepted_id=None
             else:
-                case.accepted_interpretation=selection; claim,derivation=execute(selection,case_id=case.case_id); case.append_ledger(claim=claim,derivation=derivation)
-                mode=ResponseMode.STRICT if claim.status.value=="computed" else ResponseMode.UNKNOWN; status=CognitiveCaseStatus.SUCCESS if mode is ResponseMode.STRICT else CognitiveCaseStatus.ABSTAINED; accepted_id=selection.interpretation_id
+                case.accepted_interpretation=selection
+                domain_snapshot_id=getattr(getattr(self._state_authority,"domain",None),"domain_snapshot_id","domain:none")
+                plan=build_graphix_plan(selection, request_digest=request.utterance.digest, state_snapshot_id=case.state_snapshot_id or "", domain_snapshot_id=domain_snapshot_id)
+                compiled=compile_graphix_plan(plan, request_digest=request.utterance.digest, state_snapshot_id=case.state_snapshot_id or "", domain_snapshot_id=domain_snapshot_id)
+                claim,derivation,evidence=execute_graphix_plan(compiled, request_digest=request.utterance.digest, state_snapshot_id=case.state_snapshot_id or "", domain_snapshot_id=domain_snapshot_id, case_id=case.case_id, domain=getattr(self._state_authority,"domain",None))
+                case.append_ledger(claim=claim,derivation=derivation,evidence=evidence)
+                mode=ResponseMode.STRICT if claim.status.value in {"computed","retrieved"} else ResponseMode.UNKNOWN; status=CognitiveCaseStatus.SUCCESS if mode is ResponseMode.STRICT else CognitiveCaseStatus.ABSTAINED; accepted_id=selection.interpretation_id
             response_ir=ResponseIR(RESPONSE_IR_VERSION,f"response-{case.case_id}",case.case_id,accepted_id,case.state_snapshot_id,mode,(claim.claim_id,))
             case.response_ir=response_ir
             # The adapter sees only the projection; firewall rejection is always strict fallback.
