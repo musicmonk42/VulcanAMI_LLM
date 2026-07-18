@@ -9,8 +9,8 @@ from typing import Any
 SCHEMA_VERSION="vulcan-audit/1"
 MAX_FILE_BYTES=8_000_000; MAX_LINE_BYTES=64_000; MAX_EVENTS=100_000; MAX_DEPTH=8; MAX_ITEMS=256; MAX_STRING=2048
 _FIELDS={"schema_version","sequence","event_type","timestamp","previous_hash","data","event_hash"}
-_EVENT=re.compile(r"(?:case|domain|alignment|runtime|memory)\.[a-z][a-z0-9_]{0,31}")
-_ALLOWED={"case.started","case.interpreted","case.plan_compiled","case.ledger_committed","case.alignment_decided","case.finalized","case.completed","case.abstained","case.failed","domain.activation_prepared","domain.activation_committed","domain.activation_aborted","alignment.activation_prepared","alignment.activation_committed","alignment.activation_aborted","memory.write_prepared","memory.write_committed","memory.write_aborted","runtime.ready"}
+_EVENT=re.compile(r"(?:case|domain|alignment|runtime|memory|csiu)\.[a-z][a-z0-9_]{0,31}")
+_ALLOWED={"case.started","case.interpreted","case.plan_compiled","case.ledger_committed","case.alignment_decided","case.finalized","case.completed","case.abstained","case.failed","domain.activation_prepared","domain.activation_committed","domain.activation_aborted","alignment.activation_prepared","alignment.activation_committed","alignment.activation_aborted","memory.write_prepared","memory.write_committed","memory.write_aborted","runtime.ready","csiu.snapshot_validated","csiu.snapshot_rejected","csiu.decision_prepared","csiu.influence_applied","csiu.influence_blocked","csiu.decision_aborted","csiu.weight_proposed","csiu.alignment_proposed","csiu.kill_switch_changed"}
 _TRANS={None:{"case.started"},"case.started":{"case.interpreted","case.failed"},"case.interpreted":{"case.plan_compiled","case.failed"},"case.plan_compiled":{"case.ledger_committed","case.failed"},"case.ledger_committed":{"case.alignment_decided","case.failed"},"case.alignment_decided":{"case.finalized","case.abstained","case.failed"},"case.finalized":{"case.completed","case.abstained","case.failed"},"case.abstained":set(),"case.completed":set(),"case.failed":set()}
 
 class AuditError(RuntimeError): pass

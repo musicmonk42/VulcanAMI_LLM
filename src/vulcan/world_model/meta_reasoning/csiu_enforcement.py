@@ -1,465 +1,289 @@
-# src/vulcan/world_model/meta_reasoning/csiu_enforcement.py
+from __future__ import annotations
+"""Inspectable CSIU enforcement and typed contracts.
+
+CSIU is visible to operators/auditors. It can regularize only a closed set of
+plan metadata fields and can propose, but never activate, alignment policy
+changes.
 """
-CSIU (Collective Self-Improvement via Human Understanding) Enforcement Module
-
-INTERNAL ENGINEERING USE ONLY - DO NOT EXPOSE TO END USERS
-
-This module provides explicit enforcement, monitoring, and controls for the CSIU mechanism
-to ensure transparency, safety, and compliance with the documented 5% influence cap.
-
-Security: CRITICAL
-- Enforces maximum influence caps
-- Provides kill switches
-- Logs all CSIU effects (DEBUG/INTERNAL level only)
-- Monitors cumulative influence
-- Provides audit trail (engineering access only)
-
-IMPORTANT: All CSIU logging uses DEBUG level or internal-only logs.
-           User-facing logs never mention CSIU.
-"""
-
-import json
-import logging
-import threading
-import time
-from collections import deque
-from dataclasses import asdict, dataclass
+import copy, hashlib, json, math, os, threading, time, uuid
+from dataclasses import dataclass, field, replace
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
 
-from vulcan.world_model.meta_reasoning.serialization_mixin import SerializationMixin
+try:
+    from vulcan.world_model.meta_reasoning.serialization_mixin import SerializationMixin
+except Exception:
+    class SerializationMixin:
+        pass
 
-logger = logging.getLogger(__name__)
+SCHEMA_SNAPSHOT="vulcan-csiu-metric-snapshot/1"; SCHEMA_POLICY="vulcan-csiu-policy/1"; SCHEMA_DECISION="vulcan-csiu-decision/1"; SCHEMA_RECORD="vulcan-csiu-influence-record/1"; SCHEMA_PROPOSAL="vulcan-csiu-alignment-proposal/1"
+UTC=timezone.utc
+METRIC_ORDER=("A","H","C","V","D","G","E","U","M")
+DIRECTIONS={"A":1,"H":-1,"C":1,"V":-1,"D":-1,"G":-1,"E":1,"U":1,"M":-1}
+DEFAULT_RANGES={k:(0.0,1.0) for k in METRIC_ORDER}
+DEFAULT_WEIGHTS={"A":0.6,"H":0.6,"C":0.6,"V":0.6,"D":0.6,"G":0.6,"E":0.5,"U":0.5,"M":0.5}
+MAX_ITEMS=64; MAX_STR=512
 
+class CSIUValidationError(ValueError): pass
 
-@dataclass
+def _now(): return datetime.now(UTC)
+def _ts(dt: datetime)->str:
+    if dt.tzinfo is None: raise CSIUValidationError("timestamp must be timezone-aware UTC")
+    return dt.astimezone(UTC).isoformat().replace("+00:00","Z")
+def _parse_ts(s: str)->datetime:
+    if not isinstance(s,str) or not s.endswith("Z"): raise CSIUValidationError("invalid timestamp")
+    try: return datetime.fromisoformat(s.replace("Z","+00:00")).astimezone(UTC)
+    except Exception as e: raise CSIUValidationError("invalid timestamp") from e
+
+def _num(x: Any, name="number")->float:
+    if isinstance(x,bool) or not isinstance(x,(int,float)) or not math.isfinite(float(x)): raise CSIUValidationError(f"invalid {name}")
+    return float(x)
+def _clean(v: Any, depth=0)->Any:
+    if depth>8: raise CSIUValidationError("nested object too deep")
+    if v is None or isinstance(v,bool): return v
+    if isinstance(v,(int,float)): return _num(v)
+    if isinstance(v,str):
+        if len(v)>MAX_STR or any(ord(c)<32 for c in v): raise CSIUValidationError("invalid string")
+        return v
+    if isinstance(v,Mapping):
+        if len(v)>MAX_ITEMS: raise CSIUValidationError("object too large")
+        return {str(k):_clean(val,depth+1) for k,val in sorted(v.items())}
+    if isinstance(v,(list,tuple)):
+        if len(v)>MAX_ITEMS: raise CSIUValidationError("array too large")
+        return [_clean(x,depth+1) for x in v]
+    raise CSIUValidationError("unsupported value")
+def canonical_digest(o: Mapping[str,Any])->str:
+    return hashlib.sha256(json.dumps(_clean(dict(o)),sort_keys=True,separators=(",",":"),allow_nan=False).encode()).hexdigest()
+
+def _id(prefix: str, body: Mapping[str,Any])->str: return f"{prefix}-{canonical_digest(body)[:24]}"
+
+@dataclass(frozen=True)
+class CSIUPolicy:
+    schema_version: str = SCHEMA_POLICY
+    policy_version: str = "csiu-weight-policy/1"
+    metric_definition_version: str = "csiu-metrics/1"
+    weights: Mapping[str,float] = field(default_factory=lambda: dict(DEFAULT_WEIGHTS))
+    metric_ranges: Mapping[str,Tuple[float,float]] = field(default_factory=lambda: dict(DEFAULT_RANGES))
+    min_sample_count: int = 30
+    max_snapshot_age_seconds: float = 3600.0
+    ewma_alpha: float = 0.3
+    max_single_influence: float = 0.05
+    max_cumulative_influence_window: float = 0.10
+    cumulative_window_seconds: float = 3600.0
+    policy_id: str = "csiu-policy-default"
+    created_at: str = field(default_factory=lambda:_ts(_now()))
+    policy_digest: str = ""
+    def __post_init__(self):
+        w={k:_num(self.weights.get(k),f"weight {k}") for k in METRIC_ORDER}
+        if set(self.weights)!=set(METRIC_ORDER): raise CSIUValidationError("policy weight keys mismatch")
+        if any(v<0 or v>10 for v in w.values()): raise CSIUValidationError("weight out of bounds")
+        ranges={}
+        for k in METRIC_ORDER:
+            lo,hi=self.metric_ranges.get(k,(None,None)); lo=_num(lo); hi=_num(hi)
+            if hi<=lo: raise CSIUValidationError("bad metric range")
+            ranges[k]=(lo,hi)
+        if type(self.min_sample_count) is not int or self.min_sample_count<1: raise CSIUValidationError("bad sample count")
+        for n in (self.max_snapshot_age_seconds,self.ewma_alpha,self.max_single_influence,self.max_cumulative_influence_window,self.cumulative_window_seconds): _num(n)
+        if not (0<self.ewma_alpha<=1) or self.max_single_influence<=0 or self.max_cumulative_influence_window<self.max_single_influence or self.cumulative_window_seconds<=0: raise CSIUValidationError("bad policy caps")
+        _parse_ts(self.created_at)
+        body=self.to_dict(include_digest=False); digest=canonical_digest(body)
+        object.__setattr__(self,"weights",w); object.__setattr__(self,"metric_ranges",ranges)
+        if self.policy_digest and self.policy_digest!=digest: raise CSIUValidationError("policy digest mismatch")
+        object.__setattr__(self,"policy_digest",digest)
+    def to_dict(self, include_digest=True):
+        d={"schema_version":self.schema_version,"policy_id":self.policy_id,"policy_version":self.policy_version,"metric_definition_version":self.metric_definition_version,"weights":dict(self.weights),"metric_ranges":{k:list(v) for k,v in self.metric_ranges.items()},"min_sample_count":self.min_sample_count,"max_snapshot_age_seconds":self.max_snapshot_age_seconds,"ewma_alpha":self.ewma_alpha,"max_single_influence":self.max_single_influence,"max_cumulative_influence_window":self.max_cumulative_influence_window,"cumulative_window_seconds":self.cumulative_window_seconds,"created_at":self.created_at}
+        if include_digest: d["policy_digest"]=self.policy_digest
+        return d
+
+@dataclass(frozen=True)
+class CSIUMetricSnapshot:
+    metrics: Mapping[str,float]; window_start: str; window_end: str; sample_count: int; aggregation_method: str; metric_definition_version: str; provider_id: str; provenance_digest: str; policy_digest: str; schema_version: str=SCHEMA_SNAPSHOT; snapshot_id: str=""; created_at: str=field(default_factory=lambda:_ts(_now())); privacy_cohort: Optional[Mapping[str,Any]]=None; snapshot_digest: str=""
+    def __post_init__(self):
+        if set(self.metrics)!=set(METRIC_ORDER): raise CSIUValidationError("missing metrics")
+        m={k:_num(self.metrics[k],k) for k in METRIC_ORDER}
+        for k,v in m.items():
+            lo,hi=DEFAULT_RANGES[k]
+            if not (lo<=v<=hi): raise CSIUValidationError(f"metric {k} out of range")
+        ws=_parse_ts(self.window_start); we=_parse_ts(self.window_end); _parse_ts(self.created_at)
+        if we<=ws: raise CSIUValidationError("bad window")
+        if type(self.sample_count) is not int or self.sample_count<1: raise CSIUValidationError("bad sample count")
+        if not self.provider_id or not self.provenance_digest: raise CSIUValidationError("missing provenance")
+        object.__setattr__(self,"metrics",m)
+        body=self.to_dict(include_digest=False); sid=self.snapshot_id or _id("csiu-snapshot",body); object.__setattr__(self,"snapshot_id",sid)
+        body["snapshot_id"]=sid; dg=canonical_digest(body)
+        if self.snapshot_digest and self.snapshot_digest!=dg: raise CSIUValidationError("snapshot digest mismatch")
+        object.__setattr__(self,"snapshot_digest",dg)
+    def to_dict(self, include_digest=True):
+        d={"schema_version":self.schema_version,"snapshot_id":self.snapshot_id,"created_at":self.created_at,"window_start":self.window_start,"window_end":self.window_end,"sample_count":self.sample_count,"aggregation_method":self.aggregation_method,"metric_definition_version":self.metric_definition_version,"provider_id":self.provider_id,"provenance_digest":self.provenance_digest,"policy_digest":self.policy_digest,"metrics":dict(self.metrics),"privacy_cohort":dict(self.privacy_cohort or {})}
+        if include_digest: d["snapshot_digest"]=self.snapshot_digest
+        return d
+
+@dataclass(frozen=True)
+class CSIUDecision:
+    decision_id: str; policy_digest: str; plan_digest: str; reason_code: str; utility: float=0.0; ewma_utility: float=0.0; pressure: float=0.0; actual_effect: float=0.0; applied: bool=False; blocked: bool=True; snapshot_id: str=""; snapshot_digest: str=""; schema_version: str=SCHEMA_DECISION; created_at: str=field(default_factory=lambda:_ts(_now())); decision_digest: str=""
+    def __post_init__(self):
+        for n in (self.utility,self.ewma_utility,self.pressure,self.actual_effect): _num(n)
+        _parse_ts(self.created_at); body=self.to_dict(False); dg=canonical_digest(body)
+        if self.decision_digest and self.decision_digest!=dg: raise CSIUValidationError("decision digest mismatch")
+        object.__setattr__(self,"decision_digest",dg)
+    def to_dict(self, include_digest=True):
+        d=self.__dict__.copy(); d.pop("decision_digest",None)
+        if include_digest: d["decision_digest"]=self.decision_digest
+        return dict(sorted(d.items()))
+
+@dataclass(frozen=True)
 class CSIUInfluenceRecord:
-    """Record of a single CSIU influence application"""
+    decision_id: str; policy_digest: str; plan_digest: str; pressure: float; actual_effect: float; applied: bool; state: str; timestamp: str=field(default_factory=lambda:_ts(_now())); schema_version: str=SCHEMA_RECORD; record_id: str=""; record_digest: str=""
+    def __post_init__(self):
+        _num(self.pressure); _num(self.actual_effect); _parse_ts(self.timestamp)
+        if self.state not in {"prepared","committed","aborted","blocked"}: raise CSIUValidationError("bad state")
+        body=self.to_dict(False); rid=self.record_id or _id("csiu-record",body); object.__setattr__(self,"record_id",rid); body["record_id"]=rid; dg=canonical_digest(body)
+        if self.record_digest and self.record_digest!=dg: raise CSIUValidationError("record digest mismatch")
+        object.__setattr__(self,"record_digest",dg)
+    def to_dict(self, include_digest=True):
+        d=self.__dict__.copy(); d.pop("record_digest",None)
+        if include_digest: d["record_digest"]=self.record_digest
+        return dict(sorted(d.items()))
 
-    timestamp: float
-    pressure: float
-    objective_weights_changed: Dict[str, float]
-    route_penalties_added: List[tuple]
-    reward_shaping_delta: float
-    explainability_score: float
-    metrics_snapshot: Dict[str, float]
-    plan_id: str
-    action_type: str
+@dataclass(frozen=True)
+class CSIUAlignmentProposal:
+    active_alignment_policy_id: str; active_alignment_revision: int; active_alignment_digest: str; csiu_policy_digest: str; supporting_snapshot_digests: Tuple[str,...]; trend: Mapping[str,float]; reason_codes: Tuple[str,...]; expected_effect: str; required_evaluation: str; expires_at: str; proposed_policy_delta: Mapping[str,Any]=field(default_factory=dict); approval_state: str="pending_review"; schema_version: str=SCHEMA_PROPOSAL; proposal_id: str=""; created_at: str=field(default_factory=lambda:_ts(_now())); proposal_digest: str=""
+    def __post_init__(self):
+        _parse_ts(self.created_at); _parse_ts(self.expires_at)
+        if self.approval_state not in {"pending_review","accepted","rejected","expired"}: raise CSIUValidationError("bad approval")
+        body=self.to_dict(False); pid=self.proposal_id or _id("csiu-align",body); object.__setattr__(self,"proposal_id",pid); body["proposal_id"]=pid; dg=canonical_digest(body)
+        if self.proposal_digest and self.proposal_digest!=dg: raise CSIUValidationError("proposal digest mismatch")
+        object.__setattr__(self,"proposal_digest",dg)
+    def to_dict(self, include_digest=True):
+        d=self.__dict__.copy(); d["supporting_snapshot_digests"]=list(self.supporting_snapshot_digests); d["reason_codes"]=list(self.reason_codes); d.pop("proposal_digest",None)
+        if include_digest: d["proposal_digest"]=self.proposal_digest
+        return dict(sorted(d.items()))
 
-    def to_dict(self) -> Dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass
+@dataclass(frozen=True)
 class CSIUEnforcementConfig:
-    """Configuration for CSIU enforcement"""
-
-    # Caps
-    max_single_influence: float = 0.05  # 5% cap per application
-    max_cumulative_influence_window: float = 0.10  # 10% max cumulative in window
-    cumulative_window_seconds: float = 3600.0  # 1 hour window
-
-    # Kill switches (can be set via environment or runtime)
-    global_enabled: bool = True
-    calculation_enabled: bool = True
-    regularization_enabled: bool = True
-    history_tracking_enabled: bool = True
-
-    # Logging
-    log_all_influence: bool = True
-    log_level_threshold: float = 0.01  # Log if influence > 1%
-
-    # Monitoring
-    alert_on_high_influence: bool = True
-    alert_threshold: float = 0.04  # Alert if single influence > 4%
-
-    # Audit
-    audit_trail_enabled: bool = True
-    audit_trail_max_entries: int = 10000
-
+    max_single_influence: float=0.05; max_cumulative_influence_window: float=0.10; cumulative_window_seconds: float=3600.0; history_capacity: int=1000; global_enabled: bool=True; calculation_enabled: bool=True; regularization_enabled: bool=True; proposal_generation_enabled: bool=True; history_tracking_enabled: bool=True; emergency_stop: bool=False; audit_trail_enabled: bool=True; audit_trail_max_entries: int=10000; durable_accounting_required: bool=False; durable_store_path: Optional[str]=None; clock: Optional[Callable[[],datetime]]=None
+    def __post_init__(self):
+        for name in ("max_single_influence","max_cumulative_influence_window","cumulative_window_seconds"):
+            v=getattr(self,name)
+            if isinstance(v,bool) or not isinstance(v,(int,float)) or not math.isfinite(float(v)): raise CSIUValidationError(f"bad {name}")
+        if self.max_single_influence<=0 or self.max_cumulative_influence_window<self.max_single_influence or self.cumulative_window_seconds<=0 or self.cumulative_window_seconds>86400*30: raise CSIUValidationError("bad cap relationship")
+        if type(self.history_capacity) is not int or not 1<=self.history_capacity<=100000: raise CSIUValidationError("bad history capacity")
+        if type(self.audit_trail_max_entries) is not int or self.audit_trail_max_entries<0: raise CSIUValidationError("bad audit capacity")
 
 class CSIUEnforcement(SerializationMixin):
-    """
-    CSIU Enforcement and Monitoring
-
-    This class wraps CSIU operations to ensure:
-    1. Influence caps are enforced
-    2. All effects are logged prominently
-    3. Kill switches are respected
-    4. Audit trail is maintained
-    5. Cumulative effects are tracked
-    """
-
-    _unpickleable_attrs = ['_lock']
-
-    def __init__(self, config: Optional[CSIUEnforcementConfig] = None):
-        """Initialize CSIU enforcement"""
-        self.config = config or CSIUEnforcementConfig()
-        self._lock = threading.RLock()
-
-        # Influence history for cumulative tracking
-        self._influence_history: deque = deque(maxlen=1000)
-
-        # Audit trail
-        self._audit_trail: deque = deque(maxlen=self.config.audit_trail_max_entries)
-
-        # Statistics
-        self._total_applications = 0
-        self._total_blocked = 0
-        self._total_capped = 0
-        self._max_influence_seen = 0.0
-
-        # INTERNAL ONLY: Use DEBUG level for CSIU logging
-        logger.debug(
-            "[INTERNAL] CSIU Enforcement initialized with 5% single cap, 10% cumulative cap"
-        )
-
-    def _restore_unpickleable_attrs(self) -> None:
-        """Restore unpickleable attributes after deserialization."""
-        self._lock = threading.RLock()
-
-    def is_enabled(self) -> bool:
-        """Check if CSIU is enabled"""
-        return self.config.global_enabled
-
-    def enforce_pressure_cap(self, pressure: float) -> float:
-        """
-        Enforce pressure cap and log if capping occurred
-
-        Args:
-            pressure: Raw pressure value
-
-        Returns:
-            Capped pressure value
-        """
-        if not self.config.global_enabled:
-            return 0.0
-
-        original_pressure = pressure
-
-        # Apply single influence cap
-        pressure = max(
-            -self.config.max_single_influence,
-            min(self.config.max_single_influence, pressure),
-        )
-
-        # Track if capping occurred (internal logging only)
-        if abs(pressure) < abs(original_pressure):
-            with self._lock:
-                self._total_capped += 1
-            # INTERNAL ONLY: DEBUG level logging
-            logger.debug(
-                f"[INTERNAL] CSIU pressure capped: {original_pressure:.4f} -> {pressure:.4f} "
-                f"(cap: ±{self.config.max_single_influence})"
-            )
-
-        # Update statistics
+    _unpickleable_attrs=["_lock","_clock"]
+    def __init__(self, config: Optional[CSIUEnforcementConfig]=None, policy: Optional[CSIUPolicy]=None):
+        self.config=config or CSIUEnforcementConfig(); self.policy=policy or CSIUPolicy(max_single_influence=self.config.max_single_influence,max_cumulative_influence_window=self.config.max_cumulative_influence_window,cumulative_window_seconds=self.config.cumulative_window_seconds)
+        self._lock=threading.RLock(); self._clock=self.config.clock or _now; self._influence_history=[]; self._audit_trail=[]; self._last_decision=None; self._last_snapshot=None; self._total_applications=0; self._total_blocked=0; self._total_capped=0; self._max_influence_seen=0.0; self._load_durable()
+    def _restore_unpickleable_attrs(self): self._lock=threading.RLock(); self._clock=_now
+    def _emit(self,event, data):
+        rec={"event":event,"timestamp":_ts(self._clock()),"data":_clean(data)}
+        if self.config.audit_trail_enabled and len(self._audit_trail)<self.config.audit_trail_max_entries: self._audit_trail.append(rec)
+    def _load_durable(self):
+        p=self.config.durable_store_path
+        if not p: return
+        path=Path(p)
+        if not path.exists(): return
+        for line in path.read_text(encoding="utf-8").splitlines():
+            d=json.loads(line); r=CSIUInfluenceRecord(**d)
+            if r.state in {"prepared"}: raise CSIUValidationError("unresolved prepared influence")
+            self._influence_history.append(r)
+    def _persist(self,r):
+        p=self.config.durable_store_path
+        if p:
+            Path(p).parent.mkdir(parents=True,exist_ok=True)
+            with open(p,"a",encoding="utf-8") as f: f.write(json.dumps(r.to_dict(),sort_keys=True,separators=(",",":"))+"\n")
+    def is_enabled(self): return self.config.global_enabled and not self.config.emergency_stop
+    def validate_snapshot(self, snapshot: CSIUMetricSnapshot)->Tuple[bool,str]:
+        if snapshot.policy_digest!=self.policy.policy_digest: return False,"policy_digest_mismatch"
+        if snapshot.metric_definition_version!=self.policy.metric_definition_version: return False,"metric_definition_mismatch"
+        if snapshot.sample_count<self.policy.min_sample_count: return False,"insufficient_sample_count"
+        age=(self._clock()-_parse_ts(snapshot.window_end)).total_seconds()
+        if age<0 or age>self.policy.max_snapshot_age_seconds: return False,"stale_snapshot"
+        return True,"ok"
+    def compute_utility(self, prev: CSIUMetricSnapshot, cur: CSIUMetricSnapshot)->float:
+        total=sum(abs(self.policy.weights[k]) for k in METRIC_ORDER)
+        if total<=0: raise CSIUValidationError("zero weights")
+        acc=0.0
+        for k in METRIC_ORDER:
+            lo,hi=self.policy.metric_ranges[k]; raw=(cur.metrics[k]-prev.metrics[k])*DIRECTIONS[k]; acc+=self.policy.weights[k]*(raw/(hi-lo))
+        u=acc/total
+        if not math.isfinite(u): raise CSIUValidationError("non-finite utility")
+        return max(-1.0,min(1.0,u))
+    def pressure_from_utility(self, u: float)->float:
+        u=_num(u,"utility"); p=self.config.max_single_influence*math.tanh(u)
+        return max(-self.config.max_single_influence,min(self.config.max_single_influence,p))
+    def check_cumulative_influence(self):
         with self._lock:
-            self._max_influence_seen = max(self._max_influence_seen, abs(pressure))
-
-        # Alert on high influence (internal only)
-        if (
-            self.config.alert_on_high_influence
-            and abs(pressure) > self.config.alert_threshold
-        ):
-            # INTERNAL ONLY: DEBUG level logging
-            logger.debug(
-                f"[INTERNAL] CSIU high influence: pressure={pressure:.4f} "
-                f"exceeds threshold {self.config.alert_threshold}"
-            )
-
-        return pressure
-
-    def check_cumulative_influence(self) -> Dict[str, Any]:
-        """
-        Check cumulative influence in recent window
-
-        Returns:
-            Dict with cumulative influence stats
-        """
+            self._prune_locked(); cum=sum(abs(r.actual_effect) for r in self._influence_history if r.state=="committed")
+            return {"cumulative_influence":cum,"count":len(self._influence_history),"window_seconds":self.config.cumulative_window_seconds,"max_allowed":self.config.max_cumulative_influence_window,"remaining":max(0.0,self.config.max_cumulative_influence_window-cum),"exceeds_cap":cum>self.config.max_cumulative_influence_window}
+    def _prune_locked(self):
+        cutoff=self._clock()-timedelta(seconds=self.config.cumulative_window_seconds)
+        self._influence_history=[r for r in self._influence_history if _parse_ts(r.timestamp)>=cutoff]
+    def enforce_pressure_cap(self,pressure):
+        p=_num(pressure,"pressure"); c=max(-self.config.max_single_influence,min(self.config.max_single_influence,p))
+        if abs(c)<abs(p): self._total_capped+=1
+        self._max_influence_seen=max(self._max_influence_seen,abs(c)); return c
+    def _reserve_locked(self, decision: CSIUDecision)->Tuple[bool,str]:
+        self._prune_locked()
+        if len(self._influence_history)>=self.config.history_capacity: return False,"history_capacity_exhausted"
+        cur=sum(abs(r.actual_effect) for r in self._influence_history if r.state=="committed")
+        if cur+abs(decision.actual_effect)>self.config.max_cumulative_influence_window+1e-12: return False,"cumulative_cap_exceeded"
+        return True,"ok"
+    def apply_regularization_with_enforcement(self, plan: Dict[str,Any], pressure: float, metrics: Mapping[str,float], plan_id="unknown", action_type="improvement", snapshot: Optional[CSIUMetricSnapshot]=None)->Tuple[Dict[str,Any],CSIUDecision]:
+        original=copy.deepcopy(plan or {}); pd=canonical_digest({"plan":original})
+        if not self.is_enabled() or not self.config.regularization_enabled:
+            return original,self._decision(pd,"disabled",0,0,0,True,False,snapshot)
+        try: pressure=self.enforce_pressure_cap(pressure)
+        except Exception: return original,self._decision(pd,"invalid_pressure",0,0,0,True,False,snapshot)
+        if pressure==0: return original,self._decision(pd,"zero_pressure",0,0,0,True,False,snapshot)
+        proposed=copy.deepcopy(original); effect=0.0
+        ow=proposed.get("objective_weights")
+        if isinstance(ow,dict):
+            proposed["objective_weights"]={str(k):_num(v)*(1.0-0.03*pressure) for k,v in ow.items() if not isinstance(v,bool)}; effect=max(effect,abs(0.03*pressure))
+        proposed.setdefault("csiu_regularization",{})["route_penalty"]={"kind":"entropy","value":0.03*pressure}; effect=max(effect,abs(0.03*pressure))
+        proposed.setdefault("csiu_regularization",{})["explainability_preference"]={"value":0.02*pressure}; effect=max(effect,abs(0.02*pressure))
+        effect=abs(pressure)
+        dec=self._decision(pd,"applied",0,0,pressure,False,True,snapshot,effect)
         with self._lock:
-            now = time.time()
-            window_start = now - self.config.cumulative_window_seconds
-
-            # Filter to recent window
-            recent = [r for r in self._influence_history if r.timestamp >= window_start]
-
-            if not recent:
-                return {
-                    "cumulative_influence": 0.0,
-                    "count": 0,
-                    "window_seconds": self.config.cumulative_window_seconds,
-                    "exceeds_cap": False,
-                }
-
-            # Sum absolute influences
-            cumulative = sum(abs(r.pressure) for r in recent)
-
-            exceeds_cap = cumulative > self.config.max_cumulative_influence_window
-
-            if exceeds_cap:
-                # INTERNAL ONLY: DEBUG level (not ERROR)
-                logger.debug(
-                    f"[INTERNAL] CSIU cumulative influence exceeded cap: "
-                    f"{cumulative:.4f} > {self.config.max_cumulative_influence_window} "
-                    f"in last {self.config.cumulative_window_seconds}s"
-                )
-
-            return {
-                "cumulative_influence": cumulative,
-                "count": len(recent),
-                "window_seconds": self.config.cumulative_window_seconds,
-                "exceeds_cap": exceeds_cap,
-                "max_allowed": self.config.max_cumulative_influence_window,
-            }
-
-    def should_block_influence(self) -> Tuple[bool, Optional[str]]:
-        """
-        Check if influence should be blocked due to cumulative cap
-
-        Returns:
-            (should_block, reason)
-        """
-        cumulative_stats = self.check_cumulative_influence()
-
-        if cumulative_stats["exceeds_cap"]:
-            return (
-                True,
-                f"Cumulative CSIU influence {cumulative_stats['cumulative_influence']:.4f} "
-                f"exceeds cap {cumulative_stats['max_allowed']}",
-            )
-
-        return (False, None)
-
-    def record_influence(self, record: CSIUInfluenceRecord):
-        """
-        Record an influence application for audit and cumulative tracking
-
-        Args:
-            record: Influence record to store
-        """
-        with self._lock:
-            self._influence_history.append(record)
-
-            if self.config.audit_trail_enabled:
-                self._audit_trail.append(record)
-
-            self._total_applications += 1
-
-            # INTERNAL ONLY: Log at DEBUG level, never expose to users
-            if (
-                self.config.log_all_influence
-                or abs(record.pressure) >= self.config.log_level_threshold
-            ):
-                logger.debug(
-                    f"[INTERNAL] CSIU influence applied: pressure={record.pressure:.4f}, "
-                    f"plan_id={record.plan_id}, action={record.action_type}, "
-                    f"explainability={record.explainability_score:.3f}"
-                )
-
-    def apply_regularization_with_enforcement(
-        self,
-        plan: Dict[str, Any],
-        pressure: float,
-        metrics: Dict[str, float],
-        plan_id: str = "unknown",
-        action_type: str = "improvement",
-    ) -> Dict[str, Any]:
-        """
-        Apply CSIU regularization with full enforcement
-
-        Args:
-            plan: Improvement plan to regularize
-            pressure: CSIU pressure value (will be capped)
-            metrics: Current metrics snapshot
-            plan_id: Identifier for the plan
-            action_type: Type of action
-
-        Returns:
-            Regularized plan (or original if blocked)
-        """
-        if not self.config.global_enabled or not self.config.regularization_enabled:
-            return plan
-
-        # Check if should block due to cumulative cap
-        should_block, reason = self.should_block_influence()
-        if should_block:
-            # INTERNAL ONLY: DEBUG level (user sees generic message)
-            logger.debug(f"[INTERNAL] CSIU influence blocked: {reason}")
-            with self._lock:
-                self._total_blocked += 1
-            # Return plan unmodified - DO NOT expose CSIU in metadata shown to users
-            # Only add to internal metadata
-            plan.setdefault("_internal_metadata", {})["csiu_blocked"] = True
-            plan["_internal_metadata"]["csiu_block_reason"] = reason
-            return plan
-
-        # Enforce pressure cap
-        original_pressure = pressure
-        pressure = self.enforce_pressure_cap(pressure)
-
-        # Track what we're changing
-        obj_weights_changed = {}
-        route_penalties = []
-        reward_shaping_delta = 0.0
-
-        # Apply regularization (from original self_improvement_drive.py logic)
-        plan = dict(plan or {})
-        alpha = beta = gamma = 0.03
-
-        # Objective weights adjustment
-        if "objective_weights" in plan:
-            ow = plan["objective_weights"]
-            new_ow = {}
-            for k, v in ow.items():
-                new_val = 0.99 * v + 0.01 * (v * (1.0 - alpha * pressure))
-                obj_weights_changed[k] = new_val - v
-                new_ow[k] = new_val
-            plan["objective_weights"] = new_ow
-
-        # Route penalties
-        if float(metrics.get("H", 0.0)) > 0.08:
-            penalty = ("entropy", beta * pressure)
-            plan.setdefault("route_penalties", []).append(penalty)
-            route_penalties.append(penalty)
-
-        # Reward shaping
-        if float(metrics.get("C", 0.0)) >= 0.90:
-            delta = gamma * pressure
-            plan["reward_shaping"] = plan.get("reward_shaping", 0.0) + delta
-            reward_shaping_delta += delta
-
-        # Explainability bonus
-        expl = self._estimate_explainability(plan)
-        if expl >= 0.75:
-            delta = 0.02 * pressure
-            plan["reward_shaping"] = plan.get("reward_shaping", 0.0) + delta
-            reward_shaping_delta += delta
-
-        # Human-centered bonus
-        if metrics.get("U", 0.0) >= 0.85 or metrics.get("E", 0.0) >= 0.85:
-            delta = 0.02 * pressure
-            plan["reward_shaping"] = plan.get("reward_shaping", 0.0) + delta
-            reward_shaping_delta += delta
-
-        # Add internal metadata (NEVER exposed to users)
-        # All CSIU details go in _internal_metadata, not metadata
-        plan.setdefault("_internal_metadata", {})["csiu_pressure"] = round(pressure, 3)
-        plan["_internal_metadata"]["csiu_pressure_original"] = round(
-            original_pressure, 3
-        )
-        plan["_internal_metadata"]["csiu_capped"] = pressure != original_pressure
-        plan["_internal_metadata"]["csiu_explainability"] = round(expl, 3)
-
-        # Record influence
-        record = CSIUInfluenceRecord(
-            timestamp=time.time(),
-            pressure=pressure,
-            objective_weights_changed=obj_weights_changed,
-            route_penalties_added=route_penalties,
-            reward_shaping_delta=reward_shaping_delta,
-            explainability_score=expl,
-            metrics_snapshot=dict(metrics),
-            plan_id=plan_id,
-            action_type=action_type,
-        )
-
-        if self.config.history_tracking_enabled:
-            self.record_influence(record)
-
-        return plan
-
-    def _estimate_explainability(self, plan: Dict[str, Any]) -> float:
-        """Estimate explainability score (simplified version)"""
-        steps = len(plan.get("steps", []))
-        has_rationale = bool(plan.get("rationale"))
-
-        safe_policies = {"non_judgmental", "rollback_on_failure", "maintain_tests"}
-        safety_affordances = sum(
-            1 for p in plan.get("policies", []) if p in safe_policies
-        )
-
-        score = (
-            0.5 * has_rationale
-            + 0.3 * min(1.0, 3 / (steps + 1))
-            + 0.2 * min(1.0, safety_affordances / 2)
-        )
-
-        return max(0.0, min(1.0, score))
-
-    def get_statistics(self) -> Dict[str, Any]:
-        """Get CSIU enforcement statistics"""
-        with self._lock:
-            cumulative_stats = self.check_cumulative_influence()
-
-            return {
-                "enabled": self.config.global_enabled,
-                "total_applications": self._total_applications,
-                "total_blocked": self._total_blocked,
-                "total_capped": self._total_capped,
-                "max_influence_seen": self._max_influence_seen,
-                "cumulative_stats": cumulative_stats,
-                "caps": {
-                    "max_single_influence": self.config.max_single_influence,
-                    "max_cumulative_influence_window": self.config.max_cumulative_influence_window,
-                    "window_seconds": self.config.cumulative_window_seconds,
-                },
-            }
-
-    def export_audit_trail(self, path: Optional[Path] = None) -> List[Dict[str, Any]]:
-        """
-        Export audit trail to file or return as list
-
-        Args:
-            path: Optional path to export to
-
-        Returns:
-            List of audit records
-        """
-        with self._lock:
-            records = [r.to_dict() for r in self._audit_trail]
-
+            ok,reason=self._reserve_locked(dec)
+            if not ok:
+                self._total_blocked+=1; b=CSIUDecision(dec.decision_id,self.policy.policy_digest,pd,reason,dec.utility,dec.ewma_utility,0.0,0.0,False,True,dec.snapshot_id,dec.snapshot_digest); self._emit("csiu.influence_blocked",b.to_dict()); return original,b
+            r=CSIUInfluenceRecord(dec.decision_id,self.policy.policy_digest,pd,pressure,effect,True,"committed"); self._influence_history.append(r); self._persist(r); self._total_applications+=1; self._last_decision=dec; self._emit("csiu.influence_applied",{"decision":dec.to_dict(),"record":r.to_dict()})
+        return proposed,dec
+    def _decision(self,pd,reason,u,ew,p,blocked,applied,snapshot=None,effect=0.0):
+        body={"policy_digest":self.policy.policy_digest,"plan_digest":pd,"reason":reason,"snapshot":getattr(snapshot,"snapshot_digest","")}; did=_id("csiu-decision",body)
+        return CSIUDecision(did,self.policy.policy_digest,pd,reason,u,ew,p,effect,applied,blocked,getattr(snapshot,"snapshot_id",''),getattr(snapshot,"snapshot_digest",''))
+    def propose_weight_revision(self, snapshots: List[CSIUMetricSnapshot])->Dict[str,Any]:
+        return {"schema_version":"vulcan-csiu-weight-proposal/1","active_policy_digest":self.policy.policy_digest,"proposed_weights":dict(self.policy.weights),"supporting_snapshot_digests":[s.snapshot_digest for s in snapshots],"approval_state":"pending_review","proposal_digest":canonical_digest({"active_policy_digest":self.policy.policy_digest,"weights":dict(self.policy.weights)})}
+    def propose_alignment_policy(self, active_policy: Any, snapshots: List[CSIUMetricSnapshot])->CSIUAlignmentProposal:
+        dig=getattr(active_policy,"policy_digest",""); rev=int(getattr(active_policy,"revision",0)); pid=getattr(active_policy,"policy_id","vulcan-alignment/1")
+        trend={k:0.0 for k in METRIC_ORDER}
+        if len(snapshots)>=2:
+            a,b=snapshots[-2],snapshots[-1]; trend={k:(b.metrics[k]-a.metrics[k])*DIRECTIONS[k] for k in METRIC_ORDER}
+        reasons=tuple(k for k,v in trend.items() if v<0) or ("review_recommended",)
+        return CSIUAlignmentProposal(pid,rev,dig,self.policy.policy_digest,tuple(s.snapshot_digest for s in snapshots[-4:]),trend,reasons,"review human-understanding and safety thresholds; no automatic invariant relaxation","authorized governance review plus ordinary alignment CAS activation",_ts(self._clock()+timedelta(hours=24)),{})
+    def get_statistics(self):
+        c=self.check_cumulative_influence(); return {"enabled":self.is_enabled(),"policy_digest":self.policy.policy_digest,"metric_definition_version":self.policy.metric_definition_version,"last_valid_snapshot_digest":getattr(self._last_snapshot,"snapshot_digest",None),"last_decision_digest":getattr(self._last_decision,"decision_digest",None),"total_applications":self._total_applications,"total_blocked":self._total_blocked,"total_capped":self._total_capped,"max_influence_seen":self._max_influence_seen,"cumulative_stats":c,"kill_switches":{"global_enabled":self.config.global_enabled,"calculation_enabled":self.config.calculation_enabled,"regularization_enabled":self.config.regularization_enabled,"proposal_generation_enabled":self.config.proposal_generation_enabled,"history_display_enabled":self.config.history_tracking_enabled,"emergency_stop":self.config.emergency_stop}}
+    def export_audit_trail(self,path: Optional[Path]=None):
+        records=list(self._audit_trail) if self.config.history_tracking_enabled else []
         if path:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(records, f, indent=2)
-            logger.info(f"CSIU audit trail exported to {path} ({len(records)} records)")
-
+            Path(path).parent.mkdir(parents=True,exist_ok=True); Path(path).write_text(json.dumps(records,indent=2,sort_keys=True),encoding="utf-8")
         return records
+    def reset_statistics(self, test_only: bool=False):
+        if not test_only and self._influence_history: raise CSIUValidationError("reset would erase live production budget")
+        with self._lock: self._total_applications=self._total_blocked=self._total_capped=0; self._max_influence_seen=0.0; self._audit_trail.clear(); self._emit("csiu.kill_switch_changed",{"reset":"statistics"})
 
-    def reset_statistics(self):
-        """Reset statistics (for testing)"""
-        with self._lock:
-            self._total_applications = 0
-            self._total_blocked = 0
-            self._total_capped = 0
-            self._max_influence_seen = 0.0
-            self._influence_history.clear()
-            logger.info("CSIU enforcement statistics reset")
-
-
-# Global singleton instance
-_csiu_enforcer: Optional[CSIUEnforcement] = None
-_enforcer_lock = threading.Lock()
-
-
-def get_csiu_enforcer(
-    config: Optional[CSIUEnforcementConfig] = None,
-) -> CSIUEnforcement:
-    """Get or create global CSIU enforcer instance"""
+_csiu_enforcer=None; _enforcer_lock=threading.Lock()
+def get_csiu_enforcer(config: Optional[CSIUEnforcementConfig]=None)->CSIUEnforcement:
     global _csiu_enforcer
-
     with _enforcer_lock:
-        if _csiu_enforcer is None:
-            _csiu_enforcer = CSIUEnforcement(config)
-            logger.info("Global CSIU enforcer created")
+        if _csiu_enforcer is None: _csiu_enforcer=CSIUEnforcement(config)
+        elif config is not None and config!=_csiu_enforcer.config: raise CSIUValidationError("global CSIU enforcer configuration mismatch")
         return _csiu_enforcer
-
-
-def reset_csiu_enforcer():
-    """Reset global CSIU enforcer (for testing)"""
+def reset_csiu_enforcer(test_only: bool=True):
     global _csiu_enforcer
-
     with _enforcer_lock:
-        _csiu_enforcer = None
-        logger.info("Global CSIU enforcer reset")
+        if _csiu_enforcer and not test_only and _csiu_enforcer._influence_history: raise CSIUValidationError("cannot reset live CSIU singleton")
+        _csiu_enforcer=None
