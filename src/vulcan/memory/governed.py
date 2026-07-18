@@ -75,7 +75,8 @@ _PREFERENCES: dict[str, frozenset[str]] = {
     "locale": frozenset({"en", "en-us", "en-gb", "fr", "de", "es"}),
     "response_style": frozenset({"concise", "balanced", "detailed"}),
     "unit_system": frozenset({"metric", "imperial"}),
-    "color": frozenset({"blue", "red", "green"}),
+    "compatibility_color": frozenset({"blue", "red", "green"}),
+    "color": frozenset({"blue", "red", "green"}),  # legacy alias for compatibility_color
 }
 
 def _identifier(value: object) -> bool:
@@ -83,12 +84,15 @@ def _identifier(value: object) -> bool:
 def _time(clock: Callable[[], datetime]) -> str:
     value=clock()
     if value.tzinfo is None or value.utcoffset() is None: raise ValueError("memory clock must return UTC-aware time")
-    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    return value.astimezone(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
 def _digest(values: dict[str, object]) -> str:
-    return hashlib.sha256(json.dumps(values, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
+    return hashlib.sha256(json.dumps(values, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode()).hexdigest()
 def _normal(key: str, value: str) -> tuple[str, str]:
     if not isinstance(key, str) or not isinstance(value, str) or any(ord(c)<32 for c in key+value): raise ValueError("invalid preference text")
     key, value = key.strip().lower(), value.strip().lower()
+    forbidden=("password","passwd","secret","token","api_key","apikey","credential","jwt","bearer")
+    if any(x in key or x in value for x in forbidden): raise ValueError("credential-like memory rejected")
+    if key=="color": key="compatibility_color"
     if key not in _PREFERENCES or value not in _PREFERENCES[key]: raise ValueError("unsupported typed preference")
     return key, value
 
@@ -104,14 +108,15 @@ MemoryActor = MemoryActorContext # compatibility name; construction remains doma
 class MemoryWriteProposal:
     kind: MemoryKind; namespace: str; key: str; value: str; idempotency_key: str; case_id: str|None=None
     def __post_init__(self) -> None:
-        if self.kind is not MemoryKind.EXPLICIT_PREFERENCE or not _identifier(self.namespace) or not _identifier(self.idempotency_key): raise ValueError("invalid memory proposal")
+        if self.kind is not MemoryKind.EXPLICIT_PREFERENCE or self.namespace != "profile" or not _identifier(self.idempotency_key): raise ValueError("invalid memory proposal")
         key,value=_normal(self.key,self.value); object.__setattr__(self,"key",key); object.__setattr__(self,"value",value)
         if self.case_id is not None and not _identifier(self.case_id): raise ValueError("invalid case reference")
 @dataclass(frozen=True)
 class MemoryReadRequest:
     actor: MemoryActorContext; namespace: str; query: str; maximum_results: int=5
     def __post_init__(self) -> None:
-        if not _identifier(self.namespace) or self.query not in _PREFERENCES or not 1<=self.maximum_results<=MAX_RESULTS: raise ValueError("memory reads require an allowlisted exact key")
+        if self.namespace != "profile" or (self.query if self.query != "color" else "compatibility_color") not in _PREFERENCES or not 1<=self.maximum_results<=MAX_RESULTS: raise ValueError("memory reads require an allowlisted exact key")
+        if self.query == "color": object.__setattr__(self, "query", "compatibility_color")
 @dataclass(frozen=True)
 class MemoryRecord:
     record_id:str; revision:int; tenant_id:str; subject_id:str; actor_id:str; purpose:str; namespace:str; key:str; value:str|None; kind:MemoryKind; lifecycle:MemoryLifecycle; policy_version:str; created_at:str; expires_at:str; deletion_epoch:int; digest:str; supersedes:str|None=None
@@ -146,12 +151,15 @@ class GovernedMemoryPort(Protocol):
     def forget(self, actor:MemoryActorContext, record_id:str, revision:int, idempotency_key:str|None=None)->MemoryCommitResult: ...
     def readiness(self)->None: ...
     def close(self)->None: ...
+    def capabilities(self)->tuple[str,...]: ...
 
 class SQLiteMemoryRepository:
     """Serialized SQLite repository with immutable revisions and authoritative heads."""
-    def __init__(self,path:str,*,policy:MemoryPolicyPort|None=None,clock:Callable[[],datetime]|None=None, durable_root: str | None = None)->None:
+    def __init__(self,path:str,*,policy:MemoryPolicyPort|None=None,clock:Callable[[],datetime]|None=None, durable_root: str | None = None, audit=None)->None:
         if not path or path==":memory:": raise ValueError("durable memory requires an explicit filesystem path")
-        self._path=Path(path).resolve();
+        raw_path=Path(path)
+        if raw_path.is_symlink() or Path(str(raw_path)+".lock").is_symlink(): raise RuntimeError("governed-memory symlink path rejected")
+        self._path=raw_path.resolve();
         if durable_root is not None:
             root=Path(durable_root).resolve(strict=True)
             if root not in (self._path, *self._path.parents): raise RuntimeError("memory database is outside durable root")
@@ -160,8 +168,15 @@ class SQLiteMemoryRepository:
         self._ownership=open(str(self._path)+".lock", "a+", encoding="utf-8")
         try: fcntl.flock(self._ownership.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as exc: self._ownership.close(); raise RuntimeError("governed-memory writer is already owned") from exc
-        self._lock=threading.RLock(); self._closed=False; self._policy=policy or DefaultMemoryPolicy(); self._clock=clock or (lambda:datetime.now(timezone.utc))
-        self._db=sqlite3.connect(str(self._path),check_same_thread=False,isolation_level=None); self._db.execute("PRAGMA foreign_keys=ON"); self._db.execute("PRAGMA busy_timeout=5000"); self._db.execute("PRAGMA journal_mode=WAL"); self._migrate(); self.readiness()
+        self._lock=threading.RLock(); self._closed=False; self._policy=policy or DefaultMemoryPolicy(); self._clock=clock or (lambda:datetime.now(timezone.utc)); self._audit=audit
+        try:
+            self._db=sqlite3.connect(str(self._path),check_same_thread=False,isolation_level=None); self._db.execute("PRAGMA foreign_keys=ON"); self._db.execute("PRAGMA busy_timeout=5000"); self._db.execute("PRAGMA journal_mode=WAL"); self._migrate(); self.readiness()
+        except Exception:
+            if hasattr(self,"_db"):
+                try: self._db.close()
+                except Exception: pass
+            fcntl.flock(self._ownership.fileno(), fcntl.LOCK_UN); self._ownership.close()
+            raise
     def _migrate(self)->None:
         with self._lock:
             self._db.executescript("""
@@ -178,9 +193,54 @@ class SQLiteMemoryRepository:
         with self._lock:
             if self._closed: raise RuntimeError("memory repository is closed")
             if self._db.execute("PRAGMA integrity_check").fetchone() != ("ok",): raise RuntimeError("memory repository integrity check failed")
+            expected={
+                "memory_schema":{"version"},
+                "memory_revisions":{"record_id","revision","tenant_id","subject_id","actor_id","purpose","namespace","key_name","value","kind","lifecycle","policy_version","created_at","expires_at","deletion_epoch","digest","supersedes"},
+                "memory_heads":{"record_id","tenant_id","subject_id","purpose","namespace","key_name","current_revision","current_lifecycle","deletion_epoch"},
+                "memory_idempotency":{"tenant_id","subject_id","idempotency_key","operation","request_digest","record_id"},
+                "memory_journal":{"sequence","operation","record_id","revision","tenant_id","subject_id","request_digest","committed_at"},
+            }
+            tables={r[0] for r in self._db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")}
+            if tables != set(expected): raise RuntimeError("memory schema table verification failed")
+            for table, cols in expected.items():
+                got={r[1] for r in self._db.execute(f"PRAGMA table_info({table})")}
+                if got != cols: raise RuntimeError("memory schema column verification failed")
             if self._db.execute("SELECT version FROM memory_schema").fetchone() != (SCHEMA_VERSION,): raise RuntimeError("memory schema verification failed")
-            bad=self._db.execute("SELECT 1 FROM memory_heads h LEFT JOIN memory_revisions r ON r.record_id=h.record_id AND r.revision=h.current_revision WHERE r.record_id IS NULL LIMIT 1").fetchone()
-            if bad: raise RuntimeError("memory head corruption fails closed")
+            rows=self._db.execute("SELECT record_id,revision,tenant_id,subject_id,actor_id,purpose,namespace,key_name,value,kind,lifecycle,policy_version,created_at,expires_at,deletion_epoch,digest,supersedes FROM memory_revisions ORDER BY record_id,revision").fetchall()
+            groups={}
+            for r in rows:
+                rid,rev,tenant,subject,actor,purpose,namespace,key,value,kind,lifecycle,policy,created,expires,epoch,digest,sup=r
+                if not all(_identifier(x) for x in (rid,tenant,subject,actor,purpose,namespace,key)) or policy != self._policy.version: raise RuntimeError("memory identity corruption fails closed")
+                if namespace!="profile" or key not in _PREFERENCES or kind!=MemoryKind.EXPLICIT_PREFERENCE.value: raise RuntimeError("memory policy surface corruption fails closed")
+                if type(rev) is not int or type(epoch) is not int or rev<1 or epoch<0: raise RuntimeError("memory revision corruption fails closed")
+                c=datetime.fromisoformat(created.replace("Z","+00:00")); e=datetime.fromisoformat(expires.replace("Z","+00:00"))
+                if c.tzinfo is None or e.tzinfo is None or e<c: raise RuntimeError("memory timestamp corruption fails closed")
+                if lifecycle in (MemoryLifecycle.TOMBSTONED.value, MemoryLifecycle.PURGED.value) and value is not None: raise RuntimeError("memory tombstone plaintext fails closed")
+                data={"record_id":rid,"revision":rev,"tenant_id":tenant,"subject_id":subject,"actor_id":actor,"purpose":purpose,"namespace":namespace,"key":key,"value":value,"kind":kind,"lifecycle":lifecycle,"policy_version":policy,"created_at":created,"expires_at":expires,"deletion_epoch":epoch,"supersedes":sup}
+                if _digest(data)!=digest: raise RuntimeError("memory digest corruption fails closed")
+                groups.setdefault(rid,[]).append(r)
+            for rid, rs in groups.items():
+                ident=None; prev_epoch=0
+                for i,r in enumerate(rs, start=1):
+                    if r[1]!=i: raise RuntimeError("memory revision gap fails closed")
+                    cur_ident=(r[2],r[3],r[5],r[6],r[7],r[9])
+                    if ident is None: ident=cur_ident
+                    elif cur_ident!=ident: raise RuntimeError("memory identity mutation fails closed")
+                    expected_sup=None if i==1 else f"{rid}:{i-1}"
+                    if r[16]!=expected_sup: raise RuntimeError("memory supersedes chain fails closed")
+                    if r[14] not in (prev_epoch, prev_epoch+1): raise RuntimeError("memory deletion epoch corruption fails closed")
+                    if r[14]==prev_epoch+1 and r[10] not in (MemoryLifecycle.TOMBSTONED.value, MemoryLifecycle.PURGED.value): raise RuntimeError("memory deletion epoch changed outside deletion")
+                    prev_epoch=r[14]
+            heads=self._db.execute("SELECT record_id,tenant_id,subject_id,purpose,namespace,key_name,current_revision,current_lifecycle,deletion_epoch FROM memory_heads").fetchall()
+            if len(heads)!=len(groups): raise RuntimeError("memory head/history mismatch fails closed")
+            for h in heads:
+                rs=groups.get(h[0]);
+                if not rs: raise RuntimeError("memory head orphan fails closed")
+                last=rs[-1]
+                head_key_ok = h[5] == last[7] or (last[10] in (MemoryLifecycle.TOMBSTONED.value, MemoryLifecycle.PURGED.value) and str(h[5]).startswith(last[7]+"#deleted"))
+                if (h[1],h[2],h[3],h[4],h[6],h[7],h[8]) != (last[2],last[3],last[5],last[6],last[1],last[10],last[14]) or not head_key_ok: raise RuntimeError("memory head not latest fails closed")
+            bad=self._db.execute("SELECT 1 FROM memory_idempotency i LEFT JOIN memory_revisions r ON i.record_id=r.record_id WHERE i.record_id IS NOT NULL AND r.record_id IS NULL LIMIT 1").fetchone()
+            if bad: raise RuntimeError("memory idempotency orphan fails closed")
     def _record(self,row):
         data=list(row); data[9]=MemoryKind(data[9]); data[10]=MemoryLifecycle(data[10]); return MemoryRecord(*data)
     def _decision(self,op,actor,proposal=None): return self._policy.decide(op,actor,proposal)
@@ -196,6 +256,11 @@ class SQLiteMemoryRepository:
     def _insert_revision(self,data):
         self._db.execute("INSERT INTO memory_revisions VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",tuple(data[k] for k in ("record_id","revision","tenant_id","subject_id","actor_id","purpose","namespace","key","value","kind","lifecycle","policy_version","created_at","expires_at","deletion_epoch","digest","supersedes")))
     def _journal(self,op,data,digest): self._db.execute("INSERT INTO memory_journal(operation,record_id,revision,tenant_id,subject_id,request_digest,committed_at) VALUES(?,?,?,?,?,?,?)",(op.value,data["record_id"],data["revision"],data["tenant_id"],data["subject_id"],digest,_time(self._clock)))
+    def _audit_event(self,event_type,actor,op,proposal=None,record=None,prior_digest=None,new_digest=None,deletion_epoch=0):
+        if not self._audit: return
+        h=lambda x: hashlib.sha256(str(x).encode()).hexdigest()[:32]
+        payload={"operation_type":op.value,"tenant_digest":h(actor.tenant_id),"subject_digest":h(actor.subject_id),"purpose":actor.purpose,"namespace":proposal.namespace if proposal else (record.namespace if record else "profile"),"key":proposal.key if proposal else (record.key if record else "unknown"),"record_id":record.record_id if record else "pending","revision":record.revision if record else 0,"prior_record_digest":prior_digest,"new_record_digest":new_digest,"policy_identity":self._policy.version,"policy_revision":self._policy.version,"deletion_epoch":deletion_epoch,"result_category":event_type.rsplit("_",1)[-1]}
+        self._audit.append(event_type,payload)
     def commit(self,actor,proposal):
         if self._decision(MemoryOperation.CREATE,actor,proposal).decision is PolicyDecision.REJECT:return MemoryCommitResult(MemoryReason.POLICY_REJECTED)
         digest=self._envelope(MemoryOperation.CREATE,actor,f"{proposal.namespace}:{proposal.key}",proposal)
@@ -204,16 +269,22 @@ class SQLiteMemoryRepository:
             try:
                 prior=self._idempotent(actor,proposal.idempotency_key,MemoryOperation.CREATE,digest)
                 if prior is not None:self._db.execute("COMMIT");return prior
-                exists=self._db.execute("SELECT 1 FROM memory_heads WHERE tenant_id=? AND subject_id=? AND purpose=? AND namespace=? AND key_name=?",(actor.tenant_id,actor.subject_id,actor.purpose,proposal.namespace,proposal.key)).fetchone()
-                if exists:self._db.execute("COMMIT");return MemoryCommitResult(MemoryReason.CONFLICT)
-                now=_time(self._clock); rid="mem-"+uuid4().hex; data={"record_id":rid,"revision":1,"tenant_id":actor.tenant_id,"subject_id":actor.subject_id,"actor_id":actor.actor_id,"purpose":actor.purpose,"namespace":proposal.namespace,"key":proposal.key,"value":proposal.value,"kind":proposal.kind.value,"lifecycle":"active","policy_version":self._policy.version,"created_at":now,"expires_at":(datetime.fromisoformat(now.replace("Z","+00:00"))+self._policy.retention(actor,proposal)).isoformat().replace("+00:00","Z"),"deletion_epoch":0,"supersedes":None};data["digest"]=_digest(data);self._insert_revision(data);self._db.execute("INSERT INTO memory_heads VALUES(?,?,?,?,?,?,?,?,?)",(rid,actor.tenant_id,actor.subject_id,actor.purpose,proposal.namespace,proposal.key,1,"active",0));self._db.execute("INSERT INTO memory_idempotency VALUES(?,?,?,?,?,?)",(actor.tenant_id,actor.subject_id,proposal.idempotency_key,"create",digest,rid));self._journal(MemoryOperation.CREATE,data,digest);self._db.execute("COMMIT");return MemoryCommitResult(MemoryReason.COMMITTED,self._record(tuple(data[k] for k in ("record_id","revision","tenant_id","subject_id","actor_id","purpose","namespace","key","value","kind","lifecycle","policy_version","created_at","expires_at","deletion_epoch","digest","supersedes"))))
-            except Exception:self._db.execute("ROLLBACK");raise
+                exists=self._db.execute("SELECT record_id,current_lifecycle,deletion_epoch FROM memory_heads WHERE tenant_id=? AND subject_id=? AND purpose=? AND namespace=? AND key_name=?",(actor.tenant_id,actor.subject_id,actor.purpose,proposal.namespace,proposal.key)).fetchone()
+                if exists and exists[1]=="active":self._db.execute("COMMIT");return MemoryCommitResult(MemoryReason.CONFLICT)
+                if exists and exists[1] in ("tombstoned","purged"):
+                    self._db.execute("UPDATE memory_heads SET key_name=? WHERE record_id=?",(proposal.key+"#deleted"+str(exists[2]), exists[0]))
+                self._audit_event("memory.write_prepared", actor, MemoryOperation.CREATE, proposal, new_digest=digest)
+                now=_time(self._clock); rid="mem-"+uuid4().hex; data={"record_id":rid,"revision":1,"tenant_id":actor.tenant_id,"subject_id":actor.subject_id,"actor_id":actor.actor_id,"purpose":actor.purpose,"namespace":proposal.namespace,"key":proposal.key,"value":proposal.value,"kind":proposal.kind.value,"lifecycle":"active","policy_version":self._policy.version,"created_at":now,"expires_at":(datetime.fromisoformat(now.replace("Z","+00:00"))+self._policy.retention(actor,proposal)).isoformat().replace("+00:00","Z"),"deletion_epoch":0,"supersedes":None};data["digest"]=_digest(data);self._insert_revision(data);self._db.execute("INSERT INTO memory_heads VALUES(?,?,?,?,?,?,?,?,?)",(rid,actor.tenant_id,actor.subject_id,actor.purpose,proposal.namespace,proposal.key,1,"active",0));self._db.execute("INSERT INTO memory_idempotency VALUES(?,?,?,?,?,?)",(actor.tenant_id,actor.subject_id,proposal.idempotency_key,"create",digest,rid));self._journal(MemoryOperation.CREATE,data,digest);self._db.execute("COMMIT");rec=self._record(tuple(data[k] for k in ("record_id","revision","tenant_id","subject_id","actor_id","purpose","namespace","key","value","kind","lifecycle","policy_version","created_at","expires_at","deletion_epoch","digest","supersedes")));self._audit_event("memory.write_committed", actor, MemoryOperation.CREATE, proposal, rec, new_digest=rec.digest);return MemoryCommitResult(MemoryReason.COMMITTED,rec)
+            except Exception:
+                try: self._db.execute("ROLLBACK")
+                except Exception: pass
+                raise
     def read(self,request):
         if self._decision(MemoryOperation.READ,request.actor).decision is PolicyDecision.REJECT:return ()
         with self._lock:
             now=_time(self._clock); rows=self._db.execute("SELECT r.record_id,r.revision,r.tenant_id,r.subject_id,r.actor_id,r.purpose,r.namespace,r.key_name,r.value,r.kind,r.lifecycle,r.policy_version,r.created_at,r.expires_at,r.deletion_epoch,r.digest,r.supersedes FROM memory_heads h JOIN memory_revisions r ON r.record_id=h.record_id AND r.revision=h.current_revision WHERE h.tenant_id=? AND h.subject_id=? AND h.purpose=? AND h.namespace=? AND h.key_name=? AND h.current_lifecycle='active' AND r.expires_at>? LIMIT ?",(request.actor.tenant_id,request.actor.subject_id,request.actor.purpose,request.namespace,request.query,now,request.maximum_results)).fetchall();return tuple(self._record(r) for r in rows)
     def correct(self,actor,record_id,base_revision,proposal): return self._advance(MemoryOperation.CORRECT,actor,record_id,base_revision,proposal,proposal.idempotency_key)
-    def tombstone(self,actor,record_id,revision,idempotency_key=None): return self._advance(MemoryOperation.FORGET,actor,record_id,revision,None,idempotency_key or f"forget-{record_id}-{revision}")
+    def tombstone(self,actor,record_id,revision,idempotency_key=None): return self._advance(MemoryOperation.FORGET,actor,record_id,revision,None,idempotency_key or f"forget-{record_id}-{revision}-{uuid4().hex}")
     def _advance(self,op,actor,rid,base,proposal,key):
         if not _identifier(rid) or base<1:raise ValueError("invalid memory revision")
         if self._decision(op,actor,proposal).decision is PolicyDecision.REJECT:return MemoryCommitResult(MemoryReason.POLICY_REJECTED)
@@ -228,14 +299,25 @@ class SQLiteMemoryRepository:
                 old=cur.record
                 if old is None or old.revision!=base or old.lifecycle is not MemoryLifecycle.ACTIVE:self._db.execute("COMMIT");return MemoryCommitResult(MemoryReason.CONFLICT)
                 if proposal and (proposal.namespace!=old.namespace or proposal.key!=old.key):self._db.execute("COMMIT");return MemoryCommitResult(MemoryReason.CONFLICT)
+                self._audit_event("memory.write_prepared", actor, op, proposal, old, prior_digest=old.digest, new_digest=digest, deletion_epoch=old.deletion_epoch)
                 now=_time(self._clock); deletion=old.deletion_epoch+(op is MemoryOperation.FORGET); lifecycle="tombstoned" if op is MemoryOperation.FORGET else "active"; data={"record_id":rid,"revision":base+1,"tenant_id":old.tenant_id,"subject_id":old.subject_id,"actor_id":actor.actor_id,"purpose":old.purpose,"namespace":old.namespace,"key":old.key,"value":None if op is MemoryOperation.FORGET else proposal.value,"kind":old.kind.value,"lifecycle":lifecycle,"policy_version":self._policy.version,"created_at":now,"expires_at":old.expires_at,"deletion_epoch":deletion,"supersedes":f"{rid}:{base}"};data["digest"]=_digest(data);self._insert_revision(data)
                 # Erase every retained payload revision in the same transaction; the head/tombstone remains.
-                if op is MemoryOperation.FORGET:self._db.execute("UPDATE memory_revisions SET value=NULL WHERE record_id=?",(rid,))
+                if op is MemoryOperation.FORGET:
+                    self._db.execute("UPDATE memory_revisions SET value=NULL WHERE record_id=?",(rid,))
+                    redacted=self._db.execute("SELECT record_id,revision,tenant_id,subject_id,actor_id,purpose,namespace,key_name,value,kind,lifecycle,policy_version,created_at,expires_at,deletion_epoch,supersedes FROM memory_revisions WHERE record_id=?",(rid,)).fetchall()
+                    for rr in redacted:
+                        rd={"record_id":rr[0],"revision":rr[1],"tenant_id":rr[2],"subject_id":rr[3],"actor_id":rr[4],"purpose":rr[5],"namespace":rr[6],"key":rr[7],"value":rr[8],"kind":rr[9],"lifecycle":rr[10],"policy_version":rr[11],"created_at":rr[12],"expires_at":rr[13],"deletion_epoch":rr[14],"supersedes":rr[15]}
+                        self._db.execute("UPDATE memory_revisions SET digest=? WHERE record_id=? AND revision=?",(_digest(rd),rid,rr[1]))
+                    data["value"]=None; data["digest"]=_digest(data)
                 self._db.execute("UPDATE memory_heads SET current_revision=?,current_lifecycle=?,deletion_epoch=? WHERE record_id=?",(base+1,lifecycle,deletion,rid));self._db.execute("INSERT INTO memory_idempotency VALUES(?,?,?,?,?,?)",(actor.tenant_id,actor.subject_id,key,op.value,digest,rid));self._journal(op,data,digest);self._db.execute("COMMIT")
                 rec=self._record(tuple(data[k] for k in ("record_id","revision","tenant_id","subject_id","actor_id","purpose","namespace","key","value","kind","lifecycle","policy_version","created_at","expires_at","deletion_epoch","digest","supersedes")))
                 receipt=None if op is not MemoryOperation.FORGET else DeletionReceipt("del-"+uuid4().hex,DeletionState.COMPLETED,rid,base+1,deletion,self._policy.version,("sqlite_payloads","canonical_head"),("sqlite_payloads","canonical_head"))
+                self._audit_event("memory.write_committed", actor, op, proposal, rec, prior_digest=old.digest, new_digest=rec.digest, deletion_epoch=deletion)
                 return MemoryCommitResult(MemoryReason.COMMITTED,rec,False,receipt)
-            except Exception:self._db.execute("ROLLBACK");raise
+            except Exception:
+                try: self._db.execute("ROLLBACK")
+                except Exception: pass
+                raise
     def close(self):
         with self._lock:
             if not self._closed:self._db.close();fcntl.flock(self._ownership.fileno(), fcntl.LOCK_UN);self._ownership.close();self._closed=True
@@ -248,12 +330,15 @@ class GovernedMemoryService:
     def forget(self,actor,record_id,revision,idempotency_key=None):return self._repository.tombstone(actor,record_id,revision,idempotency_key)
     def readiness(self):self._repository.readiness()
     def close(self):self._repository.close()
+    def capabilities(self):
+        self.readiness(); return ("governed-preference-memory",)
 class DisabledMemoryService:
     def remember(self,*args,**kwargs):return MemoryCommitResult(MemoryReason.MEMORY_DISABLED)
     def retrieve(self,*args,**kwargs):return ()
     def correct(self,*args,**kwargs):return MemoryCommitResult(MemoryReason.MEMORY_DISABLED)
     def forget(self,*args,**kwargs):return MemoryCommitResult(MemoryReason.MEMORY_DISABLED)
     def readiness(self):return None
+    def capabilities(self):return ()
     def close(self):return None
 
 def compose_governed_memory(config: MemoryRuntimeConfig | None = None)->GovernedMemoryPort:

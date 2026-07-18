@@ -88,8 +88,22 @@ class AlignmentRegistry:
         with self._lock:
             if expected_previous_digest!=self._active.policy_digest: raise ValueError("stale CAS")
             if pol.revision<=self._active.revision or pol.policy_digest in self._hist: raise ValueError("revision reuse")
-            if self.audit: self.audit.append("alignment.policy_activated", {"policy_id":pol.policy_id,"revision":pol.revision,"previous_digest":self._active.policy_digest,"policy_digest":pol.policy_digest,"actor_id":actor_id or "system"})
-            self._persist(pol); self._active=pol; self._hist[pol.policy_digest]=pol; self._evict(); return pol
+            event={"policy_id":pol.policy_id,"revision":pol.revision,"expected_prior_digest":self._active.policy_digest,"proposed_new_digest":pol.policy_digest,"actor_id":actor_id or "system"}
+            if self.audit: self.audit.append("alignment.activation_prepared", event)
+            prior=self._active
+            try:
+                self._persist(pol); self._active=pol; self._hist[pol.policy_digest]=pol
+                if self.audit: self.audit.append("alignment.activation_committed", {**event,"active_policy_digest":pol.policy_digest})
+                self._evict(); return pol
+            except Exception:
+                self._active=prior
+                try: self._persist(prior)
+                except Exception: pass
+                self._hist.pop(pol.policy_digest, None)
+                if self.audit:
+                    try: self.audit.append("alignment.activation_aborted", {**event,"result_category":"aborted"})
+                    except Exception: pass
+                raise
     def _evict(self):
         for d in list(self._hist)[:-MAX_HIST]:
             if d in self._leases: continue

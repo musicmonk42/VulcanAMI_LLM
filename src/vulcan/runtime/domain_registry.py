@@ -78,15 +78,32 @@ class PersistentDomainRegistry:
             elif expected_previous_digest is not None: raise ValueError("unexpected previous digest")
             domains=dict(self._active.domains); domains[bundle.domain]=bundle
             snap=_build_snapshot(domains)
-            if self.audit:
-                append = getattr(self.audit, "append", None)
-                event_data={"domain":bundle.domain,"revision":bundle.revision,"version":bundle.version,"prior_bundle_digest":old.digest if old else None,"new_bundle_digest":bundle.digest,"snapshot_id":snap.snapshot_id,"fact_count":len(bundle.facts),"evidence_count":len(bundle.evidence),"actor_id":"system"}
-                if append: append("domain.activated", event_data)
-                else: self.audit(event_data)
-            self._persist(bundle)
-            self._active=snap; self._snapshots[snap.snapshot_id]=snap
-            self._evict()
-            return snap.snapshot_id
+            event_data={"domain":bundle.domain,"revision":bundle.revision,"version":bundle.version,"expected_prior_digest":old.digest if old else None,"proposed_new_digest":bundle.digest,"snapshot_id":snap.snapshot_id,"fact_count":len(bundle.facts),"evidence_count":len(bundle.evidence),"actor_id":"system"}
+            append = getattr(self.audit, "append", None) if self.audit else None
+            if append: append("domain.activation_prepared", event_data)
+            elif self.audit: self.audit({**event_data,"event_type":"domain.activation_prepared"})
+            persisted=False
+            try:
+                self._persist(bundle); persisted=True
+                prior_active=self._active
+                self._active=snap; self._snapshots[snap.snapshot_id]=snap
+                if append: append("domain.activation_committed", {**event_data,"active_snapshot_id":snap.snapshot_id})
+                elif self.audit: self.audit({**event_data,"event_type":"domain.activation_committed","active_snapshot_id":snap.snapshot_id})
+                self._evict()
+                return snap.snapshot_id
+            except Exception as exc:
+                if persisted:
+                    try: (self.root / f"{bundle.domain}-{bundle.revision:010d}.json").unlink(missing_ok=True)
+                    except Exception: pass
+                self._active=self._snapshots.get(getattr(self._active, "snapshot_id", ""), self._active)
+                self._snapshots.pop(snap.snapshot_id, None)
+                if append:
+                    try: append("domain.activation_aborted", {**event_data,"result_category":"aborted"})
+                    except Exception: pass
+                elif self.audit:
+                    try: self.audit({**event_data,"event_type":"domain.activation_aborted","result_category":"aborted"})
+                    except Exception: pass
+                raise
     def _release(self, sid):
         with self._lock:
             n=self._leases.get(sid,0)-1
