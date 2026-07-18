@@ -1,8 +1,8 @@
 version: "1"
 auto_apply:
-  enabled: true
+  enabled: false
   # Budget limits for a single auto-apply
-  max_files: 3
+  max_files: 1
   max_total_loc: 100
 
   # Allow/deny patterns (POSIX-style, relative to repo root)
@@ -10,8 +10,6 @@ auto_apply:
     - "src/vulcan/**/*.py"
     - "src/safety/**/*.py"
     - "tests/**/*.py"
-    - "configs/**"
-    - "scripts/**"
     - "!src/**/auth/**"
     - "!src/**/security/**"
     - "!src/**/db/**"
