@@ -12,7 +12,7 @@ import math
 import operator
 import re
 import unicodedata
-from dataclasses import asdict, dataclass, is_dataclass
+from dataclasses import asdict, dataclass, is_dataclass, replace
 from datetime import datetime, timezone
 from enum import Enum
 from fractions import Fraction
@@ -37,6 +37,14 @@ class EvidenceKind(str, Enum):
     SOURCE_DOCUMENT="source_document"; SOURCE_EXCERPT="source_excerpt"; OBSERVATION="observation"; TOOL_OUTPUT="tool_output"; RETRIEVED_RECORD="retrieved_record"; FORMAL_PREMISE="formal_premise"; USER_ASSERTION="user_assertion"; POLICY_FACT="policy_fact"; STATE_SNAPSHOT="state_snapshot"
 class ExecutionStatus(str, Enum): SUCCESS="success"; PARTIAL="partial"; NOT_APPLICABLE="not_applicable"; UNKNOWN="unknown"; ERROR="error"; CANCELLED="cancelled"
 class ResponseMode(str, Enum): STRICT="strict"; CLARIFICATION="clarification"; PARTIAL="partial"; UNKNOWN="unknown"; ERROR="error"; ACTION_CONFIRMATION="action_confirmation"
+
+@dataclass(frozen=True)
+class GraphixPlan:
+    schema_version: str; plan_id: str; operation: str; request_digest: str; state_snapshot_id: str; domain_snapshot_id: str; operands: tuple[tuple[str, str], ...]; parameters: tuple[tuple[str, str], ...] = ()
+
+@dataclass(frozen=True)
+class CompiledGraphixPlan:
+    plan: GraphixPlan; plan_digest: str
 
 @dataclass(frozen=True)
 class Utterance:
@@ -78,6 +86,10 @@ class InterpretationProposal:
 
 class LanguageInputPort(Protocol):
     async def propose(self, utterance: Utterance) -> InterpretationProposal: ...
+
+class DomainLookupPort(Protocol):
+    domain_snapshot_id: str
+    def lookup_exact(self, key: str) -> tuple[str, str | None]: ...
 
 @dataclass(frozen=True)
 class InterpretationBundle:
@@ -147,7 +159,7 @@ def validate_proposal(utterance: Utterance, proposal: InterpretationProposal) ->
         raise ValueError("unsupported interpretation proposal")
     validated: list[ProposedCandidate] = []
     for candidate in proposal.candidates:
-        if candidate.operation not in {"arithmetic", "unsupported"} or not _valid_text(candidate.expression):
+        if candidate.operation not in {"arithmetic", "lookup", "memory_read", "memory_write", "memory_forget", "unsupported"} or not _valid_text(candidate.expression):
             raise ValueError("unsupported proposal operation")
         if candidate.diagnostic_confidence is not None and (not isinstance(candidate.diagnostic_confidence, float) or not math.isfinite(candidate.diagnostic_confidence)):
             raise ValueError("invalid proposal confidence")
@@ -164,6 +176,8 @@ def accept(bundle: InterpretationBundle) -> AcceptedInterpretation | Clarificati
     if len(bundle.candidates) != 1:
         return ClarificationRequest("interpretation", "Please provide one supported, unambiguous request.", f"clarification-{uuid4().hex}")
     candidate = bundle.candidates[0]
+    if candidate.operation == "unsupported":
+        return ClarificationRequest("interpretation", "Please provide one supported, unambiguous request.", f"clarification-{uuid4().hex}")
     return AcceptedInterpretation(0, candidate.operation, candidate.expression, f"accepted-{uuid4().hex}")
 
 _BIN = {ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul, ast.Div: operator.truediv, ast.Mod: operator.mod, ast.Pow: operator.pow}
@@ -200,25 +214,95 @@ def execute(accepted: AcceptedInterpretation, *, case_id: str = "case") -> tuple
         return Claim(cid, Proposition(accepted.expression, "evaluates_to", value, expression=accepted.expression), EpistemicStatus.COMPUTED, derivation_ids=(did,), assumptions=accepted.assumptions), derivation
     except (SyntaxError, ValueError, OverflowError):
         derivation = Derivation(did, "bounded-arithmetic-ast", "2", (), cid, (), (), True, ExecutionStatus.NOT_APPLICABLE, "", "unsupported or bounded expression")
-        return Claim(cid, Proposition("request", "support", "unsupported"), EpistemicStatus.UNKNOWN, caveat="No factual result was inferred."), derivation
+        return Claim(cid, Proposition("request", "support", "unsupported"), EpistemicStatus.UNKNOWN, derivation_ids=(did,), caveat="No factual result was inferred."), derivation
 
-def validate_ledger(evidence: tuple[EvidenceArtifact, ...], derivations: tuple[Derivation, ...], claims: tuple[Claim, ...]) -> None:
+def build_graphix_plan(accepted: AcceptedInterpretation, *, request_digest: str, state_snapshot_id: str, domain_snapshot_id: str = "domain:none") -> GraphixPlan:
+    if accepted.operation == "arithmetic":
+        operands = (("expression", accepted.expression),)
+    elif accepted.operation == "lookup":
+        operands = (("key", accepted.expression),)
+    elif accepted.operation in {"memory_read", "memory_write", "memory_forget"}:
+        operands = (("request_span", accepted.expression),)
+    else:
+        raise ValueError("unsupported operation")
+    return GraphixPlan("graphix-plan/1", f"plan-{uuid4().hex}", accepted.operation, request_digest, state_snapshot_id, domain_snapshot_id, operands)
+
+def compile_graphix_plan(plan: GraphixPlan, *, request_digest: str, state_snapshot_id: str, domain_snapshot_id: str) -> CompiledGraphixPlan:
+    _validate_graphix_plan(plan, request_digest=request_digest, state_snapshot_id=state_snapshot_id, domain_snapshot_id=domain_snapshot_id)
+    return CompiledGraphixPlan(plan, canonical_digest(plan))
+
+def _operand(plan: GraphixPlan, name: str) -> str:
+    matches = [v for k, v in plan.operands if k == name]
+    if len(matches) != 1: raise ValueError("invalid operands")
+    return matches[0]
+
+def _validate_graphix_plan(plan: GraphixPlan, *, request_digest: str, state_snapshot_id: str, domain_snapshot_id: str) -> None:
+    if plan.schema_version != "graphix-plan/1" or not re.fullmatch(r"plan-[0-9a-f]{32}", plan.plan_id): raise ValueError("invalid plan identity")
+    if plan.request_digest != request_digest or plan.state_snapshot_id != state_snapshot_id or plan.domain_snapshot_id != domain_snapshot_id: raise ValueError("plan snapshot mismatch")
+    if plan.operation not in {"arithmetic", "lookup", "memory_read", "memory_write", "memory_forget"}: raise ValueError("operation is not closed")
+    if plan.parameters: raise ValueError("plan parameters are closed")
+    keys = [k for k, _ in plan.operands]
+    if len(keys) != len(set(keys)) or not keys: raise ValueError("invalid operands")
+    if any(k in {"domain_hint", "domain_filter", "evidence_domain", "answer", "evidence", "code"} for k, _ in plan.operands): raise ValueError("evidence selection override rejected")
+    for key, value in plan.operands:
+        if not _valid_text(key, 64) or not _valid_text(value, MAX_REFERENCE): raise ValueError("invalid operand text")
+    if plan.operation == "arithmetic" and set(keys) != {"expression"}: raise ValueError("invalid arithmetic operands")
+    if plan.operation == "lookup" and set(keys) != {"key"}: raise ValueError("invalid lookup operands")
+
+def execute_graphix_plan(compiled: CompiledGraphixPlan, *, request_digest: str, state_snapshot_id: str, domain_snapshot_id: str, case_id: str = "case", domain: DomainLookupPort | None = None) -> tuple[Claim, Derivation, tuple[EvidenceArtifact, ...]]:
+    if canonical_digest(compiled.plan) != compiled.plan_digest: raise ValueError("compiled plan was mutated")
+    _validate_graphix_plan(compiled.plan, request_digest=request_digest, state_snapshot_id=state_snapshot_id, domain_snapshot_id=domain_snapshot_id)
+    accepted = AcceptedInterpretation(0, compiled.plan.operation, _operand(compiled.plan, "expression") if compiled.plan.operation == "arithmetic" else _operand(compiled.plan, "key"), compiled.plan.plan_id)
+    if compiled.plan.operation == "arithmetic":
+        claim, derivation = execute(accepted, case_id=case_id)
+        return claim, derivation, ()
+    if compiled.plan.operation == "lookup":
+        if domain is None or getattr(domain, "domain_snapshot_id", None) != domain_snapshot_id: raise ValueError("domain snapshot mismatch")
+        value, citation = domain.lookup_exact(accepted.expression)
+        if not _valid_text(value): raise ValueError("lookup miss")
+        eid, cid, did = f"evidence-{uuid4().hex}", f"claim-{uuid4().hex}", f"derivation-{uuid4().hex}"
+        ev = EvidenceArtifact(eid, EvidenceKind.RETRIEVED_RECORD, canonical_digest(value), citation or f"domain:{domain_snapshot_id}:{accepted.expression}", "injected-domain-port", "exact-key", case_id, state_snapshot_id=state_snapshot_id, observed_at=datetime.now(timezone.utc), source_integrity="digest-verified", trust_policy="domain-port", citation=citation)
+        der = Derivation(did, "exact-domain-lookup", "1", (eid,), cid, (), (("key", accepted.expression),), True, ExecutionStatus.SUCCESS, canonical_digest((accepted.expression, value)))
+        cl = Claim(cid, Proposition(accepted.expression, "lookup_value", value), EpistemicStatus.RETRIEVED, (eid,), (did,), citation_ids=(eid,), temporal_validity="snapshot-bound")
+        return cl, der, (ev,)
+    raise ValueError("unsupported canonical operation")
+
+def _bounded_id(value: str) -> bool:
+    return isinstance(value, str) and 1 <= len(value) <= 96 and re.fullmatch(r"[A-Za-z0-9_.:-]+", value) is not None
+
+def validate_ledger(evidence: tuple[EvidenceArtifact, ...], derivations: tuple[Derivation, ...], claims: tuple[Claim, ...], *, case_id: str | None = None) -> None:
     eids, dids, cids = {e.artifact_id for e in evidence}, {d.derivation_id for d in derivations}, {c.claim_id for c in claims}
+    all_ids = [*(e.artifact_id for e in evidence), *(d.derivation_id for d in derivations), *(c.claim_id for c in claims)]
+    if len(set(all_ids)) != len(all_ids) or not all(_bounded_id(i) for i in all_ids): raise ValueError("duplicate or invalid ledger id")
     if len(eids) != len(evidence) or len(dids) != len(derivations) or len(cids) != len(claims): raise ValueError("duplicate ledger id")
+    for e in evidence:
+        if case_id is not None and e.case_id != case_id: raise ValueError("cross-case evidence")
+        if e.schema_version != LEDGER_VERSION or not re.fullmatch(r"[0-9a-f]{64}", e.content_digest): raise ValueError("invalid evidence integrity")
+        if not _valid_text(e.reference) or not _valid_text(e.origin) or not _valid_text(e.acquisition_method): raise ValueError("invalid evidence provenance")
+        if e.citation is not None and not _valid_text(e.citation): raise ValueError("invalid citation")
+        if e.observed_at is not None and e.observed_at.tzinfo is None: raise ValueError("temporal metadata must be timezone aware")
+        if e.valid_until is not None and (e.valid_until.tzinfo is None or (e.observed_at and e.valid_until < e.observed_at)): raise ValueError("invalid temporal metadata")
     for derivation in derivations:
         if derivation.output_claim_id not in cids or len(derivation.trace_digest) > MAX_TRACE: raise ValueError("invalid derivation reference")
+        if len(set(derivation.inputs)) != len(derivation.inputs) or derivation.derivation_id in derivation.inputs or derivation.output_claim_id in derivation.inputs: raise ValueError("invalid derivation inputs")
+        if not set(derivation.inputs) <= (eids | cids): raise ValueError("dangling derivation input")
+    referenced_derivations = {d for c in claims for d in c.derivation_ids}
+    if referenced_derivations != dids: raise ValueError("dangling or unused derivation")
     for claim in claims:
-        if not set(claim.evidence_ids) <= eids or not set(claim.derivation_ids) <= dids or not set(claim.contradictions) <= cids or not set(claim.citation_ids) <= eids: raise ValueError("dangling ledger reference")
-        output = [d for d in derivations if d.output_claim_id == claim.claim_id and d.status is ExecutionStatus.SUCCESS]
-        if claim.status is EpistemicStatus.COMPUTED and not output: raise ValueError("computed claim lacks successful derivation")
-        if claim.status is EpistemicStatus.PROVEN and (not output or not any(e.kind is EvidenceKind.FORMAL_PREMISE for e in evidence if e.artifact_id in claim.evidence_ids)): raise ValueError("proven claim lacks formal evidence")
-        if claim.status is EpistemicStatus.OBSERVED and not any(e.kind is EvidenceKind.OBSERVATION for e in evidence if e.artifact_id in claim.evidence_ids): raise ValueError("observed claim lacks observation")
-        if claim.status is EpistemicStatus.RETRIEVED and not any(e.kind is EvidenceKind.RETRIEVED_RECORD for e in evidence if e.artifact_id in claim.evidence_ids): raise ValueError("retrieved claim lacks retrieved evidence")
+        if len(set(claim.evidence_ids)) != len(claim.evidence_ids) or len(set(claim.derivation_ids)) != len(claim.derivation_ids): raise ValueError("duplicate claim reference")
+        if not set(claim.evidence_ids) <= eids or not set(claim.derivation_ids) <= dids or not set(claim.contradictions) <= cids or not set(claim.citation_ids) <= set(claim.evidence_ids): raise ValueError("dangling ledger reference")
+        if any(d.output_claim_id != claim.claim_id for d in derivations if d.derivation_id in claim.derivation_ids): raise ValueError("claim derivation output mismatch")
+        successful = [d for d in derivations if d.derivation_id in claim.derivation_ids and d.status is ExecutionStatus.SUCCESS]
+        evs = [e for e in evidence if e.artifact_id in claim.evidence_ids]
+        if claim.status is EpistemicStatus.COMPUTED and not successful: raise ValueError("computed claim lacks successful derivation")
+        if claim.status is EpistemicStatus.PROVEN and (not successful or not any(e.kind is EvidenceKind.FORMAL_PREMISE for e in evs)): raise ValueError("proven claim lacks formal evidence")
+        if claim.status is EpistemicStatus.OBSERVED and not any(e.kind is EvidenceKind.OBSERVATION for e in evs): raise ValueError("observed claim lacks observation")
+        if claim.status is EpistemicStatus.RETRIEVED and not any(e.kind is EvidenceKind.RETRIEVED_RECORD for e in evs): raise ValueError("retrieved claim lacks retrieved evidence")
         if claim.status is EpistemicStatus.ASSUMED and not claim.assumptions: raise ValueError("assumption not visible")
 
 def render_strict(ir: ResponseIR, claims: tuple[Claim, ...], derivations: tuple[Derivation, ...] = (), evidence: tuple[EvidenceArtifact, ...] = ()) -> RenderArtifact:
     if ir.schema_version != RESPONSE_IR_VERSION or ir.literals or ir.max_chars <= 0: raise ValueError("invalid response IR")
-    validate_ledger(evidence, derivations, claims)
+    validate_ledger(evidence, derivations, claims, case_id=ir.case_id)
     by_id = {claim.claim_id: claim for claim in claims}
     if not set(ir.required_claim_ids) <= set(by_id) or set(ir.required_claim_ids) & set(ir.optional_claim_ids): raise ValueError("IR references unknown or duplicate claim")
     parts: list[str] = []

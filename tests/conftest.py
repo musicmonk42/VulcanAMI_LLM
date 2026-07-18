@@ -12,9 +12,16 @@ import traceback
 import uuid
 from unittest.mock import MagicMock
 
-import numpy as np
+try:
+    import numpy as np
+except ImportError:  # dependency-light canonical/security tests do not need NumPy
+    np = None
 import pytest
-from dotenv import load_dotenv  # <<< --- ADDED DOTENV --- >>>
+try:
+    from dotenv import load_dotenv  # <<< --- ADDED DOTENV --- >>>
+except ImportError:
+    def load_dotenv(*args, **kwargs):
+        return False
 
 # ============================================================
 # CI-Specific Optimizations for Faster Test Execution
@@ -278,7 +285,8 @@ _alias_all_src_modules()
 @pytest.fixture(autouse=True)
 def reset_random_state():
     """Ensure each test starts with a fresh random state."""
-    np.random.seed(12345)
+    if np is not None:
+        np.random.seed(12345)
     yield
 
 
