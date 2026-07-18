@@ -9,8 +9,8 @@ from typing import Any
 SCHEMA_VERSION="vulcan-audit/1"
 MAX_FILE_BYTES=8_000_000; MAX_LINE_BYTES=64_000; MAX_EVENTS=100_000; MAX_DEPTH=8; MAX_ITEMS=256; MAX_STRING=2048
 _FIELDS={"schema_version","sequence","event_type","timestamp","previous_hash","data","event_hash"}
-_EVENT=re.compile(r"(?:case|domain|alignment|runtime)\.[a-z][a-z0-9_]{0,31}")
-_ALLOWED={"case.started","case.interpreted","case.plan_compiled","case.ledger_committed","case.alignment_decided","case.finalized","case.completed","case.abstained","case.failed","domain.activated","alignment.policy_activated","runtime.ready"}
+_EVENT=re.compile(r"(?:case|domain|alignment|runtime|memory)\.[a-z][a-z0-9_]{0,31}")
+_ALLOWED={"case.started","case.interpreted","case.plan_compiled","case.ledger_committed","case.alignment_decided","case.finalized","case.completed","case.abstained","case.failed","domain.activation_prepared","domain.activation_committed","domain.activation_aborted","alignment.activation_prepared","alignment.activation_committed","alignment.activation_aborted","memory.write_prepared","memory.write_committed","memory.write_aborted","runtime.ready"}
 _TRANS={None:{"case.started"},"case.started":{"case.interpreted","case.failed"},"case.interpreted":{"case.plan_compiled","case.failed"},"case.plan_compiled":{"case.ledger_committed","case.failed"},"case.ledger_committed":{"case.alignment_decided","case.failed"},"case.alignment_decided":{"case.finalized","case.abstained","case.failed"},"case.finalized":{"case.completed","case.abstained","case.failed"},"case.abstained":set(),"case.completed":set(),"case.failed":set()}
 
 class AuditError(RuntimeError): pass
@@ -101,7 +101,7 @@ class CanonicalAudit:
     def verify(self):
         if self.path.is_symlink(): raise AuditError("symlinked audit path")
         if self.path.exists() and self.path.stat().st_size>MAX_FILE_BYTES: raise AuditError("audit file bound")
-        seq=0; prev="0"*64; states={}
+        seq=0; prev="0"*64; states={}; prepared={}
         data=self.path.read_bytes() if self.path.exists() else b""
         if data and not data.endswith(b"\n"): raise AuditError("incomplete final line")
         for line in data.splitlines():
@@ -116,12 +116,27 @@ class CanonicalAudit:
                 _case_data(o["event_type"],d); cid=d["case_id"]
                 if o["event_type"] not in _TRANS.get(states.get(cid),set()): raise AuditError("invalid case lifecycle")
                 states[cid]=o["event_type"]
+            elif o["event_type"].endswith("activation_prepared"):
+                key=(o["event_type"].rsplit("_",1)[0], d.get("domain") or d.get("policy_id"), d.get("proposed_new_digest"))
+                prepared[key]=True
+            elif o["event_type"] == "memory.write_prepared":
+                prepared[("memory.write", d.get("operation_type"))]=True
+            elif o["event_type"].endswith(("activation_committed","activation_aborted")):
+                key=(o["event_type"].rsplit("_",1)[0], d.get("domain") or d.get("policy_id"), d.get("proposed_new_digest"))
+                prepared.pop(key, None)
+            elif o["event_type"] in {"memory.write_committed","memory.write_aborted"}:
+                prepared.pop(("memory.write", d.get("operation_type")), None)
             seq=o["sequence"]; prev=o["event_hash"]
             if seq>MAX_EVENTS: raise AuditError("event bound")
+        if prepared: raise AuditError("unresolved prepared transaction")
         self._seq=seq; self._prev=prev; self._case_state=states
-    def events_for_case(self,case_id:str):
+    def _events_matching(self, prefix:str, field:str, value:str):
         self.verify(); out=[]
         for line in self.path.read_bytes().splitlines():
             o=_loads(line)
-            if o["event_type"].startswith("case.") and o["data"].get("case_id")==case_id: out.append(AuditEvent(**o))
+            if o["event_type"].startswith(prefix) and o["data"].get(field)==value: out.append(AuditEvent(**o))
         return tuple(out)
+    def events_for_case(self,case_id:str): return self._events_matching("case.", "case_id", case_id)
+    def events_for_domain(self,domain:str): return self._events_matching("domain.", "domain", domain)
+    def events_for_alignment(self,policy_id:str): return self._events_matching("alignment.", "policy_id", policy_id)
+    def events_for_memory_record(self,record_id:str): return self._events_matching("memory.", "record_id", record_id)
