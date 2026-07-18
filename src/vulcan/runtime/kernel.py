@@ -52,10 +52,17 @@ class CognitiveKernel:
                 case.append_ledger(claim=claim,derivation=derivation); mode=ResponseMode.CLARIFICATION; status=CognitiveCaseStatus.ABSTAINED; accepted_id=None
             else:
                 case.accepted_interpretation=selection
-                domain_snapshot_id=getattr(getattr(self._state_authority,"domain",None),"domain_snapshot_id","domain:none")
-                plan=build_graphix_plan(selection, request_digest=request.utterance.digest, state_snapshot_id=case.state_snapshot_id or "", domain_snapshot_id=domain_snapshot_id)
-                compiled=compile_graphix_plan(plan, request_digest=request.utterance.digest, state_snapshot_id=case.state_snapshot_id or "", domain_snapshot_id=domain_snapshot_id)
-                claim,derivation,evidence=execute_graphix_plan(compiled, request_digest=request.utterance.digest, state_snapshot_id=case.state_snapshot_id or "", domain_snapshot_id=domain_snapshot_id, case_id=case.case_id, domain=getattr(self._state_authority,"domain",None))
+                domain_port=getattr(self._state_authority,"domain",None)
+                lease_cm=domain_port.lease() if hasattr(domain_port,"lease") else None
+                leased_domain=lease_cm if lease_cm is not None else domain_port
+                try:
+                    domain_snapshot_id=getattr(leased_domain,"domain_snapshot_id","domain:none")
+                    plan=build_graphix_plan(selection, request_digest=request.utterance.digest, state_snapshot_id=case.state_snapshot_id or "", domain_snapshot_id=domain_snapshot_id)
+                    compiled=compile_graphix_plan(plan, request_digest=request.utterance.digest, state_snapshot_id=case.state_snapshot_id or "", domain_snapshot_id=domain_snapshot_id)
+                    if getattr(leased_domain,"domain_snapshot_id",None) != compiled.plan.domain_snapshot_id: raise ValueError("plan snapshot mismatch")
+                    claim,derivation,evidence=execute_graphix_plan(compiled, request_digest=request.utterance.digest, state_snapshot_id=case.state_snapshot_id or "", domain_snapshot_id=domain_snapshot_id, case_id=case.case_id, domain=leased_domain)
+                finally:
+                    if lease_cm is not None: lease_cm.close()
                 case.append_ledger(claim=claim,derivation=derivation,evidence=evidence)
                 mode=ResponseMode.STRICT if claim.status.value in {"computed","retrieved"} else ResponseMode.UNKNOWN; status=CognitiveCaseStatus.SUCCESS if mode is ResponseMode.STRICT else CognitiveCaseStatus.ABSTAINED; accepted_id=selection.interpretation_id
             response_ir=ResponseIR(RESPONSE_IR_VERSION,f"response-{case.case_id}",case.case_id,accepted_id,case.state_snapshot_id,mode,(claim.claim_id,))

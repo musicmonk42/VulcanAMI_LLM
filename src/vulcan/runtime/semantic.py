@@ -89,7 +89,7 @@ class LanguageInputPort(Protocol):
 
 class DomainLookupPort(Protocol):
     domain_snapshot_id: str
-    def lookup_exact(self, key: str) -> tuple[str, str | None]: ...
+    def lookup_exact(self, key: str) -> object: ...
 
 @dataclass(frozen=True)
 class InterpretationBundle:
@@ -258,9 +258,28 @@ def execute_graphix_plan(compiled: CompiledGraphixPlan, *, request_digest: str, 
         return claim, derivation, ()
     if compiled.plan.operation == "lookup":
         if domain is None or getattr(domain, "domain_snapshot_id", None) != domain_snapshot_id: raise ValueError("domain snapshot mismatch")
-        value, citation = domain.lookup_exact(accepted.expression)
+        result = domain.lookup_exact(accepted.expression)
+        eid_base, cid, did = f"evidence-{uuid4().hex}", f"claim-{uuid4().hex}", f"derivation-{uuid4().hex}"
+        if hasattr(result, "status"):
+            status = getattr(result, "status")
+            if getattr(result, "domain_snapshot_id", None) != domain_snapshot_id: raise ValueError("domain result snapshot mismatch")
+            if status != "retrieved":
+                epistemic = EpistemicStatus.CONTESTED if status == "contested" else EpistemicStatus.UNKNOWN
+                der = Derivation(did, "exact-domain-lookup", "2", (), cid, (), (("key", accepted.expression), ("domain_status", status)), True, ExecutionStatus.NOT_APPLICABLE, canonical_digest((accepted.expression, status)), "domain data unavailable")
+                cl = Claim(cid, Proposition(accepted.expression, "lookup_value", "unavailable"), epistemic, (), (did,), caveat=f"Domain lookup abstained: {status}.")
+                return cl, der, ()
+            value = getattr(result, "value")
+            if not _valid_text(value): raise ValueError("lookup miss")
+            evidence_artifacts = []
+            for i, support in enumerate(getattr(result, "evidence", ())):
+                evidence_artifacts.append(EvidenceArtifact(f"{eid_base}-{i}", EvidenceKind.RETRIEVED_RECORD, support.content_digest, support.uri, f"domain:{support.domain}:{support.revision}:{support.fact_id}:{support.evidence_id}", support.acquisition_method, case_id, state_snapshot_id=state_snapshot_id, observed_at=support.acquired_at, valid_until=support.valid_until, source_integrity="digest-verified", trust_policy="domain-registry", citation=support.uri, limitations=("evidence-truncated",) if getattr(result, "truncated", False) else ()))
+            eids = tuple(e.artifact_id for e in evidence_artifacts)
+            der = Derivation(did, "exact-domain-lookup", "2", eids, cid, (), (("key", accepted.expression), ("domain_snapshot_id", domain_snapshot_id)), True, ExecutionStatus.SUCCESS, canonical_digest((accepted.expression, value, eids)))
+            cl = Claim(cid, Proposition(accepted.expression, "lookup_value", value), EpistemicStatus.RETRIEVED, eids, (did,), citation_ids=eids, temporal_validity="snapshot-bound")
+            return cl, der, tuple(evidence_artifacts)
+        value, citation = result
         if not _valid_text(value): raise ValueError("lookup miss")
-        eid, cid, did = f"evidence-{uuid4().hex}", f"claim-{uuid4().hex}", f"derivation-{uuid4().hex}"
+        eid = eid_base
         ev = EvidenceArtifact(eid, EvidenceKind.RETRIEVED_RECORD, canonical_digest(value), citation or f"domain:{domain_snapshot_id}:{accepted.expression}", "injected-domain-port", "exact-key", case_id, state_snapshot_id=state_snapshot_id, observed_at=datetime.now(timezone.utc), source_integrity="digest-verified", trust_policy="domain-port", citation=citation)
         der = Derivation(did, "exact-domain-lookup", "1", (eid,), cid, (), (("key", accepted.expression),), True, ExecutionStatus.SUCCESS, canonical_digest((accepted.expression, value)))
         cl = Claim(cid, Proposition(accepted.expression, "lookup_value", value), EpistemicStatus.RETRIEVED, (eid,), (did,), citation_ids=(eid,), temporal_validity="snapshot-bound")
