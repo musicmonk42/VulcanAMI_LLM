@@ -534,13 +534,21 @@ def pytest_sessionfinish(session, exitstatus):
 
     print(f"[conftest] Test session finished with exit status {exitstatus}")
 
-# Dependency-light asyncio marker support when pytest-asyncio is unavailable.
+# Dependency-light asyncio marker support when pytest-asyncio/AnyIO is unavailable.
+def _compatible_async_plugin_present(config):
+    pm=config.pluginmanager
+    return any(pm.hasplugin(name) for name in ("asyncio", "pytest_asyncio", "anyio"))
+
 def pytest_pyfunc_call(pyfuncitem):
-    if pyfuncitem.get_closest_marker("asyncio") is not None:
-        import asyncio, inspect
-        testfunction = pyfuncitem.obj
-        if inspect.iscoroutinefunction(testfunction):
-            kwargs = {name: pyfuncitem.funcargs[name] for name in pyfuncitem._fixtureinfo.argnames}
-            asyncio.run(testfunction(**kwargs))
-            return True
+    marker=pyfuncitem.get_closest_marker("asyncio")
+    if marker is None or _compatible_async_plugin_present(pyfuncitem.config):
+        return None
+    import asyncio, inspect, pytest
+    testfunction=pyfuncitem.obj
+    if inspect.isasyncgenfunction(testfunction):
+        raise pytest.UsageError("async generator tests require a real async pytest plugin")
+    if inspect.iscoroutinefunction(testfunction):
+        kwargs={name: pyfuncitem.funcargs[name] for name in pyfuncitem._fixtureinfo.argnames}
+        asyncio.run(testfunction(**kwargs))
+        return True
     return None
