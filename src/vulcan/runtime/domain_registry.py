@@ -76,11 +76,16 @@ class PersistentDomainRegistry:
                 if bundle.revision <= old.revision: raise ValueError("non-monotonic revision")
                 if not expected_previous_digest or expected_previous_digest != old.digest: raise ValueError("stale expected_previous_digest")
             elif expected_previous_digest is not None: raise ValueError("unexpected previous digest")
-            self._persist(bundle)
             domains=dict(self._active.domains); domains[bundle.domain]=bundle
-            snap=_build_snapshot(domains); self._active=snap; self._snapshots[snap.snapshot_id]=snap
+            snap=_build_snapshot(domains)
+            if self.audit:
+                append = getattr(self.audit, "append", None)
+                event_data={"domain":bundle.domain,"revision":bundle.revision,"version":bundle.version,"prior_bundle_digest":old.digest if old else None,"new_bundle_digest":bundle.digest,"snapshot_id":snap.snapshot_id,"fact_count":len(bundle.facts),"evidence_count":len(bundle.evidence),"actor_id":"system"}
+                if append: append("domain.activated", event_data)
+                else: self.audit(event_data)
+            self._persist(bundle)
+            self._active=snap; self._snapshots[snap.snapshot_id]=snap
             self._evict()
-            if self.audit: self.audit({"event":"domain_activated","domain":bundle.domain,"revision":bundle.revision,"digest":bundle.digest,"snapshot_id":snap.snapshot_id})
             return snap.snapshot_id
     def _release(self, sid):
         with self._lock:

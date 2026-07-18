@@ -273,17 +273,15 @@ def execute_graphix_plan(compiled: CompiledGraphixPlan, *, request_digest: str, 
             evidence_artifacts = []
             for i, support in enumerate(getattr(result, "evidence", ())):
                 evidence_artifacts.append(EvidenceArtifact(f"{eid_base}-{i}", EvidenceKind.RETRIEVED_RECORD, support.content_digest, support.uri, f"domain:{support.domain}:{support.revision}:{support.fact_id}:{support.evidence_id}", support.acquisition_method, case_id, state_snapshot_id=state_snapshot_id, observed_at=support.acquired_at, valid_until=support.valid_until, source_integrity="digest-verified", trust_policy="domain-registry", citation=support.uri, limitations=("evidence-truncated",) if getattr(result, "truncated", False) else ()))
+            if not evidence_artifacts:
+                der = Derivation(did, "exact-domain-lookup", "2", (), cid, (), (("key", accepted.expression), ("domain_status", "missing_evidence")), True, ExecutionStatus.NOT_APPLICABLE, canonical_digest((accepted.expression, "missing_evidence")), "domain data unavailable")
+                cl = Claim(cid, Proposition(accepted.expression, "lookup_value", "unavailable"), EpistemicStatus.UNKNOWN, (), (did,), caveat="Domain lookup lacked canonical evidence.")
+                return cl, der, ()
             eids = tuple(e.artifact_id for e in evidence_artifacts)
             der = Derivation(did, "exact-domain-lookup", "2", eids, cid, (), (("key", accepted.expression), ("domain_snapshot_id", domain_snapshot_id)), True, ExecutionStatus.SUCCESS, canonical_digest((accepted.expression, value, eids)))
             cl = Claim(cid, Proposition(accepted.expression, "lookup_value", value), EpistemicStatus.RETRIEVED, eids, (did,), citation_ids=eids, temporal_validity="snapshot-bound")
             return cl, der, tuple(evidence_artifacts)
-        value, citation = result
-        if not _valid_text(value): raise ValueError("lookup miss")
-        eid = eid_base
-        ev = EvidenceArtifact(eid, EvidenceKind.RETRIEVED_RECORD, canonical_digest(value), citation or f"domain:{domain_snapshot_id}:{accepted.expression}", "injected-domain-port", "exact-key", case_id, state_snapshot_id=state_snapshot_id, observed_at=datetime.now(timezone.utc), source_integrity="digest-verified", trust_policy="domain-port", citation=citation)
-        der = Derivation(did, "exact-domain-lookup", "1", (eid,), cid, (), (("key", accepted.expression),), True, ExecutionStatus.SUCCESS, canonical_digest((accepted.expression, value)))
-        cl = Claim(cid, Proposition(accepted.expression, "lookup_value", value), EpistemicStatus.RETRIEVED, (eid,), (did,), citation_ids=(eid,), temporal_validity="snapshot-bound")
-        return cl, der, (ev,)
+        raise ValueError("canonical domain lookup requires typed DomainLookupResult")
     raise ValueError("unsupported canonical operation")
 
 def _bounded_id(value: str) -> bool:
