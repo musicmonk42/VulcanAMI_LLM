@@ -1,7 +1,7 @@
 import hashlib, os, time
 from datetime import datetime, timezone, timedelta
 
-from vulcan.world_model.meta_reasoning.self_improvement_drive import SelfImprovementDrive
+from vulcan.world_model.meta_reasoning.self_improvement_drive import compose_self_improvement_drive
 from vulcan.world_model.meta_reasoning.csiu_enforcement import METRIC_ORDER, CSIUMetricSnapshot, reset_csiu_enforcer
 from vulcan.world_model.meta_reasoning.governed_transaction import (
     ApprovalStore, ImprovementPolicy, ImprovementProposal, VerificationGate,
@@ -10,11 +10,19 @@ from vulcan.world_model.meta_reasoning.governed_transaction import (
 )
 from vulcan.runtime.audit import CanonicalAudit
 
+class MutableVerifier(ClosedApprovalVerifier):
+    def __init__(self):
+        self.principals={}
+        super().__init__(self.principals)
+    def is_authorized(self, principal, bindings):
+        self._principals=dict(self.principals)
+        return super().is_authorized(principal, bindings)
+
 
 def sha(s): return hashlib.sha256(s.encode()).hexdigest()
 
 def cfg():
-    return {"drives":{"self_improvement":{"enabled":True,"priority":1,"objectives":[{"type":"bugfix","weight":1.0}],"constraints":{"require_human_approval":True,"max_changes_per_session":5},"triggers":[],"resource_limits":{}}}}
+    return {"drives":{"self_improvement":{"enabled":True,"priority":1,"objectives":[{"type":"bugfix","weight":1.0}],"constraints":{"require_human_approval":True,"governed_transactions_enabled":True,"unattended_application_permitted":True,"independent_approval_required":True,"max_changes_per_session":5},"triggers":[],"resource_limits":{}}}}
 
 def mk_drive(tmp_path, gate):
     reset_csiu_enforcer()
@@ -22,8 +30,13 @@ def mk_drive(tmp_path, gate):
     pol=ImprovementPolicy('auto-apply-policy/2',True,repo,('bugfix',),('src/*.py',),(),1,1000,10,True,{'deterministic':('rel',)},(gate,),5,2000,True)
     snap=inspect_repository(repo,('src/*.py',))
     prop=ImprovementProposal(SCHEMA_VERSION,'prop-1','bugfix','src/t.py',sha('X=1\n'),'X=1\n','X=2\n',sha('X=2\n'),snap.digest,'deterministic','rel','proof',pol.digest,'')
-    drive=SelfImprovementDrive(config_path=cfg(), state_path=str(tmp_path/'state.json'))
-    drive.improvement_policy=pol; drive.approval_store=ApprovalStore(tmp_path/'approvals.json'); drive.audit_owner=CanonicalAudit(tmp_path/'audit.jsonl'); drive._auto_apply_enabled=True
+    policy_file=tmp_path/'auto_policy.json'
+    policy_file.write_text('{"auto_apply": {"enabled": true}}', encoding='utf-8')
+    os.environ['VULCAN_AUTO_APPLY_POLICY']=str(policy_file)
+    verifier=MutableVerifier()
+    store=ApprovalStore(tmp_path/'approvals.json')
+    audit=CanonicalAudit(tmp_path/'audit.jsonl')
+    drive=compose_self_improvement_drive(config_path=cfg(), state_path=str(tmp_path/'state.json'), improvement_policy=pol, approval_store=store, approval_verifier=verifier, audit_owner=audit)
     obj=drive.objectives[0]
     drive.should_trigger=lambda ctx: True
     drive.select_objective=lambda: obj
@@ -48,24 +61,24 @@ def mk_drive(tmp_path, gate):
     assert d1.reason_code=="baseline_established"
     assert drive._csiu_enforcer.check_cumulative_influence()["cumulative_influence"]==0
     phase['n']=2
-    return repo, drive, prop
+    return repo, drive, prop, verifier.principals
 
-def issue_for(drive, approval_id):
+def issue_for(drive, approval_id, verifier_map):
     pending=next(a for a in drive.state.pending_approvals if a["approval_id"]==approval_id)
     bindings={"approval_id":approval_id,"proposal_digest":pending["proposal_digest"],"policy_digest":pending["policy_digest"],"original_source_digest":pending["original_source_digest"],"required_scope":"self_improvement.approve"}
     principal=ApprovalIssuer().issue_principal("independent-reviewer",("self_improvement.approve",),bindings=bindings,ttl_seconds=60)
-    drive.approval_verifier=ClosedApprovalVerifier({principal.principal_id:principal})
+    verifier_map[principal.principal_id]=principal
     return principal
 
 def test_governed_drive_e2e_step_approval_resume_success(tmp_path, monkeypatch):
     monkeypatch.setenv('INTRINSIC_CSIU_OFF','0'); monkeypatch.setenv(DISABLED_ENV,'0')
-    repo, drive, prop = mk_drive(tmp_path, VerificationGate('pycompile',('python','-m','py_compile','src/t.py')))
+    repo, drive, prop, verifier_map = mk_drive(tmp_path, VerificationGate('pycompile',('python','-m','py_compile','src/t.py')))
     original=(repo/'src/t.py').read_bytes()
     action=drive.step({'force':True})
     assert action['status']=='pending_governed_approval' and action['_wait_for_approval'] is True
     assert action['approval_id'] and action['proposal_digest']==prop.digest()
     assert (repo/'src/t.py').read_bytes()==original
-    assert drive.approve_governed_pending(action['approval_id'], issue_for(drive, action['approval_id']))
+    assert drive.approve_governed_pending(action['approval_id'], issue_for(drive, action['approval_id'], verifier_map))
     resumed=drive.resume_governed_pending(action['approval_id'])
     assert resumed['status']==TransactionStatus.APPLIED_AND_VERIFIED.value
     assert (repo/'src/t.py').read_text()=='X=2\n'
@@ -85,10 +98,10 @@ def test_governed_drive_e2e_step_approval_resume_success(tmp_path, monkeypatch):
 
 def test_governed_drive_e2e_step_approval_resume_rollback(tmp_path, monkeypatch):
     monkeypatch.setenv('INTRINSIC_CSIU_OFF','0'); monkeypatch.setenv(DISABLED_ENV,'0')
-    repo, drive, prop = mk_drive(tmp_path, VerificationGate('fail',('python','-c','import sys; sys.exit(1)')))
+    repo, drive, prop, verifier_map = mk_drive(tmp_path, VerificationGate('fail',('python','-c','import sys; sys.exit(1)')))
     action=drive.step({'force':True})
     assert action['status']=='pending_governed_approval'
-    assert drive.approve_governed_pending(action['approval_id'], issue_for(drive, action['approval_id']))
+    assert drive.approve_governed_pending(action['approval_id'], issue_for(drive, action['approval_id'], verifier_map))
     resumed=drive.resume_governed_pending(action['approval_id'])
     assert resumed['status']==TransactionStatus.VERIFICATION_FAILED_ROLLBACK_SUCCEEDED.value
     assert (repo/'src/t.py').read_text()=='X=1\n'

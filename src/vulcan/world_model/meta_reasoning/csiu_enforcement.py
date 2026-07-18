@@ -192,8 +192,9 @@ class CSIUEnforcement(SerializationMixin):
     _unpickleable_attrs=["_lock","_clock"]
     def __init__(self, config: Optional[CSIUEnforcementConfig]=None, policy: Optional[CSIUPolicy]=None):
         self.config=config or CSIUEnforcementConfig(); self._explicit_policy = policy is not None; self.policy=policy or CSIUPolicy(max_single_influence=self.config.max_single_influence,max_cumulative_influence_window=self.config.max_cumulative_influence_window,cumulative_window_seconds=self.config.cumulative_window_seconds)
-        self._lock=threading.RLock(); self._clock=self.config.clock or _now; self.enforcer_id=f"csiu:{self.policy.policy_id}:{self.policy.policy_digest}"; self._durable_ready=False; self._durable_prev="0"*64; self._durable_fd=None; self._influence_history=[]; self._audit_trail=[]; self._last_decision=None; self._last_snapshot=None; self._last_ewma=0.0; self._closed=False; self._seen_snapshot_digests=set(); self._total_applications=0; self._total_blocked=0; self._total_capped=0; self._max_influence_seen=0.0; self._last_snapshot_digest=""
-        try: self._load_durable()
+        self._lock=threading.RLock(); self._clock=self.config.clock or _now; self.enforcer_id=f"csiu:{self.policy.policy_id}:{self.policy.policy_digest}"; self._durable_ready=False; self._durable_prev="0"*64; self._durable_fd=None; self._influence_history=[]; self._audit_trail=[]; self._last_decision=None; self._last_snapshot=None; self._last_ewma=0.0; self._closed=False; self._seen_snapshot_digests=set(); self._total_applications=0; self._total_blocked=0; self._total_capped=0; self._max_influence_seen=0.0; self._last_snapshot_digest=""; self._alignment_cooldown_evidence_id=""; self._alignment_cooldown_until=datetime.min.replace(tzinfo=UTC); self._alignment_cooldown_proposal_digest=""; self._alignment_cooldown_active_digest=""; self._alignment_cooldown_active_revision=0; self._alignment_cooldown_created_at=""
+        try:
+            self._load_durable(); self._load_alignment_state()
         except Exception:
             if self._durable_fd is not None:
                 try: os.close(self._durable_fd)
@@ -359,6 +360,10 @@ class CSIUEnforcement(SerializationMixin):
             self._persist(r)
 
     def observe_telemetry_snapshots(self, previous: Optional[CSIUMetricSnapshot], current: Optional[CSIUMetricSnapshot], *, observation_id: str = "telemetry-observation") -> CSIUDecision:
+        with self._lock:
+            return self._observe_telemetry_snapshots_locked(previous, current, observation_id=observation_id)
+
+    def _observe_telemetry_snapshots_locked(self, previous: Optional[CSIUMetricSnapshot], current: Optional[CSIUMetricSnapshot], *, observation_id: str = "telemetry-observation") -> CSIUDecision:
         """Accept typed telemetry for accounting/cursor state without plan influence.
 
         This public operation is intentionally evaluation-only: it never builds a
@@ -436,6 +441,10 @@ class CSIUEnforcement(SerializationMixin):
             self._last_snapshot=snapshot; self._seen_snapshot_digests.add(snapshot.snapshot_digest)
         return proposed,dec
     def apply_regularization_from_snapshots(self, plan: Dict[str,Any], previous: Optional[CSIUMetricSnapshot], current: Optional[CSIUMetricSnapshot], plan_id="unknown", action_type="improvement"):
+        with self._lock:
+            return self._apply_regularization_from_snapshots_locked(plan, previous, current, plan_id, action_type)
+
+    def _apply_regularization_from_snapshots_locked(self, plan: Dict[str,Any], previous: Optional[CSIUMetricSnapshot], current: Optional[CSIUMetricSnapshot], plan_id="unknown", action_type="improvement"):
         original=copy.deepcopy(plan or {})
         if self._closed: raise CSIUValidationError("csiu enforcer closed")
         if previous is None or current is None:
@@ -493,6 +502,27 @@ class CSIUEnforcement(SerializationMixin):
         return CSIUDecision(did,self.policy.policy_digest,pd,reason,u,ew,p,effect,applied,blocked,getattr(snapshot,"snapshot_id",''),getattr(snapshot,"snapshot_digest",''))
     def propose_weight_revision(self, snapshots: List[CSIUMetricSnapshot])->Dict[str,Any]:
         return {"schema_version":"vulcan-csiu-weight-proposal/1","active_policy_digest":self.policy.policy_digest,"proposed_weights":dict(self.policy.weights),"supporting_snapshot_digests":[s.snapshot_digest for s in snapshots],"approval_state":"pending_review","proposal_digest":canonical_digest({"active_policy_digest":self.policy.policy_digest,"weights":dict(self.policy.weights)})}
+    def _alignment_state_path(self) -> Optional[Path]:
+        if not self.config.durable_store_path:
+            return None
+        return Path(str(self.config.durable_store_path) + ".alignment.json")
+    def _load_alignment_state(self) -> None:
+        path=self._alignment_state_path()
+        if not path or not path.exists(): return
+        doc=json.loads(path.read_text(encoding="utf-8"))
+        self._alignment_cooldown_evidence_id=str(doc.get("evidence_id", ""))
+        self._alignment_cooldown_until=_parse_ts(str(doc.get("cooldown_until", "1970-01-01T00:00:00Z")))
+        self._alignment_cooldown_proposal_digest=str(doc.get("proposal_digest", ""))
+        self._alignment_cooldown_active_digest=str(doc.get("active_alignment_digest", ""))
+        self._alignment_cooldown_active_revision=int(doc.get("active_alignment_revision", 0))
+        self._alignment_cooldown_created_at=str(doc.get("created_at", ""))
+    def _persist_alignment_state(self, doc: Mapping[str,Any]) -> None:
+        path=self._alignment_state_path()
+        if not path: return
+        tmp=path.with_suffix(path.suffix+".tmp")
+        tmp.write_text(json.dumps(dict(doc),sort_keys=True,separators=(",",":"),allow_nan=False),encoding="utf-8")
+        os.replace(tmp,path)
+
     def propose_alignment_policy(self, active_policy: Any, snapshots: List[CSIUMetricSnapshot])->CSIUAlignmentProposal:
         dig=getattr(active_policy,"policy_digest",""); rev=int(getattr(active_policy,"revision",0)); pid=getattr(active_policy,"policy_id","vulcan-alignment/1")
         if not (dig and rev >= 1):
@@ -504,7 +534,13 @@ class CSIUEnforcement(SerializationMixin):
             raise CSIUValidationError("alignment evidence windows must be ordered and unique")
         provider=snapshots[0].provider_id; cohort=snapshots[0].privacy_cohort; last_end=None
         for s in snapshots:
-            ok,reason=self.validate_snapshot(s) if s.snapshot_digest not in self._seen_snapshot_digests else (s.policy_digest==self.policy.policy_digest and s.metric_definition_version==self.policy.metric_definition_version and s.sample_count>=self.policy.min_sample_count, "ok")
+            prior_last = self._last_snapshot
+            prior_seen = set(self._seen_snapshot_digests)
+            self._last_snapshot = None
+            self._seen_snapshot_digests = {d for d in self._seen_snapshot_digests if d != s.snapshot_digest}
+            ok,reason=self.validate_snapshot(s)
+            self._last_snapshot = prior_last
+            self._seen_snapshot_digests = prior_seen
             if not ok:
                 raise CSIUValidationError(f"invalid alignment evidence: {reason}")
             if s.policy_digest != self.policy.policy_digest:
@@ -543,6 +579,8 @@ class CSIUEnforcement(SerializationMixin):
         prop=CSIUAlignmentProposal(pid,rev,dig,self.policy.policy_digest,evidence,trend,reasons,"review human-understanding and safety thresholds; proposed deltas only tighten controls","authorized governance review plus ordinary alignment CAS activation",_ts(self._clock()+timedelta(hours=24)),delta)
         if delta:
             self._alignment_cooldown_evidence_id=evidence_id; self._alignment_cooldown_until=self._clock()+timedelta(hours=1)
+            self._alignment_cooldown_proposal_digest=prop.proposal_digest; self._alignment_cooldown_active_digest=dig; self._alignment_cooldown_active_revision=rev; self._alignment_cooldown_created_at=prop.created_at
+            self._persist_alignment_state({"evidence_id":evidence_id,"active_alignment_revision":rev,"active_alignment_digest":dig,"proposal_digest":prop.proposal_digest,"created_at":prop.created_at,"cooldown_until":_ts(self._alignment_cooldown_until)})
         return prop
     def get_statistics(self):
         c=self.check_cumulative_influence(); return {"enabled":self.is_enabled(),"policy_digest":self.policy.policy_digest,"metric_definition_version":self.policy.metric_definition_version,"last_valid_snapshot_digest":getattr(self._last_snapshot,"snapshot_digest",None),"last_decision_digest":getattr(self._last_decision,"decision_digest",None),"total_applications":self._total_applications,"total_blocked":self._total_blocked,"total_capped":self._total_capped,"max_influence_seen":self._max_influence_seen,"cumulative_stats":c,"kill_switches":{"global_enabled":self.config.global_enabled,"calculation_enabled":self.config.calculation_enabled,"regularization_enabled":self.config.regularization_enabled,"proposal_generation_enabled":self.config.proposal_generation_enabled,"history_display_enabled":self.config.history_tracking_enabled,"emergency_stop":self.config.emergency_stop}}
