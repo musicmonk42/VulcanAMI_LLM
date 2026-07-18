@@ -9,7 +9,6 @@ Phase 1 of WorldModel decomposition.
 import ast
 import difflib
 import logging
-import subprocess
 import time
 from typing import Any, Dict, Optional, Tuple
 
@@ -48,14 +47,13 @@ def _validate_code_ast(wm, content: str) -> None:
 def _apply_diff_and_commit(
     wm, file_path: str, original_code: str, updated_code: str, commit_message: str
 ) -> Tuple[str, bool]:
-    """
-    Apply diff and commit changes.
-    Returns tuple of (diff_summary, commit_succeeded).
-    """
-    full_path = wm.repo_root / file_path
+    """Deprecated compatibility entry point.
 
-    # 1. Generate Diff
-    diff_lines = list(
+    Phase 8 routes all source mutations through
+    GovernedSelfImprovementTransaction.  This legacy direct-write/Git path now
+    fails closed and never writes, commits, or executes plan-supplied behavior.
+    """
+    diff_summary = "\n".join(
         difflib.unified_diff(
             original_code.splitlines(),
             updated_code.splitlines(),
@@ -64,69 +62,10 @@ def _apply_diff_and_commit(
             lineterm="",
         )
     )
-    diff_summary = "\n".join(diff_lines)
-
-    # 2. Apply Change
-    full_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(full_path, "w", encoding="utf-8") as f:
-        f.write(updated_code)
-
-    # 3. Git Commit
-    try:
-        from vulcan.settings import settings
-        auto_commit_enabled = settings.self_improvement_auto_commit
-    except (ImportError, AttributeError):
-        auto_commit_enabled = False
-
-    if not auto_commit_enabled:
-        logger.info("Self-improvement auto-commit disabled (set VULCAN_SELF_IMPROVEMENT_AUTO_COMMIT=true to enable)")
-        return diff_summary, False
-
-    if not (wm.repo_root / ".git").exists():
-        logger.warning(
-            f"Cannot commit: {wm.repo_root} is not a Git repository. Skipping commit."
-        )
-        return diff_summary, False
-
-    try:
-        subprocess.run(  # nosec B603 B607
-            ["git", "add", file_path],
-            cwd=wm.repo_root,
-            check=True,
-            capture_output=True,
-        )
-
-        commit_result = subprocess.run(  # nosec B603 B607
-            ["git", "commit", "-m", f"vulcan(auto): {commit_message}"],
-            cwd=wm.repo_root,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-
-        hash_result = subprocess.run(  # nosec B603 B607
-            ["git", "rev-parse", "--short", "HEAD"],
-            cwd=wm.repo_root,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-
-        logger.info(f"Git Commit successful: {hash_result.stdout.strip()}")
-        return diff_summary, True
-
-    except subprocess.CalledProcessError as e:
-        if "nothing to commit" in e.stderr:
-            logger.info(
-                "Commit skipped: No functional changes detected by Git after writing."
-            )
-            return diff_summary, False
-        logger.error(f"Git commit failed for {file_path}: {e.stderr}")
-        raise RuntimeError(f"Git commit failed: {e.stderr}") from e
-    except Exception as e:
-        logger.error(f"Critical error during file application or Git: {e}")
-        raise
-
+    raise RuntimeError(
+        "legacy self-improvement application is disabled; use "
+        "GovernedSelfImprovementTransaction"
+    )
 
 def _execute_improvement(wm, improvement_action: Dict[str, Any]):
     """
