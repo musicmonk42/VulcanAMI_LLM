@@ -9,6 +9,8 @@ from pathlib import Path
 import os
 
 from vulcan.memory.governed import GovernedMemoryPort, compose_governed_memory
+from vulcan.learning_owner import LearningCapabilityStatus, LearningOwner
+from vulcan.learning_bandit import ShadowLinUCBToolBandit
 
 from .alignment import AlignmentRegistry
 from .audit import CanonicalAudit
@@ -77,6 +79,7 @@ class RuntimeContainer:
     domain_registry: PersistentDomainRegistry | None = None
     durable_root: Path | None = None
     self_improvement: SelfImprovementRuntime | None = None
+    learning_owner: LearningOwner | None = None
     closed: bool = False
 
     async def close(self) -> None:
@@ -99,6 +102,7 @@ class RuntimeContainer:
             self.alignment,
             self.audit,
             self.self_improvement,
+            self.learning_owner,
             self.domain_registry,
             self.kernel,
             self.safety,
@@ -137,6 +141,7 @@ class RuntimeContainer:
             "domain_registry": self.domain_registry,
             "durable_root": self.durable_root,
             "self_improvement": self.self_improvement,
+            "learning_owner": self.learning_owner,
         }
         for name, owner in required.items():
             if owner is None:
@@ -164,6 +169,10 @@ class RuntimeContainer:
                 pass
         if self.self_improvement is not None:
             result = tuple(dict.fromkeys((*result, *self.self_improvement.capabilities())))
+        if self.learning_owner is None:
+            raise RuntimeError("canonical learning owner is unavailable")
+        learning_status = self.learning_owner.capability.value
+        result = tuple(dict.fromkeys((*result, f"learning:{learning_status}")))
         if not isinstance(result, tuple) or not all(isinstance(value, str) for value in result):
             raise RuntimeError("canonical kernel returned an invalid capability list")
         return result
@@ -195,15 +204,26 @@ class RuntimeContainer:
             alignment = AlignmentRegistry(f"{root}/alignment/active.json", audit=audit)
             domain_registry = PersistentDomainRegistry(f"{root}/domains", audit=audit)
             self_improvement = compose_self_improvement_runtime(durable_root=Path(root), audit=audit, alignment=alignment, world_model=world_state)
+            shadow_bandit = ShadowLinUCBToolBandit()
+            learning_owner = LearningOwner(
+                capability=LearningCapabilityStatus.SHADOW,
+                resources={"deployment_continual": getattr(deps, "continual", None)},
+                shadow_bandit=shadow_bandit,
+            )
+            learning_owner.readiness()
+            setattr(deps, "learning_owner", learning_owner)
+            setattr(deps, "learning_system", learning_owner)
+            setattr(deployment, "learning_owner", learning_owner)
+            setattr(deployment, "learning_system", learning_owner)
             setattr(world_state, "domain", domain_registry)
             setattr(world_state, "self_improvement_runtime", self_improvement)
             setattr(world_state, "self_improvement_drive", self_improvement.drive)
             kernel = CognitiveKernel(state_authority=world_state, finalizer=SafetyResponseFinalizer(safety),
                                      language_input=language_input, language_output=language_output, memory=memory, audit=audit, alignment=alignment)
             return cls(str(uuid4()), deployment, world_state, kernel, safety, memory,
-                       language_input, language_output, config, audit, alignment, domain_registry, Path(root), self_improvement)
+                       language_input, language_output, config, audit, alignment, domain_registry, Path(root), self_improvement, learning_owner)
         except Exception:
-            for r in (self_improvement, domain_registry, alignment, audit, memory, language_output, language_input):
+            for r in (locals().get("learning_owner"), self_improvement, domain_registry, alignment, audit, memory, language_output, language_input):
                 if r is not None:
                     close=getattr(r,"close",None)
                     if close: close()

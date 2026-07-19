@@ -354,39 +354,11 @@ class MathematicalAccuracyIntegration:
         penalty: float,
         error_type: str,
     ):
-        """Apply penalty to tool weight in learning system."""
-        # Use learning system's weight adjustment mechanism
-        if hasattr(learning_system, '_weight_lock'):
-            with learning_system._weight_lock:
-                if tool_name not in learning_system.tool_weight_adjustments:
-                    learning_system.tool_weight_adjustments[tool_name] = 0.0
-                
-                old_weight = learning_system.tool_weight_adjustments[tool_name]
-                new_weight = old_weight + penalty
-                
-                # Apply bounds from learning system
-                from ..learning import MIN_TOOL_WEIGHT, MAX_TOOL_WEIGHT
-                learning_system.tool_weight_adjustments[tool_name] = max(
-                    MIN_TOOL_WEIGHT, min(MAX_TOOL_WEIGHT, new_weight)
-                )
-                
-                logger.info(
-                    f"[MathLearning] Tool '{tool_name}' weight: {old_weight:.4f} -> "
-                    f"{learning_system.tool_weight_adjustments[tool_name]:.4f} "
-                    f"(penalty: {penalty:.4f}, error: {error_type})"
-                )
-        else:
-            # Fallback: create outcome for process_outcome
-            outcome = {
-                "query_id": f"math_penalty_{tool_name}_{time.time()}",
-                "status": "error",
-                "tools": [tool_name],
-                "query_type": "mathematical_verification",
-                "routing_ms": 0,
-                "total_ms": 0,
-                "math_error": error_type,
-            }
-            await learning_system.process_outcome(outcome)
+        """Observe a penalty candidate without mutating legacy additive weights."""
+        logger.info(
+            "[MathLearning] Tool penalty observed but not applied; "
+            "shadow bandit consumes only committed canonical observations."
+        )
 
     async def _apply_tool_reward(
         self,
@@ -394,37 +366,11 @@ class MathematicalAccuracyIntegration:
         tool_name: str,
         reward: float,
     ):
-        """Apply reward to tool weight in learning system."""
-        if hasattr(learning_system, '_weight_lock'):
-            with learning_system._weight_lock:
-                if tool_name not in learning_system.tool_weight_adjustments:
-                    learning_system.tool_weight_adjustments[tool_name] = 0.0
-                
-                old_weight = learning_system.tool_weight_adjustments[tool_name]
-                new_weight = old_weight + reward
-                
-                # Apply bounds
-                from ..learning import MIN_TOOL_WEIGHT, MAX_TOOL_WEIGHT
-                learning_system.tool_weight_adjustments[tool_name] = max(
-                    MIN_TOOL_WEIGHT, min(MAX_TOOL_WEIGHT, new_weight)
-                )
-                
-                logger.info(
-                    f"[MathLearning] Tool '{tool_name}' weight: {old_weight:.4f} -> "
-                    f"{learning_system.tool_weight_adjustments[tool_name]:.4f} "
-                    f"(reward: {reward:.4f})"
-                )
-        else:
-            # Fallback: create successful outcome
-            outcome = {
-                "query_id": f"math_reward_{tool_name}_{time.time()}",
-                "status": "success",
-                "tools": [tool_name],
-                "query_type": "mathematical_verification",
-                "routing_ms": 0,
-                "total_ms": 0,
-            }
-            await learning_system.process_outcome(outcome)
+        """Observe a reward candidate without mutating legacy additive weights."""
+        logger.info(
+            "[MathLearning] Tool reward observed but not applied; "
+            "shadow bandit consumes only committed canonical observations."
+        )
 
     # ========================================================================
     # CONVENIENCE METHODS FOR COMMON OPERATIONS
@@ -437,36 +383,18 @@ class MathematicalAccuracyIntegration:
         tool_name: str,
         learning_system: Optional["UnifiedLearningSystem"] = None,
     ) -> Tuple["VerificationResult", MathematicalFeedback]:
-        """
-        Verify a Bayesian calculation and apply learning feedback.
-        
-        Convenience method that combines verification and learning.
-        
-        Args:
-            problem: BayesianProblem specification
-            claimed_answer: The claimed posterior probability
-            tool_name: Tool that produced the answer
-            learning_system: Learning system for weight updates
-            
-        Returns:
-            Tuple of (VerificationResult, MathematicalFeedback)
-        """
+        """Verify a Bayesian calculation and produce non-mutating feedback."""
         if not self.math_engine:
             raise RuntimeError("Mathematical verification engine not available")
-        
-        # Verify the calculation
         verification_result = self.math_engine.verify_bayesian_calculation(
             problem, claimed_answer
         )
-        
-        # Process result through learning integration
         feedback = await self.process_verification_result(
             verification_result,
             tool_name,
             learning_system,
             problem_type="bayesian",
         )
-        
         return verification_result, feedback
 
     def penalize_tool(
@@ -475,82 +403,29 @@ class MathematicalAccuracyIntegration:
         error_type: "MathErrorType",
         learning_system: "UnifiedLearningSystem",
     ):
-        """
-        Synchronous method to penalize a tool for mathematical error.
-        
-        This is a convenience method for direct penalization without
-        async context.
-        
-        Args:
-            tool_name: Name of the tool to penalize
-            error_type: Type of mathematical error
-            learning_system: Learning system for weight update
-        """
-        import asyncio
-        
+        """Record error counts without mutating legacy additive weights."""
         if not MATH_VERIFICATION_AVAILABLE:
             logger.warning("Mathematical verification not available")
             return
-        
-        penalty = MATH_ERROR_PENALTIES.get(error_type, WEIGHT_ADJUSTMENT_FAILURE)
-        
-        # Apply directly to learning system
-        if hasattr(learning_system, '_weight_lock'):
-            with learning_system._weight_lock:
-                if tool_name not in learning_system.tool_weight_adjustments:
-                    learning_system.tool_weight_adjustments[tool_name] = 0.0
-                
-                from ..learning import MIN_TOOL_WEIGHT, MAX_TOOL_WEIGHT
-                old = learning_system.tool_weight_adjustments[tool_name]
-                learning_system.tool_weight_adjustments[tool_name] = max(
-                    MIN_TOOL_WEIGHT,
-                    min(MAX_TOOL_WEIGHT, old + penalty)
-                )
-                
-                logger.info(
-                    f"[MathLearning] Penalized '{tool_name}': {old:.4f} -> "
-                    f"{learning_system.tool_weight_adjustments[tool_name]:.4f}"
-                )
-        
-        # Track error
         self.tool_error_counts[tool_name][error_type.value] += 1
         self.total_errors += 1
+        logger.info(
+            "[MathLearning] Direct legacy penalty mutation rejected; "
+            "shadow bandit requires committed canonical observations."
+        )
 
     def reward_tool(
         self,
         tool_name: str,
         learning_system: "UnifiedLearningSystem",
     ):
-        """
-        Synchronous method to reward a tool for correct mathematical result.
-        
-        Args:
-            tool_name: Name of the tool to reward
-            learning_system: Learning system for weight update
-        """
-        if hasattr(learning_system, '_weight_lock'):
-            with learning_system._weight_lock:
-                if tool_name not in learning_system.tool_weight_adjustments:
-                    learning_system.tool_weight_adjustments[tool_name] = 0.0
-                
-                from ..learning import MIN_TOOL_WEIGHT, MAX_TOOL_WEIGHT
-                old = learning_system.tool_weight_adjustments[tool_name]
-                learning_system.tool_weight_adjustments[tool_name] = max(
-                    MIN_TOOL_WEIGHT,
-                    min(MAX_TOOL_WEIGHT, old + MATH_VERIFICATION_REWARD)
-                )
-                
-                logger.info(
-                    f"[MathLearning] Rewarded '{tool_name}': {old:.4f} -> "
-                    f"{learning_system.tool_weight_adjustments[tool_name]:.4f}"
-                )
-        
-        # Track success
+        """Record success counts without mutating legacy additive weights."""
         self.tool_success_counts[tool_name] += 1
+        logger.info(
+            "[MathLearning] Direct legacy reward mutation rejected; "
+            "shadow bandit requires committed canonical observations."
+        )
 
-    # ========================================================================
-    # STATISTICS AND REPORTING
-    # ========================================================================
 
     def get_statistics(self) -> Dict[str, Any]:
         """Get mathematical accuracy statistics."""

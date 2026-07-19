@@ -284,89 +284,126 @@ class ContinualLearner:
 
 
 class ProgressiveColumn(nn.Module):
-    """Single column in Progressive Neural Network"""
+    """Single explicitly owned column in an isolated Progressive Neural Network."""
 
-    def __init__(self, input_dim: int, hidden_dim: int, output_dim: int):
+    def __init__(self, input_dim: int, hidden_dim: int, output_dim: int, generator: Optional[torch.Generator] = None):
         super().__init__()
-        self.layers = nn.ModuleList(
-            [
-                nn.Linear(input_dim, hidden_dim),
-                nn.ReLU(),
-                nn.Linear(hidden_dim, hidden_dim),
-                nn.ReLU(),
-                nn.Linear(hidden_dim, output_dim),
-            ]
-        )
+        self.input_dim = int(input_dim); self.hidden_dim = int(hidden_dim); self.output_dim = int(output_dim)
+        self.fc1 = nn.Linear(input_dim, hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, hidden_dim)
+        self.out = nn.Linear(hidden_dim, output_dim)
+        self._reset(generator)
+
+    def _reset(self, generator: Optional[torch.Generator]) -> None:
+        for layer in (self.fc1, self.fc2, self.out):
+            nn.init.xavier_uniform_(layer.weight, generator=generator)
+            nn.init.zeros_(layer.bias)
+
+    def forward_activations(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        h1 = torch.relu(self.fc1(x))
+        h2 = torch.relu(self.fc2(h1))
+        out = self.out(h2)
+        return h1, h2, out
 
     def forward(self, x: torch.Tensor) -> List[torch.Tensor]:
-        """Forward pass returning intermediate activations"""
-        activations = []
-        h = x
-        for layer in self.layers:
-            h = layer(h)
-            if isinstance(layer, nn.ReLU):
-                activations.append(h)
-        activations.append(h)
-        return activations
+        return list(self.forward_activations(x))
 
 
 class ProgressiveNeuralNetwork(nn.Module):
-    """Progressive Neural Network for continual learning"""
+    """Isolated Progressive Neural Network for research-only continual learning."""
 
-    def __init__(self, input_dim: int, hidden_dim: int, output_dim: int):
+    def __init__(self, input_dim: int, hidden_dim: int, output_dim: int, rng_seed: Optional[int] = None):
         super().__init__()
-        self.input_dim = input_dim
-        self.hidden_dim = hidden_dim
-        self.output_dim = output_dim
-
+        if input_dim <= 0 or hidden_dim <= 0 or output_dim <= 0:
+            raise ValueError("progressive dimensions must be positive")
+        self.input_dim = int(input_dim)
+        self.hidden_dim = int(hidden_dim)
+        self.output_dim = int(output_dim)
+        self.rng_seed = int(rng_seed or 0)
+        self._generator = torch.Generator()
+        self._generator.manual_seed(self.rng_seed)
         self.columns = nn.ModuleList()
         self.lateral_connections = nn.ModuleDict()
+        self.task_to_column: Dict[str, int] = {}
 
     def add_column(self, task_id: str) -> None:
-        """Add new column for task"""
+        """Add a new trainable column and freeze all earlier columns."""
+        if not isinstance(task_id, str) or not task_id:
+            raise ValueError("task_id required")
+        if task_id in self.task_to_column:
+            raise ValueError("task already has progressive column")
         column_idx = len(self.columns)
-        self.columns.append(
-            ProgressiveColumn(self.input_dim, self.hidden_dim, self.output_dim)
-        )
-
-        # Add lateral connections from all previous columns
+        for col in self.columns:
+            for param in col.parameters():
+                param.requires_grad_(False)
+        self.columns.append(ProgressiveColumn(self.input_dim, self.hidden_dim, self.output_dim, self._generator))
+        self.task_to_column[task_id] = column_idx
         if column_idx > 0:
             for prev_idx in range(column_idx):
                 key = f"{prev_idx}_to_{column_idx}"
-                self.lateral_connections[key] = nn.ModuleList(
-                    [
-                        nn.Linear(self.hidden_dim, self.hidden_dim),
-                        nn.Linear(self.hidden_dim, self.hidden_dim),
-                        nn.Linear(self.output_dim, self.output_dim),
-                    ]
-                )
+                mods = nn.ModuleList([
+                    nn.Linear(self.hidden_dim, self.hidden_dim),
+                    nn.Linear(self.hidden_dim, self.hidden_dim),
+                    nn.Linear(self.output_dim, self.output_dim),
+                ])
+                for layer in mods:
+                    nn.init.xavier_uniform_(layer.weight, generator=self._generator)
+                    nn.init.zeros_(layer.bias)
+                self.lateral_connections[key] = mods
 
-    def forward(self, x: torch.Tensor, column_idx: int) -> torch.Tensor:
-        """Forward pass through specific column with lateral connections"""
-        if column_idx >= len(self.columns):
+    def trainable_parameters_for_column(self, column_idx: int) -> List[nn.Parameter]:
+        self._validate_column(column_idx)
+        params = list(self.columns[column_idx].parameters())
+        for prev_idx in range(column_idx):
+            key = f"{prev_idx}_to_{column_idx}"
+            if key not in self.lateral_connections:
+                raise ValueError("missing lateral connection")
+            params.extend(self.lateral_connections[key].parameters())
+        return [p for p in params if p.requires_grad]
+
+    def _validate_column(self, column_idx: int) -> None:
+        if type(column_idx) is not int or column_idx < 0 or column_idx >= len(self.columns):
             raise ValueError(f"Column {column_idx} not found")
 
-        # Get activations from current column
-        current_activations = self.columns[column_idx](x)
-
-        # Add lateral connections from previous columns
-        if column_idx > 0:
+    def forward(self, x: torch.Tensor, column_idx: int, *, ablate_lateral: bool = False) -> torch.Tensor:
+        """Forward pass where lateral contributions affect hidden states and final output."""
+        self._validate_column(column_idx)
+        if x.shape[-1] != self.input_dim:
+            raise ValueError("progressive input dimension mismatch")
+        lateral_h1 = lateral_h2 = lateral_out = None
+        if column_idx > 0 and not ablate_lateral:
             for prev_idx in range(column_idx):
-                prev_activations = self.columns[prev_idx](x)
                 key = f"{prev_idx}_to_{column_idx}"
+                if key not in self.lateral_connections:
+                    raise ValueError("missing lateral connection")
+                with torch.no_grad():
+                    p_h1, p_h2, p_out = self.columns[prev_idx].forward_activations(x)
+                lat = self.lateral_connections[key]
+                c1, c2, c3 = lat[0](p_h1), lat[1](p_h2), lat[2](p_out)
+                lateral_h1 = c1 if lateral_h1 is None else lateral_h1 + c1
+                lateral_h2 = c2 if lateral_h2 is None else lateral_h2 + c2
+                lateral_out = c3 if lateral_out is None else lateral_out + c3
+        col = self.columns[column_idx]
+        h1 = col.fc1(x)
+        if lateral_h1 is not None: h1 = h1 + lateral_h1
+        h1 = torch.relu(h1)
+        h2 = col.fc2(h1)
+        if lateral_h2 is not None: h2 = h2 + lateral_h2
+        h2 = torch.relu(h2)
+        out = col.out(h2)
+        if lateral_out is not None: out = out + lateral_out
+        return out
 
-                if key in self.lateral_connections:
-                    lateral = self.lateral_connections[key]
-                    for i, (prev_act, lat_conn) in enumerate(
-                        zip(prev_activations, lateral)
-                    ):
-                        if i < len(current_activations) - 1:
-                            current_activations[i] = current_activations[i] + lat_conn(
-                                prev_act
-                            )
-
-        return current_activations[-1]
-
+    def manifest(self) -> Dict[str, Any]:
+        return {
+            "input_dim": self.input_dim,
+            "hidden_dim": self.hidden_dim,
+            "output_dim": self.output_dim,
+            "rng_seed": self.rng_seed,
+            "tasks": dict(self.task_to_column),
+            "columns": len(self.columns),
+            "laterals": sorted(self.lateral_connections.keys()),
+        }
 
 # ============================================================
 # ENHANCED CONTINUAL LEARNER
@@ -382,12 +419,19 @@ class EnhancedContinualLearner(nn.Module):
         config: LearningConfig = None,
         use_hierarchical: bool = True,
         use_progressive: bool = False,
+        allow_unverified_progressive: bool = False,
+        progressive_rng_seed: Optional[int] = None,
     ):
+        if use_progressive and not allow_unverified_progressive:
+            raise RuntimeError(
+                "Progressive learning is disabled until verification gates pass."
+            )
         super().__init__()
         self.config = config or LearningConfig()
         self.embedding_dim = embedding_dim
         self.use_hierarchical = use_hierarchical
-        self.use_progressive = use_progressive
+        self.use_progressive = bool(use_progressive and allow_unverified_progressive)
+        self.progressive_rng_seed = int(progressive_rng_seed or 0)
 
         # Task management
         self.task_detector = TaskDetector(self.config.task_detection_threshold)
@@ -406,10 +450,10 @@ class EnhancedContinualLearner(nn.Module):
         # General model
         self.general_model = self._create_task_head()
 
-        # Progressive Neural Network (optional)
-        if use_progressive:
+        # Progressive Neural Network (optional; unavailable in production defaults)
+        if self.use_progressive:
             self.progressive_network = ProgressiveNeuralNetwork(
-                embedding_dim, HIDDEN_DIM, embedding_dim
+                embedding_dim, HIDDEN_DIM, embedding_dim, rng_seed=self.progressive_rng_seed
             )
 
         # EWC components
@@ -1009,8 +1053,14 @@ class EnhancedContinualLearner(nn.Module):
         )
 
     def _setup_optimizer(self, task_id: str, model: nn.Module):
-        """Setup optimizer and scheduler for task."""
-        params = list(self.shared_encoder.parameters()) + list(model.parameters())
+        """Setup optimizer and scheduler for the exact intended parameter set."""
+        if self.use_progressive and hasattr(self, "progressive_network") and task_id in self.task_order:
+            column_idx = self.task_order.index(task_id)
+            params = self.progressive_network.trainable_parameters_for_column(column_idx)
+            if not params:
+                raise RuntimeError("progressive optimizer has no owned parameters")
+        else:
+            params = list(self.shared_encoder.parameters()) + list(model.parameters())
         self.optimizers[task_id] = optim.Adam(params, lr=self.config.learning_rate)
         self.schedulers[task_id] = ReduceLROnPlateau(
             self.optimizers[task_id], mode="min", patience=10, factor=0.5
@@ -1346,7 +1396,7 @@ class EnhancedContinualLearner(nn.Module):
                             "consolidation_counter": self.consolidation_counter,
                             "embedding_dim": self.embedding_dim,
                             "use_hierarchical": self.use_hierarchical,
-                            "use_progressive": self.use_progressive,
+                            "use_progressive": False,
                             "optimizer_states": {
                                 task_id_opt: opt.state_dict()
                                 for task_id_opt, opt in self.optimizers.items()
@@ -1510,9 +1560,10 @@ class EnhancedContinualLearner(nn.Module):
             for param_group in optimizer.param_groups:
                 param_group["lr"] = self.live_feedback.adaptive_lr
 
-        optimizer.zero_grad()
+        optimizer.zero_grad(set_to_none=True)
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(self.parameters(), 1.0)
+        intended_params = [p for group in optimizer.param_groups for p in group["params"]]
+        torch.nn.utils.clip_grad_norm_(intended_params, 1.0)
 
         # Safety check with correct parameter names
         # THREAD SAFETY FIX: Reuse validator to prevent thread leaks.
@@ -1550,7 +1601,7 @@ class EnhancedContinualLearner(nn.Module):
                 if not safe:
                     logger.warning(f"Blocked update: {reason}")
                     # Rollback by not stepping optimizer and zeroing gradients
-                    optimizer.zero_grad()
+                    optimizer.zero_grad(set_to_none=True)
                     return {
                         "task_id": task_id,
                         "loss": loss.item(),
@@ -1901,6 +1952,104 @@ class EnhancedContinualLearner(nn.Module):
 
                 return stats
 
+
+    def _progressive_tensor_to_json(self, value: Any) -> Any:
+        if isinstance(value, torch.Tensor):
+            return {"__tensor__": True, "dtype": str(value.dtype), "shape": list(value.shape), "data": value.detach().cpu().tolist()}
+        if isinstance(value, dict):
+            return {str(k): self._progressive_tensor_to_json(v) for k, v in sorted(value.items(), key=lambda kv: str(kv[0]))}
+        if isinstance(value, (list, tuple)):
+            return [self._progressive_tensor_to_json(v) for v in value]
+        if isinstance(value, (str, int, float, bool)) or value is None:
+            return value
+        raise ValueError("unsupported progressive state value")
+
+    def _progressive_tensor_from_json(self, value: Any) -> Any:
+        if isinstance(value, dict) and value.get("__tensor__") is True:
+            dtype_name = str(value.get("dtype", "torch.float32")).replace("torch.", "")
+            dtype = getattr(torch, dtype_name)
+            t = torch.tensor(value["data"], dtype=dtype)
+            if list(t.shape) != list(value["shape"]):
+                raise ValueError("progressive tensor shape mismatch")
+            return t
+        if isinstance(value, dict):
+            return {k: self._progressive_tensor_from_json(v) for k, v in value.items()}
+        if isinstance(value, list):
+            return [self._progressive_tensor_from_json(v) for v in value]
+        return value
+
+    def save_progressive_research_state(self, path: str) -> str:
+        """Save strict JSON research-only progressive state without pickle."""
+        if not self.use_progressive or not hasattr(self, "progressive_network"):
+            raise RuntimeError("progressive research state unavailable")
+        doc = {
+            "schema_version": "vulcan-progressive-research/1",
+            "embedding_dim": self.embedding_dim,
+            "task_order": list(self.task_order),
+            "task_info": {k: v.__dict__ for k, v in self.task_info.items()},
+            "progressive_manifest": self.progressive_network.manifest(),
+            "model_state": self._progressive_tensor_to_json(self.progressive_network.state_dict()),
+            "optimizer_states": {k: self._progressive_tensor_to_json(v.state_dict()) for k, v in self.optimizers.items()},
+            "scheduler_states": {k: self._progressive_tensor_to_json(v.state_dict()) for k, v in self.schedulers.items()},
+            "task_masks": self._progressive_tensor_to_json(self.task_masks),
+            "free_capacity": self._progressive_tensor_to_json(self.free_capacity),
+            "training_cursor": {k: int(getattr(v, "samples_seen", 0)) for k, v in self.task_info.items()},
+            "rng_seed": self.progressive_rng_seed,
+        }
+        payload = {k: doc[k] for k in sorted(doc)}
+        import hashlib, json, os, tempfile
+        digest = hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest()
+        payload["manifest_digest"] = digest
+        target = Path(path); target.parent.mkdir(parents=True, exist_ok=True)
+        raw = json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+        fd, tmp = tempfile.mkstemp(prefix=".progressive.", suffix=".json", dir=target.parent)
+        with os.fdopen(fd, "wb") as f:
+            f.write(raw); f.flush(); os.fsync(f.fileno())
+        os.replace(tmp, target)
+        return str(target)
+
+    def load_progressive_research_state(self, path: str) -> None:
+        """Strictly restore research-only progressive state, rejecting partial manifests."""
+        import hashlib, json
+        raw = Path(path).read_bytes()
+        def pairs(items):
+            out = {}
+            for k, v in items:
+                if k in out: raise ValueError("duplicate progressive state key")
+                out[k] = v
+            return out
+        doc = json.loads(raw.decode(), object_pairs_hook=pairs, parse_constant=lambda x: (_ for _ in ()).throw(ValueError("non-finite progressive state")))
+        digest = doc.pop("manifest_digest", None)
+        expected = hashlib.sha256(json.dumps({k: doc[k] for k in sorted(doc)}, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest()
+        if digest != expected: raise ValueError("progressive manifest digest mismatch")
+        required = {"schema_version","embedding_dim","task_order","task_info","progressive_manifest","model_state","optimizer_states","scheduler_states","task_masks","free_capacity","training_cursor","rng_seed"}
+        if set(doc) != required or doc["schema_version"] != "vulcan-progressive-research/1": raise ValueError("progressive manifest schema mismatch")
+        if int(doc["embedding_dim"]) != self.embedding_dim: raise ValueError("progressive embedding dimension mismatch")
+        self.progressive_rng_seed = int(doc["rng_seed"])
+        self.use_progressive = True
+        self.progressive_network = ProgressiveNeuralNetwork(self.embedding_dim, HIDDEN_DIM, self.embedding_dim, rng_seed=self.progressive_rng_seed)
+        self.task_order = []
+        self.task_info = {}
+        self.task_models.clear(); self.optimizers.clear(); self.schedulers.clear()
+        for task_id in doc["task_order"]:
+            self.task_order.append(task_id)
+            self.progressive_network.add_column(task_id)
+            self.task_models[task_id] = self._create_task_head()
+            self._setup_optimizer(task_id, self.task_models[task_id])
+            self.task_info[task_id] = TaskInfo(**doc["task_info"][task_id])
+        if self.progressive_network.manifest() != doc["progressive_manifest"]: raise ValueError("progressive architecture manifest mismatch")
+        state = self._progressive_tensor_from_json(doc["model_state"])
+        if set(state) != set(self.progressive_network.state_dict()): raise ValueError("progressive model state keys mismatch")
+        self.progressive_network.load_state_dict(state, strict=True)
+        opt_states = {k: self._progressive_tensor_from_json(v) for k, v in doc["optimizer_states"].items()}
+        if set(opt_states) != set(self.optimizers): raise ValueError("progressive optimizer state keys mismatch")
+        for k, v in opt_states.items(): self.optimizers[k].load_state_dict(v)
+        sched_states = {k: self._progressive_tensor_from_json(v) for k, v in doc["scheduler_states"].items()}
+        if set(sched_states) != set(self.schedulers): raise ValueError("progressive scheduler state keys mismatch")
+        for k, v in sched_states.items(): self.schedulers[k].load_state_dict(v)
+        self.task_masks = self._progressive_tensor_from_json(doc["task_masks"])
+        self.free_capacity = self._progressive_tensor_from_json(doc["free_capacity"])
+
     def save_state(self, path: Optional[str] = None) -> str:
         """Save complete state for recovery - exclude non-picklable objects."""
         if path is None:
@@ -1975,7 +2124,7 @@ class EnhancedContinualLearner(nn.Module):
                     "consolidation_counter": self.consolidation_counter,
                     "embedding_dim": self.embedding_dim,
                     "use_hierarchical": self.use_hierarchical,
-                    "use_progressive": self.use_progressive,
+                    "use_progressive": False,
                     # Store optimizer states
                     "optimizer_states": {
                         task_id: opt.state_dict()
@@ -2005,6 +2154,12 @@ class EnhancedContinualLearner(nn.Module):
 
         with self._lock:
             with self._stats_lock:
+                if bool(state.get("use_progressive", False)):
+                    logger.warning("Ignoring disabled progressive learning flag in saved state")
+                self.use_progressive = False
+                if hasattr(self, "progressive_network"):
+                    delattr(self, "progressive_network")
+
                 # 1. Restore config FIRST
                 if "config" in state:
                     loaded_config_dict = state["config"]
@@ -2035,21 +2190,17 @@ class EnhancedContinualLearner(nn.Module):
                     if task_id not in self.optimizers:
                         self._setup_optimizer(task_id, task_head)
 
-                # 4. Load model weights - use strict=False to handle any mismatches gracefully
-                try:
-                    self.load_state_dict(state["model_state"], strict=False)
-                except Exception as e:
-                    logger.warning(
-                        f"Failed to load full state dict, attempting partial load: {e}"
-                    )
-                    # Try to load only matching keys
-                    current_state = self.state_dict()
-                    filtered_state = {
-                        k: v
-                        for k, v in state["model_state"].items()
-                        if k in current_state
-                    }
-                    self.load_state_dict(filtered_state, strict=False)
+                # 4. Load only parameters owned by the disabled runtime architecture.
+                current_state = self.state_dict()
+                filtered_state = {
+                    k: v
+                    for k, v in state["model_state"].items()
+                    if k in current_state and not k.startswith("progressive_network.")
+                }
+                missing = set(current_state) - set(filtered_state)
+                if missing:
+                    logger.warning("Checkpoint missing parameters for current learner architecture")
+                self.load_state_dict(filtered_state, strict=True)
 
                 # 5. Restore EWC and PackNet data
                 self.fisher_information = state["fisher_information"]

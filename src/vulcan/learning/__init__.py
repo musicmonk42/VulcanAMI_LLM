@@ -1,6 +1,6 @@
 """
-VULCAN-AGI Learning Module - Unified Integration
-Coordinates: Continual + Curriculum + Meta + RLHF + World Model + Metacognition
+VULCAN learning compatibility facade
+Capabilities are reported by the canonical LearningOwner matrix.
 """
 
 from __future__ import annotations
@@ -14,7 +14,10 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-import numpy as np
+try:
+    import numpy as np
+except ImportError:  # dependency-light owner imports must not require NumPy
+    np = None
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +95,8 @@ TORCH_DEPENDENT_COMPONENTS = [
     "EnhancedContinualLearner",
     "MetaLearner",
     "MetaLearningAlgorithm",
+    "MetaUpdateResult",
+    "MetaUpdateStatus",
     "TaskDetector",
     "CompositionalUnderstanding",
     "MetaCognitiveMonitor",
@@ -99,14 +104,23 @@ TORCH_DEPENDENT_COMPONENTS = [
     "RLHFManager",
 ]
 
-# Import torch-free components
-from .curriculum_learning import (
-    CurriculumLearner,
-    LearnedDifficultyEstimator,
-    PacingStrategy,
-)
+# Import torch-free components. Keep package import available for LearningOwner even
+# when optional numerical dependencies are absent.
+try:
+    from .curriculum_learning import (
+        CurriculumLearner,
+        LearnedDifficultyEstimator,
+        PacingStrategy,
+    )
+except ImportError:
+    CurriculumLearner = None
+    LearnedDifficultyEstimator = None
+    PacingStrategy = None
 from .learning_types import FeedbackData, LearningConfig, LearningMode, TaskInfo
-from .parameter_history import ParameterHistoryManager
+try:
+    from .parameter_history import ParameterHistoryManager
+except ImportError:
+    ParameterHistoryManager = None
 
 # Import learning state persistence
 try:
@@ -132,7 +146,7 @@ except ImportError:
 if TORCH_AVAILABLE:
     try:
         from .continual_learning import ContinualLearner, EnhancedContinualLearner
-        from .meta_learning import MetaLearner, MetaLearningAlgorithm, TaskDetector
+        from .meta_learning import MetaLearner, MetaLearningAlgorithm, MetaUpdateResult, MetaUpdateStatus, TaskDetector
         from .metacognition import CompositionalUnderstanding, MetaCognitiveMonitor
         from .rlhf_feedback import LiveFeedbackProcessor, RLHFManager
     except Exception as e:
@@ -156,23 +170,28 @@ except Exception as e:
 
 class UnifiedLearningSystem:
     """
-    Production-ready unified learning system integrating all components:
-    - Continual Learning (EWC, replay, progressive networks)
+    Contained learning composition facade; capabilities are owner-reported:
+    - Continual Learning (EWC and replay; progressive mutation disabled)
     - Curriculum Learning (adaptive difficulty)
-    - Meta-Learning (MAML, task adaptation)
-    - RLHF (human feedback, PPO)
-    - World Model (planning, dynamics prediction)
-    - Metacognition (self-monitoring, improvement)
+    - Meta-learning research adapters; MAML/PROTO unavailable
+    - RLHF shadow reward research; PPO unavailable
+    - World-model research adapters; production planning disabled
+    - Metacognition observe-only diagnostics
     """
 
     def __init__(
         self,
         config: Optional[LearningConfig] = None,
         embedding_dim: int = 384,
-        enable_world_model: bool = True,
+        enable_world_model: bool = False,
         enable_curriculum: bool = True,
         enable_metacognition: bool = True,
+        enable_progressive: bool = False,
     ):
+        if enable_progressive:
+            raise RuntimeError(
+                "Progressive learning is disabled until verification gates pass."
+            )
         self.config = config or LearningConfig()
         self.embedding_dim = embedding_dim
 
@@ -184,7 +203,7 @@ class UnifiedLearningSystem:
                 embedding_dim=embedding_dim,
                 config=self.config,
                 use_hierarchical=True,
-                use_progressive=True,
+                use_progressive=False,
             )
         else:
             logger.warning(
@@ -293,15 +312,10 @@ class UnifiedLearningSystem:
                             self._learning_persistence.clear_state()
                         logger.info("[Learning] Tool weights reset to defaults (0.0) due to corruption")
                     else:
-                        # Note: Propagate persisted weights to shared ToolWeightManager at startup
-                        # This ensures the ensemble uses learned weights from previous sessions
-                        if WEIGHT_MANAGER_AVAILABLE and get_weight_manager:
-                            try:
-                                for tool, adjustment in persisted_weights.items():
-                                    get_weight_manager().set_weight(tool, 1.0 + adjustment)
-                                logger.info(f"[Learning] Propagated {len(persisted_weights)} persisted weights to ToolWeightManager")
-                            except Exception as e:
-                                logger.warning(f"[Learning] Failed to propagate persisted weights: {e}")
+                        logger.info(
+                            "[Learning] Persisted legacy tool weights quarantined; "
+                            "not imported into runtime selection or shadow bandit state."
+                        )
             except Exception as e:
                 logger.warning(f"[Learning] Failed to initialize persistence: {e}")
                 self._learning_persistence = None
@@ -849,48 +863,11 @@ class UnifiedLearningSystem:
                         f"{original_delta:+.4f} * {WEIGHT_PENALTY_UNVERIFIED} = {weight_delta:+.4f}"
                     )
             
-            if weight_delta != 0.0:  # Only process if there's a weight change
-                with self._weight_lock:
-                    # Apply periodic weight decay first (moves weights towards 0)
-                    self._apply_weight_decay_if_needed()
-                    
-                    for tool in tools:
-                        if tool not in self.tool_weight_adjustments:
-                            self.tool_weight_adjustments[tool] = 0.0
-                        
-                        new_weight = self.tool_weight_adjustments[tool] + weight_delta
-                        
-                        # Note: Clamp weight to bounds to prevent death spiral
-                        old_weight = self.tool_weight_adjustments[tool]
-                        self.tool_weight_adjustments[tool] = max(MIN_TOOL_WEIGHT, min(MAX_TOOL_WEIGHT, new_weight))
-                        
-                        # Log if weight was clamped
-                        if self.tool_weight_adjustments[tool] != new_weight:
-                            logger.info(
-                                f"[Learning] Tool '{tool}' weight CLAMPED: {old_weight:+.3f} + {weight_delta:+.3f} = "
-                                f"{new_weight:+.3f} -> {self.tool_weight_adjustments[tool]:+.3f} (bounds: [{MIN_TOOL_WEIGHT}, {MAX_TOOL_WEIGHT}])"
-                            )
-                        else:
-                            logger.info(f"[Learning] Tool '{tool}' weight adjustment: {weight_delta:+.3f} (cumulative: {self.tool_weight_adjustments[tool]:+.3f})")
-                        
-                        # Note: Propagate weight to shared ToolWeightManager so Ensemble can use it
-                        # Previously, learning updated its own dictionary but Ensemble read from a separate
-                        # ToolWeightManager instance, so learned weights were never applied.
-                        if WEIGHT_MANAGER_AVAILABLE and get_weight_manager:
-                            try:
-                                # Use absolute weight (1.0 + adjustment) since ToolWeightManager expects base weight
-                                get_weight_manager().set_weight(tool, 1.0 + self.tool_weight_adjustments[tool])
-                                logger.debug(f"[Learning] Propagated weight to ToolWeightManager: {tool} = {1.0 + self.tool_weight_adjustments[tool]:.4f}")
-                            except Exception as e:
-                                logger.warning(f"[Learning] Failed to propagate weight to ToolWeightManager: {e}")
-                    
-                    # PERSISTENCE FIX: Save tool weights to disk after every update
-                    # This ensures learning state persists across queries and server restarts
-                    if self._learning_persistence:
-                        try:
-                            self._learning_persistence.update_tool_weights(self.tool_weight_adjustments)
-                        except Exception as e:
-                            logger.warning(f"[Learning] Failed to persist tool weights: {e}")
+            if weight_delta != 0.0:
+                logger.info(
+                    "[Learning] Legacy additive tool-weight update rejected; "
+                    "shadow bandit consumes only committed canonical observations."
+                )
         else:
             logger.warning(f"[Learning] No tools recorded for {query_id} - cannot learn from selection")
         
@@ -933,40 +910,8 @@ class UnifiedLearningSystem:
         logger.info(f"[Learning] Outcome processing complete for {query_id}")
 
     def _apply_weight_decay_if_needed(self) -> None:
-        """
-        Apply periodic weight decay to all tool weights.
-        
-        Note: This method prevents the tool weight death spiral by
-        periodically decaying weights towards zero. Without decay, weights
-        can accumulate indefinitely in either direction.
-        
-        This should be called while holding self._weight_lock.
-        """
-        current_time = time.time()
-        time_since_decay = current_time - self._last_weight_decay_time
-        
-        if time_since_decay >= WEIGHT_DECAY_INTERVAL_SECONDS:
-            # Calculate how many decay intervals have passed, capped to prevent precision issues
-            intervals = min(
-                int(time_since_decay / WEIGHT_DECAY_INTERVAL_SECONDS),
-                MAX_DECAY_INTERVALS
-            )
-            decay_multiplier = WEIGHT_DECAY_FACTOR ** intervals
-            
-            decayed_count = 0
-            for tool in self.tool_weight_adjustments:
-                old_weight = self.tool_weight_adjustments[tool]
-                if abs(old_weight) > WEIGHT_DECAY_EPSILON:  # Only decay non-zero weights
-                    self.tool_weight_adjustments[tool] = old_weight * decay_multiplier
-                    decayed_count += 1
-            
-            if decayed_count > 0:
-                logger.info(
-                    f"[Learning] Applied weight decay (factor={decay_multiplier:.3f}) "
-                    f"to {decayed_count} tool weights after {time_since_decay:.0f}s"
-                )
-            
-            self._last_weight_decay_time = current_time
+        """Legacy additive tool weights are quarantined; no decay mutation occurs."""
+        self._last_weight_decay_time = time.time()
 
     def get_tool_weight_adjustment(self, tool: str) -> float:
         """
@@ -982,9 +927,8 @@ class UnifiedLearningSystem:
             Cumulative weight adjustment (positive = more successful, negative = less successful)
             Value is bounded by [MIN_TOOL_WEIGHT, MAX_TOOL_WEIGHT]
         """
-        # Note: Use lock for thread-safe read
-        with self._weight_lock:
-            return self.tool_weight_adjustments.get(tool, 0.0)
+        # Legacy additive weights are quarantined and no longer authoritative.
+        return 0.0
 
     def reset_tool_weights(self) -> None:
         """
@@ -1256,8 +1200,8 @@ class UnifiedLearningSystem:
 
     def process_experience(self, experience: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Main entry point: Process experience through unified system
-        Coordinates: continual + curriculum + meta + RLHF + world model + metacognition
+        Compatibility entry point for contained learning subsystems.
+        This does not advertise or activate unsupported capabilities.
         """
 
         # Add curriculum context if active
@@ -1364,7 +1308,7 @@ class UnifiedLearningSystem:
         self,
         current_state: torch.Tensor,
         candidate_actions: List[torch.Tensor],
-        algorithm: PlanningAlgorithm = PlanningAlgorithm.MCTS,
+        algorithm: Any = None,
         horizon: int = 5,
     ) -> Tuple[torch.Tensor, Dict]:
         """Use world model for planning (if enabled)"""
@@ -1528,7 +1472,7 @@ class UnifiedLearningSystem:
         save_dir = Path(base_path) / f"state_{int(time.time())}"
         save_dir.mkdir(parents=True, exist_ok=True)
 
-        logger.info(f"Saving unified learning state to {save_dir}...")
+        logger.info(f"Saving contained learning state to {save_dir}...")
 
         # Save continual learner
         continual_path = self.continual_learner.save_state(
@@ -1758,12 +1702,17 @@ __all__ = [
     "RLHFManager",
     "LiveFeedbackProcessor",
     "UnifiedWorldModel",
+    "IsolatedWorldModel",
+    "DiscreteActionSpace",
+    "ContinuousActionSpace",
     "LearningConfig",
     "TaskInfo",
     "FeedbackData",
     "LearningMode",
     "PlanningAlgorithm",
     "MetaLearningAlgorithm",
+    "MetaUpdateResult",
+    "MetaUpdateStatus",
     "PacingStrategy",
     # Weight adjustment constants
     "WEIGHT_ADJUSTMENT_SUCCESS",
@@ -1802,87 +1751,25 @@ except ImportError as e:
 
 
 # =============================================================================
-# Singleton Learning System Getter
+# Compatibility Learning System Accessors
 # =============================================================================
-# This provides a module-level singleton for the UnifiedLearningSystem.
-# Used by system_observer.py and other components that need learning integration.
-
-_learning_system_instance: Optional[UnifiedLearningSystem] = None
-_learning_system_lock = threading.Lock()
+# Production ownership belongs to vulcan.learning.owner.LearningOwner composed by
+# RuntimeContainer. These helpers never construct or register a module-global owner.
 
 
-def get_learning_system() -> Optional[UnifiedLearningSystem]:
-    """
-    Get or create the singleton UnifiedLearningSystem instance.
-    
-    This function provides a centralized way to access the learning system
-    from anywhere in the codebase. It ensures only one instance exists.
-    
-    Returns:
-        The UnifiedLearningSystem singleton instance, or None if 
-        initialization fails (e.g., torch not available).
-    
-    Example:
-        from vulcan.learning import get_learning_system
-        
-        learning = get_learning_system()
-        if learning:
-            learning.process_outcome(outcome_data)
-    """
-    global _learning_system_instance
-    
-    # Fast path: return existing instance
-    if _learning_system_instance is not None:
-        return _learning_system_instance
-    
-    # Slow path: create instance with lock
-    with _learning_system_lock:
-        # Double-check after acquiring lock
-        if _learning_system_instance is not None:
-            return _learning_system_instance
-        
-        try:
-            _learning_system_instance = UnifiedLearningSystem()
-            logger.info("UnifiedLearningSystem singleton initialized via get_learning_system()")
-            return _learning_system_instance
-        except Exception as e:
-            logger.warning(f"Failed to initialize UnifiedLearningSystem singleton: {e}")
-            return None
+def get_learning_system(owner: Optional[Any] = None) -> Optional[Any]:
+    """Return an explicitly injected canonical learning owner, never create one."""
+    return owner
 
 
-def set_learning_system(instance: UnifiedLearningSystem) -> None:
-    """
-    Set the singleton UnifiedLearningSystem instance.
-    
-    This allows external code (e.g., full_platform.py) to set a pre-configured
-    instance as the singleton, which will be returned by get_learning_system().
-    
-    Args:
-        instance: The UnifiedLearningSystem instance to use as the singleton.
-    """
-    global _learning_system_instance
-    with _learning_system_lock:
-        _learning_system_instance = instance
-        logger.info("UnifiedLearningSystem singleton set via set_learning_system()")
+def set_learning_system(instance: Any) -> None:
+    """Reject module-global learning registration in production composition."""
+    raise RuntimeError("learning owner must be injected by RuntimeContainer")
 
 
 def reset_learning_system() -> None:
-    """
-    Reset the singleton UnifiedLearningSystem instance.
-    
-    This is primarily used for testing to ensure a fresh instance.
-    It will shutdown the existing instance if one exists.
-    """
-    global _learning_system_instance
-    with _learning_system_lock:
-        if _learning_system_instance is not None:
-            try:
-                if hasattr(_learning_system_instance, 'shutdown'):
-                    _learning_system_instance.shutdown()
-            except Exception as e:
-                logger.warning(f"Error shutting down learning system during reset: {e}")
-            _learning_system_instance = None
-            logger.info("UnifiedLearningSystem singleton reset")
+    """Compatibility no-op; RuntimeContainer owns learning lifecycle."""
+    return None
 
 
 # Add singleton functions to exports

@@ -1018,7 +1018,7 @@ class StartupManager:
                 self._preload_bert_model(),
                 self._preload_model_registry(),
                 self._preload_hierarchical_memory(),
-                self._preload_unified_learning_system(),
+                # LearningOwner is composed once by RuntimeContainer; do not prewarm another owner.
                 self._preload_reasoning_singletons(),
                 self._preload_unified_reasoner(),
                 return_exceptions=True
@@ -1092,18 +1092,8 @@ class StartupManager:
             logger.warning(f"HierarchicalMemory preload failed: {e}")  # Changed from debug to warning
     
     async def _preload_unified_learning_system(self) -> None:
-        """
-        Preload UnifiedLearningSystem singleton.
-        
-        P2 Fix: Issue #10 - Log failures as warnings, not debug.
-        """
-        try:
-            from vulcan.reasoning.singletons import get_unified_learning_system
-            learning_system = get_unified_learning_system()
-            if learning_system:
-                logger.debug(f"{LogEmoji.SUCCESS} UnifiedLearningSystem preloaded")
-        except Exception as e:
-            logger.warning(f"UnifiedLearningSystem preload failed: {e}")  # Changed from debug to warning
+        """Compatibility no-op: RuntimeContainer owns LearningOwner composition."""
+        logger.debug("LearningOwner preloading skipped; RuntimeContainer composes it once")
     
     async def _preload_reasoning_singletons(self) -> None:
         """

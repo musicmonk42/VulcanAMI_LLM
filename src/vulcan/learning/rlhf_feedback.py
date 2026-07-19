@@ -3,12 +3,16 @@ RLHF (Reinforcement Learning from Human Feedback) and live feedback processing
 """
 
 import asyncio
+import hashlib
+import json
 import logging
 import threading
 import time
-from collections import deque
+from collections import defaultdict, deque
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import dataclass
+from enum import Enum
+from typing import Any, Dict, List, Optional, Protocol, Tuple
 
 import aiohttp
 import numpy as np
@@ -23,6 +27,339 @@ from .learning_types import FeedbackData, LearningConfig
 
 logger = logging.getLogger(__name__)
 
+
+
+class FeedbackIngestionStatus(Enum):
+    ACCEPTED = "accepted"
+    DUPLICATE = "duplicate"
+    REJECTED = "rejected"
+
+
+class ShadowRewardTrainingStatus(Enum):
+    CANDIDATE_READY = "candidate_ready"
+    REJECTED = "rejected"
+    UNAVAILABLE = "unavailable"
+
+
+@dataclass(frozen=True)
+class TrustedFeatureBatch:
+    features: torch.Tensor
+    encoder_release_digest: str
+
+
+class TrustedFeatureEncoder(Protocol):
+    """Trusted deterministic feature encoder port for isolated RLHF training."""
+
+    encoder_id: str
+    release_digest: str
+    output_dim: int
+
+    def encode(self, normalized_input: str) -> TrustedFeatureBatch:
+        ...
+
+
+@dataclass(frozen=True)
+class EvidenceBoundFeedback:
+    """Immutable bounded feedback tied to canonical evidence and reviewer authority."""
+
+    observation_id: str
+    case_digest: str
+    request_digest: str
+    tenant_digest: str
+    response_ledger_digest: str
+    reviewer_digest: str
+    reviewer_verifier_digest: str
+    reward: float
+    normalized_input: str
+    timestamp_utc_microseconds: int
+    encoder_release_digest: str
+    feedback_digest: str
+
+
+@dataclass(frozen=True)
+class FeedbackIngestionResult:
+    status: FeedbackIngestionStatus
+    feedback_digest: str
+    message: str
+
+
+@dataclass(frozen=True)
+class ShadowRewardTrainingResult:
+    status: ShadowRewardTrainingStatus
+    candidate_digest: str
+    train_metric: float
+    validation_metric: float
+    heldout_metric: float
+    baseline_metric: float
+    threshold: float
+    message: str
+
+
+_HEX64 = set("0123456789abcdef")
+
+
+def _require_digest(value: str, label: str) -> str:
+    if not isinstance(value, str) or len(value) != 64 or any(ch not in _HEX64 for ch in value):
+        raise ValueError(f"invalid {label}")
+    return value
+
+
+def _canonical_json(obj: Any) -> str:
+    return json.dumps(obj, sort_keys=True, separators=(",", ":"), allow_nan=False)
+
+
+def build_evidence_bound_feedback(
+    *,
+    observation_id: str,
+    case_digest: str,
+    request_digest: str,
+    tenant_digest: str,
+    response_ledger_digest: str,
+    reviewer_digest: str,
+    reviewer_verifier_digest: str,
+    reward: float,
+    normalized_input: str,
+    timestamp_utc_microseconds: int,
+    encoder_release_digest: str,
+) -> EvidenceBoundFeedback:
+    """Trusted constructor for evidence-bound feedback.
+
+    Caller dictionaries are intentionally not accepted. The caller must pass exact
+    canonical bindings already verified by server-side case/ledger/reviewer code.
+    """
+    if not isinstance(observation_id, str) or not observation_id or len(observation_id) > 128:
+        raise ValueError("invalid observation_id")
+    for label, value in (
+        ("case_digest", case_digest),
+        ("request_digest", request_digest),
+        ("tenant_digest", tenant_digest),
+        ("response_ledger_digest", response_ledger_digest),
+        ("reviewer_digest", reviewer_digest),
+        ("reviewer_verifier_digest", reviewer_verifier_digest),
+        ("encoder_release_digest", encoder_release_digest),
+    ):
+        _require_digest(value, label)
+    if type(reward) is bool or not isinstance(reward, (int, float)) or not np.isfinite(float(reward)) or float(reward) < -1.0 or float(reward) > 1.0:
+        raise ValueError("reward must be finite and in [-1, 1]")
+    if not isinstance(normalized_input, str) or not normalized_input or len(normalized_input) > 4096:
+        raise ValueError("normalized_input must be bounded text")
+    if "bearer " in normalized_input.lower() or "password" in normalized_input.lower() or "api_key" in normalized_input.lower():
+        raise ValueError("normalized_input contains secret-like content")
+    if type(timestamp_utc_microseconds) is bool or not isinstance(timestamp_utc_microseconds, int) or timestamp_utc_microseconds <= 0:
+        raise ValueError("timestamp must be UTC microseconds")
+    payload = {
+        "observation_id": observation_id,
+        "case_digest": case_digest,
+        "request_digest": request_digest,
+        "tenant_digest": tenant_digest,
+        "response_ledger_digest": response_ledger_digest,
+        "reviewer_digest": reviewer_digest,
+        "reviewer_verifier_digest": reviewer_verifier_digest,
+        "reward": float(reward),
+        "normalized_input": normalized_input,
+        "timestamp_utc_microseconds": timestamp_utc_microseconds,
+        "encoder_release_digest": encoder_release_digest,
+    }
+    digest = hashlib.sha256(_canonical_json(payload).encode()).hexdigest()
+    return EvidenceBoundFeedback(feedback_digest=digest, **payload)
+
+
+class ShadowRewardModelTrainer:
+    """Isolated deterministic shadow reward-model trainer.
+
+    The model is a candidate only. Its predictions are never connected to PPO,
+    runtime routing, or response generation in this phase.
+    """
+
+    def __init__(self, encoder: Optional[TrustedFeatureEncoder], feature_dim: int, *, seed: int = 0, capacity: int = 1024, min_examples: int = 6):
+        if encoder is None:
+            raise RuntimeError("trusted feature encoder unavailable")
+        if feature_dim <= 0 or capacity <= 0 or min_examples <= 0:
+            raise ValueError("invalid shadow reward trainer bounds")
+        self.encoder = encoder
+        self.feature_dim = int(feature_dim)
+        self.seed = int(seed)
+        self.capacity = int(capacity)
+        self.min_examples = int(min_examples)
+        self._feedback: Dict[str, EvidenceBoundFeedback] = {}
+        self._by_observation: Dict[str, str] = {}
+        self._lock = threading.RLock()
+        self._closed = False
+        self._model = nn.Linear(self.feature_dim, 1).to(torch.device("cpu"))
+        self._candidate_digest = ""
+        self._candidate_doc: Dict[str, Any] = {}
+        self._train_lock = threading.RLock()
+
+    @property
+    def pending_count(self) -> int:
+        with self._lock:
+            return len(self._feedback)
+
+    @property
+    def candidate_digest(self) -> str:
+        return self._candidate_digest
+
+    def close(self) -> None:
+        with self._lock:
+            self._closed = True
+            self._feedback.clear()
+            self._by_observation.clear()
+
+    def encode_features(self, normalized_input: str) -> torch.Tensor:
+        batch = self.encoder.encode(normalized_input)
+        if batch.encoder_release_digest != self.encoder.release_digest:
+            raise ValueError("encoder release digest mismatch")
+        if batch.encoder_release_digest not in (self.encoder.release_digest,):
+            raise ValueError("unknown encoder release")
+        features = batch.features.detach().cpu().flatten().to(dtype=torch.float32)
+        if features.numel() != self.feature_dim or self.encoder.output_dim != self.feature_dim:
+            raise ValueError("encoder feature dimension mismatch")
+        if not torch.isfinite(features).all().item():
+            raise ValueError("non-finite encoder features")
+        norm = torch.linalg.vector_norm(features)
+        if norm > 1.0 + 1e-6:
+            raise ValueError("encoder features must be normalized")
+        return features
+
+    def submit_feedback(self, feedback: EvidenceBoundFeedback) -> FeedbackIngestionResult:
+        if not isinstance(feedback, EvidenceBoundFeedback):
+            raise TypeError("evidence-bound feedback required")
+        with self._lock:
+            if self._closed:
+                raise RuntimeError("shadow reward trainer closed")
+            if feedback.encoder_release_digest != self.encoder.release_digest:
+                raise ValueError("feedback encoder release mismatch")
+            if feedback.feedback_digest in self._feedback:
+                return FeedbackIngestionResult(FeedbackIngestionStatus.DUPLICATE, feedback.feedback_digest, "duplicate feedback ignored")
+            previous = self._by_observation.get(feedback.observation_id)
+            if previous and previous != feedback.feedback_digest:
+                raise ValueError("observation feedback idempotency conflict")
+            if len(self._feedback) >= self.capacity:
+                raise RuntimeError("shadow reward feedback queue full")
+            # Validate feature deterministically at ingestion so unknown encoders fail closed.
+            self.encode_features(feedback.normalized_input)
+            self._feedback[feedback.feedback_digest] = feedback
+            self._by_observation[feedback.observation_id] = feedback.feedback_digest
+            return FeedbackIngestionResult(FeedbackIngestionStatus.ACCEPTED, feedback.feedback_digest, "feedback accepted")
+
+    def _split(self, feedback: List[EvidenceBoundFeedback]) -> Tuple[List[EvidenceBoundFeedback], List[EvidenceBoundFeedback], List[EvidenceBoundFeedback]]:
+        buckets = {"train": [], "validation": [], "heldout": []}
+        related: Dict[str, List[EvidenceBoundFeedback]] = defaultdict(list)
+        for item in feedback:
+            related[item.case_digest].append(item)
+        for key in sorted(related):
+            digest_int = int(hashlib.sha256(key.encode()).hexdigest()[:8], 16) % 10
+            bucket = "train" if digest_int < 6 else "validation" if digest_int < 8 else "heldout"
+            buckets[bucket].extend(sorted(related[key], key=lambda f: f.feedback_digest))
+        return buckets["train"], buckets["validation"], buckets["heldout"]
+
+    def _dataset(self, rows: List[EvidenceBoundFeedback]) -> Tuple[torch.Tensor, torch.Tensor]:
+        x = torch.stack([self.encode_features(row.normalized_input) for row in rows])
+        y = torch.tensor([[row.reward] for row in rows], dtype=torch.float32)
+        return x, y
+
+    def _accuracy(self, model: nn.Module, rows: List[EvidenceBoundFeedback]) -> float:
+        if not rows:
+            return 0.0
+        x, y = self._dataset(rows)
+        with torch.no_grad():
+            pred = torch.tanh(model(x))
+        return float(((pred >= 0) == (y >= 0)).to(torch.float32).mean().item())
+
+    def train_shadow_candidate(self, *, epochs: int = 80, batch_size: int = 8, threshold: float = 0.20) -> ShadowRewardTrainingResult:
+        with self._train_lock:
+            with self._lock:
+                rows = list(self._feedback.values())
+            if len(rows) < self.min_examples:
+                return ShadowRewardTrainingResult(ShadowRewardTrainingStatus.REJECTED, self._candidate_digest, 0.0, 0.0, 0.0, 0.5, threshold, "insufficient feedback")
+            train, validation, heldout = self._split(rows)
+            if not train or not validation or not heldout:
+                return ShadowRewardTrainingResult(ShadowRewardTrainingStatus.REJECTED, self._candidate_digest, 0.0, 0.0, 0.0, 0.5, threshold, "split lacks train/validation/heldout coverage")
+            torch.manual_seed(self.seed)
+            candidate = nn.Linear(self.feature_dim, 1).to(torch.device("cpu"))
+            nn.init.zeros_(candidate.weight); nn.init.zeros_(candidate.bias)
+            optimizer = optim.SGD(candidate.parameters(), lr=0.25)
+            x_train, y_train = self._dataset(train)
+            for _ in range(max(1, min(int(epochs), 200))):
+                for start in range(0, len(train), max(1, min(int(batch_size), 64))):
+                    bx = x_train[start:start + batch_size]
+                    by = y_train[start:start + batch_size]
+                    loss = F.mse_loss(torch.tanh(candidate(bx)), by)
+                    if not torch.isfinite(loss).all().item():
+                        return ShadowRewardTrainingResult(ShadowRewardTrainingStatus.REJECTED, self._candidate_digest, 0.0, 0.0, 0.0, 0.5, threshold, "non-finite loss")
+                    optimizer.zero_grad(set_to_none=True)
+                    loss.backward()
+                    torch.nn.utils.clip_grad_norm_(candidate.parameters(), 1.0)
+                    optimizer.step()
+            train_metric = self._accuracy(candidate, train)
+            validation_metric = self._accuracy(candidate, validation)
+            heldout_metric = self._accuracy(candidate, heldout)
+            baseline = 0.5
+            if heldout_metric < baseline + threshold or validation_metric < baseline + threshold:
+                return ShadowRewardTrainingResult(ShadowRewardTrainingStatus.REJECTED, self._candidate_digest, train_metric, validation_metric, heldout_metric, baseline, threshold, "held-out or validation metric below promotion threshold")
+            digest_doc = {
+                "schema": "vulcan-shadow-reward/1",
+                "encoder_release_digest": self.encoder.release_digest,
+                "feature_dim": self.feature_dim,
+                "state": self._jsonify_tensors(candidate.state_dict()),
+                "cursor": len(rows),
+            }
+            self._candidate_digest = hashlib.sha256(_canonical_json(digest_doc).encode()).hexdigest()
+            self._candidate_doc = digest_doc
+            self._model.load_state_dict(candidate.state_dict(), strict=True)
+            return ShadowRewardTrainingResult(ShadowRewardTrainingStatus.CANDIDATE_READY, self._candidate_digest, train_metric, validation_metric, heldout_metric, baseline, threshold, "shadow candidate trained; not active")
+
+    def save_shadow_candidate(self, path: str) -> str:
+        if not self._candidate_digest:
+            raise RuntimeError("no shadow candidate available")
+        doc = dict(self._candidate_doc)
+        doc["candidate_digest"] = self._candidate_digest
+        canonical = _canonical_json({k: doc[k] for k in sorted(doc) if k != "candidate_digest"})
+        if hashlib.sha256(canonical.encode()).hexdigest() != self._candidate_digest:
+            raise ValueError("shadow candidate digest mismatch")
+        target = Path(path); target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(_canonical_json(doc))
+        return str(target)
+
+    def load_shadow_candidate(self, path: str) -> None:
+        doc = json.loads(Path(path).read_text())
+        required = {"schema", "encoder_release_digest", "feature_dim", "candidate_digest", "state"}
+        if set(doc) != required or doc["schema"] != "vulcan-shadow-reward/1":
+            raise ValueError("shadow reward schema mismatch")
+        if doc["encoder_release_digest"] != self.encoder.release_digest or int(doc["feature_dim"]) != self.feature_dim:
+            raise ValueError("shadow reward binding mismatch")
+        canonical = _canonical_json({k: doc[k] for k in sorted(doc) if k != "candidate_digest"})
+        if hashlib.sha256(canonical.encode()).hexdigest() != doc["candidate_digest"]:
+            raise ValueError("shadow candidate digest mismatch")
+        state = self._dejsonify_tensors(doc["state"])
+        if set(state) != set(self._model.state_dict()):
+            raise ValueError("shadow reward model state mismatch")
+        self._model.load_state_dict(state, strict=True)
+        self._candidate_digest = doc["candidate_digest"]
+        self._candidate_doc = {k: doc[k] for k in doc if k != "candidate_digest"}
+
+    def _jsonify_tensors(self, value: Any) -> Any:
+        if torch.is_tensor(value):
+            t = value.detach().cpu()
+            return {"__tensor__": True, "dtype": str(t.dtype), "shape": list(t.shape), "data": t.reshape(-1).tolist()}
+        if isinstance(value, dict):
+            return {str(k): self._jsonify_tensors(v) for k, v in value.items()}
+        return value
+
+    def _dejsonify_tensors(self, value: Any) -> Any:
+        if isinstance(value, dict) and value.get("__tensor__") is True:
+            dtype = getattr(torch, value["dtype"].replace("torch.", ""))
+            return torch.tensor(value["data"], dtype=dtype).reshape(value["shape"])
+        if isinstance(value, dict):
+            return {k: self._dejsonify_tensors(v) for k, v in value.items()}
+        return value
+
+    def predict_shadow(self, normalized_input: str) -> float:
+        features = self.encode_features(normalized_input)
+        with torch.no_grad():
+            return float(torch.tanh(self._model(features.unsqueeze(0))).item())
+
+
 # ============================================================
 # RLHF IMPLEMENTATION
 # ============================================================
@@ -31,9 +368,11 @@ logger = logging.getLogger(__name__)
 class RLHFManager:
     """Reinforcement Learning from Human Feedback manager"""
 
-    def __init__(self, base_model: nn.Module, config: LearningConfig = None):
+    def __init__(self, base_model: nn.Module, config: LearningConfig = None, feature_encoder: Optional[TrustedFeatureEncoder] = None):
         self.config = config or LearningConfig()
         self.base_model = base_model
+        self.feature_encoder = feature_encoder
+        self.ppo_enabled = False
 
         # FIXED: Initialize thread safety locks FIRST before any threads
         self._lock = threading.RLock()
@@ -327,224 +666,44 @@ class RLHFManager:
             )
 
     def _extract_features(self, data: Any) -> torch.Tensor:
-        """FIXED: Extract features with device management and consistent dimensions"""
+        """Extract trusted deterministic features; reject unknown inputs fail-closed."""
         if isinstance(data, torch.Tensor):
-            # Ensure 1D tensor of size embedding_dim
-            if data.numel() == self.embedding_dim:
-                result = data.reshape(self.embedding_dim)
-            elif data.numel() < self.embedding_dim:
-                # Pad with zeros
-                result = F.pad(data.flatten(), (0, self.embedding_dim - data.numel()))
-            else:
-                # Truncate
-                result = data.flatten()[: self.embedding_dim]
-            return result.to(self.device)
-        elif isinstance(data, np.ndarray):
-            # Convert numpy array to tensor and resize
-            flat_data = data.flatten()
-            if len(flat_data) < self.embedding_dim:
-                flat_data = np.pad(flat_data, (0, self.embedding_dim - len(flat_data)))
-            elif len(flat_data) > self.embedding_dim:
-                flat_data = flat_data[: self.embedding_dim]
-            return torch.tensor(flat_data, dtype=torch.float32, device=self.device)
-        elif isinstance(data, dict) and "embedding" in data:
+            if data.numel() != self.embedding_dim:
+                raise ValueError("tensor feature dimension mismatch")
+            result = data.detach().reshape(self.embedding_dim).to(dtype=torch.float32, device=self.device)
+            if not torch.isfinite(result).all().item():
+                raise ValueError("non-finite tensor features")
+            return result
+        if isinstance(data, np.ndarray):
+            flat = torch.tensor(data.flatten(), dtype=torch.float32, device=self.device)
+            if flat.numel() != self.embedding_dim:
+                raise ValueError("ndarray feature dimension mismatch")
+            if not torch.isfinite(flat).all().item():
+                raise ValueError("non-finite ndarray features")
+            return flat
+        if isinstance(data, dict) and "embedding" in data:
             return self._extract_features(data["embedding"])
-        else:
-            # Default to random features (should be replaced with proper encoding)
-            return torch.randn(self.embedding_dim, device=self.device)
+        if isinstance(data, str):
+            if self.feature_encoder is None:
+                raise RuntimeError("trusted feature encoder unavailable")
+            batch = self.feature_encoder.encode(data)
+            if batch.encoder_release_digest != self.feature_encoder.release_digest:
+                raise ValueError("encoder release digest mismatch")
+            features = batch.features.detach().flatten().to(dtype=torch.float32, device=self.device)
+            if features.numel() != self.embedding_dim or self.feature_encoder.output_dim != self.embedding_dim:
+                raise ValueError("encoder feature dimension mismatch")
+            if not torch.isfinite(features).all().item():
+                raise ValueError("non-finite encoder features")
+            return features
+        raise RuntimeError("trusted feature encoder unavailable for input type")
 
     def update_policy_with_ppo(self, trajectories: List[Dict[str, Any]]):
-        """FIXED: Update policy using PPO with proper dimension handling and gradient management"""
-        if not trajectories:
-            return
+        """PPO remains disabled; reward-model candidates cannot affect runtime policy."""
+        return {"status": "unavailable", "reason": "ppo_disabled_shadow_phase"}
 
-        all_states = []
-        all_actions = []
-        all_old_log_probs = []
-        all_rewards = []
-        all_advantages = []
-
-        # Collect all trajectory data
-        for trajectory in trajectories:
-            try:
-                # FIXED: Ensure proper dimensions for states and actions
-                states = trajectory["states"]
-                actions = trajectory["actions"]
-                log_probs = trajectory["log_probs"]
-
-                # FIXED: Convert to tensors properly using detach().clone()
-                if not isinstance(states, torch.Tensor):
-                    states = torch.stack(
-                        [
-                            (
-                                s.detach().clone()
-                                if isinstance(s, torch.Tensor)
-                                else torch.tensor(s, dtype=torch.float32)
-                            )
-                            for s in states
-                        ]
-                    )
-                if not isinstance(actions, torch.Tensor):
-                    actions = torch.stack(
-                        [
-                            (
-                                a.detach().clone()
-                                if isinstance(a, torch.Tensor)
-                                else torch.tensor(a, dtype=torch.float32)
-                            )
-                            for a in actions
-                        ]
-                    )
-                if not isinstance(log_probs, torch.Tensor):
-                    log_probs = torch.stack(
-                        [
-                            (
-                                lp.detach().clone()
-                                if isinstance(lp, torch.Tensor)
-                                else torch.tensor(lp, dtype=torch.float32)
-                            )
-                            for lp in log_probs
-                        ]
-                    )
-
-                states = states.to(self.device)
-                actions = actions.to(self.device)
-                log_probs = log_probs.to(self.device)
-
-                # FIXED: Ensure states and actions have correct dimensions
-                # States should be [seq_len, embedding_dim]
-                if states.dim() == 1:
-                    states = states.unsqueeze(0)
-                if actions.dim() == 1:
-                    actions = actions.unsqueeze(0)
-
-                # Ensure correct feature dimension
-                if states.shape[-1] != self.embedding_dim:
-                    # Pad or truncate to embedding_dim
-                    if states.shape[-1] < self.embedding_dim:
-                        states = F.pad(
-                            states, (0, self.embedding_dim - states.shape[-1])
-                        )
-                    else:
-                        states = states[..., : self.embedding_dim]
-
-                if actions.shape[-1] != self.embedding_dim:
-                    if actions.shape[-1] < self.embedding_dim:
-                        actions = F.pad(
-                            actions, (0, self.embedding_dim - actions.shape[-1])
-                        )
-                    else:
-                        actions = actions[..., : self.embedding_dim]
-
-                # Get rewards from reward model
-                with torch.no_grad():
-                    # FIXED: Concatenate for reward model (expects 2*embedding_dim)
-                    state_action_pairs = torch.cat([states, actions], dim=-1)
-                    human_rewards = self.reward_model(state_action_pairs).squeeze(-1)
-
-                # Compute advantages using GAE
-                values = self.value_model(states).squeeze(-1)
-                advantages = self._compute_advantages(human_rewards, values)
-
-                # Normalize advantages
-                advantages = (advantages - advantages.mean()) / (
-                    advantages.std() + 1e-8
-                )
-
-                all_states.append(states)
-                all_actions.append(actions)
-                all_old_log_probs.append(log_probs)
-                all_rewards.append(human_rewards)
-                all_advantages.append(advantages)
-            except Exception as e:
-                logger.error(f"Failed to process trajectory: {e}")
-                continue
-
-        if not all_states:
-            logger.warning("No valid trajectories to process")
-            return
-
-        # Concatenate all data - detach since they're inputs
-        all_states = torch.cat(all_states, dim=0).detach()
-        all_actions = torch.cat(all_actions, dim=0).detach()
-        all_old_log_probs = torch.cat(all_old_log_probs, dim=0).detach()
-        all_rewards = torch.cat(all_rewards, dim=0).detach()
-        all_advantages = torch.cat(all_advantages, dim=0).detach()
-
-        # Ensure models are in training mode
-        self.base_model.train()
-        self.policy_head.train()
-        self.value_model.train()
-
-        # PPO epochs
-        for epoch in range(self.config.ppo_epochs):
-            # Shuffle data for each epoch
-            perm = torch.randperm(len(all_states))
-
-            for i in range(0, len(all_states), self.config.batch_size):
-                batch_indices = perm[i : i + self.config.batch_size]
-
-                batch_states = all_states[batch_indices]
-                batch_actions = all_actions[batch_indices]
-                batch_old_log_probs = all_old_log_probs[batch_indices]
-                batch_advantages = all_advantages[batch_indices]
-                batch_rewards = all_rewards[batch_indices]
-
-                # Compute new log probs and entropy
-                new_log_probs, entropy = self._compute_log_probs(
-                    batch_states, batch_actions
-                )
-
-                # Compute ratio
-                ratio = torch.exp(new_log_probs - batch_old_log_probs)
-
-                # Clipped objective
-                surr1 = ratio * batch_advantages
-                surr2 = (
-                    torch.clamp(
-                        ratio, 1 - self.config.ppo_clip, 1 + self.config.ppo_clip
-                    )
-                    * batch_advantages
-                )
-
-                policy_loss = -torch.min(surr1, surr2).mean()
-
-                # FIXED: Value loss with proper dimension handling
-                value_pred = self.value_model(batch_states).squeeze()
-                # Ensure batch_rewards has same shape as value_pred
-                if value_pred.dim() != batch_rewards.dim():
-                    if batch_rewards.dim() == 0:
-                        batch_rewards = batch_rewards.unsqueeze(0)
-                    elif value_pred.dim() == 0:
-                        value_pred = value_pred.unsqueeze(0)
-                value_loss = F.mse_loss(value_pred, batch_rewards)
-
-                # Entropy bonus for exploration
-                entropy_loss = -entropy.mean() * 0.01
-
-                # Total loss
-                total_loss = policy_loss + 0.5 * value_loss + entropy_loss
-
-                # Optimization step
-                self.policy_optimizer.zero_grad()
-                self.value_optimizer.zero_grad()
-
-                # FIXED: Single backward pass without retain_graph
-                total_loss.backward()
-
-                torch.nn.utils.clip_grad_norm_(self.base_model.parameters(), 1.0)
-                torch.nn.utils.clip_grad_norm_(self.policy_head.parameters(), 1.0)
-                torch.nn.utils.clip_grad_norm_(self.value_model.parameters(), 1.0)
-
-                self.policy_optimizer.step()
-                self.value_optimizer.step()
-
-        with self._lock:
-            self.feedback_stats["policy_updates"] += 1
-        logger.info(
-            f"PPO update complete: policy_loss={policy_loss.item():.4f}, "
-            f"value_loss={value_loss.item():.4f}"
-        )
+    def _disabled_update_policy_with_ppo_impl(self, trajectories: List[Dict[str, Any]]):
+        """PPO implementation intentionally unavailable in shadow reward phase."""
+        raise RuntimeError("ppo_disabled_shadow_phase")
 
     def _compute_log_probs(
         self, states: torch.Tensor, actions: torch.Tensor

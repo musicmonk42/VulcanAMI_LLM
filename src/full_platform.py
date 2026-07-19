@@ -1846,52 +1846,12 @@ async def _background_services_initialization(app: FastAPI, worker_id: int, logg
                 await asyncio.sleep(0.05)  # Brief yield for health checks
 
                 # ================================================================
-                # UNIFIED LEARNING SYSTEM INITIALIZATION
+                # LEARNING OWNER INITIALIZATION
                 # ================================================================
-                try:
-                    from vulcan.learning import UnifiedLearningSystem, LearningConfig
-                    
-                    logger.info("Initializing UnifiedLearningSystem...")
-                    learning_config = LearningConfig(
-                        learning_rate=0.001,
-                        ewc_lambda=100.0,
-                        meta_lr=0.001,
-                        rlhf_enabled=False,  # Start with RLHF disabled until stable
-                        checkpoint_frequency=1000,
-                    )
-                    unified_learning = UnifiedLearningSystem(
-                        config=learning_config,
-                        embedding_dim=384,
-                        enable_world_model=False,  # Disable for now - adds overhead
-                        enable_curriculum=True,
-                        enable_metacognition=True,
-                    )
-                    logger.info("✓ UnifiedLearningSystem initialized")
-                    
-                    # Store reference for other components
-                    vulcan_deployment.learning_system = unified_learning
-                    vulcan_module.app.state.learning_system = unified_learning
-                    
-                    # BUG FIX: Also set learning_system on deps to fix the cryptographic fast-path crash
-                    # Error was: 'EnhancedCollectiveDeps' object has no attribute 'learning_system'
-                    if vulcan_deployment.collective and vulcan_deployment.collective.deps:
-                        vulcan_deployment.collective.deps.learning_system = unified_learning
-                        logger.info("✓ Learning system wired to EnhancedCollectiveDeps")
-                    
-                    # Wire OutcomeBridge to UnifiedLearningSystem for feedback loop
-                    try:
-                        from vulcan.curiosity_engine.outcome_bridge import get_outcome_bridge
-                        outcome_bridge = get_outcome_bridge()
-                        outcome_bridge.set_learning_system(unified_learning)
-                        logger.info("✓ OutcomeBridge connected to UnifiedLearningSystem - feedback loop ACTIVE")
-                    except ImportError as e:
-                        logger.warning(f"OutcomeBridge not available: {e}")
-                    except Exception as e:
-                        logger.warning(f"⚠️ Could not connect OutcomeBridge to LearningSystem - no feedback loop: {e}")
-                except ImportError as e:
-                    logger.warning(f"UnifiedLearningSystem not available: {e}")
-                except Exception as e:
-                    logger.error(f"Failed to initialize UnifiedLearningSystem: {e}")
+                # RuntimeContainer is the only production composer for LearningOwner.
+                # Mounted legacy platform code may consume an injected owner but must
+                # not construct a competing learning owner here.
+                logger.info("LearningOwner construction skipped; RuntimeContainer owns learning")
 
                 await asyncio.sleep(0.05)  # Brief yield for health checks
 
@@ -2873,26 +2833,7 @@ async def _background_services_initialization(app: FastAPI, worker_id: int, logg
             # WIRE UP LEARNING SYSTEM TO ROUTING AND TOOL SELECTION
             # ================================================================
             if unified_learning is not None:
-                try:
-                    from vulcan.routing.query_router import get_query_analyzer
-                    
-                    query_analyzer = get_query_analyzer()
-                    if hasattr(query_analyzer, 'set_learning_system'):
-                        query_analyzer.set_learning_system(unified_learning)
-                        logger.info("✓ Learning system connected to QueryRouter")
-                    
-                    if vulcan_deployment and hasattr(vulcan_deployment, 'tool_selector') and vulcan_deployment.tool_selector:
-                        vulcan_deployment.tool_selector.learning_system = unified_learning
-                        logger.info("✓ Learning system connected to ToolSelector")
-                    
-                    import atexit
-                    atexit.register(unified_learning.shutdown)
-                    logger.info("✓ Learning system shutdown hook registered")
-                    
-                except ImportError as e:
-                    logger.debug(f"Could not wire learning to routing: {e}")
-                except Exception as e:
-                    logger.warning(f"Learning system wiring incomplete: {e}")
+                logger.info("✓ Canonical LearningOwner already injected by RuntimeContainer")
 
         except ImportError as e:
             components_status["Query Routing Layer"] = False

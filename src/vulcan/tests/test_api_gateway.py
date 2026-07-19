@@ -1204,15 +1204,24 @@ class TestAPIGateway(AioHTTPTestCase):
 
     @unittest_run_loop
     async def test_learn_missing_experience(self):
-        """Test learning without experience data."""
+        """Learning endpoint fails closed before payload validation."""
         login_data = await self._login_and_get_token()
         token = login_data["access_token"]
 
         resp = await self.client.request(
             "POST", "/v1/learn", json={}, headers={"Authorization": f"Bearer {token}"}
         )
+        data = await resp.json()
 
-        assert resp.status == 400
+        assert resp.status == 501
+        assert resp.headers["Cache-Control"] == "no-store"
+        assert data["error"]["code"] == "learning_not_implemented"
+
+    @unittest_run_loop
+    async def test_learn_authentication_still_required(self):
+        """Authentication middleware still runs before /v1/learn containment."""
+        resp = await self.client.request("POST", "/v1/learn", json={"experience": {}})
+        assert resp.status == 401
 
     @unittest_run_loop
     async def test_reason_missing_query(self):

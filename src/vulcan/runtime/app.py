@@ -128,7 +128,7 @@ def create_app()->FastAPI:
     async def live(): return {'status':'alive'}
     @app.get('/health/ready')
     async def ready(request:Request):
-        try: rt=await _runtime(request); return {'status':'ready','runtime_id':rt.runtime_id,'capabilities':list(rt.capabilities())}
+        try: rt=await _runtime(request); return {'status':'ready','runtime_id':rt.runtime_id,'learning_owner_id':rt.learning_owner.owner_id,'learning_status':rt.learning_owner.capability.value,'capabilities':list(rt.capabilities()),'learning_capabilities':[c.__dict__ | {'status': c.status.value, 'readiness_state': c.readiness_state.value} for c in rt.learning_owner.capability_matrix()]}
         except HTTPException: return JSONResponse(status_code=503, content={'status':'not_ready'})
     async def chat(request:Request):
         _principal(request,'reason:write'); rt=await _runtime(request); data=await _body(request); body=ReasonRequest.model_validate(data)

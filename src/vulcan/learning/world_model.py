@@ -2,6 +2,8 @@
 Unified world model with dynamics and reward prediction
 """
 
+import hashlib
+import json
 import io
 import logging
 import math
@@ -134,6 +136,243 @@ def atomic_write_with_retry(
 
 # ============================================================
 # WORLD MODEL TYPES
+
+@dataclass(frozen=True)
+class ContinuousActionSpace:
+    action_dim: int
+    low: float
+    high: float
+
+
+@dataclass(frozen=True)
+class DiscreteActionSpace:
+    actions: Tuple[Tuple[float, ...], ...]
+
+
+@dataclass(frozen=True)
+class IsolatedWorldModelTrainResult:
+    transition_loss: float
+    reward_loss: float
+    curiosity_loss: float
+    candidate_digest: str
+
+
+class IsolatedWorldModel(nn.Module):
+    """Research-only deterministic world model with explicit state/action spaces.
+
+    State space: finite float vectors of shape ``[state_dim]``.
+    Action space: either a fixed discrete registry of legal action vectors or a
+    bounded continuous box. Only the discrete planner is proven in this phase;
+    CEM/MPPI-style continuous planning remains unavailable here.
+    """
+
+    schema_version = "vulcan-isolated-world-model/1"
+
+    def __init__(self, state_dim: int, action_space: DiscreteActionSpace | ContinuousActionSpace, *, seed: int = 0, hidden_dim: int = 32):
+        super().__init__()
+        if state_dim <= 0 or hidden_dim <= 0:
+            raise ValueError("world model dimensions must be positive")
+        self.state_dim = int(state_dim)
+        self.action_space = action_space
+        self.seed = int(seed)
+        torch.manual_seed(self.seed)
+        self.action_dim = self._infer_action_dim(action_space)
+        self.transition_model = nn.Sequential(nn.Linear(self.state_dim + self.action_dim, hidden_dim), nn.Tanh(), nn.Linear(hidden_dim, self.state_dim))
+        self.reward_model = nn.Sequential(nn.Linear(self.state_dim + self.action_dim, hidden_dim), nn.Tanh(), nn.Linear(hidden_dim, 1))
+        self.curiosity_forward_model = nn.Sequential(nn.Linear(self.state_dim + self.action_dim, hidden_dim), nn.Tanh(), nn.Linear(hidden_dim, self.state_dim))
+        self.optimizer = optim.Adam(self.parameters(), lr=0.01)
+        self.gradient_clip_norm = 1.0
+        self.discount = 0.95
+        self.candidate_digest = ""
+
+    def _infer_action_dim(self, action_space: DiscreteActionSpace | ContinuousActionSpace) -> int:
+        if isinstance(action_space, ContinuousActionSpace):
+            if action_space.action_dim <= 0 or not np.isfinite(action_space.low) or not np.isfinite(action_space.high) or action_space.low >= action_space.high:
+                raise ValueError("invalid continuous action space")
+            return int(action_space.action_dim)
+        if isinstance(action_space, DiscreteActionSpace):
+            if not action_space.actions:
+                raise ValueError("discrete action space requires legal actions")
+            dim = len(action_space.actions[0])
+            if dim <= 0:
+                raise ValueError("invalid discrete action dimension")
+            for action in action_space.actions:
+                if len(action) != dim or not all(np.isfinite(float(v)) for v in action):
+                    raise ValueError("invalid discrete action")
+            return dim
+        raise TypeError("unknown action space")
+
+    def _validate_state(self, state: torch.Tensor, *, batched: bool = False) -> torch.Tensor:
+        if not isinstance(state, torch.Tensor):
+            raise TypeError("state must be tensor")
+        value = state.detach().to(dtype=torch.float32)
+        if not batched and value.shape != (self.state_dim,):
+            raise ValueError("state dimension mismatch")
+        if batched and (value.dim() != 2 or value.shape[1] != self.state_dim or value.shape[0] == 0):
+            raise ValueError("batched state dimension mismatch")
+        if not torch.isfinite(value).all().item():
+            raise ValueError("non-finite state")
+        return value
+
+    def _validate_action(self, action: torch.Tensor, *, batched: bool = False) -> torch.Tensor:
+        if not isinstance(action, torch.Tensor):
+            raise TypeError("action must be tensor")
+        value = action.detach().to(dtype=torch.float32)
+        if not batched and value.shape != (self.action_dim,):
+            raise ValueError("action dimension mismatch")
+        if batched and (value.dim() != 2 or value.shape[1] != self.action_dim or value.shape[0] == 0):
+            raise ValueError("batched action dimension mismatch")
+        if not torch.isfinite(value).all().item():
+            raise ValueError("non-finite action")
+        if isinstance(self.action_space, ContinuousActionSpace):
+            if (value < self.action_space.low).any().item() or (value > self.action_space.high).any().item():
+                raise ValueError("continuous action outside bounds")
+        else:
+            legal = {tuple(float(v) for v in a) for a in self.action_space.actions}
+            rows = value.reshape(-1, self.action_dim)
+            for row in rows:
+                if tuple(float(v) for v in row.tolist()) not in legal:
+                    raise ValueError("illegal discrete action")
+        return value
+
+    def _validate_batch(self, batch: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        required = {"state", "action", "next_state", "reward"}
+        if set(batch) != required:
+            raise ValueError("world-model batch requires state/action/next_state/reward")
+        state = self._validate_state(batch["state"], batched=True)
+        action = self._validate_action(batch["action"], batched=True)
+        next_state = self._validate_state(batch["next_state"], batched=True)
+        reward = batch["reward"].detach().to(dtype=torch.float32)
+        if reward.dim() == 1:
+            reward = reward.unsqueeze(1)
+        if reward.shape != (state.shape[0], 1) or state.shape[0] != action.shape[0] or state.shape[0] != next_state.shape[0]:
+            raise ValueError("transition batch dimensions mismatch")
+        if not torch.isfinite(reward).all().item():
+            raise ValueError("non-finite reward")
+        return state, action, next_state, reward
+
+    def _features(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
+        return torch.cat([state, action], dim=-1)
+
+    def predict(self, state: torch.Tensor, action: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        self.eval()
+        state = self._validate_state(state).unsqueeze(0)
+        action = self._validate_action(action).unsqueeze(0)
+        with torch.no_grad():
+            x = self._features(state, action)
+            return self.transition_model(x).squeeze(0), self.reward_model(x).squeeze(0)
+
+    def transition_error(self, batch: Dict[str, torch.Tensor]) -> float:
+        self.eval()
+        state, action, next_state, _ = self._validate_batch(batch)
+        with torch.no_grad():
+            return float(F.mse_loss(self.transition_model(self._features(state, action)), next_state).item())
+
+    def reward_error(self, batch: Dict[str, torch.Tensor]) -> float:
+        self.eval()
+        state, action, _, reward = self._validate_batch(batch)
+        with torch.no_grad():
+            return float(F.mse_loss(self.reward_model(self._features(state, action)), reward).item())
+
+    def train_step(self, batch: Dict[str, torch.Tensor]) -> IsolatedWorldModelTrainResult:
+        state, action, next_state, reward = self._validate_batch(batch)
+        self.train()
+        x = self._features(state, action)
+        pred_next = self.transition_model(x)
+        pred_reward = self.reward_model(x)
+        curiosity_pred_next = self.curiosity_forward_model(x.detach())
+        transition_loss = F.mse_loss(pred_next, next_state)
+        reward_loss = F.mse_loss(pred_reward, reward)
+        curiosity_loss = F.mse_loss(curiosity_pred_next, next_state.detach())
+        total = transition_loss + reward_loss + curiosity_loss
+        if not torch.isfinite(total).all().item():
+            raise ValueError("non-finite world-model loss")
+        self.optimizer.zero_grad(set_to_none=True)
+        total.backward()
+        torch.nn.utils.clip_grad_norm_(self.parameters(), self.gradient_clip_norm)
+        self.optimizer.step()
+        self.candidate_digest = self._digest_state()
+        return IsolatedWorldModelTrainResult(float(transition_loss.detach()), float(reward_loss.detach()), float(curiosity_loss.detach()), self.candidate_digest)
+
+    def intrinsic_curiosity_reward(self, state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor) -> torch.Tensor:
+        """Detached clipped prediction-error reward in [0, 1]."""
+        self.eval()
+        state = self._validate_state(state).unsqueeze(0)
+        action = self._validate_action(action).unsqueeze(0)
+        next_state = self._validate_state(next_state).unsqueeze(0)
+        with torch.no_grad():
+            err = F.mse_loss(self.curiosity_forward_model(self._features(state, action)), next_state, reduction="none").mean(dim=-1)
+            return torch.clamp(err, min=0.0, max=1.0).detach()
+
+    def plan_discrete(self, current_state: torch.Tensor, *, horizon: int = 3) -> Tuple[torch.Tensor, Dict[str, Any]]:
+        """Deterministic exhaustive discrete planner with discounted learned rewards."""
+        if not isinstance(self.action_space, DiscreteActionSpace):
+            raise RuntimeError("discrete planner requires discrete action space")
+        if horizon <= 0 or horizon > 8:
+            raise ValueError("invalid planning horizon")
+        self.eval()
+        start = self._validate_state(current_state)
+        actions = [torch.tensor(a, dtype=torch.float32) for a in self.action_space.actions]
+        best_return = -float("inf")
+        best_sequence: List[torch.Tensor] = []
+
+        def rollout(state: torch.Tensor, depth: int, acc: float, seq: List[torch.Tensor]):
+            nonlocal best_return, best_sequence
+            if depth == horizon:
+                if acc > best_return or (abs(acc - best_return) <= 1e-12 and [tuple(a.tolist()) for a in seq] < [tuple(a.tolist()) for a in best_sequence]):
+                    best_return = acc
+                    best_sequence = list(seq)
+                return
+            for action in actions:
+                next_state, reward = self.predict(state, action)
+                rollout(next_state.detach(), depth + 1, acc + (self.discount ** depth) * float(reward.item()), seq + [action])
+
+        rollout(start, 0, 0.0, [])
+        if not best_sequence:
+            raise ValueError("empty candidate action sequence")
+        return best_sequence[0], {"discounted_return": best_return, "action_sequence": best_sequence, "planner": "deterministic_discrete_exhaustive"}
+
+    def _state_doc(self) -> Dict[str, Any]:
+        return {
+            "schema": self.schema_version,
+            "state_dim": self.state_dim,
+            "action_dim": self.action_dim,
+            "seed": self.seed,
+            "action_space": self.action_space.__dict__,
+            "state": {k: {"shape": list(v.shape), "data": v.detach().cpu().reshape(-1).tolist()} for k, v in self.state_dict().items()},
+        }
+
+    def _digest_state(self) -> str:
+        return hashlib.sha256(json.dumps(self._state_doc(), sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest()
+
+    def save_research_state(self, path: str) -> str:
+        doc = self._state_doc()
+        doc["candidate_digest"] = self._digest_state()
+        target = Path(path); target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps(doc, sort_keys=True, separators=(",", ":"), allow_nan=False))
+        return str(target)
+
+    def load_research_state(self, path: str) -> None:
+        doc = json.loads(Path(path).read_text())
+        digest = doc.pop("candidate_digest", None)
+        expected = hashlib.sha256(json.dumps(doc, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest()
+        if digest != expected or doc.get("schema") != self.schema_version:
+            raise ValueError("world-model state digest mismatch")
+        if int(doc.get("state_dim")) != self.state_dim or int(doc.get("action_dim")) != self.action_dim:
+            raise ValueError("world-model state dimension mismatch")
+        state = {}
+        current = self.state_dict()
+        if set(doc["state"]) != set(current):
+            raise ValueError("world-model state keys mismatch")
+        for key, value in doc["state"].items():
+            tensor = torch.tensor(value["data"], dtype=current[key].dtype).reshape(value["shape"])
+            if tensor.shape != current[key].shape:
+                raise ValueError("world-model tensor shape mismatch")
+            state[key] = tensor
+        self.load_state_dict(state, strict=True)
+        self.candidate_digest = digest
+
+
 # ============================================================
 
 
@@ -574,9 +813,11 @@ class UnifiedWorldModel(nn.Module):
         pred_value = self.predict_value(state)
         losses["value"] = F.mse_loss(pred_value, target_value)
 
-        # Curiosity loss
-        curiosity_reward = self.compute_curiosity_reward(state, action, next_state)
-        losses["curiosity"] = -curiosity_reward.mean()  # Maximize curiosity
+        # Curiosity forward model minimizes detached prediction error. Intrinsic
+        # reward is reported from detached/clipped error and is not maximized by
+        # the optimizer.
+        curiosity_reward = self.compute_curiosity_reward(state, action, next_state).detach()
+        losses["curiosity"] = curiosity_reward.mean()
 
         # Total loss
         total_loss = sum(losses.values())
@@ -737,9 +978,9 @@ class UnifiedWorldModel(nn.Module):
         elif algorithm == PlanningAlgorithm.MCTS:
             return self._plan_mcts(current_state, candidate_actions, horizon, **kwargs)
         elif algorithm == PlanningAlgorithm.CEM:
-            return self._plan_cem(current_state, candidate_actions, horizon, **kwargs)
+            raise RuntimeError("cem planner unavailable until separately proven")
         elif algorithm == PlanningAlgorithm.MPPI:
-            return self._plan_mppi(current_state, candidate_actions, horizon, **kwargs)
+            raise RuntimeError("mppi planner unavailable until separately proven")
         else:
             return self._plan_greedy(current_state, candidate_actions, horizon)
 
@@ -1288,12 +1529,12 @@ class CuriosityModule(nn.Module):
         state_action = torch.cat([state_feat, action], dim=-1)
         pred_next_feat = self.forward_model(state_action)
 
-        # Curiosity = prediction error
-        curiosity = F.mse_loss(pred_next_feat, next_state_feat, reduction="none").mean(
+        # Intrinsic reward is detached clipped prediction error in [0, 1].
+        curiosity = F.mse_loss(pred_next_feat, next_state_feat.detach(), reduction="none").mean(
             dim=-1
         )
 
-        return curiosity
+        return torch.clamp(curiosity, min=0.0, max=1.0).detach()
 
 
 # ============================================================

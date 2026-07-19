@@ -5,6 +5,7 @@ Meta-cognitive monitoring and compositional understanding
 import logging
 import pickle
 import threading
+import math
 import time
 from collections import deque
 from dataclasses import dataclass
@@ -27,6 +28,23 @@ logger = logging.getLogger(__name__)
 # ============================================================
 # METACOGNITIVE TYPES
 # ============================================================
+
+
+class MetacognitionMode(Enum):
+    """Metacognition operating modes."""
+
+    OBSERVE_ONLY = "observe_only"
+
+
+class RecommendationStatus(Enum):
+    """Recommendation application status."""
+
+    NOT_APPLIED = "not_applied"
+    REJECTED = "rejected"
+
+
+class MetacognitiveMutationRejected(RuntimeError):
+    """Raised when runtime metacognitive mutation is attempted."""
 
 
 class ReasoningPhase(Enum):
@@ -77,7 +95,14 @@ class MetaCognitiveMonitor:
         self,
         model_ref: Optional[nn.Module] = None,
         optimizer_ref: Optional[optim.Optimizer] = None,
+        mode: MetacognitionMode = MetacognitionMode.OBSERVE_ONLY,
     ):
+        if mode is not MetacognitionMode.OBSERVE_ONLY:
+            raise MetacognitiveMutationRejected(
+                "Metacognition mutation is disabled until verification gates pass."
+            )
+        self._mode = mode
+
         # References to actual model and optimizer
         self.model_ref = model_ref
         self.optimizer_ref = optimizer_ref
@@ -151,7 +176,10 @@ class MetaCognitiveMonitor:
             self.optimizer_ref = optimizer
 
     def update_self_model(self, metrics: Dict[str, Any]):
-        """FIXED: Update self-model based on performance metrics with consistent locking"""
+        """Update self-model from finite telemetry without applying mutations."""
+        for key, value in metrics.items():
+            if isinstance(value, (int, float)) and not math.isfinite(float(value)):
+                raise ValueError("Metacognitive telemetry must contain finite numeric values")
         with self._lock:
             self.learning_history.append(metrics)
 
@@ -511,7 +539,9 @@ class MetaCognitiveMonitor:
 
         # Apply improvements outside lock to allow strategies to acquire lock if needed
         if analysis["recommendations"]:
-            self._apply_improvements(analysis)
+            for rec in analysis["recommendations"]:
+                rec["status"] = RecommendationStatus.NOT_APPLIED.value
+                rec["reason"] = "Metacognitive mutation is disabled until verification gates pass."
 
         return analysis
 
@@ -549,7 +579,9 @@ class MetaCognitiveMonitor:
                     "issue": "high_loss",
                     "suggestion": "Reduce learning rate or increase model capacity",
                     "priority": "high",
-                    "auto_fix": True,
+                    "auto_fix": False,
+                    "status": RecommendationStatus.NOT_APPLIED.value,
+                    "reason": "Metacognitive mutation is disabled until verification gates pass.",
                 }
             )
 
@@ -559,7 +591,9 @@ class MetaCognitiveMonitor:
                     "issue": "high_variance",
                     "suggestion": "Increase regularization or batch size",
                     "priority": "medium",
-                    "auto_fix": True,
+                    "auto_fix": False,
+                    "status": RecommendationStatus.NOT_APPLIED.value,
+                    "reason": "Metacognitive mutation is disabled until verification gates pass.",
                 }
             )
 
@@ -569,7 +603,9 @@ class MetaCognitiveMonitor:
                     "issue": "plateau",
                     "suggestion": "Change optimizer or learning rate schedule",
                     "priority": "medium",
-                    "auto_fix": True,
+                    "auto_fix": False,
+                    "status": RecommendationStatus.NOT_APPLIED.value,
+                    "reason": "Metacognitive mutation is disabled until verification gates pass.",
                 }
             )
 
@@ -579,7 +615,9 @@ class MetaCognitiveMonitor:
                     "issue": "overconfidence",
                     "suggestion": "Calibrate confidence estimates",
                     "priority": "low",
-                    "auto_fix": True,
+                    "auto_fix": False,
+                    "status": RecommendationStatus.NOT_APPLIED.value,
+                    "reason": "Metacognitive mutation is disabled until verification gates pass.",
                 }
             )
 
@@ -589,14 +627,24 @@ class MetaCognitiveMonitor:
                     "issue": "underconfidence",
                     "suggestion": "Boost confidence in predictions",
                     "priority": "low",
-                    "auto_fix": True,
+                    "auto_fix": False,
+                    "status": RecommendationStatus.NOT_APPLIED.value,
+                    "reason": "Metacognitive mutation is disabled until verification gates pass.",
                 }
             )
 
         return recommendations
 
     def _apply_improvements(self, analysis: Dict):
-        """FIXED: Automatically apply improvements with proper locking"""
+        """Reject runtime metacognitive mutation at the mutation boundary."""
+        for rec in analysis.get("recommendations", []):
+            rec["status"] = RecommendationStatus.NOT_APPLIED.value
+            rec["reason"] = "Metacognitive mutation is disabled until verification gates pass."
+        raise MetacognitiveMutationRejected(
+            "Metacognitive mutation is disabled until verification gates pass."
+        )
+
+    def _legacy_apply_improvements_disabled(self, analysis: Dict):
         for rec in analysis["recommendations"]:
             if rec["auto_fix"] and rec["issue"] in self.improvement_strategies:
                 strategy = self.improvement_strategies[rec["issue"]]
@@ -854,6 +902,7 @@ class MetaCognitiveMonitor:
                 "confidence_history": list(self.confidence_history),
                 "causal_relations": self.causal_relations,
                 "strategy_outcomes": dict(self.strategy_outcomes),
+                "mode": self._mode.value,
             }
 
         with open(filepath, "wb") as f:
@@ -873,6 +922,7 @@ class MetaCognitiveMonitor:
             self.improvement_audit = state["improvement_audit"]
             self.confidence_history = deque(state["confidence_history"], maxlen=100)
             self.causal_relations = state.get("causal_relations", {})
+            self._mode = MetacognitionMode.OBSERVE_ONLY
 
             for k, v in state["performance_trends"].items():
                 self.performance_trends[k] = deque(v, maxlen=100)
