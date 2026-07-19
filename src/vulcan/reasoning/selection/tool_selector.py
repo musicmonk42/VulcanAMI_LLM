@@ -1310,35 +1310,10 @@ class ToolSelector:
                     available_tools = getattr(self, 'available_tools', None) or DEFAULT_AVAILABLE_TOOLS
                     valid_classifier_tools = [t for t in classifier_tools if t in available_tools]
                     
-                    # ================================================================
-                    # Note: Respect learned weights - skip tools with very negative weights
-                    # The learning system punishes failing tools, but previously the
-                    # classifier/router bypassed this. Now we filter out tools that have
-                    # been learned to be unreliable (weight < NEGATIVE_WEIGHT_THRESHOLD).
-                    # ================================================================
-                    if self.learning_system:
-                        filtered_tools = []
-                        for tool in valid_classifier_tools:
-                            weight = self.learning_system.get_tool_weight_adjustment(tool)
-                            if weight < NEGATIVE_WEIGHT_THRESHOLD:
-                                logger.info(
-                                    f"[ToolSelector] Skipping '{tool}' - learned weight "
-                                    f"too low ({weight:.3f}), suggesting alternative"
-                                )
-                                # Don't add this tool - it has been learned to be unreliable
-                            else:
-                                filtered_tools.append(tool)
-                        
-                        # If all classifier tools were filtered out, suggest fallback
-                        if not filtered_tools and valid_classifier_tools:
-                            logger.warning(
-                                f"[ToolSelector] All classifier tools rejected by "
-                                f"learned weights, using world_model as fallback"
-                            )
-                            filtered_tools = ['world_model']
-                        
-                        valid_classifier_tools = filtered_tools
-                    
+                    # Runtime learning containment: legacy additive tool-weight
+                    # adjustments are quarantined and are no longer authoritative
+                    # selector inputs.  The shadow bandit logs/evaluates elsewhere
+                    # and cannot change live routing in this phase.
                     if valid_classifier_tools:
                         # Execute with classifier's selected tools directly
                         candidates = [
@@ -1577,29 +1552,9 @@ class ToolSelector:
                 features, safe_candidates, prior_context
             )
             
-            # Apply learned weight adjustments from learning system
-            if self.learning_system and hasattr(prior_dist, 'tool_probs') and isinstance(prior_dist.tool_probs, dict):
-                for tool in prior_dist.tool_probs:
-                    adjustment = self.learning_system.get_tool_weight_adjustment(tool)
-                    if adjustment != 0:
-                        prior_dist.tool_probs[tool] += adjustment
-                        logger.info(f"[ToolSelector] Applied learned adjustment to '{tool}': {adjustment:+.3f}")
-                # Ensure no negative probabilities and renormalize
-                for tool in prior_dist.tool_probs:
-                    if prior_dist.tool_probs[tool] < 0:
-                        prior_dist.tool_probs[tool] = 0.0
-                total = sum(prior_dist.tool_probs.values())
-                if total > 0:
-                    prior_dist.tool_probs = {k: v / total for k, v in prior_dist.tool_probs.items()}
-                else:
-                    # All weights were zero/negative, reset to uniform
-                    n_tools = len(prior_dist.tool_probs)
-                    if n_tools > 0:
-                        uniform_prob = 1.0 / n_tools
-                        prior_dist.tool_probs = {k: uniform_prob for k in prior_dist.tool_probs}
-                # Update most likely tool
-                if prior_dist.tool_probs:
-                    prior_dist.most_likely_tool = max(prior_dist.tool_probs.items(), key=lambda x: x[1])[0]
+            # Runtime learning containment: do not read or apply legacy
+            # learning_system.tool_weight_adjustments.  Shadow bandit candidates
+            # are evaluated outside live routing and cannot mutate prior_dist.
 
             # Step 7: Generate candidate tools with utilities
             candidates = self._generate_candidates(
@@ -2540,63 +2495,19 @@ class ToolSelector:
             logger.debug(f"Mathematical verification skipped: {e}")
 
     def _apply_math_reward(self, tool_name: str):
-        """Apply reward to tool for correct mathematical result."""
-        if not self.learning_system:
-            return
-        
-        try:
-            if hasattr(self.learning_system, '_weight_lock'):
-                with self.learning_system._weight_lock:
-                    if tool_name not in self.learning_system.tool_weight_adjustments:
-                        self.learning_system.tool_weight_adjustments[tool_name] = 0.0
-                    
-                    # Reward for mathematical correctness (0.015)
-                    reward = 0.015
-                    old_weight = self.learning_system.tool_weight_adjustments[tool_name]
-                    self.learning_system.tool_weight_adjustments[tool_name] = min(
-                        0.2,  # MAX_TOOL_WEIGHT
-                        old_weight + reward
-                    )
-                    logger.info(
-                        f"[MathVerify] Rewarded '{tool_name}': {old_weight:.4f} -> "
-                        f"{self.learning_system.tool_weight_adjustments[tool_name]:.4f}"
-                    )
-        except Exception as e:
-            logger.warning(f"Failed to apply math reward: {e}")
+        """Observe a verified mathematical result without mutating legacy weights."""
+        logger.info(
+            "[MathVerify] Verified result observed; legacy tool-weight mutation "
+            "is disabled in favor of shadow bandit updates."
+        )
 
     def _apply_math_penalty(self, tool_name: str, error_type: Optional["MathErrorType"]):
-        """Apply penalty to tool for mathematical error."""
-        if not self.learning_system:
-            return
-        
-        try:
-            # Penalty varies by error severity
-            penalty_map = {
-                "specificity_confusion": -0.02,
-                "base_rate_neglect": -0.015,
-                "complement_error": -0.01,
-                "arithmetic_error": -0.008,
-            }
-            
-            error_name = error_type.value if error_type else "unknown"
-            penalty = penalty_map.get(error_name, -0.01)
-            
-            if hasattr(self.learning_system, '_weight_lock'):
-                with self.learning_system._weight_lock:
-                    if tool_name not in self.learning_system.tool_weight_adjustments:
-                        self.learning_system.tool_weight_adjustments[tool_name] = 0.0
-                    
-                    old_weight = self.learning_system.tool_weight_adjustments[tool_name]
-                    self.learning_system.tool_weight_adjustments[tool_name] = max(
-                        -0.1,  # MIN_TOOL_WEIGHT
-                        old_weight + penalty
-                    )
-                    logger.warning(
-                        f"[MathVerify] Penalized '{tool_name}' for {error_name}: "
-                        f"{old_weight:.4f} -> {self.learning_system.tool_weight_adjustments[tool_name]:.4f}"
-                    )
-        except Exception as e:
-            logger.warning(f"Failed to apply math penalty: {e}")
+        """Observe a mathematical error without mutating legacy weights."""
+        error_name = error_type.value if error_type else "unknown"
+        logger.warning(
+            f"[MathVerify] Error observed for '{tool_name}' ({error_name}); "
+            "legacy tool-weight mutation is disabled in favor of shadow bandit updates."
+        )
 
     def _cache_result(self, request: SelectionRequest, result: SelectionResult):
         """Cache selection and result"""
@@ -2781,7 +2692,7 @@ class ToolSelector:
                 routing_time_ms=0.0,  # Not applicable for tool selection
                 total_time_ms=result.execution_time_ms,
                 complexity=complexity,
-                query_type=f"reasoning_{result.selected_tool}",
+                query_type="reasoning",
                 tasks=1,
                 error_type=error_type,
                 tools=[result.selected_tool] if result.selected_tool else [],

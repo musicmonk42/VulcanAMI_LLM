@@ -2,12 +2,16 @@
 Meta-learning implementation with task detection
 """
 
+import hashlib
+import json
 import logging
+import os
 import pickle
+import tempfile
 import threading
 import time
 from collections import defaultdict, deque
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -47,6 +51,28 @@ class MetaLearningAlgorithm(Enum):
     REPTILE = "reptile"  # Reptile algorithm
     PROTO = "proto"  # Prototypical Networks
     ANIL = "anil"  # Almost No Inner Loop
+
+
+class MetaUpdateStatus(Enum):
+    """Closed result status for isolated meta-learning updates."""
+
+    APPLIED = "applied"
+    UNAVAILABLE = "unavailable"
+    REJECTED = "rejected"
+
+
+@dataclass(frozen=True)
+class MetaUpdateResult:
+    """Typed result for a meta-learning update boundary."""
+
+    status: MetaUpdateStatus
+    algorithm: str
+    message: str
+    tasks_used: int = 0
+    avg_query_loss: Optional[float] = None
+    gradient_norm: Optional[float] = None
+    cursor: int = 0
+    task_weights: Tuple[float, ...] = field(default_factory=tuple)
 
 
 @dataclass
@@ -421,11 +447,17 @@ class MetaLearner:
         self,
         base_model: nn.Module,
         config: LearningConfig = None,
-        algorithm: MetaLearningAlgorithm = MetaLearningAlgorithm.MAML,
+        algorithm: MetaLearningAlgorithm = MetaLearningAlgorithm.FOMAML,
+        rng_seed: int = 0,
     ):
         self.config = config or LearningConfig()
         self.algorithm = algorithm
         self.base_model = base_model
+        self.rng_seed = int(rng_seed)
+        self._rng = torch.Generator()
+        self._rng.manual_seed(self.rng_seed)
+        self.meta_cursor = 0
+        self.gradient_clip_norm = 1.0
 
         # FIXED: Get device from base model
         self.device = (
@@ -469,11 +501,8 @@ class MetaLearner:
             base_path="meta_params", config=config
         )
 
-        # Prototypical network components (if using PROTO)
-        if algorithm == MetaLearningAlgorithm.PROTO:
-            self.prototype_layer = nn.Linear(self.embedding_dim, self.embedding_dim).to(
-                self.device
-            )
+        # PROTO remains unavailable until separately proven; do not allocate
+        # algorithm-specific parameters that could be mistaken for activation.
 
         # Lock for thread safety
         self._lock = threading.RLock()
@@ -486,6 +515,9 @@ class MetaLearner:
         task_id: Optional[str] = None,
     ) -> Tuple[nn.Module, Dict[str, Any]]:
         """Fast adaptation on support set with tracking and analysis."""
+        if self.algorithm in (MetaLearningAlgorithm.MAML, MetaLearningAlgorithm.PROTO):
+            raise RuntimeError(f"{self.algorithm.value} is unavailable until separately proven")
+        self._validate_dataset(support_set, "support")
         num_steps = num_steps or self.config.adaptation_steps
 
         # Get task-specific learning rate
@@ -697,134 +729,129 @@ class MetaLearner:
 
         return adapted_model, stats
 
-    def meta_update(self, tasks: List[Dict[str, Any]]):
-        """Meta-learning update across tasks with trajectory tracking."""
-        with self._lock:
-            if self.algorithm == MetaLearningAlgorithm.REPTILE:
-                self._meta_update_reptile(tasks)
-            else:
-                self._meta_update_maml(tasks)
+    def meta_update(self, tasks: List[Dict[str, Any]]) -> MetaUpdateResult:
+        """Apply one isolated meta-update.
 
-    def _meta_update_maml(self, tasks: List[Dict[str, Any]]):
-        """FIXED: MAML meta-update with proper gradient accumulation
-
-        For MAML, we need to compute meta-gradients that account for the adaptation.
-        This uses a first-order approximation (FOMAML) by default, which is more
-        stable and doesn't require second-order derivatives.
-
-        The algorithm:
-        1. For each task: adapt base model, compute query loss, accumulate gradients
-        2. Apply meta-optimizer step with accumulated gradients
-        3. This effectively updates θ based on performance after adaptation
+        Only FOMAML is available in this containment phase. MAML and PROTO return
+        typed unavailable results instead of silently falling back to another
+        algorithm.
         """
-        # Start trajectory recording
-        trajectory_id = self.param_history.start_trajectory(
-            task_id=f"meta_batch_{time.time()}", agent_id="meta_learner"
+        with self._lock:
+            if self.algorithm != MetaLearningAlgorithm.FOMAML:
+                return MetaUpdateResult(
+                    status=MetaUpdateStatus.UNAVAILABLE,
+                    algorithm=self.algorithm.value,
+                    message=f"{self.algorithm.value} is unavailable until separately proven",
+                    cursor=self.meta_cursor,
+                )
+            return self._meta_update_fomaml(tasks)
+
+    def _meta_update_maml(self, tasks: List[Dict[str, Any]]) -> MetaUpdateResult:
+        """MAML remains unavailable; use FOMAML explicitly."""
+        return MetaUpdateResult(
+            status=MetaUpdateStatus.UNAVAILABLE,
+            algorithm=MetaLearningAlgorithm.MAML.value,
+            message="maml is unavailable until separately proven",
+            cursor=self.meta_cursor,
         )
 
-        # Zero gradients
-        self.meta_optimizer.zero_grad()
+    def _meta_update_fomaml(self, tasks: List[Dict[str, Any]]) -> MetaUpdateResult:
+        """First-order MAML (FOMAML) update.
 
-        meta_loss_sum = 0
-        task_gradients = []
-        gradient_norms = []
+        Equations for task i with bounded weight w_i:
+          phi_i^0 = theta
+          phi_i^{k+1} = phi_i^k - alpha * grad_phi L_support_i(phi_i^k)
+          g_i = grad_phi L_query_i(phi_i^K)
+          g = sum_i(w_i * g_i) / sum_i(w_i)
+          theta <- theta - beta * clip(g, ||g||_2 <= gradient_clip_norm)
 
-        # Store original base model parameters
-        original_state = {
-            name: param.data.clone()
-            for name, param in self.base_model.named_parameters()
-        }
+        The base parameters theta are never mutated during inner adaptation. Each
+        task starts from the same cloned tensors, query gradients are computed
+        independently, and exactly one outer optimizer step is applied from the
+        averaged gradient.
+        """
+        self._validate_meta_tasks(tasks)
+        named_params = dict(self.base_model.named_parameters())
+        if not named_params:
+            return MetaUpdateResult(MetaUpdateStatus.REJECTED, self.algorithm.value, "base model has no parameters", cursor=self.meta_cursor)
+        base_params = {name: p.detach().clone().to(self.device).requires_grad_(True) for name, p in named_params.items()}
+        buffers = {name: b.detach().clone().to(self.device) for name, b in self.base_model.named_buffers()}
+        total_weight = 0.0
+        accumulated = {name: torch.zeros_like(param, device=self.device) for name, param in named_params.items()}
+        meta_loss_sum = 0.0
+        task_gradients: List[List[torch.Tensor]] = []
+        gradient_norms: List[float] = []
+        weights: List[float] = []
 
         for task in tasks:
-            task_id = task.get("task_id")
-            support_set = task["support"]
-            query_set = task["query"]
+            task_weight = float(task.get("weight", 1.0))
+            if not np.isfinite(task_weight) or task_weight <= 0.0 or task_weight > 10.0:
+                raise ValueError("task weight must be finite and in (0, 10]")
+            support_set = self._validate_dataset(task.get("support"), "support")
+            query_set = self._validate_dataset(task.get("query"), "query")
+            fast_params = {name: value.detach().clone().requires_grad_(True) for name, value in base_params.items()}
+            inner_lr = float(task.get("inner_lr", self.config.inner_lr))
+            if not np.isfinite(inner_lr) or inner_lr <= 0.0 or inner_lr > 1.0:
+                raise ValueError("inner_lr must be finite and in (0, 1]")
 
-            # Get inner learning rate
-            inner_lr = self.task_learning_rates.get(task_id, self.config.inner_lr)
+            for _ in range(int(self.config.adaptation_steps)):
+                support_loss = self._compute_loss_with_params(fast_params, buffers, support_set)
+                self._require_finite_tensor(support_loss, "support loss")
+                grads = torch.autograd.grad(support_loss, tuple(fast_params.values()), create_graph=False, allow_unused=False)
+                self._require_finite_gradients(grads, "support gradients")
+                grad_norm = torch.linalg.vector_norm(torch.cat([g.reshape(-1) for g in grads]))
+                if grad_norm > self.gradient_clip_norm:
+                    scale = self.gradient_clip_norm / (grad_norm + 1e-12)
+                    grads = tuple(g * scale for g in grads)
+                fast_params = {name: (param - inner_lr * grad.detach()).detach().requires_grad_(True) for (name, param), grad in zip(fast_params.items(), grads)}
 
-            # Perform adaptation on support set
-            # Use a simple optimizer for inner loop
-            inner_optimizer = optim.SGD(self.base_model.parameters(), lr=inner_lr)
+            query_loss = self._compute_loss_with_params(fast_params, buffers, query_set)
+            self._require_finite_tensor(query_loss, "query loss")
+            query_grads = torch.autograd.grad(query_loss, tuple(fast_params.values()), create_graph=False, allow_unused=False)
+            self._require_finite_gradients(query_grads, "query gradients")
+            task_grad_list = []
+            for name, grad in zip(fast_params.keys(), query_grads):
+                detached = grad.detach()
+                accumulated[name] = accumulated[name] + task_weight * detached
+                task_grad_list.append(detached.clone())
+                gradient_norms.append(float(detached.norm().item()))
+            task_gradients.append(task_grad_list)
+            total_weight += task_weight
+            weights.append(task_weight)
+            meta_loss_sum += float(query_loss.detach().item()) * task_weight
+            self.task_losses.append(float(query_loss.detach().item()))
 
-            for step in range(self.config.adaptation_steps):
-                inner_optimizer.zero_grad()
-                support_loss = self._compute_loss(self.base_model, support_set)
-                support_loss.backward()
-                inner_optimizer.step()
-
-            # Zero gradients from adaptation before computing meta-gradients
-            self.base_model.zero_grad()
-
-            # Evaluate on query set with adapted model
-            query_loss = self._compute_loss(self.base_model, query_set)
-
-            # Compute gradients from query loss
-            # These gradients represent how to update the base model
-            # to improve post-adaptation performance
-            query_loss.backward()
-
-            meta_loss_sum += query_loss.item()
-            self.task_losses.append(query_loss.item())
-
-            # Collect gradient statistics
-            task_grad = []
-            for param in self.base_model.parameters():
-                if param.grad is not None:
-                    task_grad.append(param.grad.clone().detach())
-                    gradient_norms.append(param.grad.norm().item())
-            task_gradients.append(task_grad)
-
-            # Restore base model to original state for next task
-            # This ensures each task starts from the same base model
-            with torch.no_grad():
-                for name, param in self.base_model.named_parameters():
-                    param.data = original_state[name]
-
-            # Update task-specific learning rate
-            if task_id:
-                adapt_stats = {"trajectory": [{"loss": query_loss.item()}]}
-                self._update_task_learning_rate(task_id, adapt_stats)
-
-        # Analyze gradients
-        self._analyze_gradients(task_gradients, gradient_norms)
-
-        # Apply meta-update with accumulated gradients from all tasks
-        # The gradients have been accumulated across all tasks
-        torch.nn.utils.clip_grad_norm_(self.base_model.parameters(), 1.0)
+        if total_weight <= 0.0:
+            raise ValueError("total task weight must be positive")
+        self.meta_optimizer.zero_grad(set_to_none=True)
+        for name, param in named_params.items():
+            grad = accumulated[name] / total_weight
+            self._require_finite_tensor(grad, "averaged gradient")
+            param.grad = grad.to(param.device).clone()
+        total_norm = torch.nn.utils.clip_grad_norm_(self.base_model.parameters(), self.gradient_clip_norm)
+        self._require_finite_tensor(total_norm if torch.is_tensor(total_norm) else torch.tensor(total_norm), "outer gradient norm")
         self.meta_optimizer.step()
-
-        # Calculate average loss
-        avg_meta_loss = meta_loss_sum / len(tasks)
-
-        # Save checkpoint periodically
-        if (
-            self.config.checkpoint_frequency > 0
-            and len(self.adaptation_history) % self.config.checkpoint_frequency == 0
-        ):
-            checkpoint_path = self.param_history.save_checkpoint(
-                self.base_model,
-                metadata={
-                    "meta_loss": avg_meta_loss,
-                    "num_tasks": len(tasks),
-                    "trajectory_id": trajectory_id,
-                    "algorithm": self.algorithm.value,
-                },
-            )
-            logger.info(f"Saved meta-learning checkpoint: {checkpoint_path}")
-
-        # End trajectory
-        self.param_history.end_trajectory()
-
-        # Record meta-learning step
-        self.adaptation_history.append(
-            {
-                "timestamp": time.time(),
-                "num_tasks": len(tasks),
-                "avg_loss": avg_meta_loss,
-                "trajectory_id": trajectory_id,
-                "gradient_stats": {k: list(v) for k, v in self.gradient_stats.items()},
-            }
+        self.meta_cursor += 1
+        self._analyze_gradients(task_gradients, gradient_norms)
+        avg_meta_loss = meta_loss_sum / total_weight
+        self.adaptation_history.append({
+            "timestamp": time.time(),
+            "num_tasks": len(tasks),
+            "avg_loss": avg_meta_loss,
+            "algorithm": "fomaml",
+            "cursor": self.meta_cursor,
+            "task_weights": list(weights),
+            "gradient_clip_norm": self.gradient_clip_norm,
+        })
+        return MetaUpdateResult(
+            status=MetaUpdateStatus.APPLIED,
+            algorithm="fomaml",
+            message="fomaml update applied",
+            tasks_used=len(tasks),
+            avg_query_loss=avg_meta_loss,
+            gradient_norm=float(total_norm.detach().item() if hasattr(total_norm, "detach") else total_norm),
+            cursor=self.meta_cursor,
+            task_weights=tuple(weights),
         )
 
     def _meta_update_reptile(self, tasks: List[Dict[str, Any]]):
@@ -994,11 +1021,7 @@ class MetaLearner:
         """FIXED: Create batch from buffer indices with robust error handling"""
         # Handle empty indices
         if len(indices) == 0:
-            logger.warning("Empty indices in batch creation, returning dummy batch")
-            return {
-                "x": torch.randn(1, self.embedding_dim, device=self.device),
-                "y": torch.zeros(1, device=self.device),
-            }
+            raise ValueError("empty meta-learning batch indices")
 
         batch_x = []
         batch_y = []
@@ -1032,8 +1055,9 @@ class MetaLearner:
                     x = x.to(self.device)
                     batch_x.append(x)
 
-                    # Use reward as target if available
-                    y = exp.get("reward", 0.0)
+                    if "reward" not in exp:
+                        raise ValueError("meta-learning buffer item missing explicit reward target")
+                    y = exp["reward"]
                     if not isinstance(y, torch.Tensor):
                         y = torch.tensor(y, dtype=torch.float32)
                     if y.dim() == 0:
@@ -1046,20 +1070,163 @@ class MetaLearner:
 
         # FIXED: Handle case where all items failed to process
         if not batch_x:
-            logger.warning("All buffer items failed to process, returning dummy batch")
-            return {
-                "x": torch.randn(1, self.embedding_dim, device=self.device),
-                "y": torch.zeros(1, device=self.device),
-            }
+            raise ValueError("no valid meta-learning batch items")
 
         return {
             "x": torch.stack(batch_x),
-            "y": (
-                torch.stack(batch_y).squeeze(-1)
-                if batch_y
-                else torch.zeros(len(batch_x), device=self.device)
-            ),
+            "y": torch.stack(batch_y).squeeze(-1),
         }
+
+    def _validate_meta_tasks(self, tasks: List[Dict[str, Any]]) -> None:
+        if not isinstance(tasks, list) or not tasks:
+            raise ValueError("meta_update requires at least one task with support and query data")
+        for task in tasks:
+            if not isinstance(task, dict):
+                raise ValueError("each meta task must be a dict")
+            self._validate_dataset(task.get("support"), "support")
+            self._validate_dataset(task.get("query"), "query")
+
+    def _validate_dataset(self, data: Any, name: str) -> Dict[str, torch.Tensor]:
+        if not isinstance(data, dict):
+            raise ValueError(f"{name} set is required")
+        if "x" not in data or "y" not in data:
+            raise ValueError(f"{name} set requires explicit x and y")
+        x, y = data["x"], data["y"]
+        if not isinstance(x, torch.Tensor) or not isinstance(y, torch.Tensor):
+            raise ValueError(f"{name} x and y must be tensors")
+        if x.numel() == 0 or y.numel() == 0 or x.shape[0] == 0 or y.shape[0] == 0:
+            raise ValueError(f"{name} set must be non-empty")
+        if x.shape[0] != y.shape[0]:
+            raise ValueError(f"{name} x/y batch dimension mismatch")
+        x = x.to(self.device)
+        y = y.to(self.device)
+        self._require_finite_tensor(x, f"{name} x")
+        if y.dtype.is_floating_point:
+            self._require_finite_tensor(y, f"{name} y")
+        return {"x": x, "y": y}
+
+    def _compute_loss_with_params(self, params: Dict[str, torch.Tensor], buffers: Dict[str, torch.Tensor], data: Dict[str, torch.Tensor]) -> torch.Tensor:
+        try:
+            from torch.func import functional_call
+        except ImportError:  # pragma: no cover - older torch fallback
+            from torch.nn.utils.stateless import functional_call
+        pred = functional_call(self.base_model, {**params, **buffers}, (data["x"],))
+        y = data["y"]
+        if y.dtype == torch.long:
+            if y.dim() > 1:
+                y = y.squeeze(-1)
+            loss = F.cross_entropy(pred, y)
+        else:
+            if pred.shape != y.shape:
+                if len(pred.shape) == 2 and len(y.shape) == 1:
+                    y = y.unsqueeze(1)
+                elif len(pred.shape) == 1 and len(y.shape) == 2:
+                    pred = pred.unsqueeze(1)
+            if pred.shape != y.shape:
+                raise ValueError("prediction/target shape mismatch")
+            loss = F.mse_loss(pred, y)
+        self._require_finite_tensor(loss, "loss")
+        return loss
+
+    def _require_finite_tensor(self, value: torch.Tensor, label: str) -> None:
+        if not torch.isfinite(value).all().item():
+            raise ValueError(f"non-finite {label}")
+
+    def _require_finite_gradients(self, grads: Tuple[torch.Tensor, ...], label: str) -> None:
+        if not grads:
+            raise ValueError(f"missing {label}")
+        for grad in grads:
+            self._require_finite_tensor(grad, label)
+
+    def _jsonify_state(self, value: Any) -> Any:
+        if torch.is_tensor(value):
+            tensor = value.detach().cpu()
+            return {"__tensor__": True, "dtype": str(tensor.dtype), "shape": list(tensor.shape), "data": tensor.reshape(-1).tolist()}
+        if isinstance(value, dict):
+            return {str(k): self._jsonify_state(v) for k, v in value.items()}
+        if isinstance(value, (list, tuple)):
+            return [self._jsonify_state(v) for v in value]
+        if isinstance(value, (str, int, bool)) or value is None:
+            return value
+        if isinstance(value, float):
+            if not np.isfinite(value):
+                raise ValueError("non-finite meta-learning state")
+            return value
+        return value
+
+    def _dejsonify_state(self, value: Any) -> Any:
+        if isinstance(value, dict) and value.get("__tensor__") is True:
+            dtype_name = value["dtype"].replace("torch.", "")
+            dtype = getattr(torch, dtype_name)
+            tensor = torch.tensor(value["data"], dtype=dtype, device=self.device)
+            return tensor.reshape(value["shape"])
+        if isinstance(value, dict):
+            return {k: self._dejsonify_state(v) for k, v in value.items()}
+        if isinstance(value, list):
+            return [self._dejsonify_state(v) for v in value]
+        return value
+
+    def save_fomaml_state(self, path: str) -> str:
+        """Save exact isolated FOMAML state with canonical JSON and digest."""
+        if self.algorithm != MetaLearningAlgorithm.FOMAML:
+            raise RuntimeError("only fomaml state is available in this phase")
+        doc = {
+            "schema_version": "vulcan-fomaml-research/1",
+            "algorithm": "fomaml",
+            "config": {
+                "inner_lr": float(self.config.inner_lr),
+                "meta_lr": float(self.config.meta_lr),
+                "adaptation_steps": int(self.config.adaptation_steps),
+                "gradient_clip_norm": float(self.gradient_clip_norm),
+            },
+            "model_state": self._jsonify_state(self.base_model.state_dict()),
+            "optimizer_state": self._jsonify_state(self.meta_optimizer.state_dict()),
+            "cursor": int(self.meta_cursor),
+            "rng_seed": int(self.rng_seed),
+        }
+        canonical = json.dumps(doc, sort_keys=True, separators=(",", ":"), allow_nan=False)
+        payload = dict(doc)
+        payload["manifest_digest"] = hashlib.sha256(canonical.encode()).hexdigest()
+        target = Path(path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        raw = json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+        fd, tmp = tempfile.mkstemp(prefix=".fomaml.", suffix=".json", dir=target.parent)
+        with os.fdopen(fd, "wb") as f:
+            f.write(raw)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, target)
+        return str(target)
+
+    def load_fomaml_state(self, path: str) -> None:
+        """Strictly load isolated FOMAML state; reject corrupt or mismatched manifests."""
+        def pairs(items):
+            out = {}
+            for k, v in items:
+                if k in out:
+                    raise ValueError("duplicate fomaml state key")
+                out[k] = v
+            return out
+        doc = json.loads(Path(path).read_text(), object_pairs_hook=pairs, parse_constant=lambda x: (_ for _ in ()).throw(ValueError("non-finite fomaml state")))
+        digest = doc.pop("manifest_digest", None)
+        expected = hashlib.sha256(json.dumps(doc, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest()
+        if digest != expected:
+            raise ValueError("fomaml manifest digest mismatch")
+        required = {"schema_version", "algorithm", "config", "model_state", "optimizer_state", "cursor", "rng_seed"}
+        if set(doc) != required or doc["schema_version"] != "vulcan-fomaml-research/1" or doc["algorithm"] != "fomaml":
+            raise ValueError("fomaml manifest schema mismatch")
+        config = doc["config"]
+        expected_config = {"inner_lr", "meta_lr", "adaptation_steps", "gradient_clip_norm"}
+        if set(config) != expected_config:
+            raise ValueError("fomaml config schema mismatch")
+        state = self._dejsonify_state(doc["model_state"])
+        if set(state) != set(self.base_model.state_dict()):
+            raise ValueError("fomaml model state keys mismatch")
+        self.base_model.load_state_dict(state, strict=True)
+        self.meta_optimizer.load_state_dict(self._dejsonify_state(doc["optimizer_state"]))
+        self.meta_cursor = int(doc["cursor"])
+        self.rng_seed = int(doc["rng_seed"])
+        self._rng.manual_seed(self.rng_seed)
 
     def _clone_model(self) -> nn.Module:
         """Create a functional copy of the model.
@@ -1116,22 +1283,7 @@ class MetaLearner:
         y = data.get("y")
 
         if x is None or y is None:
-            # Self-supervised loss - handle dimension mismatch properly
-            x = data.get(
-                "input", torch.randn(1, self.embedding_dim, device=self.device)
-            )
-            x = x.to(self.device)
-            pred = model(x)
-
-            # For self-supervised learning, when dimensions don't match,
-            # use L2 regularization of the output as a learning signal
-            if pred.shape[-1] != x.shape[-1]:
-                # Use L2 norm of prediction as regularization loss
-                # This provides a meaningful gradient while avoiding dimension mismatch
-                return torch.mean(pred**2)
-            else:
-                # If dimensions match, use reconstruction loss
-                return F.mse_loss(pred, x)
+            raise ValueError("meta-learning loss requires explicit x and y")
 
         # FIXED: Ensure tensors on correct device
         x = x.to(self.device)

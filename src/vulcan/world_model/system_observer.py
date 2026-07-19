@@ -927,14 +927,10 @@ def get_learning_insights() -> Dict[str, Any]:
         if not learning:
             return {'available': False, 'reason': 'Learning system not initialized'}
         
-        # Get current tool weights
+        # Legacy additive tool weights are quarantined and no longer authoritative.
         tool_weights = {}
-        if hasattr(learning, 'tool_weight_adjustments'):
-            tool_weights = dict(learning.tool_weight_adjustments)
-        
-        # Identify well-performing and poorly-performing tools
-        well_performing = {k: v for k, v in tool_weights.items() if v > 0.01}
-        poorly_performing = {k: v for k, v in tool_weights.items() if v < -0.01}
+        well_performing = {}
+        poorly_performing = {}
         
         # Get outcome history if available
         recent_outcomes = []
@@ -1002,8 +998,9 @@ def get_tool_performance_history(tool_name: str) -> Dict[str, Any]:
     try:
         from vulcan.learning import get_learning_system
         learning = get_learning_system()
-        if learning and hasattr(learning, 'get_tool_weight_adjustment'):
-            result['weight_adjustment'] = learning.get_tool_weight_adjustment(tool_name)
+        if learning:
+            result['weight_adjustment'] = 0.0
+            result['weight_status'] = 'legacy_weights_quarantined'
     except Exception as e:
         logger.debug(f"Error getting tool weight: {e}")
     

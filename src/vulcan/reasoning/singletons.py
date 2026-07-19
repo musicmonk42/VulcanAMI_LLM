@@ -46,7 +46,7 @@ _multimodal_engine: Optional[Any] = None
 _unified_reasoner: Optional[Any] = None  # Note: Add singleton for UnifiedReasoner
 _math_verification_engine: Optional[Any] = None  # CACHING FIX: Singleton for MathematicalVerificationEngine
 _hierarchical_memory: Optional[Any] = None  # PERF FIX Issue #2: Singleton for HierarchicalMemory
-_unified_learning_system: Optional[Any] = None  # PERF FIX Issue #5: Singleton for UnifiedLearningSystem
+# Learning owner is composed by RuntimeContainer; no reasoning-level learning singleton.
 _embedding_model: Optional[Any] = None  # MEMORY LEAK FIX: Singleton for SentenceTransformer model
 _singleton_lock = threading.Lock()
 
@@ -615,9 +615,7 @@ def prewarm_all():
     mve = get_math_verification_engine()
     results['math_verification_engine'] = mve is not None
     
-    # PERF FIX Issue #5: Pre-warm UnifiedLearningSystem to persist ensemble weights
-    uls = get_unified_learning_system()
-    results['unified_learning_system'] = uls is not None
+    results['unified_learning_system'] = False
     
     success_count = sum(1 for v in results.values() if v)
     logger.info(f"[Singletons] ✓ All singletons pre-warmed ({success_count}/{len(results)} initialized)")
@@ -1157,205 +1155,13 @@ def get_hierarchical_memory(config: Optional[Any] = None) -> Optional[Any]:
 
 
 # ============================================
-# UNIFIED LEARNING SYSTEM SINGLETON (Issue #5)
-# ============================================
+# LEARNING OWNER COMPATIBILITY ACCESSOR
+# ======================================
 
-_unified_learning_system_lock = threading.Lock()
+def get_unified_learning_system(owner: Optional[Any] = None) -> Optional[Any]:
+    """Return an explicitly injected canonical learning owner; never construct one."""
+    return owner
 
-
-def get_unified_learning_system() -> Optional[Any]:
-    """
-    Get singleton UnifiedLearningSystem instance.
-    
-    PERF FIX Issue #5: The UnifiedLearningSystem was being re-instantiated
-    per request, causing:
-    - "[Ensemble] All weights are zero - using uniform weights" every request
-    - Tool weight adjustments being lost between requests
-    - Learning state not persisting across queries
-    - LearningStatePersistence re-loading from disk repeatedly
-    
-    With the singleton pattern, the learning system:
-    - Initializes once at startup with LearningStatePersistence
-    - Maintains tool weight adjustments across all requests
-    - Ensemble weights persist and accumulate properly
-    - Learning feedback actually improves routing over time
-    
-    Returns:
-        UnifiedLearningSystem instance (singleton), or None if unavailable.
-    """
-    global _unified_learning_system
-    
-    if _unified_learning_system is not None:
-        logger.debug("[Singletons] Returning cached UnifiedLearningSystem")
-        return _unified_learning_system
-    
-    with _unified_learning_system_lock:
-        if _unified_learning_system is not None:
-            return _unified_learning_system
-        
-        logger.info("[Singletons] Creating global UnifiedLearningSystem (ONCE)")
-        try:
-            from vulcan.learning import UnifiedLearningSystem
-            
-            _unified_learning_system = UnifiedLearningSystem()
-            logger.info("[Singletons] ✓ UnifiedLearningSystem created and cached")
-            logger.info("[Singletons] ✓ Tool weights will persist across requests")
-            return _unified_learning_system
-        except ImportError as e:
-            logger.warning(f"[Singletons] UnifiedLearningSystem import failed: {e}")
-            return None
-        except Exception as e:
-            logger.error(f"[Singletons] Failed to create UnifiedLearningSystem: {e}")
-            return None
-
-
-# ============================================
-# EMBEDDING MODEL SINGLETON (Memory Leak Fix)
-# ============================================
-
-_embedding_model_lock = threading.Lock()
-
-
-def get_embedding_model(model_name: str = 'all-MiniLM-L6-v2') -> Optional[Any]:
-    """
-    Get singleton SentenceTransformer embedding model.
-    
-    MEMORY LEAK FIX: The SentenceTransformer model (~300MB+ VRAM) was being
-    loaded 4 separate times across:
-    - semantic_enricher.py
-    - memory_prior.py  
-    - embedding_cache.py
-    - other components
-    
-    This singleton ensures the model is loaded once at startup and shared
-    across all reasoning components, saving ~900MB RAM.
-    
-    Args:
-        model_name: Name of the SentenceTransformer model to load
-                    (default: 'all-MiniLM-L6-v2')
-        
-    Returns:
-        SentenceTransformer model instance (singleton), or None if unavailable.
-    """
-    global _embedding_model
-    
-    if _embedding_model is not None:
-        logger.debug("[Singletons] Returning cached embedding model")
-        return _embedding_model
-    
-    with _embedding_model_lock:
-        if _embedding_model is not None:
-            return _embedding_model
-        
-        logger.info(f"[Singletons] Loading global embedding model '{model_name}' (ONCE)")
-        try:
-            from sentence_transformers import SentenceTransformer
-            _embedding_model = SentenceTransformer(model_name)
-            logger.info("[Singletons] ✓ Embedding model loaded and cached")
-            return _embedding_model
-        except ImportError as e:
-            logger.warning(f"[Singletons] sentence-transformers not available: {e}")
-            return None
-        except Exception as e:
-            logger.error(f"[Singletons] Failed to load embedding model: {e}")
-            return None
-
-
-# ============================================
-# LLM CLIENT SINGLETON (Task 4 Fix)
-# ============================================
-
-_llm_client: Optional[Any] = None
-_llm_client_lock = threading.Lock()
-
-
-def get_llm_client() -> Optional[Any]:
-    """
-    Get the global LLM client singleton.
-    
-    FIX TASK 4: Tools were being initialized with llm=None because the LLM
-    client wasn't available during component initialization. This singleton
-    provides a centralized way to access the LLM client from anywhere.
-    
-    Tries multiple sources:
-    1. Cached singleton
-    2. HybridLLMExecutor's local_llm
-    3. Global GraphixVulcanLLM instance
-    
-    Returns:
-        LLM client instance, or None if unavailable.
-    """
-    global _llm_client
-    
-    if _llm_client is not None:
-        return _llm_client
-    
-    with _llm_client_lock:
-        if _llm_client is not None:
-            return _llm_client
-        
-        # Try HybridLLMExecutor first
-        try:
-            from vulcan.llm import get_hybrid_executor
-            hybrid_executor = get_hybrid_executor()
-            if hybrid_executor is not None:
-                client = getattr(hybrid_executor, 'local_llm', None)
-                if client is not None:
-                    _llm_client = client
-                    logger.info("[Singletons] ✓ LLM client obtained from HybridLLMExecutor")
-                    return _llm_client
-        except ImportError:
-            pass
-        except Exception as e:
-            logger.debug(f"[Singletons] Failed to get LLM from hybrid executor: {e}")
-        
-        # Try global GraphixVulcanLLM singleton getter if available
-        try:
-            from vulcan.llm import GraphixVulcanLLM
-            # Try to use a public singleton getter if available
-            if hasattr(GraphixVulcanLLM, 'get_instance'):
-                instance = GraphixVulcanLLM.get_instance()
-                if instance is not None:
-                    _llm_client = instance
-                    logger.info("[Singletons] ✓ LLM client obtained from GraphixVulcanLLM.get_instance()")
-                    return _llm_client
-            # Fallback: Try to get from module-level singleton registry
-            # Note: Accessing internal attributes is not ideal but may be necessary
-            # for backward compatibility with existing code patterns
-            elif hasattr(GraphixVulcanLLM, 'default_instance'):
-                instance = GraphixVulcanLLM.default_instance
-                if instance is not None:
-                    _llm_client = instance
-                    logger.info("[Singletons] ✓ LLM client obtained from GraphixVulcanLLM.default_instance")
-                    return _llm_client
-        except ImportError:
-            pass
-        except Exception as e:
-            logger.debug(f"[Singletons] Failed to get GraphixVulcanLLM: {e}")
-        
-        logger.debug("[Singletons] LLM client not available yet")
-        return None
-
-
-def set_llm_client(client: Any) -> None:
-    """
-    Set the global LLM client singleton.
-    
-    This should be called during app initialization to make the LLM client
-    available to all reasoning components.
-    
-    Args:
-        client: The LLM client instance to set as the global singleton.
-    """
-    global _llm_client
-    with _llm_client_lock:
-        _llm_client = client
-        logger.info("[Singletons] ✓ LLM client registered")
-
-
-# ============================================
-# LEGACY COMPATIBILITY FUNCTION
-# ============================================
 
 # Module-level constant registry for efficient singleton dispatch
 # CODE REVIEW FIX: Moved from function body to module level to avoid recreating

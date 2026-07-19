@@ -1,3 +1,5 @@
+> Capability status notice: this historical README is not an active capability list. Use `docs/learning_capability_matrix.md` and `LearningOwner.capability_matrix()` for current proof-driven status. Unsupported algorithms such as MAML, PROTO, PPO, PackNet, progressive learning, RLHF, and world-model planning are unavailable or experimental unless the matrix says otherwise.
+
 VULCAN-AMI Learning Module
 Overview
 The Learning Module in VULCAN-AMI provides a unified framework for advanced learning paradigms, integrating continual learning, curriculum progression, meta-learning, reinforcement learning from human feedback (RLHF), world modeling, metacognition, and parameter auditing. It enables AI systems to learn continuously from experiences, adapt to new tasks, self-improve through reflection, plan actions via predictive models, and incorporate human preferences—all while maintaining audit trails for transparency and safety.
@@ -6,7 +8,7 @@ Key Features
 
 Continual Learning: Handles catastrophic forgetting via Elastic Weight Consolidation (EWC), experience replay, progressive networks, and hierarchical memory.
 Curriculum Learning: Adaptive difficulty progression with pacing strategies (e.g., threshold-based, self-paced) and learned difficulty estimation.
-Meta-Learning: Fast adaptation to new tasks using algorithms like MAML, Reptile, and Prototypical Networks, with automatic task detection.
+Meta-learning: historical interface; FOMAML is experimental and MAML/PROTO are unavailable unless separately proven.
 RLHF: Incorporates human feedback through PPO optimization, reward modeling, and live processing of ratings/preferences.
 World Modeling: Predicts dynamics, rewards, and uncertainties for planning (e.g., MCTS, beam search) in simulated environments.
 Metacognition: Monitors reasoning quality, detects weaknesses, and suggests self-improvements; includes compositional concept understanding.
@@ -190,7 +192,7 @@ consolidation_threshold: Steps before EWC consolidation (default: 100)
 Algorithm Selection
 Choose via enums:
 
-MetaLearningAlgorithm.MAML, .FOMAML, .REPTILE, .ANIL
+MetaLearningAlgorithm values are retained for compatibility; only FOMAML is experimental, while MAML/PROTO are unavailable.
 PlanningAlgorithm.MCTS, .CEM, .MPPI, .BEAM_SEARCH, .GREEDY
 PacingStrategy.THRESHOLD, .ADAPTIVE, .SELF_PACED, .FIXED, .EXPONENTIAL
 

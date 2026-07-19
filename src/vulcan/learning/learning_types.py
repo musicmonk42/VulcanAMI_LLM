@@ -7,7 +7,10 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-import numpy as np
+try:
+    import numpy as np
+except ImportError:  # dependency-light owner imports must not require NumPy
+    np = None
 
 
 # ============================================================

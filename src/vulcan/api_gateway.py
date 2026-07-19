@@ -2173,41 +2173,23 @@ class APIGateway:
             )
 
     async def learn(self, request):
-        """Learning endpoint."""
-        try:
-            data = await request.json()
-        except json.JSONDecodeError:
-            return web.json_response({"error": "Invalid JSON"}, status=400)
+        """Learning endpoint.
 
-        experience = data.get("experience")
-
-        if not experience:
-            return web.json_response({"error": "Experience data required"}, status=400)
-
-        try:
-            learner = self.deployment.collective.deps.continual
-
-            if learner is None:
-                return web.json_response(
-                    {"error": "Learner not available", "status": "not_initialized"},
-                    status=503,
-                )
-
-            result = learner.process_experience(experience)
-
-            return web.json_response(
-                {
-                    "adapted": result.get("adapted", False),
-                    "loss": result.get("loss", 0),
-                    "metadata": result,
+        Online learning is intentionally fail-closed until verification gates prove
+        the runtime learning path is safe and correct.  This handler returns before
+        reading the request body or resolving any learner so malformed payloads and
+        authorized adversarial requests cannot mutate learning state.
+        """
+        return web.json_response(
+            {
+                "error": {
+                    "code": "learning_not_implemented",
+                    "message": "Online learning is disabled until verification gates pass.",
                 }
-            )
-
-        except Exception as e:
-            logger.error(f"Learning failed: {e}\n{traceback.format_exc()}")
-            return web.json_response(
-                {"error": "Learning failed", "message": str(e)}, status=500
-            )
+            },
+            status=501,
+            headers={"Cache-Control": "no-store"},
+        )
 
     async def reason(self, request):
         """Reasoning endpoint."""
