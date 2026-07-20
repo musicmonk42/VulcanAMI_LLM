@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vulcan.example/schemas/graphix/epistemic-v1.json",
+  "title": "Graphix Epistemic v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "commit_id", "episode_id", "case_id", "snapshot_digest", "authority_principal_id", "committed_at", "claims", "evidence", "derivations", "prior_commit_digest", "commit_digest"],
+  "properties": {
+    "schema_version": {"const": "graphix.epistemic/1"},
+    "commit_id": {"$ref": "#/$defs/id"},
+    "episode_id": {"$ref": "#/$defs/id"},
+    "case_id": {"$ref": "#/$defs/id"},
+    "snapshot_digest": {"$ref": "#/$defs/digest"},
+    "authority_principal_id": {"$ref": "#/$defs/id"},
+    "committed_at": {"type": "string", "format": "date-time"},
+    "prior_commit_digest": {"anyOf": [{"$ref": "#/$defs/digest"}, {"type": "null"}]},
+    "commit_digest": {"$ref": "#/$defs/digest"},
+    "claims": {"type": "array", "minItems": 1, "maxItems": 32, "items": {"$ref": "#/$defs/claim"}},
+    "evidence": {"type": "array", "maxItems": 32, "items": {"$ref": "#/$defs/evidence"}},
+    "derivations": {"type": "array", "maxItems": 32, "items": {"$ref": "#/$defs/derivation"}}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{2,127}$"},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "status": {"enum": ["PROVEN", "DISPROVEN", "COMPUTED", "OBSERVED", "RETRIEVED", "ESTIMATED", "HYPOTHESIS", "CONTESTED", "UNKNOWN", "ERROR"]},
+    "evidence_kind": {"enum": ["PROOF", "OBSERVATION", "RETRIEVAL", "COMPUTATION", "CITATION", "COUNTEREXAMPLE"]},
+    "claim": {"type": "object", "additionalProperties": false, "required": ["claim_id", "proposition_id", "status", "episode_id", "snapshot_digest", "evidence_ids", "derivation_ids", "contested_by"], "properties": {"claim_id": {"$ref": "#/$defs/id"}, "proposition_id": {"$ref": "#/$defs/id"}, "status": {"$ref": "#/$defs/status"}, "episode_id": {"$ref": "#/$defs/id"}, "snapshot_digest": {"$ref": "#/$defs/digest"}, "evidence_ids": {"type": "array", "maxItems": 32, "items": {"$ref": "#/$defs/id"}}, "derivation_ids": {"type": "array", "maxItems": 32, "items": {"$ref": "#/$defs/id"}}, "contested_by": {"type": "array", "maxItems": 32, "items": {"$ref": "#/$defs/id"}}}},
+    "evidence": {"type": "object", "additionalProperties": false, "required": ["evidence_id", "kind", "episode_id", "snapshot_digest", "content_digest", "provenance_id", "observed_at", "valid_until", "citations", "source_episode_id"], "properties": {"evidence_id": {"$ref": "#/$defs/id"}, "kind": {"$ref": "#/$defs/evidence_kind"}, "episode_id": {"$ref": "#/$defs/id"}, "snapshot_digest": {"$ref": "#/$defs/digest"}, "content_digest": {"$ref": "#/$defs/digest"}, "provenance_id": {"$ref": "#/$defs/id"}, "observed_at": {"type": "string", "format": "date-time"}, "valid_until": {"anyOf": [{"type": "string", "format": "date-time"}, {"type": "null"}]}, "citations": {"type": "array", "maxItems": 32, "items": {"$ref": "#/$defs/id"}}, "source_episode_id": {"anyOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]}}},
+    "derivation": {"type": "object", "additionalProperties": false, "required": ["derivation_id", "input_claim_ids", "evidence_ids", "rule_id", "output_claim_id"], "properties": {"derivation_id": {"$ref": "#/$defs/id"}, "input_claim_ids": {"type": "array", "maxItems": 32, "items": {"$ref": "#/$defs/id"}}, "evidence_ids": {"type": "array", "maxItems": 32, "items": {"$ref": "#/$defs/id"}}, "rule_id": {"$ref": "#/$defs/id"}, "output_claim_id": {"$ref": "#/$defs/id"}}}
+  }
+}
