@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vulcan.example/schemas/graphix/language-v1.json",
+  "title": "Graphix Language v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "utterance", "candidates"],
+  "properties": {
+    "schema_version": {"const": "graphix.language/1"},
+    "utterance": {"$ref": "#/$defs/utterance_ref"},
+    "candidates": {"type": "array", "minItems": 1, "maxItems": 8, "items": {"$ref": "#/$defs/candidate"}},
+    "ambiguity_spans": {"type": "array", "maxItems": 32, "items": {"$ref": "#/$defs/span"}},
+    "unresolved_dimensions": {"type": "array", "maxItems": 32, "items": {"type": "string", "minLength": 1, "maxLength": 128}}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "privacy": {"enum": ["PUBLIC", "INTERNAL", "PERSONAL", "SENSITIVE_PERSONAL", "SECRET"]},
+    "utterance_ref": {
+      "type": "object", "additionalProperties": false,
+      "required": ["utterance_id", "normalized_text", "digest", "locale", "normalization", "privacy_label"],
+      "properties": {
+        "utterance_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{2,127}$"},
+        "normalized_text": {"type": "string", "minLength": 1, "maxLength": 10000},
+        "digest": {"$ref": "#/$defs/digest"},
+        "locale": {"type": "string", "pattern": "^[A-Za-z0-9_-]{2,35}$"},
+        "normalization": {"const": "NFC"},
+        "privacy_label": {"$ref": "#/$defs/privacy"}
+      }
+    },
+    "span": {
+      "type": "object", "additionalProperties": false,
+      "required": ["utterance_id", "start", "end", "normalized_text", "privacy_label", "unit"],
+      "properties": {
+        "utterance_id": {"type": "string"}, "start": {"type": "integer", "minimum": 0}, "end": {"type": "integer", "minimum": 1},
+        "normalized_text": {"type": "string", "minLength": 1, "maxLength": 10000},
+        "privacy_label": {"$ref": "#/$defs/privacy"}, "unit": {"const": "unicode-codepoint"}
+      }
+    },
+    "grounded_value": {
+      "type": "object", "additionalProperties": false,
+      "required": ["value"],
+      "properties": {
+        "value": {"type": "string", "minLength": 1, "maxLength": 10000},
+        "source_spans": {"type": "array", "maxItems": 32, "items": {"$ref": "#/$defs/span"}},
+        "external_sources": {"type": "array", "maxItems": 32}
+      },
+      "anyOf": [{"required": ["source_spans"]}, {"required": ["external_sources"]}]
+    },
+    "dialogue_act": {"type": "object", "additionalProperties": false, "required": ["kind", "span", "polarity"], "properties": {"kind": {"enum": ["ASK", "REQUEST", "INFORM", "CLARIFY", "CORRECT", "REFUSE", "OTHER"]}, "span": {"$ref": "#/$defs/span"}, "polarity": {"enum": ["affirmed", "negated", "uncertain"]}}},
+    "frame": {"type": "object", "additionalProperties": false, "required": ["frame_type", "predicate", "participants", "negated", "modality", "quantities", "temporal_expressions"], "properties": {"frame_type": {"type": "string"}, "predicate": {"$ref": "#/$defs/grounded_value"}, "participants": {"type": "object", "additionalProperties": {"$ref": "#/$defs/grounded_value"}}, "negated": {"type": "boolean"}, "modality": {"enum": ["ASSERTIVE", "QUESTION", "REQUEST", "POSSIBLE", "REQUIRED", "PROHIBITED", "PREFERRED"]}, "quantities": {"type": "array", "items": {"$ref": "#/$defs/grounded_value"}}, "temporal_expressions": {"type": "array", "items": {"$ref": "#/$defs/grounded_value"}}}},
+    "candidate": {"type": "object", "additionalProperties": false, "required": ["candidate_id", "dialogue_acts", "entity_mentions", "frames"], "properties": {"candidate_id": {"type": "string"}, "dialogue_acts": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/dialogue_act"}}, "entity_mentions": {"type": "array", "maxItems": 32}, "frames": {"type": "array", "maxItems": 16, "items": {"$ref": "#/$defs/frame"}}, "confidence": {"type": ["number", "null"], "minimum": 0, "maximum": 1}}}
+  }
+}
