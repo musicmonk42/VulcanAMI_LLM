@@ -1,0 +1,1 @@
+"""Persistence protocols and primitives."""

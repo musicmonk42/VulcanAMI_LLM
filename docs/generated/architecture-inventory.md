@@ -1,6 +1,6 @@
 # Generated architecture inventory
 
-Digest: `3d3845e97a17464c96d6c3921a71c9cd0e4a9fdd3ef63927d6792589e091cd4c`
+Digest: `d96637cab34e1f0d68655a0161739a7932fa2c983795f9f966e4f4d4714fc05a`
 
 This file is generated from `docs/generated/architecture-inventory.json`.
 
@@ -118,7 +118,7 @@ Count: 425
 
 ## Import Identities
 
-Count: 1665
+Count: 1668
 
 - `tests/security/test_output_firewall.py:1` module='vulcan.runtime.output', reachability='test-only'
 - `tests/test_probabilistic_routing.py:10` module='src.vulcan.reasoning.probabilistic_reasoning', reachability='test-only'
@@ -170,7 +170,7 @@ Count: 1665
 - `src/vulcan/utils_main/__init__.py:104` module='vulcan.utils_main.network', reachability='unknown'
 - `src/vulcan/reasoning/singletons.py:1042` module='vulcan.reasoning.multimodal_reasoning', reachability='unknown'
 - `src/vulcan/orchestrator/dependencies.py:1044` module='vulcan.learning.continual_learning', reachability='unknown'
-- ... 1615 more in JSON
+- ... 1618 more in JSON
 
 ## Singletons
 
@@ -363,7 +363,7 @@ Count: 400
 
 ## Persistence
 
-Count: 303
+Count: 304
 
 - `src/platform/background.py:108` kind='call', reachability='unknown', value='fcntl.flock'
 - `src/adversarial_tester.py:1109` kind='call', reachability='unknown', value='sqlite3.connect'
@@ -415,7 +415,7 @@ Count: 303
 - `tests/security/test_phase7_auth_outbox.py:57` kind='call', reachability='test-only', value='SQLiteMemoryRepository'
 - `src/api_server.py:576` kind='call', reachability='unknown', value='sqlite3.connect'
 - `src/nso_aligner.py:623` kind='call', reachability='unknown', value='sqlite3.connect'
-- ... 253 more in JSON
+- ... 254 more in JSON
 
 ## Environment Readers
 
