@@ -7418,9 +7418,9 @@ tensorboardx==2.6.4 \
     --hash=sha256:5970cf3a1f0a6a6e8b180ccf46f3fe832b8a25a70b86e5a237048a7c0beb18e2 \
     --hash=sha256:b163ccb7798b31100b9f5fa4d6bc22dad362d7065c2f24b51e50731adde86828
     # via -r requirements.txt
-termcolor==3.1.0 \
-    --hash=sha256:591dd26b5c2ce03b9e43f391264626557873ce1d379019786f99b0c2bee140aa \
-    --hash=sha256:6a6dd7fbee581909eeec6a756cff1d7f7c376063b14e4a298dc4980309e55970
+termcolor==3.3.0 \
+    --hash=sha256:348871ca648ec6a9a983a13ab626c0acce02f515b9e1983332b17af7979521c5 \
+    --hash=sha256:cf642efadaf0a8ebbbf4bc7a31cec2f9b5f21a9f726f4ccbb08192c9c26f43a5
     # via -r requirements.txt
 thinc==8.3.10 \
     --hash=sha256:026999d749075c890fbb1df47d75389a81b712afccea519a5c7bb86783d0cd73 \
