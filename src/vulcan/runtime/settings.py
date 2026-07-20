@@ -133,7 +133,13 @@ def _secret(value:str|None, name:str, *, required:bool)->OpaqueSecret|None:
     if value is None:
         if required: raise SettingsError(f"{name} is required")
         return None
-    if len(value.encode())<32 or value.lower() in {"changeme","secret","password","dev-secret-change-me"}: raise SettingsError(f"weak secret for {name}")
+    if len(value.encode())<32 or _CTL.search(value): raise SettingsError(f"weak secret for {name}")
+    lower=value.lower()
+    weak={"changeme","secret","password","admin","super-secret-key","insecure-dev-secret","default-super-secret-key-change-me","dev-secret-change-me"}
+    if lower in weak or any(x in lower for x in ("123456","password","qwerty","letmein","jwtsecret","graphixsecret","change-in-production")):
+        raise SettingsError(f"weak secret for {name}")
+    classes=sum([any(c.islower() for c in value), any(c.isupper() for c in value), any(c.isdigit() for c in value), any(not c.isalnum() for c in value)])
+    if len(set(value)) < 12 and classes < 3: raise SettingsError(f"weak secret for {name}")
     return OpaqueSecret(SecretSource.direct, value, name)
 
 def load_runtime_settings(env:Mapping[str,str]|None=None)->RuntimeSettings:

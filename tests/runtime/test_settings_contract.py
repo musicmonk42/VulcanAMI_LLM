@@ -6,8 +6,8 @@ import pytest
 
 from vulcan.runtime.settings import RuntimeSettings, SettingsError, generate_settings_schema, load_runtime_settings
 
-SECRET = "x" * 40
-APPROVAL = "y" * 40
+SECRET = "AbCdEfGhIjKlMnOpQrStUvWxYz7890+/safe"
+APPROVAL = "YnOpQrStUvWxAbCdEfGhIjKlM7890+/approval"
 
 def env(tmp_path: Path, **overrides: str) -> dict[str, str]:
     base = {

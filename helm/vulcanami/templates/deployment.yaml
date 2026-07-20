@@ -95,7 +95,7 @@ spec:
           valueFrom:
             secretKeyRef:
               name: {{ include "vulcanami.fullname" . }}-secrets
-              key: jwtSecretKey
+              key: vulcanJwtSecret
         - name: VULCAN_ENV
           value: {{ .Values.runtime.environment | quote }}
         - name: VULCAN_JWT_ISSUER

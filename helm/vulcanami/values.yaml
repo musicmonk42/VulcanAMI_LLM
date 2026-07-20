@@ -431,7 +431,7 @@ persistence:
 # Secrets (REQUIRED: Must be set via --set-string or external secret management)
 # Empty values will cause deployment validation to fail
 secrets:
-  jwtSecretKey: ""  # REQUIRED
+  vulcanJwtSecret: ""  # REQUIRED
   bootstrapKey: ""  # REQUIRED
   postgresPassword: ""  # REQUIRED
   redisPassword: ""  # REQUIRED
