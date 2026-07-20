@@ -630,3 +630,8 @@ Count: 281
 - `helm/vulcanami/values.yaml:23` # To get the digest of an image:
 - `helm/vulcanami/values.yaml:117` livenessProbe:
 - `helm/vulcanami/values.yaml:126` readinessProbe:
+
+## P22 governed memory transactional outbox
+
+- `src/vulcan/memory/governed.py:` owner_domain='memory', authority='sqlite-heads', transaction_boundary='revision+head+idempotency+journal+outbox before audit delivery'
+- `src/vulcan/memory/outbox.py:` owner_domain='memory', authority='deterministic audit event id adapter', delivery='at-least-once with duplicate terminal as idempotent success'
