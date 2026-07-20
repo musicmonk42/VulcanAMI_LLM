@@ -1,12 +1,12 @@
 # Generated architecture inventory
 
-Digest: `bf2bb3e865b2a37f186025e3dff7f12a699d5c86cf197a4bf151eb82e0154d7c`
+Digest: `9bfa5043f83bd95d2ec7bd05b2037fe1fc9261d2b07532c227c09f49eba7e48f`
 
 This file is generated from `docs/generated/architecture-inventory.json`.
 
 ## Entrypoints
 
-Count: 404
+Count: 405
 
 - `src/vulcan/tests/test_multimodal_reasoning.py:999` kind='python_main_guard', reachability='test-only'
 - `src/vulcan/tests/test_curiosity_engine_integration.py:1000` kind='python_main_guard', reachability='test-only'
@@ -58,7 +58,7 @@ Count: 404
 - `src/vulcan/tests/test_principle_learner.py:1163` kind='python_main_guard', reachability='test-only'
 - `src/vulcan/tests/test_dynamics_model.py:1169` kind='python_main_guard', reachability='test-only'
 - `src/vulcan/tests/test_prediction_engine.py:1172` kind='python_main_guard', reachability='test-only'
-- ... 354 more in JSON
+- ... 355 more in JSON
 
 ## Routes
 
@@ -118,7 +118,7 @@ Count: 425
 
 ## Import Identities
 
-Count: 1693
+Count: 1719
 
 - `tests/security/test_output_firewall.py:1` module='vulcan.runtime.output', reachability='test-only'
 - `tests/test_probabilistic_routing.py:10` module='src.vulcan.reasoning.probabilistic_reasoning', reachability='test-only'
@@ -126,6 +126,7 @@ Count: 1693
 - `tests/assurance/test_capability_registry.py:10` module='vulcan.assurance.capabilities', reachability='test-only'
 - `tests/core/test_core_primitives.py:10` module='vulcan.core.decisions', reachability='test-only'
 - `src/vulcan/endpoints/__init__.py:10` module='vulcan.endpoints.distillation', reachability='unknown'
+- `tests/graphix/test_core.py:10` module='vulcan.graphix.codec', reachability='test-only'
 - `tests/test_progressive_research.py:10` module='vulcan.learning_owner', reachability='test-only'
 - `tests/test_world_model_research.py:10` module='vulcan.learning_owner', reachability='test-only'
 - `tests/security/test_local_language_governance.py:10` module='vulcan.local_language.tokenizer', reachability='test-only'
@@ -169,8 +170,7 @@ Count: 1693
 - `src/vulcan/api_gateway.py:104` module='vulcan.planning', reachability='unknown'
 - `src/api_server.py:104` module='vulcan.reasoning.reasoning_types', reachability='unknown'
 - `src/vulcan/utils_main/__init__.py:104` module='vulcan.utils_main.network', reachability='unknown'
-- `src/vulcan/reasoning/singletons.py:1042` module='vulcan.reasoning.multimodal_reasoning', reachability='unknown'
-- ... 1643 more in JSON
+- ... 1669 more in JSON
 
 ## Singletons
 
@@ -363,7 +363,7 @@ Count: 400
 
 ## Persistence
 
-Count: 334
+Count: 340
 
 - `tests/persistence/test_memory_outbox_v2.py:103` kind='call', reachability='test-only', value='SQLiteMemoryRepository'
 - `src/vulcan/runtime/alignment.py:107` kind='call', reachability='production-reachable', value='fcntl.flock'
@@ -374,12 +374,16 @@ Count: 334
 - `src/vulcan/safety/adversarial_integration.py:1166` kind='call', reachability='unknown', value='sqlite3.connect'
 - `src/vulcan/safety/rollback_audit.py:1230` kind='call', reachability='unknown', value='sqlite3.connect'
 - `tests/test_learning_outbox.py:125` kind='call', reachability='test-only', value='sqlite3.connect'
+- `tests/faults/persistence/test_persistence_fault_matrix.py:128` kind='call', reachability='test-only', value='SQLiteMemoryRepository'
 - `tests/security/test_governed_memory.py:13` kind='call', reachability='test-only', value='SQLiteMemoryRepository'
 - `src/vulcan/knowledge_crystallizer/knowledge_storage.py:1301` kind='call', reachability='unknown', value='self._load_from_sqlite'
 - `src/vulcan/knowledge_crystallizer/knowledge_storage.py:1311` kind='call', reachability='unknown', value='self._init_sqlite'
 - `src/vulcan/knowledge_crystallizer/knowledge_storage.py:1315` kind='call', reachability='unknown', value='self._init_sqlite'
+- `tests/faults/persistence/test_persistence_fault_matrix.py:132` kind='call', reachability='test-only', value='sqlite3.connect'
 - `src/vulcan/knowledge_crystallizer/knowledge_storage.py:1325` kind='call', reachability='unknown', value='sqlite3.connect'
 - `src/vulcan/runtime/audit.py:134` kind='call', reachability='production-reachable', value='fcntl.flock'
+- `tests/faults/persistence/test_persistence_fault_matrix.py:134` kind='call', reachability='test-only', value='SQLiteMemoryRepository'
+- `tests/faults/persistence/test_persistence_fault_matrix.py:136` kind='call', reachability='test-only', value='sqlite3.connect'
 - `src/listener.py:138` kind='call', reachability='unknown', value='sqlite3.connect'
 - `src/adversarial_tester.py:158` kind='call', reachability='unknown', value='sqlite3.connect'
 - `tests/security/test_governed_memory_architecture.py:17` kind='call', reachability='test-only', value='SQLiteMemoryRepository'
@@ -411,11 +415,7 @@ Count: 334
 - `src/governance/registry_api_server.py:344` kind='call', reachability='unknown', value='sqlite3.connect'
 - `tests/persistence/test_memory_outbox_v2.py:37` kind='call', reachability='test-only', value='sqlite3.connect'
 - `tests/test_adversarial_tester.py:379` kind='call', reachability='test-only', value='sqlite3.connect'
-- `src/listener.py:390` kind='call', reachability='unknown', value='sqlite3.connect'
-- `src/api_server.py:396` kind='call', reachability='unknown', value='sqlite3.connect'
-- `tests/persistence/test_memory_outbox_v2.py:44` kind='call', reachability='test-only', value='SQLiteMemoryRepository'
-- `src/vulcan/memory/governed.py:444` kind='call', reachability='unknown', value='fcntl.flock'
-- ... 284 more in JSON
+- ... 290 more in JSON
 
 ## Environment Readers
 
