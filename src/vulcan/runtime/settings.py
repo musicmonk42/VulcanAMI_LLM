@@ -1,7 +1,7 @@
 """One immutable authority for canonical runtime process settings."""
 from __future__ import annotations
 
-import json, os, re
+import errno, json, os, re, stat, tempfile
 from dataclasses import dataclass, field, fields, is_dataclass
 from enum import Enum
 from pathlib import Path
@@ -26,12 +26,29 @@ class OpaqueSecret:
     def to_public(self)->dict[str,str]: return {"source": self.source.value, "env_name": self.env_name, "redacted": "true"}
 
 @dataclass(frozen=True)
+class DurableRootPaths:
+    audit: Path
+    alignment: Path
+    domains: Path
+    governed_memory: Path
+    learning_outbox: Path
+    csiu: Path
+    approval: Path
+    improvement: Path
+
+@dataclass(frozen=True)
+class DurableRootValidation:
+    category: str
+    public_message: str
+
+@dataclass(frozen=True)
 class RuntimeSettings:
     environment: VulcanEnvironment
     jwt_issuer: str
     jwt_audience: str
     jwt_secret: OpaqueSecret = field(repr=False)
     durable_root: Path
+    durable_paths: DurableRootPaths
     language_mode: LanguageMode = LanguageMode.deterministic_only
     language_release_path: Path|None = None
     openai_enabled: bool = False
@@ -122,11 +139,12 @@ def _path(v:str|None, name:str, required:bool)->Path|None:
     p=Path(v)
     if not p.is_absolute(): raise SettingsError(f"{name} must be absolute")
     r=p.resolve(strict=False); repo=Path(__file__).resolve().parents[3]
-    if r in {Path('/'),Path('/tmp'),Path.home(),repo.resolve()} or str(r).startswith(str(repo.resolve())+os.sep): raise SettingsError(f"unsafe {name}")
     cur=Path('/')
-    for part in r.parts[1:]:
+    for part in p.parts[1:]:
         cur=cur/part
         if cur.exists() and cur.is_symlink(): raise SettingsError(f"symlinked {name}")
+    tmp=Path(tempfile.gettempdir()).resolve()
+    if r in {Path('/'),tmp,Path.home(),repo.resolve()} or str(r).startswith(str(repo.resolve())+os.sep): raise SettingsError(f"unsafe {name}")
     return r
 
 def _secret(value:str|None, name:str, *, required:bool)->OpaqueSecret|None:
@@ -141,6 +159,59 @@ def _secret(value:str|None, name:str, *, required:bool)->OpaqueSecret|None:
     classes=sum([any(c.islower() for c in value), any(c.isupper() for c in value), any(c.isdigit() for c in value), any(not c.isalnum() for c in value)])
     if len(set(value)) < 12 and classes < 3: raise SettingsError(f"weak secret for {name}")
     return OpaqueSecret(SecretSource.direct, value, name)
+
+def durable_root_paths(root: Path) -> DurableRootPaths:
+    root = root.resolve(strict=False)
+    return DurableRootPaths(
+        audit=root/"audit",
+        alignment=root/"alignment",
+        domains=root/"domains",
+        governed_memory=root/"memory",
+        learning_outbox=root/"learning"/"outbox",
+        csiu=root/"csiu",
+        approval=root/"approval",
+        improvement=root/"improvement",
+    )
+
+def validate_durable_root(root: Path, *, expected_uid: int|None=None, expected_gid: int|None=None) -> DurableRootValidation:
+    try:
+        resolved = _path(str(root), "VULCAN_RUNTIME_DURABLE_ROOT", True)
+        if resolved is None: return DurableRootValidation("missing", "durable root validation failed: missing")
+        resolved.mkdir(mode=0o700, parents=True, exist_ok=True)
+        st = resolved.stat()
+        if stat.S_IMODE(st.st_mode) & 0o077:
+            return DurableRootValidation("insecure_permissions", "durable root validation failed: permissions")
+        if expected_uid is not None and st.st_uid != expected_uid:
+            return DurableRootValidation("owner_mismatch", "durable root validation failed: owner")
+        if expected_gid is not None and st.st_gid != expected_gid:
+            return DurableRootValidation("owner_mismatch", "durable root validation failed: owner")
+        for directory in durable_root_paths(resolved).__dict__.values():
+            directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+        probe = resolved/".fsync-probe"
+        flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+        fd = os.open(probe, flags, 0o600)
+        try:
+            os.write(fd, b"vulcan-durable-root-probe\n")
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+        dir_fd = os.open(resolved, os.O_RDONLY)
+        try:
+            os.fsync(dir_fd)
+        finally:
+            os.close(dir_fd)
+        probe.unlink(missing_ok=True)
+        return DurableRootValidation("ok", "durable root validation ok")
+    except PermissionError:
+        return DurableRootValidation("not_writable", "durable root validation failed: writable")
+    except OSError as exc:
+        if exc.errno in (errno.EROFS, errno.EACCES, errno.EPERM):
+            return DurableRootValidation("not_writable", "durable root validation failed: writable")
+        return DurableRootValidation("fsync_unavailable", "durable root validation failed: fsync")
+    except SettingsError as exc:
+        text=str(exc)
+        category="unsafe_path" if "unsafe" in text or "symlinked" in text else "invalid_path"
+        return DurableRootValidation(category, f"durable root validation failed: {category}")
 
 def load_runtime_settings(env:Mapping[str,str]|None=None)->RuntimeSettings:
     env=dict(os.environ if env is None else env); warnings=[]
@@ -159,8 +230,11 @@ def load_runtime_settings(env:Mapping[str,str]|None=None)->RuntimeSettings:
     if self_imp and approval is None: raise SettingsError("self-improvement requires approval HMAC secret")
     mem_enabled=_bool(get("VULCAN_MEMORY_ENABLED"),"VULCAN_MEMORY_ENABLED",True)
     mem_backend=MemoryBackend(_text(get("VULCAN_MEMORY_BACKEND"),"VULCAN_MEMORY_BACKEND","sqlite" if mem_enabled else "disabled"))
-    mem_path=_path(get("VULCAN_MEMORY_SQLITE_PATH") or (str(durable/"memory"/"memory.sqlite") if mem_enabled else None),"VULCAN_MEMORY_SQLITE_PATH", mem_enabled)
-    return RuntimeSettings(environment,_text(get("VULCAN_JWT_ISSUER"),"VULCAN_JWT_ISSUER","vulcan"),_text(get("VULCAN_JWT_AUDIENCE"),"VULCAN_JWT_AUDIENCE","vulcan-runtime"),jwt,durable,lang,release,get("OPENAI_API_KEY") is not None,get("ANTHROPIC_API_KEY") is not None,mem_enabled,mem_backend,mem_path,_bool(get("VULCAN_AUDIT_ENABLED"),"VULCAN_AUDIT_ENABLED",True),csiu,_bool(get("VULCAN_LEARNING_ENABLED"),"VULCAN_LEARNING_ENABLED",True),self_imp,approval,replicas,_float(get("VULCAN_REQUEST_TIMEOUT_SECONDS"),"VULCAN_REQUEST_TIMEOUT_SECONDS",30.0,0.1,300.0),_bool(get("VULCAN_PUBLIC_DIAGNOSTICS"),"VULCAN_PUBLIC_DIAGNOSTICS",False),tuple(warnings[:16]))
+    paths=durable_root_paths(durable)
+    mem_path=_path(get("VULCAN_MEMORY_SQLITE_PATH") or (str(paths.governed_memory/"memory.sqlite") if mem_enabled else None),"VULCAN_MEMORY_SQLITE_PATH", mem_enabled)
+    validation=validate_durable_root(durable)
+    if environment is VulcanEnvironment.production and validation.category != "ok": raise SettingsError(validation.public_message)
+    return RuntimeSettings(environment,_text(get("VULCAN_JWT_ISSUER"),"VULCAN_JWT_ISSUER","vulcan"),_text(get("VULCAN_JWT_AUDIENCE"),"VULCAN_JWT_AUDIENCE","vulcan-runtime"),jwt,durable,paths,lang,release,get("OPENAI_API_KEY") is not None,get("ANTHROPIC_API_KEY") is not None,mem_enabled,mem_backend,mem_path,_bool(get("VULCAN_AUDIT_ENABLED"),"VULCAN_AUDIT_ENABLED",True),csiu,_bool(get("VULCAN_LEARNING_ENABLED"),"VULCAN_LEARNING_ENABLED",True),self_imp,approval,replicas,_float(get("VULCAN_REQUEST_TIMEOUT_SECONDS"),"VULCAN_REQUEST_TIMEOUT_SECONDS",30.0,0.1,300.0),_bool(get("VULCAN_PUBLIC_DIAGNOSTICS"),"VULCAN_PUBLIC_DIAGNOSTICS",False),tuple(warnings[:16]))
 
 def _public(v):
     if isinstance(v,OpaqueSecret): return v.to_public()

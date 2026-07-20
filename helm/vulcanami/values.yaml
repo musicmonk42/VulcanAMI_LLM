@@ -36,7 +36,7 @@ runtime:
   environment: production
   jwtIssuer: vulcan
   jwtAudience: vulcan-runtime
-  durableRoot: /var/lib/vulcan/runtime
+  durableRoot: /var/lib/vulcan
   languageMode: deterministic_only
   auditEnabled: true
   csiuEnabled: true
@@ -176,8 +176,8 @@ config:
 # supplies a single-writer PVC-backed root and an absolute database path.
 governedMemory:
   enabled: false
-  durableRoot: /var/lib/vulcan-governed-memory
-  sqlitePath: /var/lib/vulcan-governed-memory/preferences.sqlite
+  durableRoot: /var/lib/vulcan
+  sqlitePath: /var/lib/vulcan/memory/memory.sqlite
   replicas: 1
   backend: sqlite
   policyVersion: memory-policy/2
@@ -402,8 +402,8 @@ memorySystem:
     proofSystem: groth16
   # Persistent storage paths
   paths:
-    memoryStore: /app/memory_store
-    cacheRoot: /tmp/vulcan_cache
+    memoryStore: /var/lib/vulcan/memory
+    cacheRoot: /tmp/vulcan-cache
     configPath: /app/configs
   # Learning State Persistence Configuration
   # Persists tool weights, concepts, and contraindications across queries and restarts
@@ -414,19 +414,25 @@ memorySystem:
 
 # Persistent Volume Claims for memory system
 persistence:
-  memoryStore:
+  durableRoot:
     enabled: true
+    storageClass: ""
+    accessMode: ReadWriteOnce
+    size: 50Gi
+    retain: true
+  cache:
+    enabled: false
+    storageClass: ""
+    accessMode: ReadWriteOnce
+    size: 10Gi
+    retain: false
+  memoryStore:
+    enabled: false
     storageClass: ""  # Uses default storage class if empty
     accessMode: ReadWriteOnce
     size: 50Gi
     # Set to true to keep PVC when helm release is deleted
     retain: true
-  cache:
-    enabled: true
-    storageClass: ""
-    accessMode: ReadWriteOnce
-    size: 10Gi
-    retain: false
 
 # Secrets (REQUIRED: Must be set via --set-string or external secret management)
 # Empty values will cause deployment validation to fail

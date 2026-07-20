@@ -264,10 +264,11 @@ COPY --from=builder /app/sbom.json ./sbom.json
 
 # Production runtime immutability: source, bundled policy/config, and model assets are read-only.
 # Only explicit state/cache directories are writable by the non-root runtime user.
-RUN mkdir -p /app/data /app/data/backups /app/memory_store /app/cache /tmp/vulcan /app/models && \
+RUN mkdir -p /var/lib/vulcan/audit /var/lib/vulcan/alignment /var/lib/vulcan/domains /var/lib/vulcan/memory /var/lib/vulcan/learning/outbox /var/lib/vulcan/csiu /var/lib/vulcan/approval /var/lib/vulcan/improvement /app/data /app/data/backups /tmp/vulcan-cache /app/models && \
     chown -R root:root /app/src /app/configs /app/config /app/models && \
     chmod -R a-w /app/src /app/configs /app/config /app/models && \
-    chown -R graphix:graphix /app/data /app/memory_store /app/cache /tmp/vulcan
+    chown -R graphix:graphix /var/lib/vulcan /app/data /tmp/vulcan-cache && \
+    chmod 0700 /var/lib/vulcan /var/lib/vulcan/audit /var/lib/vulcan/alignment /var/lib/vulcan/domains /var/lib/vulcan/memory /var/lib/vulcan/learning /var/lib/vulcan/learning/outbox /var/lib/vulcan/csiu /var/lib/vulcan/approval /var/lib/vulcan/improvement /tmp/vulcan-cache
 
 # Add hardened entrypoint script
 # This updated script enforces:
@@ -286,6 +287,9 @@ ENV PYTHONPATH=/app/src
 ENV VULCAN_ENV=production
 ENV VULCAN_SAFETY_LEVEL=strict
 ENV VULCAN_ENABLE_SELF_IMPROVEMENT=false
+ENV VULCAN_RUNTIME_DURABLE_ROOT=/var/lib/vulcan
+ENV VULCAN_CACHE_ROOT=/tmp/vulcan-cache
+VOLUME ["/var/lib/vulcan"]
 
 # Default port for containerized deployments (can be overridden via PORT env var)
 ENV PORT=8000

@@ -5,6 +5,7 @@ metadata:
   labels:
     {{- include "vulcanami.labels" . | nindent 4 }}
 spec:
+  {{- if and (eq .Values.runtime.environment "production") (or .Values.autoscaling.enabled (ne (int .Values.replicaCount) 1)) }}{{ fail "canonical durable-root sqlite backend requires replicaCount=1 and autoscaling.enabled=false" }}{{ end }}
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
   {{- end }}
@@ -512,6 +513,10 @@ spec:
           mountPath: /tmp
         - name: app-data
           mountPath: /app/data
+        - name: durable-root
+          mountPath: {{ .Values.runtime.durableRoot }}
+        - name: model-cache
+          mountPath: {{ .Values.memorySystem.paths.cacheRoot }}
         # Shared memory for Ray object store (prevents /dev/shm warning)
         - name: dshm
           mountPath: /dev/shm
@@ -532,6 +537,11 @@ spec:
       - name: tmp
         emptyDir: {}
       - name: app-data
+        emptyDir: {}
+      - name: durable-root
+        persistentVolumeClaim:
+          claimName: {{ include "vulcanami.fullname" . }}-durable-root
+      - name: model-cache
         emptyDir: {}
       # Shared memory for Ray object store (prevents /dev/shm warning)
       # Ray recommends at least 30% of available RAM for object store

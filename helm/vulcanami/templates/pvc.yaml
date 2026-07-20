@@ -1,3 +1,26 @@
+{{- if .Values.persistence.durableRoot.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "vulcanami.fullname" . }}-durable-root
+  labels:
+    {{- include "vulcanami.labels" . | nindent 4 }}
+    component: durable-root
+  {{- if .Values.persistence.durableRoot.retain }}
+  annotations:
+    "helm.sh/resource-policy": keep
+  {{- end }}
+spec:
+  accessModes:
+    - {{ .Values.persistence.durableRoot.accessMode }}
+  {{- if .Values.persistence.durableRoot.storageClass }}
+  storageClassName: {{ .Values.persistence.durableRoot.storageClass }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.durableRoot.size }}
+---
+{{- end }}
 {{- if .Values.persistence.memoryStore.enabled }}
 apiVersion: v1
 kind: PersistentVolumeClaim
