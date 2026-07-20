@@ -55,7 +55,7 @@
       "evidence_requirements": ["impact_assessment", "test_result", "operator_review", "incident_record"],
       "failure_disposition": "fail_closed",
       "review_trigger": "Any personal-data category, consent scope, memory retention, or provider-context change.",
-      "implementation_status": "planned",
+      "implementation_status": "partial",
       "depends_on": ["AMI-AUTH-001", "AMI-EVID-001"]
     },
     {
