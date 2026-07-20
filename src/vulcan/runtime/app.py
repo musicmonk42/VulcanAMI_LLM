@@ -3,46 +3,20 @@ from __future__ import annotations
 import asyncio, json
 from contextlib import asynccontextmanager
 from uuid import uuid4
-try:
-    from fastapi import FastAPI, HTTPException, Request
-    from fastapi.responses import JSONResponse
-except Exception:  # dependency-light route-manifest diagnostics
-    class HTTPException(Exception):
-        def __init__(self, status_code:int, detail:str='', headers=None): self.status_code=status_code; self.detail=detail; self.headers=headers or {}; super().__init__(detail)
-    class JSONResponse(dict):
-        def __init__(self, status_code:int=200, content=None, headers=None): super().__init__(content or {}); self.status_code=status_code; self.headers=headers or {}
-    class Request: pass
-    class _State: pass
-    class _Route:
-        def __init__(self,path,endpoint): self.path=path; self.endpoint=endpoint
-    class FastAPI:
-        def __init__(self, *a, **k): self.routes=[]; self.state=_State()
-        def get(self,path):
-            def deco(fn): self.routes.append(_Route(path,fn)); return fn
-            return deco
-        def post(self,path):
-            def deco(fn): self.routes.append(_Route(path,fn)); return fn
-            return deco
-        def patch(self,path):
-            def deco(fn): self.routes.append(_Route(path,fn)); return fn
-            return deco
-        def delete(self,path):
-            def deco(fn): self.routes.append(_Route(path,fn)); return fn
-            return deco
-        def middleware(self, _kind):
-            def deco(fn): return fn
-            return deco
-try:
-    from pydantic import BaseModel, ConfigDict, Field, StrictStr, StrictInt
-except Exception:  # pragma: no cover
-    BaseModel=object; ConfigDict=dict; Field=lambda *a,**k: None; StrictStr=str; StrictInt=int
+
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr
+
 from .auth import AuthConfig, AuthError, AuthorizationError, authenticate_bearer
 from .case import CognitiveCase
 from .composition import compose_runtime
-from .settings import load_runtime_settings
+from .settings import SettingsError, load_runtime_settings
 from .kernel import KernelRequest
 from .semantic import Utterance
 from vulcan.memory.governed import MemoryActorContext, MemoryKind, MemoryReadRequest, MemoryWriteProposal, MemoryReason
+from .errors import StartupErrorCategory, StartupFailure
+from .route_manifest import generate_route_manifest
 
 MAX_BODY=16_384
 ABSENT_ETAG='"absent"'
@@ -52,17 +26,27 @@ ABSENT_ETAG='"absent"'
 async def lifespan(app: FastAPI):
     app.state.ready=False; app.state.runtime=None; app.state.auth_config=None; app.state.runtime_settings=None; runtime=None
     try:
-        settings=load_runtime_settings()
+        try:
+            settings=load_runtime_settings()
+        except SettingsError as exc:
+            app.state.startup_error = StartupFailure(StartupErrorCategory.SETTINGS_INVALID, "runtime settings invalid", exc)
+            raise app.state.startup_error from exc
         app.state.runtime_settings=settings
         app.state.auth_config=settings.auth_config()
         runtime=await asyncio.to_thread(compose_runtime, settings)
         await runtime.readiness(); app.state.runtime=runtime; app.state.ready=True
         yield
-    except BaseException:
+    except BaseException as exc:
         app.state.ready=False; app.state.runtime=None
+        if isinstance(exc, StartupFailure):
+            app.state.startup_error = exc
+        else:
+            app.state.startup_error = StartupFailure(StartupErrorCategory.RUNTIME_UNHEALTHY, "runtime startup failed", exc)
         if runtime is not None:
-            try: await runtime.close()
-            except BaseException: pass
+            try:
+                await runtime.close()
+            except BaseException as close_exc:
+                exc.add_note(f"runtime close failed during startup cleanup: {type(close_exc).__name__}")
         raise
     finally:
         app.state.ready=False
@@ -116,12 +100,9 @@ class BundleBody(BaseModel):
     bundle: dict
     model_config=ConfigDict(extra='forbid', strict=True)
 
-def generate_route_manifest():
-    return tuple({'path':p,'method':m,'classification':'public' if p.startswith('/health/') else 'protected'} for p,m in [('/health/live','GET'),('/health/ready','GET'),('/v1/capabilities','GET'),('/v1/chat','POST'),('/v1/admin/domains','POST'),('/v1/admin/alignment','POST'),('/v1/audit/cases/{case_id}','GET'),('/v1/admin/improvements','GET'),('/v1/admin/improvements/{proposal_id}','GET'),('/v1/admin/improvements/{proposal_id}/approve','POST'),('/v1/admin/improvements/{proposal_id}/reject','POST'),('/v1/admin/improvements/{proposal_id}/resume','POST'),('/v1/admin/improvements/{proposal_id}/status','GET'),('/v1/audit/improvements/{proposal_digest}','GET'),('/v1/memory/preferences','POST'),('/v1/memory/preferences/{key}','GET'),('/v1/memory/preferences/{record_id}','PATCH'),('/v1/memory/preferences/{record_id}','DELETE')])
-
 def create_app()->FastAPI:
     app=FastAPI(title='VULCAN canonical runtime', version='7.0', lifespan=lifespan)
-    app.state.route_manifest=generate_route_manifest(); app.state.ready=False; app.state.runtime=None
+    app.state.route_manifest=generate_route_manifest(); app.state.ready=False; app.state.runtime=None; app.state.startup_error=None
     @app.middleware('http')
     async def bounds(request, call_next):
         resp=await call_next(request); resp.headers.setdefault('Cache-Control','no-store'); resp.headers.setdefault('X-Content-Type-Options','nosniff'); return resp
@@ -133,7 +114,9 @@ def create_app()->FastAPI:
             rt=await _runtime(request)
             diagnostics = rt.settings.public_dict() if rt.settings.public_diagnostics else {'environment': rt.settings.environment.value, 'settings_schema': rt.settings.schema()['schema_version']}
             return {'status':'ready','runtime_id':rt.runtime_id,'diagnostics':diagnostics,'learning_owner_id':rt.learning_owner.owner_id,'learning_status':rt.learning_owner.capability.value,'capabilities':list(rt.capabilities()),'learning_capabilities':[c.__dict__ | {'status': c.status.value, 'readiness_state': c.readiness_state.value} for c in rt.learning_owner.capability_matrix()]}
-        except HTTPException: return JSONResponse(status_code=503, content={'status':'not_ready'})
+        except HTTPException:
+            err=getattr(request.app.state,'startup_error',None); code=err.public_code if isinstance(err,StartupFailure) else 'runtime_not_ready'
+            return JSONResponse(status_code=503, content={'status':'not_ready','code':code})
     @app.get('/v1/capabilities')
     async def capabilities():
         from vulcan.runtime.capabilities import public_capability_response

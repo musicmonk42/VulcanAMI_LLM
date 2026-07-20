@@ -144,8 +144,8 @@ class RuntimeContainer:
                 meta = self.language_input.readiness()
                 abi = meta["runtime_abi"]
                 result = tuple(dict.fromkeys((*result, "verified-transformer-span", f"language-abi:{abi}")))
-            except Exception:
-                pass
+            except Exception as exc:
+                raise RuntimeError("language interface readiness failed") from exc
         if self.self_improvement is not None:
             result = tuple(dict.fromkeys((*result, *self.self_improvement.capabilities())))
         if self.learning_owner is None:
@@ -161,10 +161,12 @@ class RuntimeContainer:
         deps = getattr(getattr(deployment, "collective", None), "deps", None)
         world_state = getattr(deps, "world_model", None)
         if world_state is None:
-            raise RuntimeError("required canonical World State is unavailable")
+            from .errors import StartupErrorCategory, StartupFailure
+            raise StartupFailure(StartupErrorCategory.WORLD_MISSING, "required canonical World State is unavailable")
         safety = getattr(deps, "safety_validator", None)
         if safety is None:
-            raise RuntimeError("required safety finalization service is unavailable")
+            from .errors import StartupErrorCategory, StartupFailure
+            raise StartupFailure(StartupErrorCategory.SAFETY_MISSING, "required safety finalization service is unavailable")
         config = (language_config or LanguageRuntimeConfig(settings.language_mode.value, str(settings.language_release_path) if settings.language_release_path else None)).validated()
         # Deterministic remains default/fallback; transformer mode is admitted only after strict release verification.
         language_input: LanguageInputPort = DeterministicLanguageInput()

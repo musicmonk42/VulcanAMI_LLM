@@ -1,31 +1,82 @@
 """Single composition function for the production runtime."""
 from __future__ import annotations
-from types import SimpleNamespace
-from .container import RuntimeContainer
-from .settings import RuntimeSettings
 
-class _FallbackSafety:
-    def readiness(self): return True
-    def validate(self, *a, **k): return True
-    async def finalize(self, artifact):
-        return SimpleNamespace(decision=SimpleNamespace(value='allowed'), public_text=getattr(artifact,'text',str(artifact)))
-    def close(self): pass
-class _FallbackWorld:
-    snapshot_id='fallback-world'
-    def readiness(self): return True
-    def close(self): pass
-class _FallbackDeployment:
-    def __init__(self):
-        self.collective=SimpleNamespace(deps=SimpleNamespace(world_model=_FallbackWorld(), safety_validator=_FallbackSafety()))
-    def readiness(self): return True
-    def close(self): pass
+from importlib import import_module, util
+from types import SimpleNamespace
+
+from .container import RuntimeContainer
+from .errors import StartupErrorCategory, StartupFailure
+from .settings import RuntimeSettings, VulcanEnvironment
+
+
+class DevelopmentStubDeployment:
+    """Deliberately named non-production stub; cognitive routes must remain unavailable."""
+
+    production_ready = False
+
+    def __init__(self) -> None:
+        self.collective = SimpleNamespace(deps=SimpleNamespace(world_model=DevelopmentStubWorld(), safety_validator=DevelopmentStubSafety()))
+
+    def readiness(self) -> bool:
+        return False
+
+    def close(self) -> None:
+        return None
+
+
+class DevelopmentStubWorld:
+    production_ready = False
+    snapshot_id = "development-stub-world"
+
+    def readiness(self) -> bool:
+        return False
+
+
+class DevelopmentStubSafety:
+    production_ready = False
+
+    def readiness(self) -> bool:
+        return False
+
+
+def _startup_failure(category: StartupErrorCategory, message: str, exc: BaseException | None = None) -> StartupFailure:
+    return StartupFailure(category, message, exc)
+
+
+def _module_available(name: str) -> bool:
+    try:
+        return util.find_spec(name) is not None
+    except ValueError:
+        return True
+
 
 def compose_runtime(settings: RuntimeSettings) -> RuntimeContainer:
     """Construct the deployment graph from the already-parsed settings authority."""
+    if settings.development_stub_mode:
+        if settings.environment is VulcanEnvironment.production:
+            raise _startup_failure(StartupErrorCategory.SETTINGS_INVALID, "development stub mode is forbidden in production")
+        return RuntimeContainer.new(deployment=DevelopmentStubDeployment(), settings=settings)
+    if not _module_available("vulcan.config") or not _module_available("vulcan.orchestrator.deployment"):
+        raise _startup_failure(StartupErrorCategory.DEPLOYMENT_IMPORT_FAILED, "production deployment dependency import failed")
     try:
-        from vulcan.config import get_config
-        from vulcan.orchestrator.deployment import ProductionDeployment
-        deployment=ProductionDeployment(get_config())
-    except Exception:
-        deployment=_FallbackDeployment()
-    return RuntimeContainer.new(deployment=deployment, settings=settings)
+        config_module = import_module("vulcan.config")
+        deployment_module = import_module("vulcan.orchestrator.deployment")
+        deployment = deployment_module.ProductionDeployment(config_module.get_config())
+    except BaseException as exc:
+        raise _startup_failure(StartupErrorCategory.DEPLOYMENT_CONSTRUCTION_FAILED, "production deployment construction failed", exc) from exc
+    try:
+        return RuntimeContainer.new(deployment=deployment, settings=settings)
+    except StartupFailure:
+        raise
+    except OSError as exc:
+        raise _startup_failure(StartupErrorCategory.FILESYSTEM_UNAVAILABLE, "runtime durable filesystem unavailable", exc) from exc
+    except RuntimeError as exc:
+        text = str(exc).lower()
+        category = StartupErrorCategory.RUNTIME_UNHEALTHY
+        if "world" in text:
+            category = StartupErrorCategory.WORLD_MISSING
+        elif "safety" in text:
+            category = StartupErrorCategory.SAFETY_MISSING
+        elif "kernel" in text or "reason" in text:
+            category = StartupErrorCategory.REASONER_MISSING
+        raise _startup_failure(category, str(exc), exc) from exc

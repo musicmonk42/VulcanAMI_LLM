@@ -10,7 +10,7 @@ CONFIG_PATH = ROOT / "config" / "capabilities.yaml"
 
 
 def composed_runtime_ports() -> set[str]:
-    from vulcan.runtime.app import generate_route_manifest
+    from vulcan.runtime.route_manifest import generate_route_manifest
     return {f"{item['method']} {item['path']}" for item in generate_route_manifest()}
 
 
