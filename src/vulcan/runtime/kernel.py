@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from vulcan.memory.governed import GovernedMemoryPort
 from .case import CognitiveCase, CognitiveCaseStatus
-from .finalization import ResponseFinalizerPort
+from .finalization import FinalizationDecision, ResponseFinalizerPort
 from vulcan.safety.safety_types import ResponseSafetyContext
 from .semantic import (ClarificationRequest, DeterministicLanguageInput, LanguageInputPort, RESPONSE_IR_VERSION, ResponseIR, ResponseMode, Utterance, accept, build_graphix_plan, compile_graphix_plan, execute, execute_graphix_plan, render_strict, validate_proposal)
 from .output import DeterministicLanguageOutput, LanguageOutputPort, SemanticFirewall, project
@@ -24,7 +24,20 @@ class KernelResult:
     status: CognitiveCaseStatus
     finalization: str
     def transport(self, *, case_id: str, runtime_id: str, snapshot_id: str | None) -> dict[str, object]:
-        return {"response": self.response, "metadata": {"case_id":case_id,"runtime_id":runtime_id,"state_snapshot_id":snapshot_id,"semantic_schema_version":self.response_ir.schema_version,"finalized":True,"finalization_safety_decision":self.finalization}}
+        released = self.finalization == FinalizationDecision.ALLOW.value
+        return {
+            "response": self.response,
+            "metadata": {
+                "case_id": case_id,
+                "runtime_id": runtime_id,
+                "state_snapshot_id": snapshot_id,
+                "semantic_schema_version": self.response_ir.schema_version,
+                "terminal_status": self.status.value,
+                "response_released": released,
+                "finalized": True,
+                "finalization_safety_decision": self.finalization,
+            },
+        }
 class CognitiveKernel:
     def __init__(self, *, state_authority: Any, finalizer: ResponseFinalizerPort, language_input: LanguageInputPort | None = None, language_output: LanguageOutputPort | None = None, memory: "GovernedMemoryPort | None" = None, audit: Any = None, alignment: Any = None) -> None:
         # The kernel owns the only memory port exposed to the production path.
@@ -35,8 +48,7 @@ class CognitiveKernel:
         caps=["bounded-arithmetic"]
         mem_caps=getattr(self._memory, "capabilities", None)
         if callable(mem_caps):
-            try: caps.extend(mem_caps())
-            except Exception: pass
+            caps.extend(mem_caps())
         return tuple(caps)
     async def handle(self, request: KernelRequest, case: CognitiveCase) -> KernelResult:
         if case.terminal_status is not CognitiveCaseStatus.OPEN: raise RuntimeError("kernel received a closed cognitive case")
@@ -109,9 +121,17 @@ class CognitiveKernel:
             else:
                 finalization=await finalize(artifact, final_context)
             case.record_finalization(finalization.decision.value)
-            if self._audit: self._audit.append("case.finalized", {"case_id":case.case_id,"request_id":case.request_id,"request_digest":case.input_hash,"finalization":finalization.decision.value,"rendered_response_digest":artifact.ir_digest})
+            if finalization.decision is FinalizationDecision.BLOCK:
+                status = CognitiveCaseStatus.BLOCKED
+            elif finalization.decision is FinalizationDecision.ERROR:
+                status = CognitiveCaseStatus.FINALIZATION_ERROR
+            elif finalization.decision is FinalizationDecision.CANCELLED:
+                status = CognitiveCaseStatus.CANCELLED
+            if self._audit: self._audit.append("case.finalized", {"case_id":case.case_id,"request_id":case.request_id,"request_digest":case.input_hash,"finalization":finalization.decision.value,"terminal_status":status.value,"rendered_response_digest":artifact.ir_digest})
             case.close(status)
-            if self._audit: self._audit.append("case.completed" if status is CognitiveCaseStatus.SUCCESS else "case.abstained", {"case_id":case.case_id,"request_id":case.request_id,"request_digest":case.input_hash,"status":status.value,"rendered_response_digest":artifact.ir_digest})
+            if self._audit:
+                event_type = "case.completed" if status is CognitiveCaseStatus.SUCCESS else f"case.{status.value}"
+                self._audit.append(event_type, {"case_id":case.case_id,"request_id":case.request_id,"request_digest":case.input_hash,"status":status.value,"rendered_response_digest":artifact.ir_digest})
             return KernelResult(finalization.public_text,response_ir,status,finalization.decision.value)
         except asyncio.CancelledError:
             if case.terminal_status is CognitiveCaseStatus.OPEN: case.close(CognitiveCaseStatus.CANCELLED,"cancelled")
