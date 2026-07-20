@@ -271,7 +271,7 @@ opentelemetry-instrumentation-fastapi==0.46b0
 opentelemetry-proto==1.25.0
 opentelemetry-sdk==1.25.0
 opentelemetry-semantic-conventions==0.46b0
-opentelemetry-util-http==0.46b0
+opentelemetry-util-http==0.65b0
 opentracing==2.4.0
 optuna==3.6.1
 ordered-set==4.1.0
