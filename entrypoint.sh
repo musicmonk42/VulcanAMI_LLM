@@ -54,8 +54,9 @@ echo "Thread limits set: OMP=$OMP_NUM_THREADS, MKL=$MKL_NUM_THREADS, TORCH=$TORC
 # ============================================================================
 # JWT SECRET VALIDATION (Security Best Practice)
 # ============================================================================
-INSECURE_DEFAULTS="super-secret-key insecure-dev-secret default-super-secret-key-change-me changeme password secret admin"
+INSECURE_DEFAULTS="super-secret-key insecure-dev-secret default-super-secret-key-change-me changeme password secret admin dev-secret-change-me"
 MIN_LENGTH=32
+JWT_SECRET_NAMES="VULCAN_JWT_SECRET GRAPHIX_JWT_SECRET JWT_SECRET_KEY JWT_SECRET"
 
 get_env() {
   var_name="$1"
@@ -71,72 +72,73 @@ is_weak() {
       return 0
     fi
   done
-  # Very naive pattern checks (extend as needed)
   case "$lower" in
-    *"123456"*|*"password"*|*"qwerty"*|*"letmein"*|*"jwtsecret"*|*"graphixsecret"*)
-      return 0
-      ;;
+    *"123456"*|*"password"*|*"qwerty"*|*"letmein"*|*"jwtsecret"*|*"graphixsecret"*|*"change-in-production"*) return 0 ;;
   esac
+  uniq_count=$(printf '%s' "$val" | fold -w1 | sort -u | wc -l | tr -d ' ')
+  classes=0
+  printf '%s' "$val" | grep -q '[a-z]' && classes=$((classes + 1))
+  printf '%s' "$val" | grep -q '[A-Z]' && classes=$((classes + 1))
+  printf '%s' "$val" | grep -q '[0-9]' && classes=$((classes + 1))
+  printf '%s' "$val" | grep -q '[^A-Za-z0-9]' && classes=$((classes + 1))
+  if [ "$uniq_count" -lt 12 ] && [ "$classes" -lt 3 ]; then
+    return 0
+  fi
   return 1
 }
 
-is_urlsafe() {
-  # Basic check: only URL-safe base64 chars plus length > 0
-  # We allow any printable char; stronger checks can be added.
-  val="$1"
-  echo "$val" | grep -Eq '^[A-Za-z0-9_\-]+$'
-}
-
 validate_secret() {
-  name="$1"
-  value="$2"
-  if [ -z "$value" ]; then
+  value="$1"
+  if [ -z "$value" ]; then return 1; fi
+  if [ "${#value}" -lt "$MIN_LENGTH" ]; then
+    echo "ERROR: JWT secret configuration is invalid." >&2
     return 1
   fi
-  if [ "${#value}" -lt "$MIN_LENGTH" ]; then
-    echo "ERROR: $name is too short (< $MIN_LENGTH chars)." >&2
+  if printf '%s' "$value" | LC_ALL=C grep -q '[[:cntrl:]]'; then
+    echo "ERROR: JWT secret configuration is invalid." >&2
     return 1
   fi
   if is_weak "$value"; then
-    echo "ERROR: $name matches known weak pattern." >&2
+    echo "ERROR: JWT secret configuration is invalid." >&2
     return 1
-  fi
-  # Warn (do not fail) if not urlsafe
-  if ! is_urlsafe "$value"; then
-    echo "WARNING: $name contains characters outside URL-safe set. (Acceptable but consider using urlsafe token)" >&2
   fi
   return 0
 }
 
-SECRET_OK=0
-SELECTED=""
-EXPIRY_NOTE="(rotate secrets periodically)"
-
-for VAR in VULCAN_JWT_SECRET GRAPHIX_JWT_SECRET JWT_SECRET_KEY JWT_SECRET; do
+FOUND_NAMES=""
+UNIQUE_VALUES_FILE="${TMPDIR:-/tmp}/vulcan-jwt-values.$$"
+: > "$UNIQUE_VALUES_FILE"
+for VAR in $JWT_SECRET_NAMES; do
   VAL="$(get_env "$VAR")"
   if [ -n "$VAL" ]; then
-    if validate_secret "$VAR" "$VAL"; then
-      SECRET_OK=1
-      SELECTED="$VAR"
-      break
-    else
-      echo "Validation failed for $VAR." >&2
-      SECRET_OK=0
-    fi
+    FOUND_NAMES="$FOUND_NAMES $VAR"
+    printf '%s\n' "$VAL" >> "$UNIQUE_VALUES_FILE"
   fi
 done
 
-if [ "$SECRET_OK" -ne 1 ]; then
+if [ ! -s "$UNIQUE_VALUES_FILE" ]; then
+  rm -f "$UNIQUE_VALUES_FILE"
   cat >&2 <<'EOF'
 ERROR: No valid JWT secret provided.
 Production serving refuses to downgrade into limited/no-auth mode.
-Provide one STRONG secret (>=32 chars, not common/weak) via VULCAN_JWT_SECRET. Deprecated aliases GRAPHIX_JWT_SECRET, JWT_SECRET_KEY, and JWT_SECRET are accepted for one migration window only.
+Provide one STRONG secret (>=32 chars, high entropy, not a placeholder) via VULCAN_JWT_SECRET. Deprecated aliases GRAPHIX_JWT_SECRET, JWT_SECRET_KEY, and JWT_SECRET are accepted for one migration window only when they carry the same single value.
 EOF
   exit 78
-else
-  echo "Verified JWT secret in variable: $SELECTED $EXPIRY_NOTE"
-  export JWT_VALIDATION_MODE="enabled"
 fi
+UNIQUE_COUNT=$(sort -u "$UNIQUE_VALUES_FILE" | wc -l | tr -d ' ')
+SELECTED_VALUE=$(sed -n '1p' "$UNIQUE_VALUES_FILE")
+rm -f "$UNIQUE_VALUES_FILE"
+if [ "$UNIQUE_COUNT" -ne 1 ]; then
+  echo "ERROR: Conflicting JWT secret configuration." >&2
+  exit 78
+fi
+if ! validate_secret "$SELECTED_VALUE"; then
+  echo "ERROR: No valid JWT secret provided." >&2
+  exit 78
+fi
+export VULCAN_JWT_SECRET="$SELECTED_VALUE"
+echo "Verified canonical JWT secret configuration (rotate secrets periodically)"
+export JWT_VALIDATION_MODE="enabled"
 
 # Execute production-owned safety/profile defaults
 export VULCAN_ENV="${VULCAN_ENV:-production}"
