@@ -41,7 +41,7 @@ backports-datetime-fromisoformat==2.0.3
 bandit==1.9.2
 base58==2.1.1
 bcrypt==4.3.0
-beautifulsoup4==4.14.3
+beautifulsoup4==4.15.0
 bidict==0.23.1
 bigtree==1.0.3
 bitarray==2.9.3
