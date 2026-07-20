@@ -104,11 +104,8 @@ class RuntimeContainer:
         if first_error is not None:
             raise first_error
 
-    async def readiness(self) -> None:
-        """Verify the actual object graph rather than a route-local flag."""
-        if self.closed:
-            raise RuntimeError("canonical runtime is closed")
-        required = {
+    def _required_owners(self) -> dict[str, Any]:
+        return {
             "deployment": self.deployment,
             "world_state": self.world_state,
             "kernel": self.kernel,
@@ -123,9 +120,24 @@ class RuntimeContainer:
             "self_improvement": self.self_improvement,
             "learning_owner": self.learning_owner,
         }
-        for name, owner in required.items():
+
+    async def admission(self) -> None:
+        """Fast traffic gate: the composed runtime exists and is not closing."""
+        if self.closed:
+            raise RuntimeError("canonical runtime is closed")
+
+    async def shallow_readiness(self) -> None:
+        """Fast readiness: verify mandatory owners are present without deep I/O."""
+        await self.admission()
+        for name, owner in self._required_owners().items():
             if owner is None:
                 raise RuntimeError(f"required canonical {name} is unavailable")
+
+    async def deep_integrity(self) -> None:
+        """Deep integrity: execute every owner-provided readiness/health check."""
+        await self.shallow_readiness()
+        required = self._required_owners()
+        for name, owner in required.items():
             check = getattr(owner, "readiness", None) or getattr(owner, "healthcheck", None)
             if check is not None:
                 result = check()
@@ -133,6 +145,10 @@ class RuntimeContainer:
                     result = await result
                 if result is False:
                     raise RuntimeError(f"required canonical {name} is unhealthy")
+
+    async def readiness(self) -> None:
+        """Backward-compatible deep readiness adapter; not used for liveness."""
+        await self.deep_integrity()
 
     def capabilities(self) -> tuple[str, ...]:
         """Return only capabilities supplied by the composed kernel object."""
