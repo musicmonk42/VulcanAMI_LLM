@@ -13,6 +13,9 @@ if TYPE_CHECKING:
                            EvidenceArtifact, InterpretationBundle, ResponseIR)
 from uuid import uuid4
 
+from vulcan.microkernel.episode import ActorBinding, CognitiveEpisode
+from vulcan.microkernel.state_machine import ALLOWED_TRANSITIONS, EpisodeState
+
 
 class CognitiveCaseStatus(str, Enum):
     OPEN = "open"
@@ -55,6 +58,7 @@ class CognitiveCase:
     finalization_status: str | None = None
     render_artifact: object | None = field(default=None, repr=False)
     events: list[CaseEvent] = field(default_factory=list)
+    episode: CognitiveEpisode | None = field(default=None, repr=False)
 
     @classmethod
     def create(cls, *, request_id: str, conversation_id: str | None, input_digest: str | None = None,
@@ -65,7 +69,17 @@ class CognitiveCase:
             if message is None:
                 raise ValueError("input_digest is required")
             input_digest = sha256(message.encode("utf-8")).hexdigest()
-        case = cls(request_id=request_id, conversation_id=conversation_id, input_hash=input_digest)
+        episode = CognitiveEpisode.create(
+            actor=ActorBinding(
+                actor_id="legacy-runtime",
+                principal_digest=sha256(request_id.encode("utf-8")).hexdigest(),
+                authority="CognitiveCaseAdapter",
+            ),
+            request_id=request_id,
+            input_digest=input_digest,
+            conversation_id=conversation_id,
+        )
+        case = cls(request_id=request_id, conversation_id=conversation_id, input_hash=input_digest, case_id=episode.episode_id, episode=episode)
         case.record("created")
         return case
 
@@ -113,3 +127,32 @@ class CognitiveCase:
         self.failure_kind = failure_kind
         self.record("terminal", status.value)
         self.terminal_status = status
+        if self.episode is not None:
+            target = {
+                CognitiveCaseStatus.SUCCESS: EpisodeState.COMMUNICATED,
+                CognitiveCaseStatus.ABSTAINED: EpisodeState.ABSTAINED,
+                CognitiveCaseStatus.BLOCKED: EpisodeState.BLOCKED,
+                CognitiveCaseStatus.FINALIZATION_ERROR: EpisodeState.FAILED,
+                CognitiveCaseStatus.FAILED: EpisodeState.FAILED,
+                CognitiveCaseStatus.CANCELLED: EpisodeState.CANCELLED,
+            }.get(status)
+            if target is not None and target in ALLOWED_TRANSITIONS[self.episode.state]:
+                self.episode = self.episode.transition(
+                    target, reason=failure_kind or status.value, authority="CognitiveCaseAdapter"
+                )
+
+
+def episode_from_case(case: CognitiveCase) -> CognitiveEpisode:
+    """Compatibility adapter exposing the authoritative episode for a legacy case."""
+    if case.episode is not None:
+        return case.episode
+    return CognitiveEpisode.create(
+        actor=ActorBinding(
+            actor_id="legacy-runtime",
+            principal_digest=sha256(case.request_id.encode("utf-8")).hexdigest(),
+            authority="CognitiveCaseAdapter",
+        ),
+        request_id=case.request_id,
+        input_digest=case.input_hash,
+        conversation_id=case.conversation_id,
+    )
