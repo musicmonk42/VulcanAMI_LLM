@@ -6066,9 +6066,9 @@ pytz==2025.2 \
     #   -r requirements.txt
     #   apscheduler
     #   pandas
-pyunormalize==16.0.0 \
-    --hash=sha256:2e1dfbb4a118154ae26f70710426a52a364b926c9191f764601f5a8cb12761f7 \
-    --hash=sha256:c647d95e5d1e2ea9a2f448d1d95d8518348df24eab5c3fd32d2b5c3300a49152
+pyunormalize==17.0.0 \
+    --hash=sha256:0949a3e56817e287febcaf1b0cc4b5adf0bb107628d379335938040947eec792 \
+    --hash=sha256:f0d93b076f938db2b26d319d04f2b58505d1cd7a80b5b72badbe7d1aa4d2a31c
     # via -r requirements.txt
 pyyaml==6.0.3 \
     --hash=sha256:00c4bdeba853cc34e7dd471f16b4114f4162dc03e6b7afcc2128711f0eca823c \
