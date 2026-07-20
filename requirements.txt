@@ -71,7 +71,7 @@ circuitbreaker==2.1.3
 ckzg==2.1.1
 click==8.3.1
 cloudpathlib==0.23.0
-cloudpickle==3.1.1
+cloudpickle==3.1.2
 colorama==0.4.6
 coloredlogs==15.0.1
 colorlog==6.9.0
