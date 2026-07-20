@@ -293,7 +293,7 @@ platformdirs==4.5.0
 plotly==6.3.0
 plucky==0.4.3
 pluggy==1.6.0
-pooch==1.8.2
+pooch==1.9.0
 portalocker==3.2.0
 posthog==5.4.0
 preshed==3.0.12

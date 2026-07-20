@@ -5028,9 +5028,9 @@ pluggy==1.6.0 \
     #   -r requirements.txt
     #   pytest
     #   pytest-cov
-pooch==1.8.2 \
-    --hash=sha256:3529a57096f7198778a5ceefd5ac3ef0e4d06a6ddaf9fc2d609b806f25302c47 \
-    --hash=sha256:76561f0de68a01da4df6af38e9955c4c9d1a5c90da73f7e40276a5728ec83d10
+pooch==1.9.0 \
+    --hash=sha256:de46729579b9857ffd3e741987a2f6d5e0e03219892c167c6578c0091fb511ed \
+    --hash=sha256:f265597baa9f760d25ceb29d0beb8186c243d6607b0f60b83ecf14078dbc703b
     # via
     #   -r requirements.txt
     #   librosa
