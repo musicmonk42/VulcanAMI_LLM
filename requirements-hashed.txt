@@ -901,8 +901,9 @@ catalogue==2.0.10 \
     #   spacy
     #   srsly
     #   thinc
-causal-learn==0.1.4.3 \
-    --hash=sha256:47ca196b786ea3b899e0e0e2c6d607c37c900df9457781f6ab0b97a2c6a747d0
+causal-learn==0.1.4.8 \
+    --hash=sha256:03a2271e7b7c4835f04786c30bf190b8e24179eb71a42c32de9e4866ca37f397 \
+    --hash=sha256:8c8d408c0b2fecdf150584cbcd8271efeb590e692b8e7f6f67ed215339a094e6
     # via
     #   -r requirements.txt
     #   dowhy
