@@ -2,6 +2,7 @@
 from __future__ import annotations
 from types import SimpleNamespace
 from .container import RuntimeContainer
+from .settings import RuntimeSettings
 
 class _FallbackSafety:
     def readiness(self): return True
@@ -19,12 +20,12 @@ class _FallbackDeployment:
     def readiness(self): return True
     def close(self): pass
 
-def compose_runtime() -> RuntimeContainer:
-    """Construct the deployment graph; legacy endpoint orchestration is unreachable."""
+def compose_runtime(settings: RuntimeSettings) -> RuntimeContainer:
+    """Construct the deployment graph from the already-parsed settings authority."""
     try:
         from vulcan.config import get_config
         from vulcan.orchestrator.deployment import ProductionDeployment
         deployment=ProductionDeployment(get_config())
     except Exception:
         deployment=_FallbackDeployment()
-    return RuntimeContainer.new(deployment=deployment)
+    return RuntimeContainer.new(deployment=deployment, settings=settings)

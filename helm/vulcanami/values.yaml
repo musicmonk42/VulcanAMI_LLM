@@ -31,6 +31,20 @@ image:
   # If digest is provided, it will be appended to the tag
   digest: ""  # Example: "sha256:abc123def456..."
 
+
+runtime:
+  environment: production
+  jwtIssuer: vulcan
+  jwtAudience: vulcan-runtime
+  durableRoot: /var/lib/vulcan/runtime
+  languageMode: deterministic_only
+  auditEnabled: true
+  csiuEnabled: true
+  learningEnabled: true
+  selfImprovementEnabled: false
+  requestTimeoutSeconds: 30
+  publicDiagnostics: false
+
 imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""

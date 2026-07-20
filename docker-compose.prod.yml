@@ -222,9 +222,8 @@ services:
       - ENVIRONMENT=production
       - VERSION=${VERSION:-latest}
       - PORT=8000
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
-      - JWT_SECRET=${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
-      - GRAPHIX_JWT_SECRET=${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
+      - VULCAN_JWT_SECRET=${VULCAN_JWT_SECRET:?VULCAN_JWT_SECRET is required}
+      - VULCAN_RUNTIME_DURABLE_ROOT=${VULCAN_RUNTIME_DURABLE_ROOT:-/var/lib/vulcan/runtime}
       - BOOTSTRAP_KEY=${BOOTSTRAP_KEY:?BOOTSTRAP_KEY is required}
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
@@ -431,7 +430,7 @@ services:
     environment:
       - ENVIRONMENT=production
       - VERSION=${VERSION:-latest}
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
+      - VULCAN_JWT_SECRET=${VULCAN_JWT_SECRET:?VULCAN_JWT_SECRET is required}
       - BOOTSTRAP_KEY=${BOOTSTRAP_KEY:?BOOTSTRAP_KEY is required}
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432

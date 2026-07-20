@@ -6,9 +6,8 @@ from dataclasses import dataclass
 from typing import Any, Literal
 from uuid import uuid4
 from pathlib import Path
-import os
 
-from vulcan.memory.governed import GovernedMemoryPort, compose_governed_memory
+from vulcan.memory.governed import GovernedMemoryPort, MemoryRuntimeConfig, compose_governed_memory
 from vulcan.learning_owner import LearningCapabilityStatus, LearningOwner
 from vulcan.learning_bandit import ShadowLinUCBToolBandit
 
@@ -20,6 +19,7 @@ from .kernel import CognitiveKernel
 from .output import DeterministicLanguageOutput, LanguageOutputPort
 from .semantic import DeterministicLanguageInput, LanguageInputPort
 from .self_improvement import SelfImprovementRuntime, compose_self_improvement_runtime
+from .settings import RuntimeSettings
 
 
 LanguageMode = Literal["disabled", "deterministic_only", "transformer_proposal"]
@@ -41,28 +41,6 @@ class LanguageRuntimeConfig:
                 raise RuntimeError("transformer mode requires an absolute approved release path")
         return self
 
-def _validated_durable_root(value: object) -> str:
-    if not isinstance(value, str) or not value:
-        raise RuntimeError("VULCAN_RUNTIME_DURABLE_ROOT is required for persistent runtime capabilities")
-    p = Path(value)
-    if not p.is_absolute():
-        raise RuntimeError("durable root must be absolute")
-    resolved = p.resolve(strict=False)
-    repo = Path(__file__).resolve().parents[3]
-    forbidden = {Path('/'), Path('/tmp'), Path.home(), repo.resolve()}
-    if resolved in forbidden or str(resolved).startswith(str(repo.resolve()) + os.sep):
-        raise RuntimeError("unsafe durable root rejected")
-    cur = Path('/')
-    for part in resolved.parts[1:]:
-        cur = cur / part
-        if cur.exists() and cur.is_symlink():
-            raise RuntimeError("symlinked durable root component rejected")
-    resolved.mkdir(parents=True, exist_ok=True)
-    if resolved.is_symlink():
-        raise RuntimeError("symlinked durable root rejected")
-    return str(resolved)
-
-
 @dataclass
 class RuntimeContainer:
     runtime_id: str
@@ -80,6 +58,7 @@ class RuntimeContainer:
     durable_root: Path | None = None
     self_improvement: SelfImprovementRuntime | None = None
     learning_owner: LearningOwner | None = None
+    settings: RuntimeSettings | None = None
     closed: bool = False
 
     async def close(self) -> None:
@@ -178,7 +157,7 @@ class RuntimeContainer:
         return result
 
     @classmethod
-    def new(cls, *, deployment: Any, language_config: LanguageRuntimeConfig | None = None) -> "RuntimeContainer":
+    def new(cls, *, deployment: Any, settings: RuntimeSettings, language_config: LanguageRuntimeConfig | None = None) -> "RuntimeContainer":
         deps = getattr(getattr(deployment, "collective", None), "deps", None)
         world_state = getattr(deps, "world_model", None)
         if world_state is None:
@@ -186,7 +165,7 @@ class RuntimeContainer:
         safety = getattr(deps, "safety_validator", None)
         if safety is None:
             raise RuntimeError("required safety finalization service is unavailable")
-        config = (language_config or LanguageRuntimeConfig()).validated()
+        config = (language_config or LanguageRuntimeConfig(settings.language_mode.value, str(settings.language_release_path) if settings.language_release_path else None)).validated()
         # Deterministic remains default/fallback; transformer mode is admitted only after strict release verification.
         language_input: LanguageInputPort = DeterministicLanguageInput()
         if config.mode == "transformer_proposal":
@@ -195,15 +174,16 @@ class RuntimeContainer:
             from vulcan.local_language import build_verified_adapter
             language_input = build_verified_adapter(release_root=config.release_path or "", provider_factory=config.provider_factory)
         language_output: LanguageOutputPort = DeterministicLanguageOutput()
-        memory = compose_governed_memory()
-        root = _validated_durable_root(os.getenv("VULCAN_RUNTIME_DURABLE_ROOT") or getattr(deployment, "runtime_root", None) or getattr(deployment, "data_dir", None))
+        memory = compose_governed_memory(MemoryRuntimeConfig(settings.memory_enabled, settings.memory_sqlite_path, settings.durable_root, settings.replicas, settings.memory_backend.value))
+        root = str(settings.durable_root)
+        Path(root).mkdir(parents=True, exist_ok=True)
         audit = alignment = domain_registry = self_improvement = None
         try:
             memory.readiness()
             audit = CanonicalAudit(f"{root}/audit/events.jsonl")
             alignment = AlignmentRegistry(f"{root}/alignment/active.json", audit=audit)
             domain_registry = PersistentDomainRegistry(f"{root}/domains", audit=audit)
-            self_improvement = compose_self_improvement_runtime(durable_root=Path(root), audit=audit, alignment=alignment, world_model=world_state)
+            self_improvement = compose_self_improvement_runtime(durable_root=Path(root), audit=audit, alignment=alignment, world_model=world_state, approval_hmac_secret=settings.approval_hmac_secret.reveal() if settings.approval_hmac_secret else None)
             shadow_bandit = ShadowLinUCBToolBandit()
             learning_owner = LearningOwner(
                 capability=LearningCapabilityStatus.SHADOW,
@@ -221,7 +201,7 @@ class RuntimeContainer:
             kernel = CognitiveKernel(state_authority=world_state, finalizer=SafetyResponseFinalizer(safety),
                                      language_input=language_input, language_output=language_output, memory=memory, audit=audit, alignment=alignment)
             return cls(str(uuid4()), deployment, world_state, kernel, safety, memory,
-                       language_input, language_output, config, audit, alignment, domain_registry, Path(root), self_improvement, learning_owner)
+                       language_input, language_output, config, audit, alignment, domain_registry, Path(root), self_improvement, learning_owner, settings)
         except Exception:
             for r in (locals().get("learning_owner"), self_improvement, domain_registry, alignment, audit, memory, language_output, language_input):
                 if r is not None:

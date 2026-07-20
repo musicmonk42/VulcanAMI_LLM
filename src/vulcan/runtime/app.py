@@ -1,6 +1,6 @@
 """Canonical statically-composed authenticated ASGI application."""
 from __future__ import annotations
-import asyncio, json, os
+import asyncio, json
 from contextlib import asynccontextmanager
 from uuid import uuid4
 try:
@@ -39,6 +39,7 @@ except Exception:  # pragma: no cover
 from .auth import AuthConfig, AuthError, AuthorizationError, authenticate_bearer
 from .case import CognitiveCase
 from .composition import compose_runtime
+from .settings import load_runtime_settings
 from .kernel import KernelRequest
 from .semantic import Utterance
 from vulcan.memory.governed import MemoryActorContext, MemoryKind, MemoryReadRequest, MemoryWriteProposal, MemoryReason
@@ -46,15 +47,15 @@ from vulcan.memory.governed import MemoryActorContext, MemoryKind, MemoryReadReq
 MAX_BODY=16_384
 ABSENT_ETAG='"absent"'
 
-def _auth_config_from_env()->AuthConfig:
-    return AuthConfig(secret=os.getenv('VULCAN_JWT_SECRET') or os.getenv('GRAPHIX_JWT_SECRET') or os.getenv('JWT_SECRET') or '', issuer=os.getenv('VULCAN_JWT_ISSUER','vulcan'), audience=os.getenv('VULCAN_JWT_AUDIENCE','vulcan-runtime'))
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.ready=False; app.state.runtime=None; app.state.auth_config=None; runtime=None
+    app.state.ready=False; app.state.runtime=None; app.state.auth_config=None; app.state.runtime_settings=None; runtime=None
     try:
-        app.state.auth_config=_auth_config_from_env()
-        runtime=await asyncio.to_thread(compose_runtime)
+        settings=load_runtime_settings()
+        app.state.runtime_settings=settings
+        app.state.auth_config=settings.auth_config()
+        runtime=await asyncio.to_thread(compose_runtime, settings)
         await runtime.readiness(); app.state.runtime=runtime; app.state.ready=True
         yield
     except BaseException:
@@ -128,7 +129,10 @@ def create_app()->FastAPI:
     async def live(): return {'status':'alive'}
     @app.get('/health/ready')
     async def ready(request:Request):
-        try: rt=await _runtime(request); return {'status':'ready','runtime_id':rt.runtime_id,'learning_owner_id':rt.learning_owner.owner_id,'learning_status':rt.learning_owner.capability.value,'capabilities':list(rt.capabilities()),'learning_capabilities':[c.__dict__ | {'status': c.status.value, 'readiness_state': c.readiness_state.value} for c in rt.learning_owner.capability_matrix()]}
+        try:
+            rt=await _runtime(request)
+            diagnostics = rt.settings.public_dict() if rt.settings.public_diagnostics else {'environment': rt.settings.environment.value, 'settings_schema': rt.settings.schema()['schema_version']}
+            return {'status':'ready','runtime_id':rt.runtime_id,'diagnostics':diagnostics,'learning_owner_id':rt.learning_owner.owner_id,'learning_status':rt.learning_owner.capability.value,'capabilities':list(rt.capabilities()),'learning_capabilities':[c.__dict__ | {'status': c.status.value, 'readiness_state': c.readiness_state.value} for c in rt.learning_owner.capability_matrix()]}
         except HTTPException: return JSONResponse(status_code=503, content={'status':'not_ready'})
     @app.get('/v1/capabilities')
     async def capabilities():

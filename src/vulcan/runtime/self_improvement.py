@@ -1,7 +1,7 @@
 """Canonical runtime-owned self-improvement graph."""
 from __future__ import annotations
 
-import hashlib, hmac, json, os, time
+import hashlib, hmac, json, time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -59,9 +59,9 @@ class PersistentImprovementJournal:
 class SelfImprovementRuntime:
     durable_root: Path; audit: Any; alignment: Any; csiu: CSIUEnforcement; policy: ImprovementPolicy; approval_store: ApprovalStore; approval_authority: ApprovalAuthority; verifier: Any; journal: PersistentImprovementJournal; transaction: GovernedSelfImprovementTransaction; drive: Any; telemetry: AggregateCSIUTelemetryPort; status_port: CSIUStatusPort
     def readiness(self) -> bool:
-        assert self.drive._csiu_enforcer is self.csiu
-        assert self.transaction.audit is self.audit
-        assert self.drive.transaction is self.transaction
+        if self.drive._csiu_enforcer is not self.csiu: raise RuntimeError("CSIU authority mismatch")
+        if self.transaction.audit is not self.audit: raise RuntimeError("audit authority mismatch")
+        if self.drive.transaction is not self.transaction: raise RuntimeError("transaction authority mismatch")
         self.csiu.readiness(); self.journal.readiness(); self.approval_store._check_paths()
         return True
     def capabilities(self) -> tuple[str,...]:
@@ -71,13 +71,15 @@ class SelfImprovementRuntime:
 def build_default_policy(repo: Path) -> ImprovementPolicy:
     return ImprovementPolicy('vulcan-improvement-policy/1', True, repo, ('fix_known_bugs','improve_test_coverage','optimize_performance','enhance_safety_systems','fix_circular_imports'), ('src/**/*.py','tests/**/*.py'), ('.git/**','data/**','logs/**'), 1, 50000, 200, True, {}, (VerificationGate('compile-target', ('python','-m','compileall','-q','src'), 30.0),), 30.0, 20000, True)
 
-def compose_self_improvement_runtime(*, durable_root: Path, audit: Any, alignment: Any, world_model: Any) -> SelfImprovementRuntime:
+def compose_self_improvement_runtime(*, durable_root: Path, audit: Any, alignment: Any, world_model: Any, approval_hmac_secret: str | None) -> SelfImprovementRuntime:
     repo=Path(__file__).resolve().parents[3]
     policy=build_default_policy(repo)
     csiu_store=durable_root/'csiu'/'accounting.jsonl'; csiu_store.parent.mkdir(parents=True, exist_ok=True); csiu_store.touch(exist_ok=True)
     csiu=CSIUEnforcement(CSIUEnforcementConfig(durable_store_path=str(csiu_store), durable_accounting_required=True))
     approvals=ApprovalStore(durable_root/'approvals'/'approvals.json')
-    authority=ApprovalAuthority(approvals, os.getenv('VULCAN_APPROVAL_HMAC_SECRET','dev-secret-change-me').encode())
+    if approval_hmac_secret is None:
+        approval_hmac_secret = 'development-approval-hmac-secret-change-me-32'
+    authority=ApprovalAuthority(approvals, approval_hmac_secret.encode())
     journal=PersistentImprovementJournal(durable_root/'improvements'/'journal.jsonl')
     tx=GovernedSelfImprovementTransaction(policy, audit, approvals)
     drive=compose_self_improvement_drive(world_model=world_model, csiu_enforcer=csiu, improvement_policy=policy, approval_store=approvals, approval_verifier=authority, audit_owner=audit)
