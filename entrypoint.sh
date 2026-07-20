@@ -112,7 +112,7 @@ SECRET_OK=0
 SELECTED=""
 EXPIRY_NOTE="(rotate secrets periodically)"
 
-for VAR in GRAPHIX_JWT_SECRET JWT_SECRET_KEY JWT_SECRET; do
+for VAR in VULCAN_JWT_SECRET GRAPHIX_JWT_SECRET JWT_SECRET_KEY JWT_SECRET; do
   VAL="$(get_env "$VAR")"
   if [ -n "$VAL" ]; then
     if validate_secret "$VAR" "$VAL"; then
@@ -130,7 +130,7 @@ if [ "$SECRET_OK" -ne 1 ]; then
   cat >&2 <<'EOF'
 ERROR: No valid JWT secret provided.
 Production serving refuses to downgrade into limited/no-auth mode.
-Provide one STRONG secret (>=32 chars, not common/weak) via GRAPHIX_JWT_SECRET, JWT_SECRET_KEY, or JWT_SECRET.
+Provide one STRONG secret (>=32 chars, not common/weak) via VULCAN_JWT_SECRET. Deprecated aliases GRAPHIX_JWT_SECRET, JWT_SECRET_KEY, and JWT_SECRET are accepted for one migration window only.
 EOF
   exit 78
 else
@@ -142,6 +142,10 @@ fi
 export VULCAN_ENV="${VULCAN_ENV:-production}"
 export VULCAN_SAFETY_LEVEL="${VULCAN_SAFETY_LEVEL:-strict}"
 export VULCAN_ENABLE_SELF_IMPROVEMENT="${VULCAN_ENABLE_SELF_IMPROVEMENT:-false}"
+export VULCAN_RUNTIME_DURABLE_ROOT="${VULCAN_RUNTIME_DURABLE_ROOT:-/var/lib/vulcan/runtime}"
+export VULCAN_MEMORY_ENABLED="${VULCAN_MEMORY_ENABLED:-1}"
+export VULCAN_MEMORY_BACKEND="${VULCAN_MEMORY_BACKEND:-sqlite}"
+export VULCAN_MEMORY_SQLITE_PATH="${VULCAN_MEMORY_SQLITE_PATH:-$VULCAN_RUNTIME_DURABLE_ROOT/memory/memory.sqlite}"
 
 # Execute main process
 exec "$@"

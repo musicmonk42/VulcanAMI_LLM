@@ -91,11 +91,33 @@ spec:
         resources:
           {{- toYaml .Values.resources | nindent 12 }}
         env:
-        - name: JWT_SECRET_KEY
+        - name: VULCAN_JWT_SECRET
           valueFrom:
             secretKeyRef:
               name: {{ include "vulcanami.fullname" . }}-secrets
               key: jwtSecretKey
+        - name: VULCAN_ENV
+          value: {{ .Values.runtime.environment | quote }}
+        - name: VULCAN_JWT_ISSUER
+          value: {{ .Values.runtime.jwtIssuer | quote }}
+        - name: VULCAN_JWT_AUDIENCE
+          value: {{ .Values.runtime.jwtAudience | quote }}
+        - name: VULCAN_RUNTIME_DURABLE_ROOT
+          value: {{ .Values.runtime.durableRoot | quote }}
+        - name: VULCAN_LANGUAGE_MODE
+          value: {{ .Values.runtime.languageMode | quote }}
+        - name: VULCAN_AUDIT_ENABLED
+          value: {{ .Values.runtime.auditEnabled | quote }}
+        - name: VULCAN_CSIU_ENABLED
+          value: {{ .Values.runtime.csiuEnabled | quote }}
+        - name: VULCAN_LEARNING_ENABLED
+          value: {{ .Values.runtime.learningEnabled | quote }}
+        - name: VULCAN_ENABLE_SELF_IMPROVEMENT
+          value: {{ .Values.runtime.selfImprovementEnabled | quote }}
+        - name: VULCAN_REQUEST_TIMEOUT_SECONDS
+          value: {{ .Values.runtime.requestTimeoutSeconds | quote }}
+        - name: VULCAN_PUBLIC_DIAGNOSTICS
+          value: {{ .Values.runtime.publicDiagnostics | quote }}
         - name: BOOTSTRAP_KEY
           valueFrom:
             secretKeyRef:
