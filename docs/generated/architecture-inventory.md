@@ -1,12 +1,12 @@
 # Generated architecture inventory
 
-Digest: `f1ac0769f2ff17d8e3c589e2a6a363060169d2090d1538e9e9d6cfb7863dc165`
+Digest: `3d3845e97a17464c96d6c3921a71c9cd0e4a9fdd3ef63927d6792589e091cd4c`
 
 This file is generated from `docs/generated/architecture-inventory.json`.
 
 ## Entrypoints
 
-Count: 403
+Count: 404
 
 - `src/vulcan/tests/test_multimodal_reasoning.py:999` kind='python_main_guard', reachability='test-only'
 - `src/vulcan/tests/test_curiosity_engine_integration.py:1000` kind='python_main_guard', reachability='test-only'
@@ -58,7 +58,7 @@ Count: 403
 - `src/vulcan/tests/test_principle_learner.py:1163` kind='python_main_guard', reachability='test-only'
 - `src/vulcan/tests/test_dynamics_model.py:1169` kind='python_main_guard', reachability='test-only'
 - `src/vulcan/tests/test_prediction_engine.py:1172` kind='python_main_guard', reachability='test-only'
-- ... 353 more in JSON
+- ... 354 more in JSON
 
 ## Routes
 
@@ -419,7 +419,7 @@ Count: 303
 
 ## Environment Readers
 
-Count: 428
+Count: 431
 
 - `src/audit_log.py:416` call='os.environ.get', key='AGENT_ID', reachability='unknown'
 - `src/api_server.py:1058` call='os.environ.get', key='ALLOWED_ORIGIN', reachability='unknown'
@@ -471,7 +471,7 @@ Count: 428
 - `src/governance/app.py:50` call='os.environ.get', key='FORCE_HTTPS', reachability='unknown'
 - `src/api_gateway.py:90` call='os.environ.get', key='GATEWAY_MODE', reachability='unknown'
 - `src/vulcan/memory/hierarchical.py:1656` call='os.environ.get', key='GITHUB_ACTIONS', reachability='unknown'
-- ... 378 more in JSON
+- ... 381 more in JSON
 
 ## Capability Claims
 
@@ -498,7 +498,7 @@ Count: 18
 
 ## Ownership Graph
 
-Count: 279
+Count: 281
 
 - `src/vulcan/runtime/alignment.py:` owner_domain='alignment', reachability='production-reachable'
 - `src/vulcan/safety/governance_alignment.py:` owner_domain='alignment', reachability='unknown'
@@ -550,7 +550,7 @@ Count: 279
 - `src/memory/tests/test_governed_unlearning.py:` owner_domain='learning', reachability='test-only'
 - `src/persistant_memory_v46/tests/test_unlearning.py:` owner_domain='learning', reachability='test-only'
 - `src/persistant_memory_v46/unlearning.py:` owner_domain='learning', reachability='unknown'
-- ... 229 more in JSON
+- ... 231 more in JSON
 
 ## Text Entrypoints
 
@@ -622,8 +622,10 @@ Count: 279
 - `helm/vulcanami/templates/deployment.yaml:34` image: {{ include "vulcanami.image" . | quote }}
 - `helm/vulcanami/templates/deployment.yaml:36` command:
 - `helm/vulcanami/templates/deployment.yaml:71` image: {{ include "vulcanami.image" . | quote }}
-- `helm/vulcanami/templates/deployment.yaml:85` livenessProbe:
-- `helm/vulcanami/templates/deployment.yaml:89` readinessProbe:
+- `helm/vulcanami/templates/deployment.yaml:73` command:
+- `helm/vulcanami/templates/deployment.yaml:76` args:
+- `helm/vulcanami/templates/deployment.yaml:90` livenessProbe:
+- `helm/vulcanami/templates/deployment.yaml:94` readinessProbe:
 - `helm/vulcanami/values.yaml:13` image:
 - `helm/vulcanami/values.yaml:23` # To get the digest of an image:
 - `helm/vulcanami/values.yaml:117` livenessProbe:

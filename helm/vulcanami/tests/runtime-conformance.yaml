@@ -1,0 +1,15 @@
+suite: canonical runtime conformance
+release:
+  name: runtime-e2e
+templates:
+  - templates/deployment.yaml
+  - templates/pvc.yaml
+tests:
+  - it: renders the selected immutable image with single-writer durable storage
+    set:
+      image.tag: e2e
+      image.digest: sha256:1111111111111111111111111111111111111111111111111111111111111111
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 1

@@ -1,0 +1,50 @@
+name: runtime-e2e
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runtime-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: '3.14'
+
+jobs:
+  built-image-runtime-qualification:
+    name: exact built image runtime qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: python -m pytest -q tests/e2e/runtime_image/
+      - run: scripts/e2e/run_runtime_qualification.sh
+      - run: PYTHON_BIN='python -O' scripts/e2e/run_runtime_qualification.sh
+      - if: failure()
+        run: |
+          mkdir -p evidence/runtime-e2e
+          docker ps -a > evidence/runtime-e2e/docker-ps.txt || true
+          docker logs $(docker ps -aq --filter ancestor=vulcanami-runtime-e2e:local | head -1) 2>&1 | sed -E 's/(Bearer )[A-Za-z0-9._-]+/\1[REDACTED]/g;s/(VULCAN_JWT_SECRET=)[^ ]+/\1[REDACTED]/g' > evidence/runtime-e2e/container.log || true
+      - if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: runtime-e2e-failure-evidence
+          path: evidence/runtime-e2e
+          if-no-files-found: ignore
+
+  helm-conformance:
+    name: helm chart conformance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b
+      - uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4
+      - run: helm template runtime-e2e helm/vulcanami --set image.tag=e2e --set image.digest=sha256:1111111111111111111111111111111111111111111111111111111111111111 > rendered.yaml
+      - run: python -m pytest -q tests/e2e/runtime_image/test_helm_conformance.py
