@@ -23,6 +23,7 @@ from .semantic import DeterministicLanguageInput, LanguageInputPort
 from .self_improvement import SelfImprovementRuntime, compose_self_improvement_runtime
 from .settings import RuntimeSettings
 from .health import HealthFailureCategory, HealthStateMachine, ProcessState, bounded_disk_check, categorize_failure
+from vulcan.microkernel.snapshots import AttributeSnapshotProvider, MAX_EPISODE_LIFETIME, SnapshotBundle, construct_snapshot_bundle
 
 
 LanguageMode = Literal["disabled", "deterministic_only", "transformer_proposal"]
@@ -64,6 +65,7 @@ class RuntimeContainer:
     settings: RuntimeSettings | None = None
     closed: bool = False
     health: HealthStateMachine | None = None
+    max_episode_lifetime_seconds: int = int(MAX_EPISODE_LIFETIME.total_seconds())
 
     async def close(self) -> None:
         """Release every owned resource once, preserving the first failure.
@@ -178,6 +180,24 @@ class RuntimeContainer:
         """Backward-compatible deep readiness adapter; not used for liveness."""
         await self.deep_integrity()
 
+    def admit_snapshot_bundle(self, episode_id: str) -> SnapshotBundle:
+        """Pin every mutable state authority for one bounded episode lifetime."""
+        if self.closed:
+            raise RuntimeError("canonical runtime is closed")
+        providers = (
+            AttributeSnapshotProvider(self.world_state, owner_name="world_state"),
+            AttributeSnapshotProvider(self.world_state, owner_name="self_state"),
+            AttributeSnapshotProvider(self.world_state, owner_name="social_state"),
+            AttributeSnapshotProvider(self.world_state, owner_name="normative_state"),
+            AttributeSnapshotProvider(self.domain_registry, owner_name="domain_registry"),
+            AttributeSnapshotProvider(self.memory, owner_name="memory"),
+            AttributeSnapshotProvider(self.learning_owner, owner_name="capability_manifest"),
+            AttributeSnapshotProvider(self.self_improvement, owner_name="csiu_policy"),
+            AttributeSnapshotProvider(self.alignment, owner_name="alignment"),
+        )
+        from datetime import timedelta
+        return construct_snapshot_bundle(episode_id=episode_id, providers=providers, lifetime=timedelta(seconds=self.max_episode_lifetime_seconds))
+
     def capabilities(self) -> tuple[str, ...]:
         """Return only capabilities supplied by the composed kernel object."""
         advertised = getattr(self.kernel, "capabilities", None)
@@ -250,7 +270,7 @@ class RuntimeContainer:
             kernel = CognitiveKernel(state_authority=world_state, finalizer=SafetyResponseFinalizer(response_safety),
                                      language_input=language_input, language_output=language_output, memory=memory, audit=audit, alignment=alignment)
             container = cls(str(uuid4()), deployment, world_state, kernel, safety, memory,
-                       language_input, language_output, config, audit, alignment, domain_registry, Path(root), self_improvement, learning_owner, settings, False, HealthStateMachine())
+                       language_input, language_output, config, audit, alignment, domain_registry, Path(root), self_improvement, learning_owner, settings, False, HealthStateMachine(), int(MAX_EPISODE_LIFETIME.total_seconds()))
             container.health.admit()
             return container
         except Exception:

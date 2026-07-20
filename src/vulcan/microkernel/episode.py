@@ -10,6 +10,7 @@ from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from hashlib import sha256
 import json
+import re
 from types import MappingProxyType
 from typing import Mapping, Protocol, Sequence
 from uuid import uuid4
@@ -18,6 +19,7 @@ from .state_machine import EpisodeState, EpisodeTransitionError, ensure_transiti
 
 SCHEMA_VERSION = "cognitive-episode.v1"
 GENESIS_DIGEST = "0" * 64
+_HEX64 = re.compile(r"^[0-9a-f]{64}$")
 
 
 class Clock(Protocol):
@@ -73,6 +75,10 @@ class RequestBinding:
 class SnapshotBundleRef:
     bundle_id: str
     state_digest: str
+
+    def __post_init__(self) -> None:
+        if not self.bundle_id or not _HEX64.fullmatch(self.state_digest):
+            raise ValueError("validated snapshot bundle identity is required")
 
     def to_json(self) -> dict[str, str]:
         return {"bundle_id": self.bundle_id, "state_digest": self.state_digest}
@@ -179,6 +185,11 @@ class CognitiveEpisode:
                    effects: Sequence[ArtifactRef] = (), response: ArtifactRef | None = None, consolidation_refs: Sequence[ArtifactRef] = ()) -> "CognitiveEpisode":
         if not authority:
             raise EpisodeTransitionError("transition authority is required")
+        if self.snapshot_bundle is not None:
+            allowed = {self.snapshot_bundle.bundle_id, self.snapshot_bundle.state_digest}
+            unknown = [sid for sid in snapshot_ids if sid not in allowed]
+            if unknown and "rebase" not in reason.lower() and "transition" not in reason.lower():
+                raise EpisodeTransitionError("mixed snapshot versions require explicit transition/rebase event")
         ensure_transition(self.state, target)
         prior_digest = self.digest
         updated = replace(
