@@ -44,7 +44,11 @@ def test_auth_rejects_duplicate_keys_algorithms_key_selection_times_and_mismatch
     with pytest.raises(AuthorizationError): p.require('domains:write')
 
 class FailingAudit:
+    owner_id = "audit:test"
     def __init__(self): self.events=[]; self.fail=False; self.fail_after=False
+    def readiness(self):
+        if self.fail: raise RuntimeError('audit down')
+        return True
     def append(self, et, payload):
         if self.fail: raise RuntimeError('audit down')
         self.events.append((et,payload['operation_id']))

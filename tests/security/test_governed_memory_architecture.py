@@ -2,6 +2,7 @@
 from pathlib import Path
 import pytest
 from vulcan.memory.governed import MemoryRuntimeConfig, SQLiteMemoryRepository
+from vulcan.runtime.audit import CanonicalAudit
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -12,10 +13,11 @@ def test_runtime_does_not_import_legacy_memory_writers():
     assert not any(token in text for token in forbidden)
 
 def test_second_repository_cannot_own_the_same_sqlite_store(tmp_path):
-    first = SQLiteMemoryRepository(str(tmp_path / "preferences.sqlite"))
+    audit = CanonicalAudit(tmp_path / "audit" / "events.jsonl")
+    first = SQLiteMemoryRepository(str(tmp_path / "preferences.sqlite"), audit=audit)
     with pytest.raises(RuntimeError, match="already owned"):
-        SQLiteMemoryRepository(str(tmp_path / "preferences.sqlite"))
-    first.close()
+        SQLiteMemoryRepository(str(tmp_path / "preferences.sqlite"), audit=audit)
+    first.close(); audit.close()
 
 def test_governed_config_rejects_unsafe_or_multi_replica_topology(tmp_path):
     with pytest.raises(RuntimeError):

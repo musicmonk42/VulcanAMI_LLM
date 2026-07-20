@@ -39,13 +39,15 @@ class DummyOwner:
 
 def lightweight_container(monkeypatch: pytest.MonkeyPatch) -> None:
     import vulcan.runtime.container as container
-    monkeypatch.setattr(container, "compose_governed_memory", lambda config: DummyOwner())
+    monkeypatch.setattr(container, "compose_governed_memory", lambda config, **kwargs: DummyOwner())
     monkeypatch.setattr(container, "CanonicalAudit", lambda path: DummyOwner())
     monkeypatch.setattr(container, "AlignmentRegistry", lambda path, audit=None: DummyOwner())
     monkeypatch.setattr(container, "PersistentDomainRegistry", lambda path, audit=None: DummyOwner())
     monkeypatch.setattr(container, "compose_self_improvement_runtime", lambda **kwargs: SimpleNamespace(drive=DummyOwner(), capabilities=lambda: (), close=lambda: None))
     monkeypatch.setattr(container, "ShadowLinUCBToolBandit", lambda: DummyOwner())
     monkeypatch.setattr(container, "LearningOwner", lambda **kwargs: DummyOwner())
+    monkeypatch.setattr(container, "EnhancedSafetyResponseAdapter", lambda safety: DummyOwner())
+    monkeypatch.setattr(container, "SafetyResponseFinalizer", lambda response_safety: DummyOwner())
 
 
 class GoodWorld:
