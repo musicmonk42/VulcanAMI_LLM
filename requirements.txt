@@ -30,7 +30,7 @@ async-timeout==4.0.3
 asyncpg==0.30.0
 attrs==25.4.0
 Authlib==1.6.1
-azure-core==1.35.1
+azure-core==1.41.0
 azure-identity==1.24.0
 azure-keyvault-secrets==4.10.0
 azure-storage-blob==12.26.0
