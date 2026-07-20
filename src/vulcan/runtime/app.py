@@ -116,7 +116,7 @@ class BundleBody(BaseModel):
     model_config=ConfigDict(extra='forbid', strict=True)
 
 def generate_route_manifest():
-    return tuple({'path':p,'method':m,'classification':'public' if p.startswith('/health/') else 'protected'} for p,m in [('/health/live','GET'),('/health/ready','GET'),('/v1/chat','POST'),('/v1/admin/domains','POST'),('/v1/admin/alignment','POST'),('/v1/audit/cases/{case_id}','GET'),('/v1/admin/improvements','GET'),('/v1/admin/improvements/{proposal_id}','GET'),('/v1/admin/improvements/{proposal_id}/approve','POST'),('/v1/admin/improvements/{proposal_id}/reject','POST'),('/v1/admin/improvements/{proposal_id}/resume','POST'),('/v1/admin/improvements/{proposal_id}/status','GET'),('/v1/audit/improvements/{proposal_digest}','GET'),('/v1/memory/preferences','POST'),('/v1/memory/preferences/{key}','GET'),('/v1/memory/preferences/{record_id}','PATCH'),('/v1/memory/preferences/{record_id}','DELETE')])
+    return tuple({'path':p,'method':m,'classification':'public' if p.startswith('/health/') else 'protected'} for p,m in [('/health/live','GET'),('/health/ready','GET'),('/v1/capabilities','GET'),('/v1/chat','POST'),('/v1/admin/domains','POST'),('/v1/admin/alignment','POST'),('/v1/audit/cases/{case_id}','GET'),('/v1/admin/improvements','GET'),('/v1/admin/improvements/{proposal_id}','GET'),('/v1/admin/improvements/{proposal_id}/approve','POST'),('/v1/admin/improvements/{proposal_id}/reject','POST'),('/v1/admin/improvements/{proposal_id}/resume','POST'),('/v1/admin/improvements/{proposal_id}/status','GET'),('/v1/audit/improvements/{proposal_digest}','GET'),('/v1/memory/preferences','POST'),('/v1/memory/preferences/{key}','GET'),('/v1/memory/preferences/{record_id}','PATCH'),('/v1/memory/preferences/{record_id}','DELETE')])
 
 def create_app()->FastAPI:
     app=FastAPI(title='VULCAN canonical runtime', version='7.0', lifespan=lifespan)
@@ -130,6 +130,10 @@ def create_app()->FastAPI:
     async def ready(request:Request):
         try: rt=await _runtime(request); return {'status':'ready','runtime_id':rt.runtime_id,'learning_owner_id':rt.learning_owner.owner_id,'learning_status':rt.learning_owner.capability.value,'capabilities':list(rt.capabilities()),'learning_capabilities':[c.__dict__ | {'status': c.status.value, 'readiness_state': c.readiness_state.value} for c in rt.learning_owner.capability_matrix()]}
         except HTTPException: return JSONResponse(status_code=503, content={'status':'not_ready'})
+    @app.get('/v1/capabilities')
+    async def capabilities():
+        from vulcan.runtime.capabilities import public_capability_response
+        return public_capability_response()
     async def chat(request:Request):
         _principal(request,'reason:write'); rt=await _runtime(request); data=await _body(request); body=ReasonRequest.model_validate(data)
         utterance=Utterance.from_text(body.message); case=CognitiveCase.create(request_id='req-'+uuid4().hex, conversation_id=body.conversation_id, input_digest=utterance.digest)
