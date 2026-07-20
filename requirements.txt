@@ -275,7 +275,7 @@ opentelemetry-util-http==0.46b0
 opentracing==2.4.0
 optuna==3.6.1
 ordered-set==4.1.0
-orjson==3.11.2
+orjson==3.11.9
 ormsgpack==1.7.0
 overrides==7.7.0
 packaging==25.0
