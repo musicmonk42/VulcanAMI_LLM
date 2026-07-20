@@ -157,7 +157,7 @@ graphql-core==3.2.7
 graphql-relay==3.2.0
 graphviz==0.21
 greenlet==3.2.4
-grpc-google-iam-v1==0.14.2
+grpc-google-iam-v1==0.14.4
 # FIXED: Aligned grpcio versions
 grpcio==1.62.2
 grpcio-health-checking==1.62.2

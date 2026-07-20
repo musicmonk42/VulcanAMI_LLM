@@ -2484,9 +2484,9 @@ greenlet==3.2.4 \
     # via
     #   -r requirements.txt
     #   sqlalchemy
-grpc-google-iam-v1==0.14.2 \
-    --hash=sha256:a3171468459770907926d56a440b2bb643eec1d7ba215f48f3ecece42b4d8351 \
-    --hash=sha256:b3e1fc387a1a329e41672197d0ace9de22c78dd7d215048c4c78712073f7bd20
+grpc-google-iam-v1==0.14.4 \
+    --hash=sha256:392b3796947ed6334e61171d9ab06bf7eb357f554e5fc7556ad7aab6d0e17038 \
+    --hash=sha256:412facc320fcbd94034b4df3d557662051d4d8adfa86e0ddb4dca70a3f739964
     # via
     #   -r requirements.txt
     #   google-cloud-logging
