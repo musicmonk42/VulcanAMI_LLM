@@ -5251,9 +5251,9 @@ propcache==0.4.1 \
     #   -r requirements.txt
     #   aiohttp
     #   yarl
-proto-plus==1.26.0 \
-    --hash=sha256:6e93d5f5ca267b54300880fff156b6a3386b3fa3f43b1da62e680fc0c586ef22 \
-    --hash=sha256:bf2dfaa3da281fc3187d12d224c707cb57214fb2c22ba854eb0c105a3fb2d4d7
+proto-plus==1.28.1 \
+    --hash=sha256:6660f5f1970874bdcfc3088b435188a36a37bd3596668f7d726417c4ae8cfbed \
+    --hash=sha256:832e68e7fe064cf90ab153b6e5eb935b27891bb89aaeb68b115e9b702f6cb168
     # via
     #   -r requirements.txt
     #   google-ai-generativelanguage
