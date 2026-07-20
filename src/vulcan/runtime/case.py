@@ -18,6 +18,8 @@ class CognitiveCaseStatus(str, Enum):
     OPEN = "open"
     SUCCESS = "success"
     ABSTAINED = "abstained"
+    BLOCKED = "blocked"
+    FINALIZATION_ERROR = "finalization_error"
     FAILED = "failed"
     CANCELLED = "cancelled"
 

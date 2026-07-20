@@ -6,8 +6,8 @@ from types import SimpleNamespace
 import pytest
 
 from vulcan.runtime.case import CognitiveCase, CognitiveCaseStatus
-from vulcan.runtime.finalization import FinalizationDecision, SafetyResponseFinalizer
-from vulcan.runtime.kernel import CognitiveKernel, KernelRequest
+from vulcan.runtime.finalization import FinalizationDecision, FinalizationResult, SafetyResponseFinalizer
+from vulcan.runtime.kernel import CognitiveKernel, KernelRequest, KernelResult
 from vulcan.runtime.semantic import Utterance
 from vulcan.safety.response_adapter import EnhancedSafetyResponseAdapter
 from vulcan.safety.safety_types import ResponseSafetyContext, ResponseSafetyStatus, SafetyReport, SafetyValidator
@@ -122,3 +122,50 @@ async def test_modified_text_is_not_allowed_through():
     result = await SafetyResponseFinalizer(EnhancedSafetyResponseAdapter(ModifyingValidator(config=None))).finalize(artifact, ctx())
     assert result.decision is FinalizationDecision.BLOCK
     assert result.public_text != "changed"
+
+
+class _Finalizer:
+    def __init__(self, decision: FinalizationDecision) -> None:
+        self._decision = decision
+
+    async def finalize(self, artifact, context):
+        text = artifact.text if self._decision is FinalizationDecision.ALLOW else "safe fallback"
+        return FinalizationResult(self._decision, artifact, text)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("decision", "expected"),
+    [
+        (FinalizationDecision.BLOCK, CognitiveCaseStatus.BLOCKED),
+        (FinalizationDecision.ERROR, CognitiveCaseStatus.FINALIZATION_ERROR),
+        (FinalizationDecision.CANCELLED, CognitiveCaseStatus.CANCELLED),
+    ],
+)
+async def test_case_terminal_status_reflects_final_response_safety_decision(decision, expected):
+    utterance = Utterance.from_text("2 + 2")
+    case = CognitiveCase.create(request_id="episode", conversation_id=None, input_digest=utterance.digest)
+    result = await CognitiveKernel(state_authority=SimpleNamespace(version="1"), finalizer=_Finalizer(decision)).handle(KernelRequest(utterance, None), case)
+
+    assert case.terminal_status is expected
+    assert result.status is expected
+    assert case.finalization_status == decision.value
+
+
+def test_transport_exposes_terminal_and_release_semantics_without_second_authority():
+    from vulcan.runtime.semantic import ResponseIR, ResponseMode
+
+    response_ir = ResponseIR("1", "response-1", "case-1", None, "snapshot-1", ResponseMode.STRICT, ("claim-1",))
+    result = KernelResult(
+        "safe fallback",
+        response_ir,
+        CognitiveCaseStatus.BLOCKED,
+        FinalizationDecision.BLOCK.value,
+    )
+
+    envelope = result.transport(case_id="case-1", runtime_id="runtime-1", snapshot_id="snapshot-1")
+
+    assert envelope["response"] == "safe fallback"
+    assert envelope["metadata"]["terminal_status"] == "blocked"
+    assert envelope["metadata"]["response_released"] is False
+    assert envelope["metadata"]["finalization_safety_decision"] == "block"
