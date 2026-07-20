@@ -55,7 +55,14 @@ class CognitiveKernel:
         if request.utterance.digest != case.input_hash or request.conversation_id != case.conversation_id: raise ValueError("request/case correlation mismatch")
         self.calls += 1; case.state_snapshot_id=self._snapshot_id(); case.record("semantic_ingress")
         alignment_lease = self._alignment.lease() if self._alignment is not None else None
+        alignment_lease_closed = False
+        terminal_commit_started = False
         policy = getattr(alignment_lease, "policy", None)
+        def close_alignment_lease() -> None:
+            nonlocal alignment_lease_closed
+            if alignment_lease is not None and not alignment_lease_closed:
+                alignment_lease.close()
+                alignment_lease_closed = True
         if self._audit: self._audit.append("case.started", {"case_id":case.case_id,"request_id":case.request_id,"request_digest":case.input_hash,"conversation_id":case.conversation_id or "","state_snapshot_id":case.state_snapshot_id})
         try:
             try:
@@ -128,23 +135,29 @@ class CognitiveKernel:
             elif finalization.decision is FinalizationDecision.CANCELLED:
                 status = CognitiveCaseStatus.CANCELLED
             if self._audit: self._audit.append("case.finalized", {"case_id":case.case_id,"request_id":case.request_id,"request_digest":case.input_hash,"finalization":finalization.decision.value,"terminal_status":status.value,"rendered_response_digest":artifact.ir_digest})
-            case.close(status)
+            close_alignment_lease()
+            terminal_commit_started = True
             if self._audit:
                 event_type = "case.completed" if status is CognitiveCaseStatus.SUCCESS else f"case.{status.value}"
                 self._audit.append(event_type, {"case_id":case.case_id,"request_id":case.request_id,"request_digest":case.input_hash,"status":status.value,"rendered_response_digest":artifact.ir_digest})
+            case.close(status)
             return KernelResult(finalization.public_text,response_ir,status,finalization.decision.value)
         except asyncio.CancelledError:
-            if case.terminal_status is CognitiveCaseStatus.OPEN: case.close(CognitiveCaseStatus.CANCELLED,"cancelled")
+            close_alignment_lease()
+            if case.terminal_status is CognitiveCaseStatus.OPEN:
+                if self._audit: self._audit.append("case.cancelled", {"case_id":case.case_id,"request_id":case.request_id,"request_digest":case.input_hash,"status":CognitiveCaseStatus.CANCELLED.value})
+                case.close(CognitiveCaseStatus.CANCELLED,"cancelled")
             raise
         except Exception as exc:
+            close_alignment_lease()
+            if terminal_commit_started:
+                raise
             if case.terminal_status is CognitiveCaseStatus.OPEN:
-                if self._audit:
-                    try: self._audit.append("case.failed", {"case_id":case.case_id,"request_id":case.request_id,"request_digest":case.input_hash,"category":type(exc).__name__})
-                    except Exception: pass
+                if self._audit: self._audit.append("case.failed", {"case_id":case.case_id,"request_id":case.request_id,"request_digest":case.input_hash,"category":type(exc).__name__})
                 case.close(CognitiveCaseStatus.FAILED,type(exc).__name__)
             raise
         finally:
-            if alignment_lease is not None: alignment_lease.close()
+            close_alignment_lease()
     def _snapshot_id(self)->str:
         candidate=getattr(self._state_authority,"version",None) or getattr(self._state_authority,"snapshot_id",None)
         if candidate is None: return "world-state:unversioned"

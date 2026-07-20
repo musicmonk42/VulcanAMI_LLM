@@ -62,7 +62,7 @@ def test_alignment_blocks_bad_claims_and_passes_valid(tmp_path):
     assert not r.decide((c,), (expired,), (d,)).accepted
     assert not r.decide(tuple([c]*9), (ev,), (d,)).accepted
 
-def test_completed_append_failure_blocks_positive_response(tmp_path):
+def test_terminal_audit_failure_keeps_case_open_and_blocks_positive_response(tmp_path):
     class FailingAudit(CanonicalAudit):
         def append(self,t,d):
             if t=="case.completed": raise AuditError("disk full")
@@ -71,7 +71,33 @@ def test_completed_append_failure_blocks_positive_response(tmp_path):
     k=CognitiveKernel(state_authority=SimpleNamespace(version="1"), finalizer=Finalizer(), audit=audit, alignment=align)
     u=Utterance.from_text("2+2"); case=CognitiveCase.create(request_id="r", conversation_id=None, input_digest=u.digest)
     with pytest.raises(AuditError): asyncio.run(k.handle(KernelRequest(u,None), case))
-    assert case.terminal_status is CognitiveCaseStatus.SUCCESS  # positive was computed but not released
+    assert case.terminal_status is CognitiveCaseStatus.OPEN
+    assert [e.event_type for e in audit.events_for_case(case.case_id)][-1] == "case.finalized"
+
+
+def test_alignment_lease_cleanup_precedes_terminal_audit_commit(tmp_path):
+    order = []
+
+    class Lease:
+        policy = SimpleNamespace(policy_digest="policy", revision=1)
+        def close(self): order.append("alignment_closed")
+
+    class Alignment:
+        def lease(self): return Lease()
+        def decide(self, claims, evidence, derivations, policy):
+            return SimpleNamespace(accepted=True, reason_codes=("passed",), policy_digest="policy", policy_revision=1)
+
+    class ObservingAudit(CanonicalAudit):
+        def append(self, t, d):
+            if t == "case.completed": order.append("terminal_audit")
+            return super().append(t, d)
+
+    audit=ObservingAudit(tmp_path/"a.jsonl")
+    k=CognitiveKernel(state_authority=SimpleNamespace(version="1"), finalizer=Finalizer(), audit=audit, alignment=Alignment())
+    u=Utterance.from_text("2+2"); case=CognitiveCase.create(request_id="r", conversation_id=None, input_digest=u.digest)
+    asyncio.run(k.handle(KernelRequest(u,None), case))
+    assert order == ["alignment_closed", "terminal_audit"]
+    assert case.terminal_status is CognitiveCaseStatus.SUCCESS
 
 def test_no_raw_prompt_token_or_secret_in_case_events(tmp_path):
     audit=CanonicalAudit(tmp_path/"a.jsonl"); align=AlignmentRegistry(tmp_path/"p.json")
