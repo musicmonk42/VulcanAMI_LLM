@@ -144,10 +144,33 @@ export JWT_VALIDATION_MODE="enabled"
 export VULCAN_ENV="${VULCAN_ENV:-production}"
 export VULCAN_SAFETY_LEVEL="${VULCAN_SAFETY_LEVEL:-strict}"
 export VULCAN_ENABLE_SELF_IMPROVEMENT="${VULCAN_ENABLE_SELF_IMPROVEMENT:-false}"
-export VULCAN_RUNTIME_DURABLE_ROOT="${VULCAN_RUNTIME_DURABLE_ROOT:-/var/lib/vulcan/runtime}"
+export VULCAN_RUNTIME_DURABLE_ROOT="${VULCAN_RUNTIME_DURABLE_ROOT:-/var/lib/vulcan}"
 export VULCAN_MEMORY_ENABLED="${VULCAN_MEMORY_ENABLED:-1}"
 export VULCAN_MEMORY_BACKEND="${VULCAN_MEMORY_BACKEND:-sqlite}"
 export VULCAN_MEMORY_SQLITE_PATH="${VULCAN_MEMORY_SQLITE_PATH:-$VULCAN_RUNTIME_DURABLE_ROOT/memory/memory.sqlite}"
+export VULCAN_RUNTIME_REPLICAS="${VULCAN_RUNTIME_REPLICAS:-1}"
+export VULCAN_CACHE_ROOT="${VULCAN_CACHE_ROOT:-/tmp/vulcan-cache}"
+export PYTHONPATH="${PYTHONPATH:-/app/src:src}"
+EXPECTED_UID=""
+EXPECTED_GID=""
+if [ "$(id -u)" = "1001" ]; then
+  EXPECTED_UID=1001
+  EXPECTED_GID=1001
+fi
+VALIDATION_CATEGORY=$(EXPECTED_UID="$EXPECTED_UID" EXPECTED_GID="$EXPECTED_GID" python - <<'PY'
+import os
+from pathlib import Path
+from vulcan.runtime.settings import validate_durable_root
+uid = int(os.environ["EXPECTED_UID"]) if os.environ.get("EXPECTED_UID") else None
+gid = int(os.environ["EXPECTED_GID"]) if os.environ.get("EXPECTED_GID") else None
+r = validate_durable_root(Path(os.environ["VULCAN_RUNTIME_DURABLE_ROOT"]), expected_uid=uid, expected_gid=gid)
+print(r.category)
+PY
+)
+if [ "$VALIDATION_CATEGORY" != "ok" ]; then
+  echo "ERROR: durable root validation failed: $VALIDATION_CATEGORY" >&2
+  exit 78
+fi
 
 # Execute main process
 exec "$@"

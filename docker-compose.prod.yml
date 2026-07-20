@@ -41,7 +41,7 @@ volumes:
     driver: local
   etcd_data:
     driver: local
-  memory_store_data:
+  vulcan_durable_data:
     driver: local
 
 ################################################################################
@@ -223,7 +223,7 @@ services:
       - VERSION=${VERSION:-latest}
       - PORT=8000
       - VULCAN_JWT_SECRET=${VULCAN_JWT_SECRET:?VULCAN_JWT_SECRET is required}
-      - VULCAN_RUNTIME_DURABLE_ROOT=${VULCAN_RUNTIME_DURABLE_ROOT:-/var/lib/vulcan/runtime}
+      - VULCAN_RUNTIME_DURABLE_ROOT=/var/lib/vulcan
       - BOOTSTRAP_KEY=${BOOTSTRAP_KEY:?BOOTSTRAP_KEY is required}
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
@@ -373,15 +373,19 @@ services:
       - INDEX_TYPE=${INDEX_TYPE:-disk_based_tier_c}
       - UNLEARNING_METHOD=${UNLEARNING_METHOD:-gradient_surgery}
       - PROOF_SYSTEM=${PROOF_SYSTEM:-groth16}
-      - MEMORY_STORE_PATH=/app/memory_store
-      - CACHE_ROOT=/tmp/vulcan_cache
+      - MEMORY_STORE_PATH=/var/lib/vulcan/memory
+      - CACHE_ROOT=/tmp/vulcan-cache
+      - VULCAN_CACHE_ROOT=/tmp/vulcan-cache
+      - VULCAN_RUNTIME_REPLICAS=1
       - CONFIG_PATH=/app/configs
       # Learning State Persistence Configuration
       # Path for persisting learning state (tool weights, concepts, contraindications)
       # This ensures learning persists across queries and server restarts
-      - VULCAN_STORAGE_PATH=/app/memory_store
+      - VULCAN_STORAGE_PATH=/var/lib/vulcan/learning
     volumes:
-      - memory_store_data:/app/memory_store
+      - vulcan_durable_data:/var/lib/vulcan
+      - type: tmpfs
+        target: /tmp/vulcan-cache
     ports:
       - "8000:8000"
     depends_on:

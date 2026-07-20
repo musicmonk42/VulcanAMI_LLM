@@ -14,7 +14,7 @@ Chat request safety is mandatory. Client `enable_safety=false` is ignored, the t
 
 Health semantics follow Kubernetes probe intent: liveness is a cheap process response, startup reports initialization state, and readiness returns HTTP 503 until mandatory serving-boundary conditions and service initialization are satisfied. Health output avoids secrets and traces.
 
-The production image runs as a non-root user and makes `/app/src`, `/app/configs`, `/app/config`, and `/app/models` read-only. Writable state is limited to `/app/data`, `/app/memory_store`, `/app/cache`, and `/tmp/vulcan`.
+The production image runs as a non-root user and makes `/app/src`, `/app/configs`, `/app/config`, and `/app/models` read-only. Writable durable authority state is limited to `/var/lib/vulcan`; `/app/data`, `/dev/shm`, and `/tmp/vulcan-cache` are ephemeral runtime scratch locations.
 
 ## Transformer authority boundary (sequence item 2)
 
