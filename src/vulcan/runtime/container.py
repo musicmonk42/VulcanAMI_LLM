@@ -8,7 +8,7 @@ from typing import Any, Literal
 from uuid import uuid4
 from pathlib import Path
 
-from vulcan.memory.governed import GovernedMemoryPort, MemoryRuntimeConfig, compose_governed_memory
+from vulcan.memory.composition import GovernedMemoryPort, MemoryRuntimeConfig, compose_governed_memory
 from vulcan.learning_owner import LearningCapabilityStatus, LearningOwner
 from vulcan.learning_bandit import ShadowLinUCBToolBandit
 
@@ -221,13 +221,13 @@ class RuntimeContainer:
             from vulcan.local_language import build_verified_adapter
             language_input = build_verified_adapter(release_root=config.release_path or "", provider_factory=config.provider_factory)
         language_output: LanguageOutputPort = DeterministicLanguageOutput()
-        memory = compose_governed_memory(MemoryRuntimeConfig(settings.memory_enabled, settings.memory_sqlite_path, settings.durable_root, settings.replicas, settings.memory_backend.value))
         root = str(settings.durable_root)
         Path(root).mkdir(parents=True, exist_ok=True)
-        audit = alignment = domain_registry = self_improvement = None
+        memory = audit = alignment = domain_registry = self_improvement = None
         try:
-            memory.readiness()
             audit = CanonicalAudit(f"{root}/audit/events.jsonl")
+            memory = compose_governed_memory(MemoryRuntimeConfig(settings.memory_enabled, settings.memory_sqlite_path, settings.durable_root, settings.replicas, settings.memory_backend.value), audit=audit)
+            memory.readiness()
             alignment = AlignmentRegistry(f"{root}/alignment/active.json", audit=audit)
             domain_registry = PersistentDomainRegistry(f"{root}/domains", audit=audit)
             self_improvement = compose_self_improvement_runtime(durable_root=Path(root), audit=audit, alignment=alignment, world_model=world_state, approval_hmac_secret=settings.approval_hmac_secret.reveal() if settings.approval_hmac_secret else None)

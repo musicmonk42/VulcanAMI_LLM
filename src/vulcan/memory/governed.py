@@ -61,6 +61,34 @@ class MemoryRuntimeConfig:
             raise RuntimeError("governed-memory database escapes durable root")
         return self
 
+
+class AuditPort(Protocol):
+    owner_id: str
+    def append(self, event_type: str, data: dict[str, object]): ...
+    def readiness(self) -> object: ...
+
+@dataclass(frozen=True)
+class BorrowedAudit:
+    owner_id: str
+    port: AuditPort
+
+    @classmethod
+    def bind(cls, audit: AuditPort) -> "BorrowedAudit":
+        owner_id = getattr(audit, "owner_id", None)
+        if not isinstance(owner_id, str) or not owner_id.startswith("audit:"):
+            raise RuntimeError("canonical memory requires a canonical audit owner")
+        if not callable(getattr(audit, "append", None)) or not callable(getattr(audit, "readiness", None)):
+            raise RuntimeError("canonical memory requires an appendable audit owner")
+        return cls(owner_id, audit)
+
+    def readiness(self) -> None:
+        if getattr(self.port, "_closed", False):
+            raise RuntimeError("canonical memory audit owner is closed")
+        self.port.readiness()
+
+    def append(self, event_type: str, data: dict[str, object]):
+        return self.port.append(event_type, data)
+
 class MemoryKind(str, Enum): EXPLICIT_PREFERENCE = "explicit_preference"
 class MemoryLifecycle(str, Enum): ACTIVE="active"; SUPERSEDED="superseded"; TOMBSTONED="tombstoned"; PURGED="purged"
 class MemoryOperation(str, Enum): CREATE="create"; READ="read"; CORRECT="correct"; FORGET="forget"; LIST="list"; EXPORT="export"; MIGRATE="migrate"
@@ -155,7 +183,7 @@ class GovernedMemoryPort(Protocol):
 
 class SQLiteMemoryRepository:
     """Serialized SQLite repository with immutable revisions and authoritative heads."""
-    def __init__(self,path:str,*,policy:MemoryPolicyPort|None=None,clock:Callable[[],datetime]|None=None, durable_root: str | None = None, audit=None)->None:
+    def __init__(self,path:str,*,policy:MemoryPolicyPort|None=None,clock:Callable[[],datetime]|None=None, durable_root: str | None = None, audit: BorrowedAudit | AuditPort | None = None)->None:
         if not path or path==":memory:": raise ValueError("durable memory requires an explicit filesystem path")
         raw_path=Path(path)
         if raw_path.is_symlink() or Path(str(raw_path)+".lock").is_symlink(): raise RuntimeError("governed-memory symlink path rejected")
@@ -168,7 +196,7 @@ class SQLiteMemoryRepository:
         self._ownership=open(str(self._path)+".lock", "a+", encoding="utf-8")
         try: fcntl.flock(self._ownership.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as exc: self._ownership.close(); raise RuntimeError("governed-memory writer is already owned") from exc
-        self._lock=threading.RLock(); self._closed=False; self._policy=policy or DefaultMemoryPolicy(); self._clock=clock or (lambda:datetime.now(timezone.utc)); self._audit=audit
+        self._lock=threading.RLock(); self._closed=False; self._policy=policy or DefaultMemoryPolicy(); self._clock=clock or (lambda:datetime.now(timezone.utc)); self._owner_id=f"memory:{self._path}"; self._audit=BorrowedAudit.bind(audit) if audit is not None and not isinstance(audit, BorrowedAudit) else audit
         try:
             self._db=sqlite3.connect(str(self._path),check_same_thread=False,isolation_level=None); self._db.execute("PRAGMA foreign_keys=ON"); self._db.execute("PRAGMA busy_timeout=5000"); self._db.execute("PRAGMA journal_mode=WAL"); self._migrate(); self.readiness()
         except Exception:
@@ -193,6 +221,8 @@ class SQLiteMemoryRepository:
     def readiness(self)->None:
         with self._lock:
             if self._closed: raise RuntimeError("memory repository is closed")
+            if self._audit is None: raise RuntimeError("canonical memory requires canonical audit")
+            self._audit.readiness()
             if self._db.execute("PRAGMA integrity_check").fetchone() != ("ok",): raise RuntimeError("memory repository integrity check failed")
             expected={
                 "memory_schema":{"version"},
@@ -264,8 +294,8 @@ class SQLiteMemoryRepository:
         self._db.execute("INSERT INTO memory_revisions VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",tuple(data[k] for k in ("record_id","revision","tenant_id","subject_id","actor_id","purpose","namespace","key","value","kind","lifecycle","policy_version","created_at","expires_at","deletion_epoch","digest","supersedes")))
     def _journal(self,op,data,digest): self._db.execute("INSERT INTO memory_journal(operation,record_id,revision,tenant_id,subject_id,request_digest,committed_at) VALUES(?,?,?,?,?,?,?)",(op.value,data["record_id"],data["revision"],data["tenant_id"],data["subject_id"],digest,_time(self._clock)))
     def _audit_payload(self,event_type,op,row):
-        h=lambda x: hashlib.sha256(str(x).encode()).hexdigest()[:32]
-        return {"operation_id":row[0],"operation_type":op,"tenant_digest":h(row[5]),"subject_digest":h(row[6]),"purpose":row[7],"namespace":row[8],"key":row[9],"record_id":row[3],"revision":row[4],"prior_record_digest":row[10],"new_record_digest":row[11],"policy_identity":self._policy.version,"policy_revision":self._policy.version,"deletion_epoch":row[12],"result_category":event_type.rsplit("_",1)[-1]}
+        h=lambda x: hashlib.sha256(str(x).encode()).hexdigest()
+        return {"transaction_id":row[0],"operation_id":row[0],"actor_digest":h(row[5]+":"+row[6]),"operation_type":op,"tenant_digest":h(row[5]),"subject_digest":h(row[6]),"purpose":row[7],"namespace":row[8],"key":row[9],"record_id":row[3],"revision":row[4],"prior_record_digest":row[10],"new_record_digest":row[11],"record_digest":row[11],"policy_identity":self._policy.version,"policy_revision":self._policy.version,"deletion_epoch":row[12],"result_category":event_type.rsplit("_",1)[-1]}
     def _audit_event(self,*a,**k): return None
     def _outbox(self,event_type,op,data,digest,prior=None):
         self._db.execute("INSERT OR IGNORE INTO memory_audit_outbox VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)",(digest,event_type,op.value,data["record_id"],data["revision"],data["tenant_id"],data["subject_id"],data["purpose"],data["namespace"],data["key"],prior,data["digest"],data["deletion_epoch"],digest))
@@ -273,10 +303,11 @@ class SQLiteMemoryRepository:
         with self._lock:
             rows=self._db.execute("SELECT operation_id,event_type,operation,record_id,revision,tenant_id,subject_id,purpose,namespace,key_name,prior_record_digest,new_record_digest,deletion_epoch,request_digest,audit_complete FROM memory_audit_outbox WHERE audit_complete=0 ORDER BY rowid").fetchall()
             for row in rows:
-                if self._audit is not None:
-                    payload=self._audit_payload(row[1], row[2], row)
-                    self._audit.append('memory.write_prepared', {**payload, 'result_category':'prepared'})
-                    self._audit.append(row[1], payload)
+                if self._audit is None:
+                    raise RuntimeError("canonical memory audit owner is absent")
+                payload=self._audit_payload(row[1], row[2], row)
+                self._audit.append('memory.write_prepared', {**payload, 'result_category':'prepared'})
+                self._audit.append(row[1], payload)
                 self._db.execute("BEGIN IMMEDIATE")
                 try:
                     if row[2]=='create':
@@ -359,6 +390,8 @@ class GovernedMemoryService:
     def close(self):self._repository.close()
     def capabilities(self):
         self.readiness(); return ("governed-preference-memory",)
+    def diagnostics(self):
+        return {"memory_owner_id": self._repository._owner_id, "audit_owner_id": self._repository._audit.owner_id if self._repository._audit else None}
 class DisabledMemoryService:
     def remember(self,*args,**kwargs):return MemoryCommitResult(MemoryReason.MEMORY_DISABLED)
     def retrieve(self,*args,**kwargs):return ()
@@ -368,8 +401,11 @@ class DisabledMemoryService:
     def capabilities(self):return ()
     def close(self):return None
 
-def compose_governed_memory(config: MemoryRuntimeConfig | None = None)->GovernedMemoryPort:
-    config = (config or MemoryRuntimeConfig.from_environment()).validated()
+def compose_governed_memory(config: MemoryRuntimeConfig, *, audit: AuditPort | BorrowedAudit | None = None)->GovernedMemoryPort:
+    config = config.validated()
     if not config.enabled:return DisabledMemoryService()
-    assert config.path is not None and config.durable_root is not None
-    return GovernedMemoryService(SQLiteMemoryRepository(str(config.path), durable_root=str(config.durable_root)))
+    if config.path is None or config.durable_root is None:
+        raise RuntimeError("governed-memory paths must be configured")
+    if audit is None:
+        raise RuntimeError("canonical memory cannot be enabled without canonical audit")
+    return GovernedMemoryService(SQLiteMemoryRepository(str(config.path), durable_root=str(config.durable_root), audit=audit))
