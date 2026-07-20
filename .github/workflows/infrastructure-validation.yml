@@ -161,7 +161,7 @@ jobs:
           kustomize version
 
       - name: Install kubectl
-        uses: azure/setup-kubectl@v3
+        uses: azure/setup-kubectl@v5
         with:
           version: 'v1.28.0'
 
