@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vulcan.local/schemas/graphix/core-v1.json",
+  "title": "Graphix Core Envelope v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["dialect","schema_version","node_artifact_id","episode_id","content_digest","proposer","authority_level","source_references","snapshot_bundle_digest","epistemic_status","privacy_class","purpose","consent_references","valid_from","valid_until","extensions"],
+  "properties": {
+    "dialect": {"type":"string","pattern":"^[a-z][a-z0-9_.-]{1,63}$"},
+    "schema_version": {"type":"integer","minimum":1,"maximum":9999},
+    "node_artifact_id": {"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9_.:-]{2,127}$"},
+    "episode_id": {"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9_.:-]{2,127}$"},
+    "content_digest": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "proposer": {"type":"object","additionalProperties":false,"required":["principal_id","release_id"],"properties":{"principal_id":{"type":"string"},"release_id":{"type":"string"}}},
+    "authority_level": {"enum":["UNTRUSTED_PROPOSAL","VALIDATED_CANDIDATE","COMMITTED_BELIEF","AUTHORIZED_PLAN","EXECUTED_EFFECT"]},
+    "source_references": {"type":"array","maxItems":32,"items":{"type":"object","additionalProperties":false,"required":["kind","reference_id","digest"],"properties":{"kind":{"enum":["EPISODE","ARTIFACT","SNAPSHOT","CONSENT","CONTROL","EXTERNAL"]},"reference_id":{"type":"string"},"digest":{"anyOf":[{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},{"type":"null"}]}}}},
+    "snapshot_bundle_digest": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "epistemic_status": {"enum":["OBSERVED","INFERRED","PROPOSED","CONTESTED","RETIRED"]},
+    "privacy_class": {"enum":["PUBLIC","INTERNAL","CONFIDENTIAL","PERSONAL","SENSITIVE_PERSONAL"]},
+    "purpose": {"type":"string","minLength":1,"maxLength":256},
+    "consent_references": {"type":"array","maxItems":32,"items":{"type":"string"}},
+    "valid_from": {"type":"string","format":"date-time"},
+    "valid_until": {"anyOf":[{"type":"string","format":"date-time"},{"type":"null"}]},
+    "extensions": {"type":"array","maxItems":16,"items":{"type":"object","additionalProperties":false,"required":["namespace","schema_version","digest","value"],"properties":{"namespace":{"type":"string"},"schema_version":{"type":"integer","minimum":1},"digest":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},"value":{"type":"object"}}}}
+  }
+}
