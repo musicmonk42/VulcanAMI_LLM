@@ -7,9 +7,9 @@ bytes used by Vulcan; it does not prove those bytes are true.
 """
 from __future__ import annotations
 
-import copy, hashlib, json, os, re, tempfile, threading, unicodedata
+import copy, fcntl, hashlib, json, os, re, tempfile, threading, unicodedata
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Callable
@@ -20,6 +20,9 @@ MAX_FILE_BYTES = 1_000_000
 MAX_ENTRIES = 1024
 MAX_CONTENT = 65536
 MAX_RETURNED_EVIDENCE = 16
+MAX_EMBEDDED_ASSERTION_LINES = 128
+MAX_EMBEDDED_ASSERTION_LINE_BYTES = 4096
+DEFAULT_FUTURE_SKEW_SECONDS = 300
 _ID = re.compile(r"[a-z0-9][a-z0-9_.-]{0,63}")
 _NAME = re.compile(r"([a-z0-9][a-z0-9_.-]{0,63})-(\d{10}).json")
 _ALLOWED_TOP = {"schema_version","domain","version","revision","evidence","facts","digest"}
@@ -56,21 +59,38 @@ class _Lease:
         if not self._closed: self._closed=True; self._r._release(self._s.snapshot_id)
     def lookup_exact(self, key: str) -> DomainLookupResult: return self._r._lookup(self._s, key)
 
+class _ProcessLock:
+    def __init__(self, path: Path): self._path=path; self._fd: int | None=None
+    def __enter__(self):
+        self._fd=os.open(self._path, os.O_CREAT|os.O_RDWR, 0o600)
+        fcntl.flock(self._fd, fcntl.LOCK_EX)
+        return self
+    def __exit__(self, *a):
+        if self._fd is not None:
+            try: fcntl.flock(self._fd, fcntl.LOCK_UN)
+            finally: os.close(self._fd); self._fd=None
+
 class PersistentDomainRegistry:
-    def __init__(self, root: str | os.PathLike[str], *, audit: Callable[[dict[str,Any]],None] | None=None, retain_snapshots: int=4):
-        self.root=Path(root); self.audit=audit; self.retain=max(1, retain_snapshots); self._lock=threading.RLock(); self._leases: dict[str,int]={}
-        self.root.mkdir(parents=True, exist_ok=True); self._active=self._restore(); self._snapshots={self._active.snapshot_id:self._active}
+    def __init__(self, root: str | os.PathLike[str], *, audit: Callable[[dict[str,Any]],None] | None=None, retain_snapshots: int=4, clock: Callable[[], datetime] | None=None, future_skew: timedelta | None=None):
+        self.root=Path(root); self.audit=audit; self.retain=max(1, retain_snapshots); self._lock=threading.RLock(); self._leases: dict[str,int]={}; self._clock=clock or (lambda: datetime.now(timezone.utc)); self._future_skew=future_skew if future_skew is not None else timedelta(seconds=DEFAULT_FUTURE_SKEW_SECONDS)
+        self.root.mkdir(parents=True, exist_ok=True); self._process_lock_path=self.root/'.domain-registry.lock'; self._active=self._restore(); self._snapshots={self._active.snapshot_id:self._active}
     @property
     def domain_snapshot_id(self)->str: return self._active.snapshot_id
     def lease(self)->_Lease:
         with self._lock:
             self._leases[self._active.snapshot_id]=self._leases.get(self._active.snapshot_id,0)+1
             return _Lease(self,self._active)
-    def close(self): pass
-    def lookup_exact(self, key: str): return self.lease().lookup_exact(key)
-    def load_bundle(self, data: bytes | str, *, expected_previous_digest: str | None=None)->str:
-        bundle=_parse_bundle(data)
+    def close(self):
         with self._lock:
+            leaked=dict(self._leases); self._leases.clear()
+        if leaked: raise RuntimeError(f"domain registry leases leaked: {leaked}")
+    def lookup_exact(self, key: str):
+        with self.lease() as lease: return lease.lookup_exact(key)
+    def load_bundle(self, data: bytes | str, *, expected_previous_digest: str | None=None, actor_id: str="system", approval_provenance: dict[str,str] | None=None)->str:
+        actor_id=_text(actor_id,128)
+        approval=tuple(sorted((str(k),_text(str(v),256)) for k,v in (approval_provenance or {}).items()))
+        bundle=_parse_bundle(data, now=self._now(), future_skew=self._future_skew)
+        with self._lock, _ProcessLock(self._process_lock_path):
             old=self._active.domains.get(bundle.domain)
             if old:
                 if bundle.revision <= old.revision: raise ValueError("non-monotonic revision")
@@ -78,31 +98,36 @@ class PersistentDomainRegistry:
             elif expected_previous_digest is not None: raise ValueError("unexpected previous digest")
             domains=dict(self._active.domains); domains[bundle.domain]=bundle
             snap=_build_snapshot(domains)
-            event_data={"domain":bundle.domain,"revision":bundle.revision,"version":bundle.version,"expected_prior_digest":old.digest if old else None,"proposed_new_digest":bundle.digest,"snapshot_id":snap.snapshot_id,"fact_count":len(bundle.facts),"evidence_count":len(bundle.evidence),"actor_id":"system"}
+            event_data={"domain":bundle.domain,"revision":bundle.revision,"version":bundle.version,"expected_prior_digest":old.digest if old else None,"proposed_new_digest":bundle.digest,"snapshot_id":snap.snapshot_id,"fact_count":len(bundle.facts),"evidence_count":len(bundle.evidence),"actor_id":actor_id,"approval_provenance":dict(approval)}
             append = getattr(self.audit, "append", None) if self.audit else None
             if append: append("domain.activation_prepared", event_data)
             elif self.audit: self.audit({**event_data,"event_type":"domain.activation_prepared"})
             persisted=False
             try:
                 self._persist(bundle); persisted=True
-                prior_active=self._active
-                self._active=snap; self._snapshots[snap.snapshot_id]=snap
+                self._verify_persisted(bundle)
+                prior_active=self._active; prior_snapshots=dict(self._snapshots)
                 if append: append("domain.activation_committed", {**event_data,"active_snapshot_id":snap.snapshot_id})
                 elif self.audit: self.audit({**event_data,"event_type":"domain.activation_committed","active_snapshot_id":snap.snapshot_id})
+                self._active=snap; self._snapshots[snap.snapshot_id]=snap
                 self._evict()
                 return snap.snapshot_id
             except Exception as exc:
                 if persisted:
-                    try: (self.root / f"{bundle.domain}-{bundle.revision:010d}.json").unlink(missing_ok=True)
-                    except Exception: pass
-                self._active=self._snapshots.get(getattr(self._active, "snapshot_id", ""), self._active)
-                self._snapshots.pop(snap.snapshot_id, None)
+                    try:
+                        (self.root / f"{bundle.domain}-{bundle.revision:010d}.json").unlink(missing_ok=True)
+                    except OSError as cleanup_exc:
+                        exc.add_note(f"domain cleanup failed: {cleanup_exc}")
+                if "prior_active" in locals() and "prior_snapshots" in locals():
+                    self._active=prior_active; self._snapshots=prior_snapshots
+                else:
+                    self._snapshots.pop(snap.snapshot_id, None)
                 if append:
                     try: append("domain.activation_aborted", {**event_data,"result_category":"aborted"})
-                    except Exception: pass
+                    except Exception as audit_exc: exc.add_note(f"abort audit failed: {audit_exc}")
                 elif self.audit:
                     try: self.audit({**event_data,"event_type":"domain.activation_aborted","result_category":"aborted"})
-                    except Exception: pass
+                    except Exception as audit_exc: exc.add_note(f"abort audit failed: {audit_exc}")
                 raise
     def _release(self, sid):
         with self._lock:
@@ -115,35 +140,47 @@ class PersistentDomainRegistry:
         victims=[sid for sid in self._snapshots if sid != self._active.snapshot_id][:extra]
         if any(self._leases.get(sid) for sid in victims): raise RuntimeError("snapshot retention exhausted by live lease")
         for sid in victims: self._snapshots.pop(sid, None)
+    def _now(self):
+        return self._clock().astimezone(timezone.utc)
+    def _verify_persisted(self,b:_Bundle):
+        p=self.root/f"{b.domain}-{b.revision:010d}.json"
+        if not p.is_file(): raise RuntimeError("persisted domain file missing")
+        parsed=_parse_bundle(p.read_bytes(), now=self._now(), future_skew=self._future_skew)
+        if parsed.digest != b.digest: raise RuntimeError("persisted domain digest mismatch")
     def _persist(self,b:_Bundle):
         name=f"{b.domain}-{b.revision:010d}.json"; final=self.root/name; raw=_canonical_bytes(_bundle_to_public(b))
         fd,tmp=tempfile.mkstemp(prefix=f".{name}.",suffix=".tmp",dir=self.root)
         with os.fdopen(fd,"wb") as f: f.write(raw); f.flush(); os.fsync(f.fileno())
         os.replace(tmp, final)
+        d=os.open(self.root, os.O_DIRECTORY)
         try:
-            d=os.open(self.root, os.O_DIRECTORY); os.fsync(d); os.close(d)
-        except OSError: pass
+            os.fsync(d)
+        finally:
+            os.close(d)
     def _restore(self)->_Snapshot:
         domains={}; files=[]
         for p in self.root.iterdir():
+            if p.name == '.domain-registry.lock': continue
             if p.is_symlink() or not p.is_file(): raise ValueError("unexpected persisted file")
             m=_NAME.fullmatch(p.name)
             if not m: raise ValueError("malformed persisted filename")
             files.append((m.group(1), int(m.group(2)), p))
         for dom,rev,p in sorted(files):
             if p.stat().st_size>MAX_FILE_BYTES: raise ValueError("oversized persisted file")
-            b=_parse_bundle(p.read_bytes())
+            b=_parse_bundle(p.read_bytes(), now=self._now(), future_skew=self._future_skew)
             if b.domain!=dom or b.revision!=rev: raise ValueError("filename/bundle mismatch")
             old=domains.get(dom)
             if old and b.revision<=old.revision: raise ValueError("conflicting history")
             domains[dom]=b
         return _build_snapshot(domains)
     def _lookup(self,snap:_Snapshot,key:str)->DomainLookupResult:
-        sub,pred=_split_key(key); now=datetime.now(timezone.utc); supports=[]; vals={}
+        sub,pred=_split_key(key); now=self._now(); supports=[]; vals={}
         for fact, bundle, evs in snap.index.get((sub,pred),()):
+            if fact.valid_from and fact.valid_from > now: continue
             if fact.valid_until and fact.valid_until < now: continue
             good=[]
             for ev in evs:
+                if ev.acquired_at > now + self._future_skew: good=[]; break
                 if ev.valid_until and ev.valid_until < now: good=[]; break
                 good.append(DomainEvidenceSupport(bundle.domain,bundle.revision,fact.fact_id,ev.evidence_id,ev.uri,ev.content_digest,ev.acquired_at,ev.valid_until,ev.acquisition_method,ev.license,ev.provenance))
             if good: vals.setdefault(fact.object,[]).extend(good)
@@ -178,7 +215,9 @@ def _loads(data):
             seen[k]=v
         return seen
     return json.loads(raw.decode('utf-8'), object_pairs_hook=pairs, parse_constant=lambda x: (_ for _ in()).throw(ValueError("NaN/Infinity rejected")))
-def _parse_bundle(data):
+def _parse_bundle(data, *, now: datetime | None=None, future_skew: timedelta | None=None):
+    now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    future_skew = future_skew if future_skew is not None else timedelta(seconds=DEFAULT_FUTURE_SKEW_SECONDS)
     o=_loads(data)
     if set(o)!=_ALLOWED_TOP or o.get('schema_version')!=SCHEMA_VERSION: raise ValueError("invalid bundle schema")
     dom=_text(o['domain'],64).casefold();
@@ -194,6 +233,7 @@ def _parse_bundle(data):
         content=_text(e['content'],MAX_CONTENT); cd=e['content_digest']
         if cd!=hashlib.sha256(content.encode()).hexdigest(): raise ValueError("source digest mismatch")
         acq=_dt(e['acquired_at']); vu=_dt(e.get('valid_until'), True)
+        if acq > now + future_skew: raise ValueError("future evidence acquisition")
         if vu and vu<acq: raise ValueError("reversed validity")
         prov=e.get('provenance') or {}
         if not isinstance(prov,dict) or set(prov)-_ALLOWED_PROV: raise ValueError("invalid provenance")
@@ -209,11 +249,12 @@ def _parse_bundle(data):
         if not isinstance(refs,list) or not refs: raise ValueError("fact requires evidence")
         refs=tuple(_text(r,96) for r in refs)
         if not set(refs)<=set(evmap): raise ValueError("unknown evidence reference")
-        fact=_Fact(fid,_norm_term(f['subject']),_norm_term(f['predicate']),_norm_term(f['object']),refs,_dt(f.get('valid_from'),True),_dt(f.get('valid_until'),True))
+        fact=_Fact(fid,_norm_term(f['subject']),_norm_term(f['predicate']),_text(f['object'],256),refs,_dt(f.get('valid_from'),True),_dt(f.get('valid_until'),True))
         if fact.valid_from and fact.valid_until and fact.valid_until<fact.valid_from: raise ValueError("reversed validity")
         for r in refs:
-            assertions=[json.loads(line, object_pairs_hook=lambda p: dict(p)) for line in evmap[r].content.splitlines() if line.strip().startswith('{')]
-            if {"subject":fact.subject,"predicate":fact.predicate,"object":fact.object} not in [{k:_norm_term(v) for k,v in a.items()} for a in assertions if set(a)=={"subject","predicate","object"}]: raise ValueError("evidence does not assert fact")
+            assertions=_embedded_assertions(evmap[r].content)
+            expected={"subject":fact.subject,"predicate":fact.predicate,"object":fact.object}
+            if expected not in assertions: raise ValueError("evidence does not assert fact")
         fids.add(fid); facts.append(fact)
     pub=copy.deepcopy(o); pub.pop('digest')
     digest=hashlib.sha256(_canonical_bytes(pub)).hexdigest()
@@ -239,5 +280,19 @@ def _build_snapshot(domains):
     for b in domains.values():
         for f in b.facts: temp.setdefault((f.subject,f.predicate),[]).append((f,b,tuple(b.evidence[e] for e in f.evidence_ids)))
     frozen={k:tuple(v) for k,v in sorted(temp.items())}
-    sid='domain:'+hashlib.sha256(_canonical_bytes({d:(b.revision,b.digest) for d,b in sorted(domains.items())})).hexdigest()[:16]
+    sid='domain:'+hashlib.sha256(_canonical_bytes({d:(b.revision,b.digest) for d,b in sorted(domains.items())})).hexdigest()
     return _Snapshot(sid, MappingProxyType(dict(domains)), MappingProxyType(frozen))
+
+def _embedded_assertions(content: str):
+    assertions=[]; count=0
+    for line in content.splitlines():
+        stripped=line.strip()
+        if not stripped: continue
+        count += 1
+        if count > MAX_EMBEDDED_ASSERTION_LINES: raise ValueError("too many embedded assertion lines")
+        if len(stripped.encode("utf-8")) > MAX_EMBEDDED_ASSERTION_LINE_BYTES: raise ValueError("embedded assertion line too large")
+        if not stripped.startswith("{"): continue
+        a=_loads(stripped.encode("utf-8"))
+        if set(a)!={"subject","predicate","object"}: raise ValueError("invalid embedded assertion schema")
+        assertions.append({"subject":_norm_term(a["subject"]),"predicate":_norm_term(a["predicate"]),"object":_text(a["object"],256)})
+    return assertions
