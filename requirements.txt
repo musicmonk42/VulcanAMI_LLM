@@ -25,7 +25,7 @@ asgiref==3.11.0
 astor==0.8.1
 # asteval for safe mathematical expression evaluation in computations
 asteval==1.0.6
-astroid==4.0.2
+astroid==4.1.2
 async-timeout==4.0.3
 asyncpg==0.30.0
 attrs==25.4.0

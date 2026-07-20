@@ -283,9 +283,9 @@ astor==0.8.1 \
     --hash=sha256:070a54e890cefb5b3739d19f30f5a5ec840ffc9c50ffa7d23cc9fc1a38ebbfc5 \
     --hash=sha256:6a6effda93f4e1ce9f618779b2dd1d9d84f1e32812c23a29b3fff6fd7f63fa5e
     # via -r requirements.txt
-astroid==4.0.2 \
-    --hash=sha256:ac8fb7ca1c08eb9afec91ccc23edbd8ac73bb22cbdd7da1d488d9fb8d6579070 \
-    --hash=sha256:d7546c00a12efc32650b19a2bb66a153883185d3179ab0d4868086f807338b9b
+astroid==4.1.2 \
+    --hash=sha256:21312e682c0866dc5a309ee57e4b88ea92751b9955a58b1c31371cbbeb088707 \
+    --hash=sha256:d6c4a52bfcda4bbeb7359dead642b0248b90f7d9a07e690230bd86fefd6d37f1
     # via
     #   -r requirements.txt
     #   pylint
