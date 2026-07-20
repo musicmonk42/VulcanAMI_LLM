@@ -38,6 +38,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+server = [
+    "fastapi>=0.100.0",
+    "pydantic>=2.0.0",
+]
 dev = [
     "black>=23.0.0",
     "flake8>=6.0.0",

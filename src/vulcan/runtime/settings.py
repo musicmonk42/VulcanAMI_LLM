@@ -64,6 +64,7 @@ class RuntimeSettings:
     replicas: int = 1
     request_timeout_seconds: float = 30.0
     public_diagnostics: bool = False
+    development_stub_mode: bool = False
     deprecation_warnings: tuple[str,...] = ()
 
     def auth_config(self):
@@ -93,6 +94,7 @@ ALIASES={
  "VULCAN_RUNTIME_REPLICAS": ("VULCAN_RUNTIME_REPLICAS",),
  "VULCAN_REQUEST_TIMEOUT_SECONDS": ("VULCAN_REQUEST_TIMEOUT_SECONDS","HYBRID_EXECUTOR_TIMEOUT"),
  "VULCAN_PUBLIC_DIAGNOSTICS": ("VULCAN_PUBLIC_DIAGNOSTICS",),
+ "VULCAN_DEVELOPMENT_STUB_MODE": ("VULCAN_DEVELOPMENT_STUB_MODE",),
 }
 DEPRECATED={"GRAPHIX_JWT_SECRET":"VULCAN_JWT_SECRET","JWT_SECRET_KEY":"VULCAN_JWT_SECRET","JWT_SECRET":"VULCAN_JWT_SECRET","ENABLE_SELF_IMPROVEMENT":"VULCAN_ENABLE_SELF_IMPROVEMENT","HYBRID_EXECUTOR_TIMEOUT":"VULCAN_REQUEST_TIMEOUT_SECONDS","INTRINSIC_CSIU_OFF":"VULCAN_CSIU_ENABLED","VULCAN_TEXT_MODEL_REVISION":"VULCAN_LANGUAGE_RELEASE_PATH"}
 
@@ -225,6 +227,8 @@ def load_runtime_settings(env:Mapping[str,str]|None=None)->RuntimeSettings:
     replicas=_int(get("VULCAN_RUNTIME_REPLICAS"),"VULCAN_RUNTIME_REPLICAS",1,1,1)
     self_imp=_bool(get("VULCAN_ENABLE_SELF_IMPROVEMENT"),"VULCAN_ENABLE_SELF_IMPROVEMENT",False)
     csiu_val=get("VULCAN_CSIU_ENABLED"); csiu = (not _bool(csiu_val,"VULCAN_CSIU_ENABLED",False)) if "INTRINSIC_CSIU_OFF" in env and "VULCAN_CSIU_ENABLED" not in env else _bool(csiu_val,"VULCAN_CSIU_ENABLED",True)
+    dev_stub=_bool(get("VULCAN_DEVELOPMENT_STUB_MODE"),"VULCAN_DEVELOPMENT_STUB_MODE",False)
+    if environment is VulcanEnvironment.production and dev_stub: raise SettingsError("development stub mode is forbidden in production")
     if environment is VulcanEnvironment.production and (not csiu or not _bool(get("VULCAN_AUDIT_ENABLED"),"VULCAN_AUDIT_ENABLED",True)):
         raise SettingsError("production requires audit and CSIU")
     if self_imp and approval is None: raise SettingsError("self-improvement requires approval HMAC secret")
@@ -234,7 +238,7 @@ def load_runtime_settings(env:Mapping[str,str]|None=None)->RuntimeSettings:
     mem_path=_path(get("VULCAN_MEMORY_SQLITE_PATH") or (str(paths.governed_memory/"memory.sqlite") if mem_enabled else None),"VULCAN_MEMORY_SQLITE_PATH", mem_enabled)
     validation=validate_durable_root(durable)
     if environment is VulcanEnvironment.production and validation.category != "ok": raise SettingsError(validation.public_message)
-    return RuntimeSettings(environment,_text(get("VULCAN_JWT_ISSUER"),"VULCAN_JWT_ISSUER","vulcan"),_text(get("VULCAN_JWT_AUDIENCE"),"VULCAN_JWT_AUDIENCE","vulcan-runtime"),jwt,durable,paths,lang,release,get("OPENAI_API_KEY") is not None,get("ANTHROPIC_API_KEY") is not None,mem_enabled,mem_backend,mem_path,_bool(get("VULCAN_AUDIT_ENABLED"),"VULCAN_AUDIT_ENABLED",True),csiu,_bool(get("VULCAN_LEARNING_ENABLED"),"VULCAN_LEARNING_ENABLED",True),self_imp,approval,replicas,_float(get("VULCAN_REQUEST_TIMEOUT_SECONDS"),"VULCAN_REQUEST_TIMEOUT_SECONDS",30.0,0.1,300.0),_bool(get("VULCAN_PUBLIC_DIAGNOSTICS"),"VULCAN_PUBLIC_DIAGNOSTICS",False),tuple(warnings[:16]))
+    return RuntimeSettings(environment,_text(get("VULCAN_JWT_ISSUER"),"VULCAN_JWT_ISSUER","vulcan"),_text(get("VULCAN_JWT_AUDIENCE"),"VULCAN_JWT_AUDIENCE","vulcan-runtime"),jwt,durable,paths,lang,release,get("OPENAI_API_KEY") is not None,get("ANTHROPIC_API_KEY") is not None,mem_enabled,mem_backend,mem_path,_bool(get("VULCAN_AUDIT_ENABLED"),"VULCAN_AUDIT_ENABLED",True),csiu,_bool(get("VULCAN_LEARNING_ENABLED"),"VULCAN_LEARNING_ENABLED",True),self_imp,approval,replicas,_float(get("VULCAN_REQUEST_TIMEOUT_SECONDS"),"VULCAN_REQUEST_TIMEOUT_SECONDS",30.0,0.1,300.0),_bool(get("VULCAN_PUBLIC_DIAGNOSTICS"),"VULCAN_PUBLIC_DIAGNOSTICS",False),dev_stub,tuple(warnings[:16]))
 
 def _public(v):
     if isinstance(v,OpaqueSecret): return v.to_public()
