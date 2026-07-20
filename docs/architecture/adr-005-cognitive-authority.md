@@ -30,3 +30,24 @@ Only the cognitive microkernel may commit beliefs, authorize plans, publish effe
 ## Current owner and transaction boundary
 
 At this prompt's baseline, ADR-003 identifies `RuntimeContainer` and its `CognitiveKernel` as the current production owner. The exact transaction boundary for this architectural decision is the git commit containing these ADRs and `ami-invariants.yaml`; runtime durable transaction code is out of scope for P00 and must cite these invariants when implemented.
+
+## P26 implementation note: principals and capabilities
+
+P26 adds typed principal identities for human, system kernel, language provider,
+reasoner, retriever, tool, policy authority, operator, auditor, and external
+provider actors. Principal metadata is descriptive only and never grants
+authority. The microkernel remains the only principal kind allowed to promote an
+artifact through the authority lattice, and promotion records bind the promoted
+level to validation, policy, validator, and evidence digests.
+
+Privileged operations are separated into proposal creation, authority reads,
+belief commitment, plan authorization, effect execution, memory mutation, and
+policy activation. Unknown operations fail closed. High-risk grants and denials
+are audited with principal and resource digests rather than raw resource content,
+secrets, or personal data.
+
+In-process capability tokens are intentionally non-serializable authority
+objects. They bind principal identity, release digest, operation, episode,
+resource digest, expiry, and nonce; replay is denied by the issuer. Persisted
+approval signatures remain a future migration and these object tokens are not a
+cryptographic proof across process or persistence boundaries.
