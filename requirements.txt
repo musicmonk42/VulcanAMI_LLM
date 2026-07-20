@@ -374,7 +374,7 @@ requests-file==3.0.1
 requests-oauthlib==2.0.0
 requests-toolbelt==1.0.0
 Resource==0.2.1
-responses==0.25.8
+responses==0.26.2
 rich==14.2.0
 rpds-py==0.29.0
 rsa==4.9.1
