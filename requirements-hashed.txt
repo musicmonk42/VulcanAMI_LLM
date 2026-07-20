@@ -6896,9 +6896,9 @@ semopy==2.3.11 \
     # via
     #   -r requirements.txt
     #   lingam
-sentence-transformers==5.1.2 \
-    --hash=sha256:0f6c8bd916a78dc65b366feb8d22fd885efdb37432e7630020d113233af2b856 \
-    --hash=sha256:724ce0ea62200f413f1a5059712aff66495bc4e815a1493f7f9bca242414c333
+sentence-transformers==5.6.0 \
+    --hash=sha256:0e7164d051e416c1853ade7c274ff52af3f9da0f4be7f0b83d734c27699e1057 \
+    --hash=sha256:d2075b5e687a1611005e20ab04a6846994d51adfcf39610aed066af3c0c0b81f
     # via -r requirements.txt
 sentry-sdk==2.33.2 \
     --hash=sha256:8d57a3b4861b243aa9d558fda75509ad487db14f488cbdb6c78c614979d77632 \
