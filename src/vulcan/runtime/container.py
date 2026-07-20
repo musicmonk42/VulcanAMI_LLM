@@ -14,6 +14,7 @@ from vulcan.learning_bandit import ShadowLinUCBToolBandit
 from .alignment import AlignmentRegistry
 from .audit import CanonicalAudit
 from .domain_registry import PersistentDomainRegistry
+from vulcan.safety.response_adapter import EnhancedSafetyResponseAdapter
 from .finalization import SafetyResponseFinalizer
 from .kernel import CognitiveKernel
 from .output import DeterministicLanguageOutput, LanguageOutputPort
@@ -200,7 +201,9 @@ class RuntimeContainer:
             setattr(world_state, "domain", domain_registry)
             setattr(world_state, "self_improvement_runtime", self_improvement)
             setattr(world_state, "self_improvement_drive", self_improvement.drive)
-            kernel = CognitiveKernel(state_authority=world_state, finalizer=SafetyResponseFinalizer(safety),
+            response_safety = EnhancedSafetyResponseAdapter(safety)
+            response_safety.readiness()
+            kernel = CognitiveKernel(state_authority=world_state, finalizer=SafetyResponseFinalizer(response_safety),
                                      language_input=language_input, language_output=language_output, memory=memory, audit=audit, alignment=alignment)
             return cls(str(uuid4()), deployment, world_state, kernel, safety, memory,
                        language_input, language_output, config, audit, alignment, domain_registry, Path(root), self_improvement, learning_owner, settings)

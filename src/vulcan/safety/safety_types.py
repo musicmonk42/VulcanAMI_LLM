@@ -13,7 +13,7 @@ import uuid
 from dataclasses import asdict, dataclass, field, fields
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple
 
 # Module logger for SafetyConfig debug messages
 _logger = logging.getLogger(__name__)
@@ -501,6 +501,53 @@ class ToolSafetyContract:
         data = json.loads(json_str)
         return cls.from_dict(data)
 
+
+class ResponseSafetyStatus(str, Enum):
+    """Closed response-safety outcomes at the canonical finalization boundary."""
+
+    ALLOW = "allow"
+    BLOCK = "block"
+    ERROR = "error"
+    TIMEOUT = "timeout"
+    CANCELLED = "cancelled"
+    UNAVAILABLE = "unavailable"
+    MODIFIED = "modified"
+
+
+@dataclass(frozen=True)
+class ResponseSafetyContext:
+    """Redacted, digest-bound context for response finalization safety checks."""
+
+    case_id: str
+    episode_id: str
+    response_ir_digest: str
+    rendered_text_digest: str
+    policy_identity: str
+    policy_release: str
+    actor_risk: str = "unknown"
+
+
+@dataclass(frozen=True)
+class ResponseSafetyDecision:
+    """Auditable response safety decision. Raw prompt/response secrets are excluded."""
+
+    status: ResponseSafetyStatus
+    reason: str
+    confidence: float
+    audit: Dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def allowed(self) -> bool:
+        return self.status is ResponseSafetyStatus.ALLOW
+
+
+class ResponseSafetyPort(Protocol):
+    """Closed port for final response validation."""
+
+    async def evaluate_response(
+        self, response_text: str, context: ResponseSafetyContext
+    ) -> ResponseSafetyDecision:
+        raise NotImplementedError
 
 # ============================================================
 # BASE CLASSES AND INTERFACES

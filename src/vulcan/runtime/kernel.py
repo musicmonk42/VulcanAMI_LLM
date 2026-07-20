@@ -1,6 +1,8 @@
 """Framework-independent typed semantic orchestration boundary."""
 from __future__ import annotations
 import asyncio
+import hashlib
+import inspect
 from dataclasses import dataclass
 from typing import Any
 from typing import TYPE_CHECKING
@@ -8,6 +10,7 @@ if TYPE_CHECKING:
     from vulcan.memory.governed import GovernedMemoryPort
 from .case import CognitiveCase, CognitiveCaseStatus
 from .finalization import ResponseFinalizerPort
+from vulcan.safety.safety_types import ResponseSafetyContext
 from .semantic import (ClarificationRequest, DeterministicLanguageInput, LanguageInputPort, RESPONSE_IR_VERSION, ResponseIR, ResponseMode, Utterance, accept, build_graphix_plan, compile_graphix_plan, execute, execute_graphix_plan, render_strict, validate_proposal)
 from .output import DeterministicLanguageOutput, LanguageOutputPort, SemanticFirewall, project
 @dataclass(frozen=True)
@@ -99,7 +102,13 @@ class CognitiveKernel:
                 # Provider/adapter failures are diagnostics only; strict rendering remains authoritative.
                 case.record("output_draft_unavailable")
             artifact=render_strict(response_ir,case.claims,case.derivations,case.evidence); case.render_artifact=artifact; case.record("strict_rendered")
-            finalization=await self._finalizer.finalize(artifact); case.record_finalization(finalization.decision.value)
+            final_context=ResponseSafetyContext(case_id=case.case_id, episode_id=case.request_id, response_ir_digest=artifact.ir_digest, rendered_text_digest=hashlib.sha256(artifact.text.encode("utf-8")).hexdigest(), policy_identity=getattr(policy,"policy_digest","") or "unknown", policy_release=str(getattr(policy,"revision","") or getattr(policy,"policy_revision","") or "unknown"), actor_risk="unknown")
+            finalize = self._finalizer.finalize
+            if len(inspect.signature(finalize).parameters) == 1:
+                finalization=await finalize(artifact)
+            else:
+                finalization=await finalize(artifact, final_context)
+            case.record_finalization(finalization.decision.value)
             if self._audit: self._audit.append("case.finalized", {"case_id":case.case_id,"request_id":case.request_id,"request_digest":case.input_hash,"finalization":finalization.decision.value,"rendered_response_digest":artifact.ir_digest})
             case.close(status)
             if self._audit: self._audit.append("case.completed" if status is CognitiveCaseStatus.SUCCESS else "case.abstained", {"case_id":case.case_id,"request_id":case.request_id,"request_digest":case.input_hash,"status":status.value,"rendered_response_digest":artifact.ir_digest})

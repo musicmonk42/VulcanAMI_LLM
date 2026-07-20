@@ -43,7 +43,42 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-import numpy as np
+try:
+    import numpy as np
+except ImportError:  # pragma: no cover - exercised in minimal CI images
+    import math as _math
+
+    class _FallbackLinalg:
+        @staticmethod
+        def norm(values):
+            return _math.sqrt(sum(float(v) * float(v) for v in values))
+
+    class _FallbackNumpy:
+        ndarray = list
+        floating = float
+        linalg = _FallbackLinalg()
+
+        @staticmethod
+        def isnan(value):
+            return _math.isnan(float(value))
+
+        @staticmethod
+        def isinf(value):
+            return _math.isinf(float(value))
+
+        @staticmethod
+        def any(values):
+            return any(values)
+
+        @staticmethod
+        def clip(value, minimum, maximum):
+            return max(minimum, min(maximum, value))
+
+        @staticmethod
+        def sign(value):
+            return -1 if value < 0 else (1 if value > 0 else 0)
+
+    np = _FallbackNumpy()
 
 # Import RiskLevel for query risk classification
 try:
