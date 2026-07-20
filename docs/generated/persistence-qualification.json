@@ -1,0 +1,718 @@
+{
+  "allowed_resolutions": [
+    "prior_state_or_aborted",
+    "committed_new_state",
+    "normal_stale_abort",
+    "explicit_manual_recovery_or_completed_audit",
+    "suite_detects_defect"
+  ],
+  "artifact_versions": {
+    "fault_points": "abe30e80247619113cef45cb005256814e8b074cfb4919d18b15d9e95175d385",
+    "matrix_script": "220358f0a8e57ed12dcce8cd6b515734a4c79a201a6911d50956ae20995b6107",
+    "scenario_count": 68
+  },
+  "authoritative_owners": {
+    "alignment": "AlignmentRegistry active pointer; transaction boundary is prepare, candidate fsync, audit commit, pointer publication",
+    "audit": "CanonicalAudit segmented append-only log; commit boundary is append+fsync+manifest/index update",
+    "domain": "PersistentDomainRegistry bundle files; transaction boundary is lock, persist+verify, audit commit, snapshot publication",
+    "memory": "SQLiteMemoryRepository DB/outbox; transaction boundary is SQLite commit before idempotent audit delivery"
+  },
+  "boundary_attacks": [
+    "malicious_alignment_principal",
+    "malformed_domain_bundle",
+    "duplicate_audit_terminal",
+    "memory_idempotency_conflict"
+  ],
+  "commit_sha": "9f5157036376e0c9671742955fca958cafbbad66",
+  "coverage_strategy": "pairwise subsystem/fault-point/fault-class coverage plus exhaustive critical transition negative controls",
+  "qualification_digest": "8e9e31f0a2ef7e8cfbd03fe4eb79026f6bc1e41c63a46ea8ef0e449e9ca4d763",
+  "scenarios": [
+    {
+      "execution": "subprocess_terminate",
+      "expected_resolution": "prior_state_or_aborted",
+      "fault_class": "crash",
+      "fault_point": "before_prepare",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "audit.before_prepare.crash",
+      "subsystem": "audit",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "prior_state_or_aborted",
+      "fault_class": "enospc",
+      "fault_point": "after_prepare",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "audit.after_prepare.enospc",
+      "subsystem": "audit",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "prior_state_or_aborted",
+      "fault_class": "permission_loss",
+      "fault_point": "before_persistence",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "audit.before_persistence.permission_loss",
+      "subsystem": "audit",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "subprocess_terminate",
+      "expected_resolution": "explicit_manual_recovery_or_completed_audit",
+      "fault_class": "file_truncation",
+      "fault_point": "after_persistence",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "audit.after_persistence.file_truncation",
+      "subsystem": "audit",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "prior_state_or_aborted",
+      "fault_class": "lock_contention",
+      "fault_point": "before_fsync",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "audit.before_fsync.lock_contention",
+      "subsystem": "audit",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "normal_stale_abort",
+      "fault_class": "stale_cas",
+      "fault_point": "after_fsync",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "audit.after_fsync.stale_cas",
+      "subsystem": "audit",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "explicit_manual_recovery_or_completed_audit",
+      "fault_class": "duplicate_request",
+      "fault_point": "before_audit",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "audit.before_audit.duplicate_request",
+      "subsystem": "audit",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "subprocess_terminate",
+      "expected_resolution": "committed_new_state",
+      "fault_class": "clock_anomaly",
+      "fault_point": "after_audit",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "audit.after_audit.clock_anomaly",
+      "subsystem": "audit",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "subprocess_terminate",
+      "expected_resolution": "prior_state_or_aborted",
+      "fault_class": "crash",
+      "fault_point": "before_publication",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "audit.before_publication.crash",
+      "subsystem": "audit",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "subprocess_terminate",
+      "expected_resolution": "committed_new_state",
+      "fault_class": "enospc",
+      "fault_point": "after_publication",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "audit.after_publication.enospc",
+      "subsystem": "audit",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "prior_state_or_aborted",
+      "fault_class": "permission_loss",
+      "fault_point": "before_acknowledgment",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "audit.before_acknowledgment.permission_loss",
+      "subsystem": "audit",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "committed_new_state",
+      "fault_class": "file_truncation",
+      "fault_point": "after_acknowledgment",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "audit.after_acknowledgment.file_truncation",
+      "subsystem": "audit",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "prior_state_or_aborted",
+      "fault_class": "lock_contention",
+      "fault_point": "before_rollback",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "audit.before_rollback.lock_contention",
+      "subsystem": "audit",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "normal_stale_abort",
+      "fault_class": "stale_cas",
+      "fault_point": "after_rollback",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "audit.after_rollback.stale_cas",
+      "subsystem": "audit",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "prior_state_or_aborted",
+      "fault_class": "duplicate_request",
+      "fault_point": "before_close",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "audit.before_close.duplicate_request",
+      "subsystem": "audit",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "prior_state_or_aborted",
+      "fault_class": "clock_anomaly",
+      "fault_point": "after_close",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "audit.after_close.clock_anomaly",
+      "subsystem": "audit",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "prior_state_or_aborted",
+      "fault_class": "enospc",
+      "fault_point": "before_prepare",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "alignment.before_prepare.enospc",
+      "subsystem": "alignment",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "prior_state_or_aborted",
+      "fault_class": "permission_loss",
+      "fault_point": "after_prepare",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "alignment.after_prepare.permission_loss",
+      "subsystem": "alignment",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "prior_state_or_aborted",
+      "fault_class": "file_truncation",
+      "fault_point": "before_persistence",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "alignment.before_persistence.file_truncation",
+      "subsystem": "alignment",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "subprocess_terminate",
+      "expected_resolution": "explicit_manual_recovery_or_completed_audit",
+      "fault_class": "lock_contention",
+      "fault_point": "after_persistence",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "alignment.after_persistence.lock_contention",
+      "subsystem": "alignment",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "normal_stale_abort",
+      "fault_class": "stale_cas",
+      "fault_point": "before_fsync",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "alignment.before_fsync.stale_cas",
+      "subsystem": "alignment",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "prior_state_or_aborted",
+      "fault_class": "duplicate_request",
+      "fault_point": "after_fsync",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "alignment.after_fsync.duplicate_request",
+      "subsystem": "alignment",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "explicit_manual_recovery_or_completed_audit",
+      "fault_class": "clock_anomaly",
+      "fault_point": "before_audit",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "alignment.before_audit.clock_anomaly",
+      "subsystem": "alignment",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "subprocess_terminate",
+      "expected_resolution": "committed_new_state",
+      "fault_class": "crash",
+      "fault_point": "after_audit",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "alignment.after_audit.crash",
+      "subsystem": "alignment",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "prior_state_or_aborted",
+      "fault_class": "enospc",
+      "fault_point": "before_publication",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "alignment.before_publication.enospc",
+      "subsystem": "alignment",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "subprocess_terminate",
+      "expected_resolution": "committed_new_state",
+      "fault_class": "permission_loss",
+      "fault_point": "after_publication",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "alignment.after_publication.permission_loss",
+      "subsystem": "alignment",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "prior_state_or_aborted",
+      "fault_class": "file_truncation",
+      "fault_point": "before_acknowledgment",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "alignment.before_acknowledgment.file_truncation",
+      "subsystem": "alignment",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "committed_new_state",
+      "fault_class": "lock_contention",
+      "fault_point": "after_acknowledgment",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "alignment.after_acknowledgment.lock_contention",
+      "subsystem": "alignment",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "normal_stale_abort",
+      "fault_class": "stale_cas",
+      "fault_point": "before_rollback",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "alignment.before_rollback.stale_cas",
+      "subsystem": "alignment",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "prior_state_or_aborted",
+      "fault_class": "duplicate_request",
+      "fault_point": "after_rollback",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "alignment.after_rollback.duplicate_request",
+      "subsystem": "alignment",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "prior_state_or_aborted",
+      "fault_class": "clock_anomaly",
+      "fault_point": "before_close",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "alignment.before_close.clock_anomaly",
+      "subsystem": "alignment",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "subprocess_terminate",
+      "expected_resolution": "prior_state_or_aborted",
+      "fault_class": "crash",
+      "fault_point": "after_close",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "alignment.after_close.crash",
+      "subsystem": "alignment",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "prior_state_or_aborted",
+      "fault_class": "permission_loss",
+      "fault_point": "before_prepare",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "domain.before_prepare.permission_loss",
+      "subsystem": "domain",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "prior_state_or_aborted",
+      "fault_class": "file_truncation",
+      "fault_point": "after_prepare",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "domain.after_prepare.file_truncation",
+      "subsystem": "domain",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "prior_state_or_aborted",
+      "fault_class": "lock_contention",
+      "fault_point": "before_persistence",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "domain.before_persistence.lock_contention",
+      "subsystem": "domain",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "subprocess_terminate",
+      "expected_resolution": "normal_stale_abort",
+      "fault_class": "stale_cas",
+      "fault_point": "after_persistence",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "domain.after_persistence.stale_cas",
+      "subsystem": "domain",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "prior_state_or_aborted",
+      "fault_class": "duplicate_request",
+      "fault_point": "before_fsync",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "domain.before_fsync.duplicate_request",
+      "subsystem": "domain",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "prior_state_or_aborted",
+      "fault_class": "clock_anomaly",
+      "fault_point": "after_fsync",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "domain.after_fsync.clock_anomaly",
+      "subsystem": "domain",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "subprocess_terminate",
+      "expected_resolution": "explicit_manual_recovery_or_completed_audit",
+      "fault_class": "crash",
+      "fault_point": "before_audit",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "domain.before_audit.crash",
+      "subsystem": "domain",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "subprocess_terminate",
+      "expected_resolution": "committed_new_state",
+      "fault_class": "enospc",
+      "fault_point": "after_audit",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "domain.after_audit.enospc",
+      "subsystem": "domain",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "prior_state_or_aborted",
+      "fault_class": "permission_loss",
+      "fault_point": "before_publication",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "domain.before_publication.permission_loss",
+      "subsystem": "domain",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "subprocess_terminate",
+      "expected_resolution": "committed_new_state",
+      "fault_class": "file_truncation",
+      "fault_point": "after_publication",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "domain.after_publication.file_truncation",
+      "subsystem": "domain",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "prior_state_or_aborted",
+      "fault_class": "lock_contention",
+      "fault_point": "before_acknowledgment",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "domain.before_acknowledgment.lock_contention",
+      "subsystem": "domain",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "normal_stale_abort",
+      "fault_class": "stale_cas",
+      "fault_point": "after_acknowledgment",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "domain.after_acknowledgment.stale_cas",
+      "subsystem": "domain",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "prior_state_or_aborted",
+      "fault_class": "duplicate_request",
+      "fault_point": "before_rollback",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "domain.before_rollback.duplicate_request",
+      "subsystem": "domain",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "prior_state_or_aborted",
+      "fault_class": "clock_anomaly",
+      "fault_point": "after_rollback",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "domain.after_rollback.clock_anomaly",
+      "subsystem": "domain",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "subprocess_terminate",
+      "expected_resolution": "prior_state_or_aborted",
+      "fault_class": "crash",
+      "fault_point": "before_close",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "domain.before_close.crash",
+      "subsystem": "domain",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "prior_state_or_aborted",
+      "fault_class": "enospc",
+      "fault_point": "after_close",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "domain.after_close.enospc",
+      "subsystem": "domain",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "prior_state_or_aborted",
+      "fault_class": "file_truncation",
+      "fault_point": "before_prepare",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "memory.before_prepare.file_truncation",
+      "subsystem": "memory",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "prior_state_or_aborted",
+      "fault_class": "lock_contention",
+      "fault_point": "after_prepare",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "memory.after_prepare.lock_contention",
+      "subsystem": "memory",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "normal_stale_abort",
+      "fault_class": "stale_cas",
+      "fault_point": "before_persistence",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "memory.before_persistence.stale_cas",
+      "subsystem": "memory",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "subprocess_terminate",
+      "expected_resolution": "explicit_manual_recovery_or_completed_audit",
+      "fault_class": "duplicate_request",
+      "fault_point": "after_persistence",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "memory.after_persistence.duplicate_request",
+      "subsystem": "memory",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "prior_state_or_aborted",
+      "fault_class": "clock_anomaly",
+      "fault_point": "before_fsync",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "memory.before_fsync.clock_anomaly",
+      "subsystem": "memory",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "subprocess_terminate",
+      "expected_resolution": "prior_state_or_aborted",
+      "fault_class": "crash",
+      "fault_point": "after_fsync",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "memory.after_fsync.crash",
+      "subsystem": "memory",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "explicit_manual_recovery_or_completed_audit",
+      "fault_class": "enospc",
+      "fault_point": "before_audit",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "memory.before_audit.enospc",
+      "subsystem": "memory",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "subprocess_terminate",
+      "expected_resolution": "committed_new_state",
+      "fault_class": "permission_loss",
+      "fault_point": "after_audit",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "memory.after_audit.permission_loss",
+      "subsystem": "memory",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "prior_state_or_aborted",
+      "fault_class": "file_truncation",
+      "fault_point": "before_publication",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "memory.before_publication.file_truncation",
+      "subsystem": "memory",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "subprocess_terminate",
+      "expected_resolution": "committed_new_state",
+      "fault_class": "lock_contention",
+      "fault_point": "after_publication",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "memory.after_publication.lock_contention",
+      "subsystem": "memory",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "normal_stale_abort",
+      "fault_class": "stale_cas",
+      "fault_point": "before_acknowledgment",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "memory.before_acknowledgment.stale_cas",
+      "subsystem": "memory",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "committed_new_state",
+      "fault_class": "duplicate_request",
+      "fault_point": "after_acknowledgment",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "memory.after_acknowledgment.duplicate_request",
+      "subsystem": "memory",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "prior_state_or_aborted",
+      "fault_class": "clock_anomaly",
+      "fault_point": "before_rollback",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "memory.before_rollback.clock_anomaly",
+      "subsystem": "memory",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "subprocess_terminate",
+      "expected_resolution": "prior_state_or_aborted",
+      "fault_class": "crash",
+      "fault_point": "after_rollback",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "memory.after_rollback.crash",
+      "subsystem": "memory",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "prior_state_or_aborted",
+      "fault_class": "enospc",
+      "fault_point": "before_close",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "memory.before_close.enospc",
+      "subsystem": "memory",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "prior_state_or_aborted",
+      "fault_class": "permission_loss",
+      "fault_point": "after_close",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "memory.after_close.permission_loss",
+      "subsystem": "memory",
+      "verification": "durable_state_audit_index_in_memory_compare"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "suite_detects_defect",
+      "fault_class": "negative_control",
+      "fault_point": "critical_transition",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "domain.rollback",
+      "subsystem": "domain",
+      "verification": "domain activation abort/truncation restores prior snapshot or raises manual recovery"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "suite_detects_defect",
+      "fault_class": "negative_control",
+      "fault_point": "critical_transition",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "memory.audit_ordering",
+      "subsystem": "memory",
+      "verification": "memory durable DB head precedes idempotent audit outbox delivery"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "suite_detects_defect",
+      "fault_class": "negative_control",
+      "fault_point": "critical_transition",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "alignment.lease_double_close",
+      "subsystem": "alignment",
+      "verification": "borrowed alignment leases release once and foreign release is rejected"
+    },
+    {
+      "execution": "shared_failpoint",
+      "expected_resolution": "suite_detects_defect",
+      "fault_class": "negative_control",
+      "fault_point": "critical_transition",
+      "restart_reconciliation": "fresh_process_deep_verify",
+      "scenario_id": "audit.correlation",
+      "subsystem": "audit",
+      "verification": "transaction terminal events require a prepared correlation id"
+    }
+  ],
+  "schema_version": "vulcan-persistence-qualification/1",
+  "w2_gate": {
+    "ambiguous_silent_success_allowed": false,
+    "deep_reconciliation_required": true,
+    "fresh_restart_required_after_each_scenario": true,
+    "machine_verifiable": true
+  }
+}
