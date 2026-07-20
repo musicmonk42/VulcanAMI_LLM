@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "assessment_owner": "ImpactAssessmentOwner",
+  "scope": "Repository-owned P00/P01 AMI constitution, control catalog, and assurance evidence model.",
+  "certification_disclaimer": "This impact assessment is planning evidence only and is not certification, legal compliance, safety certification, or erasure proof.",
+  "affected_parties": ["users", "operators", "maintainers", "data_subjects", "downstream_integrators"],
+  "constitutional_basis": ["HUMAN_SEPARATENESS", "CONSENT_FIDELITY", "AUTONOMY", "NON_DOMINATION", "NON_DECEPTION", "CONTESTABILITY", "CORRIGIBILITY", "RIGHT_OF_EXIT", "CROSS_PERSON_ISOLATION"],
+  "minimum_evidence": ["impact_assessment", "threat_model_result", "operator_review", "test_result"],
+  "review_triggers": ["new personal data use", "new provider context", "new model/data training path", "new authority-bearing runtime path", "capability registry change", "incident or near miss"]
+}

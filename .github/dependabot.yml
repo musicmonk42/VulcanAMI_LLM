@@ -1,0 +1,16 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    labels: [dependencies, github-actions, requires-evidence]
+    commit-message:
+      prefix: ci
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    labels: [dependencies, python, requires-evidence]
+    commit-message:
+      prefix: deps

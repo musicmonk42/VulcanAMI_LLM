@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "register_owner": "RiskOwner",
+  "certification_disclaimer": "Risk records are internal assurance planning evidence only and do not certify safety or compliance.",
+  "required_high_critical_control_kinds": ["preventive", "detective", "response", "recovery"],
+  "risks": [
+    {"id":"R-AUTHORITY-CONFUSION","title":"Authority confusion","severity":"critical","preventive_controls":["AMI-AUTH-001"],"detective_controls":["AMI-EVID-001"],"response_controls":["AMI-OPS-001"],"recovery_controls":["AMI-OPS-001"]},
+    {"id":"R-PROMPT-INJECTION","title":"Prompt injection","severity":"critical","preventive_controls":["AMI-PROMPT-001"],"detective_controls":["AMI-PROMPT-001","AMI-EVID-001"],"response_controls":["AMI-OPS-001"],"recovery_controls":["AMI-OPS-001"]},
+    {"id":"R-MODEL-SEMANTIC-DRIFT","title":"Model semantic drift","severity":"high","preventive_controls":["AMI-LEARN-001"],"detective_controls":["AMI-LEARN-001"],"response_controls":["AMI-OPS-001"],"recovery_controls":["AMI-OPS-001"]},
+    {"id":"R-FALSE-EPISTEMIC-COMMITMENT","title":"False epistemic commitment","severity":"critical","preventive_controls":["AMI-AUTH-001"],"detective_controls":["AMI-EVID-001"],"response_controls":["AMI-OPS-001"],"recovery_controls":["AMI-OPS-001"]},
+    {"id":"R-CSIU-MANIPULATION","title":"CSIU manipulation","severity":"critical","preventive_controls":["AMI-LEARN-001","AMI-AUTH-001"],"detective_controls":["AMI-EVID-001"],"response_controls":["AMI-OPS-001"],"recovery_controls":["AMI-OPS-001"]},
+    {"id":"R-SYCOPHANCY","title":"Sycophancy","severity":"high","preventive_controls":["AMI-LEARN-001","AMI-PROMPT-001"],"detective_controls":["AMI-LEARN-001"],"response_controls":["AMI-OPS-001"],"recovery_controls":["AMI-OPS-001"]},
+    {"id":"R-CROSS-USER-CONTAMINATION","title":"Cross-user contamination","severity":"critical","preventive_controls":["AMI-PRIV-001"],"detective_controls":["AMI-PRIV-001","AMI-EVID-001"],"response_controls":["AMI-OPS-001"],"recovery_controls":["AMI-OPS-001"]},
+    {"id":"R-CONSENT-FAILURE","title":"Consent failure","severity":"critical","preventive_controls":["AMI-PRIV-001"],"detective_controls":["AMI-PRIV-001"],"response_controls":["AMI-OPS-001"],"recovery_controls":["AMI-OPS-001"]},
+    {"id":"R-PROVIDER-LEAKAGE","title":"Provider leakage","severity":"critical","preventive_controls":["AMI-PRIV-001","AMI-PROMPT-001"],"detective_controls":["AMI-EVID-001"],"response_controls":["AMI-OPS-001"],"recovery_controls":["AMI-OPS-001"]},
+    {"id":"R-TRAINING-POISONING","title":"Training poisoning","severity":"critical","preventive_controls":["AMI-SUPPLY-001","AMI-LEARN-001"],"detective_controls":["AMI-LEARN-001"],"response_controls":["AMI-OPS-001"],"recovery_controls":["AMI-OPS-001"]},
+    {"id":"R-APPROVAL-FORGERY","title":"Approval forgery","severity":"critical","preventive_controls":["AMI-SDLC-001"],"detective_controls":["AMI-EVID-001"],"response_controls":["AMI-OPS-001"],"recovery_controls":["AMI-OPS-001"]},
+    {"id":"R-SOURCE-SELF-MODIFICATION","title":"Source self-modification","severity":"critical","preventive_controls":["AMI-SDLC-001","AMI-AUTH-001"],"detective_controls":["AMI-SDLC-001"],"response_controls":["AMI-OPS-001"],"recovery_controls":["AMI-OPS-001"]},
+    {"id":"R-AUDIT-EXHAUSTION","title":"Audit exhaustion","severity":"high","preventive_controls":["AMI-OPS-001"],"detective_controls":["AMI-OPS-001"],"response_controls":["AMI-OPS-001"],"recovery_controls":["AMI-OPS-001"]},
+    {"id":"R-SPLIT-BRAIN","title":"Split brain","severity":"critical","preventive_controls":["AMI-OPS-001"],"detective_controls":["AMI-OPS-001"],"response_controls":["AMI-OPS-001"],"recovery_controls":["AMI-OPS-001"]},
+    {"id":"R-SUPPLY-CHAIN-COMPROMISE","title":"Supply-chain compromise","severity":"critical","preventive_controls":["AMI-SUPPLY-001"],"detective_controls":["AMI-SUPPLY-001"],"response_controls":["AMI-OPS-001"],"recovery_controls":["AMI-OPS-001"]},
+    {"id":"R-DELETION-OVERCLAIM","title":"Deletion overclaim","severity":"high","preventive_controls":["AMI-PRIV-001","AMI-EVID-001"],"detective_controls":["AMI-PRIV-001"],"response_controls":["AMI-OPS-001"],"recovery_controls":["AMI-OPS-001"]}
+  ]
+}
