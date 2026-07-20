@@ -34,7 +34,7 @@ async def lifespan(app: FastAPI):
         app.state.runtime_settings=settings
         app.state.auth_config=settings.auth_config()
         runtime=await asyncio.to_thread(compose_runtime, settings)
-        await runtime.readiness(); app.state.runtime=runtime; app.state.ready=True
+        await runtime.deep_integrity(); app.state.runtime=runtime; app.state.ready=True
         yield
     except BaseException as exc:
         app.state.ready=False; app.state.runtime=None
@@ -82,7 +82,7 @@ async def _runtime(request:Request):
     if not getattr(request.app.state,'ready',False) or rt is None or rt.closed: raise HTTPException(503,'runtime not ready')
     try: await rt.admission()
     except Exception:
-        request.app.state.ready=False; raise HTTPException(503,'runtime not ready') from None
+        raise HTTPException(503,'runtime not ready') from None
     return rt
 
 async def _ready_runtime(request:Request):
@@ -90,7 +90,7 @@ async def _ready_runtime(request:Request):
     if not getattr(request.app.state,'ready',False) or rt is None or rt.closed: raise HTTPException(503,'runtime not ready')
     try: await rt.shallow_readiness()
     except Exception:
-        request.app.state.ready=False; raise HTTPException(503,'runtime not ready') from None
+        raise HTTPException(503,'runtime not ready') from None
     return rt
 
 async def _integrity_runtime(request:Request):
@@ -128,16 +128,19 @@ def create_app()->FastAPI:
     async def ready(request:Request):
         try:
             rt=await _ready_runtime(request)
-            diagnostics = rt.settings.public_dict() if rt.settings.public_diagnostics else {'environment': rt.settings.environment.value, 'settings_schema': rt.settings.schema()['schema_version']}
-            return {'status':'ready','runtime_id':rt.runtime_id,'diagnostics':diagnostics,'learning_owner_id':rt.learning_owner.owner_id,'learning_status':rt.learning_owner.capability.value,'capabilities':list(rt.capabilities()),'learning_capabilities':[c.__dict__ | {'status': c.status.value, 'readiness_state': c.readiness_state.value} for c in rt.learning_owner.capability_matrix()]}
+            state = rt.health.state.value if rt.health is not None else 'ready'
+            return {'status':'ready' if state == 'ready' else state}
         except HTTPException:
             err=getattr(request.app.state,'startup_error',None); code=err.public_code if isinstance(err,StartupFailure) else 'runtime_not_ready'
             return JSONResponse(status_code=503, content={'status':'not_ready','code':code})
     @app.get('/health/integrity')
     async def integrity(request:Request):
+        _principal(request,'operator:read')
         try:
             rt=await _integrity_runtime(request)
-            return {'status':'passed','runtime_id':rt.runtime_id}
+            snap = rt.health.snapshot() if rt.health is not None else None
+            last = None if snap is None or snap.last_integrity is None else {'ok':snap.last_integrity.ok,'category':None if snap.last_integrity.category is None else snap.last_integrity.category.value,'checked_at':snap.last_integrity.checked_at.isoformat(),'last_success_at':None if snap.last_integrity.last_success_at is None else snap.last_integrity.last_success_at.isoformat()}
+            return {'status':'passed','runtime_id':rt.runtime_id,'state':rt.health.state.value if rt.health is not None else 'ready','last_integrity':last}
         except HTTPException:
             return JSONResponse(status_code=503, content={'status':'failed','code':'runtime_integrity_failed'})
     @app.get('/v1/capabilities')

@@ -1,6 +1,7 @@
 """Typed owner for the one production cognitive object graph."""
 from __future__ import annotations
 
+import asyncio
 import inspect
 from dataclasses import dataclass
 from typing import Any, Literal
@@ -21,6 +22,7 @@ from .output import DeterministicLanguageOutput, LanguageOutputPort
 from .semantic import DeterministicLanguageInput, LanguageInputPort
 from .self_improvement import SelfImprovementRuntime, compose_self_improvement_runtime
 from .settings import RuntimeSettings
+from .health import HealthFailureCategory, HealthStateMachine, ProcessState, bounded_disk_check, categorize_failure
 
 
 LanguageMode = Literal["disabled", "deterministic_only", "transformer_proposal"]
@@ -61,6 +63,7 @@ class RuntimeContainer:
     learning_owner: LearningOwner | None = None
     settings: RuntimeSettings | None = None
     closed: bool = False
+    health: HealthStateMachine | None = None
 
     async def close(self) -> None:
         """Release every owned resource once, preserving the first failure.
@@ -73,6 +76,8 @@ class RuntimeContainer:
         if self.closed:
             return
         self.closed = True
+        if self.health is not None:
+            self.health.close()
         first_error: BaseException | None = None
         seen: set[int] = set()
         for resource in (
@@ -122,29 +127,52 @@ class RuntimeContainer:
         }
 
     async def admission(self) -> None:
-        """Fast traffic gate: the composed runtime exists and is not closing."""
-        if self.closed:
+        """Traffic gate: admitted runtime exists and is not draining/closing."""
+        if self.closed or (self.health is not None and self.health.state in {ProcessState.DRAINING, ProcessState.CLOSED, ProcessState.FAILED}):
             raise RuntimeError("canonical runtime is closed")
 
     async def shallow_readiness(self) -> None:
         """Fast readiness: verify mandatory owners are present without deep I/O."""
         await self.admission()
-        for name, owner in self._required_owners().items():
-            if owner is None:
-                raise RuntimeError(f"required canonical {name} is unavailable")
+        try:
+            for name, owner in self._required_owners().items():
+                if owner is None:
+                    raise RuntimeError(f"required canonical {name} is unavailable")
+            if isinstance(self.durable_root, (str, Path)):
+                await bounded_disk_check(Path(self.durable_root))
+            if self.health is not None:
+                self.health.ready()
+        except Exception as exc:
+            if self.health is not None:
+                self.health.degrade(categorize_failure(exc))
+            raise
 
     async def deep_integrity(self) -> None:
         """Deep integrity: execute every owner-provided readiness/health check."""
-        await self.shallow_readiness()
+        await self.admission()
+        for name, owner in self._required_owners().items():
+            if owner is None:
+                if self.health is not None: self.health.record_integrity(ok=False, category=HealthFailureCategory.MISSING_OWNER)
+                raise RuntimeError(f"required canonical {name} is unavailable")
+        if isinstance(self.durable_root, (str, Path)):
+            await bounded_disk_check(Path(self.durable_root))
         required = self._required_owners()
-        for name, owner in required.items():
-            check = getattr(owner, "readiness", None) or getattr(owner, "healthcheck", None)
-            if check is not None:
-                result = check()
-                if inspect.isawaitable(result):
-                    result = await result
-                if result is False:
-                    raise RuntimeError(f"required canonical {name} is unhealthy")
+        try:
+            for name, owner in required.items():
+                check = getattr(owner, "readiness", None) or getattr(owner, "healthcheck", None)
+                if check is not None:
+                    result = await asyncio.to_thread(check)
+                    if inspect.isawaitable(result):
+                        result = await result
+                    if result is False:
+                        raise RuntimeError(f"required canonical {name} is unhealthy")
+            if self.health is not None:
+                self.health.record_integrity(ok=True)
+        except Exception as exc:
+            category = categorize_failure(exc)
+            if self.health is not None:
+                self.health.record_integrity(ok=False, category=category)
+            raise
 
     async def readiness(self) -> None:
         """Backward-compatible deep readiness adapter; not used for liveness."""
@@ -221,8 +249,10 @@ class RuntimeContainer:
             response_safety.readiness()
             kernel = CognitiveKernel(state_authority=world_state, finalizer=SafetyResponseFinalizer(response_safety),
                                      language_input=language_input, language_output=language_output, memory=memory, audit=audit, alignment=alignment)
-            return cls(str(uuid4()), deployment, world_state, kernel, safety, memory,
-                       language_input, language_output, config, audit, alignment, domain_registry, Path(root), self_improvement, learning_owner, settings)
+            container = cls(str(uuid4()), deployment, world_state, kernel, safety, memory,
+                       language_input, language_output, config, audit, alignment, domain_registry, Path(root), self_improvement, learning_owner, settings, False, HealthStateMachine())
+            container.health.admit()
+            return container
         except Exception:
             for r in (locals().get("learning_owner"), self_improvement, domain_registry, alignment, audit, memory, language_output, language_input):
                 if r is not None:
