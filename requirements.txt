@@ -437,7 +437,7 @@ toolz==1.0.0
 torch==2.9.1
 torchvision==0.24.1
 tornado==6.5.2
-tqdm==4.67.1
+tqdm==4.69.0
 transformers==4.49.0
 typeguard==4.4.4
 typer==0.20.0
