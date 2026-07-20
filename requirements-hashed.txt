@@ -1867,9 +1867,9 @@ ecdsa==0.19.1 \
     --hash=sha256:30638e27cf77b7e15c4c4cc1973720149e1033827cfd00661ca5c8cc0cdb24c3 \
     --hash=sha256:478cba7b62555866fcb3bb3fe985e06decbdb68ef55713c4e5ab98c57d508e61
     # via python-jose
-eth-hash==0.7.1 \
-    --hash=sha256:0fb1add2adf99ef28883fd6228eb447ef519ea72933535ad1a0b28c6f65f868a \
-    --hash=sha256:d2411a403a0b0a62e8247b4117932d900ffb4c8c64b15f92620547ca5ce46be5
+eth-hash==0.8.0 \
+    --hash=sha256:523718a51b369ab89866b929a5c93c52978cd866ea309192ad980dd8271f9fac \
+    --hash=sha256:b009752b620da2e9c7668014849d1f5fadbe4f138603f1871cc5d4ca706896b1
     # via eth-utils
 eth-typing==3.5.2 \
     --hash=sha256:1842e628fb1ffa929b94f89a9d33caafbeb9978dc96abb6036a12bc91f1c624b \
