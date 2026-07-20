@@ -182,7 +182,7 @@ def create_app()->FastAPI:
     @app.post('/v1/admin/domains')
     async def domains(request:Request):
         p=_principal(request,'domains:write'); rt=await _runtime(request); expected=_if_match(request, allow_absent=True); _idempotency_key(request)
-        data=await _body(request); body=BundleBody.model_validate(data); snap=await asyncio.to_thread(rt.domain_registry.load_bundle, json.dumps(body.bundle, sort_keys=True, separators=(',',':')).encode(), expected_previous_digest=expected)
+        data=await _body(request); body=BundleBody.model_validate(data); snap=await asyncio.to_thread(rt.domain_registry.load_bundle, json.dumps(body.bundle, sort_keys=True, separators=(',',':')).encode(), expected_previous_digest=expected, actor_id=p.subject, approval_provenance={"request_id": _request_id(request)})
         return {'committed_snapshot_id':snap,'committed_audit_identity':'domain.activation_committed','actor':p.subject}
     @app.post('/v1/admin/alignment')
     async def alignment(request:Request):
