@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -44,7 +44,7 @@ jobs:
     name: helm chart conformance
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4
       - run: helm template runtime-e2e helm/vulcanami --set image.tag=e2e --set image.digest=sha256:1111111111111111111111111111111111111111111111111111111111111111 > rendered.yaml
       - run: python -m pytest -q tests/e2e/runtime_image/test_helm_conformance.py

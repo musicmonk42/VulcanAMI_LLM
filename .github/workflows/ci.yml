@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout pinned
-        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Install dependency-light test tooling
         run: python -m pip install pytest
       - name: Run dependency-light contracts
@@ -39,7 +39,7 @@ jobs:
     name: full integration evidence
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - run: python -m pip install pytest
       - run: python -m pytest -q tests/security/test_language_contracts.py tests/architecture/test_inventory.py
       - run: python scripts/ci/write_evidence.py --job full-integration --command "pytest language contracts and inventory" --output evidence/full-integration.json
@@ -53,7 +53,7 @@ jobs:
     name: architecture fitness evidence
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - run: python scripts/architecture_inventory.py --check
       - run: python scripts/ci/workflow_lint.py
       - run: python scripts/ci/write_evidence.py --job architecture-fitness --command "inventory check and workflow lint" --output evidence/architecture-fitness.json
@@ -67,7 +67,7 @@ jobs:
     name: static typing evidence
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - run: python -m compileall -q src
       - run: python scripts/ci/write_evidence.py --job static-typing --command "compileall src" --output evidence/static-typing.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -80,7 +80,7 @@ jobs:
     name: lint and format evidence
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - run: git diff --check
       - run: python scripts/ci/write_evidence.py --job lint-format --command "git diff --check" --output evidence/lint-format.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -93,7 +93,7 @@ jobs:
     name: optimized Python parity evidence
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - run: python -m pip install pytest
       - run: python -m pytest -q tests/core/
       - run: python -O -m pytest -q tests/core/

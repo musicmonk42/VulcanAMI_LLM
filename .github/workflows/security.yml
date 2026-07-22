@@ -14,7 +14,7 @@ jobs:
     name: secret scan evidence
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - run: python scripts/ci/secret_scan.py
       - run: python scripts/ci/write_evidence.py --job secret-scan --command "secret pattern policy" --output evidence/secret-scan.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -27,7 +27,7 @@ jobs:
     name: SAST evidence
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - run: python -m compileall -q src/vulcan/core src/vulcan/assurance src/vulcan/runtime
       - name: Workflow anti-bypass lint
         run: python scripts/ci/workflow_lint.py
@@ -42,7 +42,7 @@ jobs:
     name: dependency vulnerability policy evidence
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - run: python scripts/ci/verify_dependency_inputs.py
       - run: python scripts/ci/write_evidence.py --job dependency-vulnerability-policy --command "verify dependency inputs" --output evidence/dependency-vulnerability-policy.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
