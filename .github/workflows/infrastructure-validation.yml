@@ -127,7 +127,7 @@ jobs:
           cat /tmp/helm-output.yaml
 
       - name: Upload Helm template output
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: helm-template-output
           path: /tmp/helm-output.yaml
@@ -411,7 +411,7 @@ jobs:
           echo "✅ Deployment script help works"
 
       - name: Upload validation artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: kubernetes-manifests
           path: |
@@ -770,7 +770,7 @@ jobs:
           cat INFRASTRUCTURE_SECURITY.md
 
       - name: Upload security checklist
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: infrastructure-security-checklist
           path: INFRASTRUCTURE_SECURITY.md

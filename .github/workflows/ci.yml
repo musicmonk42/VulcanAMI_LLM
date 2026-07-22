@@ -29,7 +29,7 @@ jobs:
       - name: Write evidence
         run: python scripts/ci/write_evidence.py --job dependency-light-unit-contract --command "pytest dependency-light contracts" --output evidence/dependency-light-unit-contract.json
       - name: Upload evidence
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: dependency-light-unit-contract-evidence
           path: evidence/dependency-light-unit-contract.json
@@ -43,7 +43,7 @@ jobs:
       - run: python -m pip install pytest
       - run: python -m pytest -q tests/security/test_language_contracts.py tests/architecture/test_inventory.py
       - run: python scripts/ci/write_evidence.py --job full-integration --command "pytest language contracts and inventory" --output evidence/full-integration.json
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: full-integration-evidence
           path: evidence/full-integration.json
@@ -57,7 +57,7 @@ jobs:
       - run: python scripts/architecture_inventory.py --check
       - run: python scripts/ci/workflow_lint.py
       - run: python scripts/ci/write_evidence.py --job architecture-fitness --command "inventory check and workflow lint" --output evidence/architecture-fitness.json
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: architecture-fitness-evidence
           path: evidence/architecture-fitness.json
@@ -70,7 +70,7 @@ jobs:
       - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b
       - run: python -m compileall -q src
       - run: python scripts/ci/write_evidence.py --job static-typing --command "compileall src" --output evidence/static-typing.json
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: static-typing-evidence
           path: evidence/static-typing.json
@@ -83,7 +83,7 @@ jobs:
       - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b
       - run: git diff --check
       - run: python scripts/ci/write_evidence.py --job lint-format --command "git diff --check" --output evidence/lint-format.json
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: lint-format-evidence
           path: evidence/lint-format.json
@@ -98,7 +98,7 @@ jobs:
       - run: python -m pytest -q tests/core/
       - run: python -O -m pytest -q tests/core/
       - run: python scripts/ci/write_evidence.py --job optimized-python --command "pytest tests/core under normal and optimized Python" --output evidence/optimized-python.json
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: optimized-python-evidence
           path: evidence/optimized-python.json

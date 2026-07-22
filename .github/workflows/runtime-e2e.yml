@@ -34,7 +34,7 @@ jobs:
           docker ps -a > evidence/runtime-e2e/docker-ps.txt || true
           docker logs $(docker ps -aq --filter ancestor=vulcanami-runtime-e2e:local | head -1) 2>&1 | sed -E 's/(Bearer )[A-Za-z0-9._-]+/\1[REDACTED]/g;s/(VULCAN_JWT_SECRET=)[^ ]+/\1[REDACTED]/g' > evidence/runtime-e2e/container.log || true
       - if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: runtime-e2e-failure-evidence
           path: evidence/runtime-e2e
