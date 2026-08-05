@@ -45,6 +45,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b
-      - uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310
       - run: helm template runtime-e2e helm/vulcanami --set image.tag=e2e --set image.digest=sha256:1111111111111111111111111111111111111111111111111111111111111111 > rendered.yaml
       - run: python -m pytest -q tests/e2e/runtime_image/test_helm_conformance.py

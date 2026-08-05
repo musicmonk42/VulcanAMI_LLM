@@ -396,7 +396,7 @@ jobs:
           fi
 
       - name: Install Helm
-        uses: azure/setup-helm@v3
+        uses: azure/setup-helm@v5
         with:
           version: 'latest'
 
