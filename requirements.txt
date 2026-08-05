@@ -349,7 +349,7 @@ python-dateutil==2.9.0.post0
 python-dotenv==1.2.1
 Python-EasyConfig==0.1.7
 python-engineio==4.12.2
-python-hcl2==7.3.1
+python-hcl2==8.1.2
 python-jose==3.5.0
 python-json-logger==3.3.0
 python-magic-bin==0.4.14; sys_platform == "win32"

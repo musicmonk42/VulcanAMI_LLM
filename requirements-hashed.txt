@@ -6029,9 +6029,9 @@ python-engineio==4.12.2 \
     # via
     #   -r requirements.txt
     #   python-socketio
-python-hcl2==7.3.1 \
-    --hash=sha256:6bf6036d3dffac04e05e6aa58ff6e9a3710bba2171325584dfd7b3f8c99c6d4d \
-    --hash=sha256:f8f55583703daf7bbcb595a33c68de891064d565974ea39998b81d15a4c4657b
+python-hcl2==8.1.2 \
+    --hash=sha256:ac3d16dc6501d4f24db348b3a634afdfb5c10a6715b27cd105a5b77071b84ee3 \
+    --hash=sha256:ae809c7e6e39e8c3c3555e7b7f389082207929591fcba062c9f76afb1abe972d
     # via -r requirements.txt
 python-jose==3.5.0 \
     --hash=sha256:abd1202f23d34dfad2c3d28cb8617b90acf34132c7afd60abd0b0b7d3cb55771 \
