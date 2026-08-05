@@ -5891,9 +5891,9 @@ pyflakes==3.4.0 \
     # via
     #   -r requirements.txt
     #   flake8
-pygam==0.11.0 \
-    --hash=sha256:da22b4e479391405ed1a2b04116246ebcb986f01020bdf4477602c7be2207ed3 \
-    --hash=sha256:fa8a08f377a458eceb992e3c68d01c258e02d30c196ba746bd5d4a77329c3b8c
+pygam==0.12.0 \
+    --hash=sha256:7c098dfbfbb7a6b9fa4e1a579380e3b0b866fe8fa56f9d852ffdeaecfe56d5ea \
+    --hash=sha256:e66597040fc9b6f113a5a9229fc42fb4ea60e8f55942a3b438caccf0512835f4
     # via
     #   -r requirements.txt
     #   lingam
