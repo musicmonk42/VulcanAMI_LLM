@@ -526,7 +526,7 @@ jobs:
 
       - name: Send Slack notification
         if: steps.check-slack.outputs.has_slack_webhook == 'true'
-        uses: slackapi/slack-github-action@v1.24.0
+        uses: slackapi/slack-github-action@v4.0.0
         with:
           payload: |
             {
