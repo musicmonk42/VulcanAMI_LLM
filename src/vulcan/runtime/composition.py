@@ -62,6 +62,8 @@ def _module_available(name: str) -> bool:
 
 def _bind_constitutional_admission(container: RuntimeContainer) -> RuntimeContainer:
     """Wrap the compatibility kernel in the composed snapshot authority."""
+    if isinstance(container.kernel, ConstitutionalCognitiveKernel):
+        return container
     container.kernel = ConstitutionalCognitiveKernel.from_kernel(
         container.kernel,
         snapshot_admitter=container.admit_snapshot_bundle,

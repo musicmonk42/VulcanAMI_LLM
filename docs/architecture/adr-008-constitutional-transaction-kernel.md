@@ -65,7 +65,7 @@ This migration slice:
 
 - gives the case and episode one canonical `case-*` identity;
 - binds the composed runtime's nine-authority snapshot admission function to the kernel;
-- supplies a clearly named dependency-light compatibility snapshot only for isolated direct-kernel tests;
+- preserves direct-kernel tests as an explicitly uncomposed compatibility path while production composition uses the real snapshot admission function;
 - advances successful requests through the complete episode lifecycle to `CONSOLIDATED`;
 - records abstentions and failures as authoritative terminal episode states;
 - binds compatibility-ledger artifacts into the episode by digest;

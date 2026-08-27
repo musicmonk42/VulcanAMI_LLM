@@ -6,7 +6,7 @@
 
 The public case identity and episode identity are one canonical `case-*` identifier. The runtime creates that identity before reasoning, admits a bounded `SnapshotBundle`, and binds the bundle to the episode while it is still at its genesis `PERCEIVED` state.
 
-Production composition binds `RuntimeContainer.admit_snapshot_bundle` into `CognitiveKernel`. A clearly named compatibility bundle exists only to preserve dependency-light direct-kernel tests while explicit production state-authority ports are completed.
+Production composition wraps `CognitiveKernel` with `RuntimeContainer.admit_snapshot_bundle`. Direct-kernel tests remain an explicitly uncomposed compatibility path; they do not establish or claim production snapshot admission. Constitutional-path tests supply explicit bounded providers while production state-authority ports are completed.
 
 ## Lifecycle
 
