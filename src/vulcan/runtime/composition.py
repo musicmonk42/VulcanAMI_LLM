@@ -5,6 +5,7 @@ from importlib import import_module, util
 from types import SimpleNamespace
 
 from .container import RuntimeContainer
+from .constitutional_kernel import ConstitutionalCognitiveKernel
 from .errors import StartupErrorCategory, StartupFailure
 from .settings import RuntimeSettings, VulcanEnvironment
 
@@ -15,7 +16,12 @@ class DevelopmentStubDeployment:
     production_ready = False
 
     def __init__(self) -> None:
-        self.collective = SimpleNamespace(deps=SimpleNamespace(world_model=DevelopmentStubWorld(), safety_validator=DevelopmentStubSafety()))
+        self.collective = SimpleNamespace(
+            deps=SimpleNamespace(
+                world_model=DevelopmentStubWorld(),
+                safety_validator=DevelopmentStubSafety(),
+            )
+        )
 
     def readiness(self) -> bool:
         return False
@@ -39,7 +45,11 @@ class DevelopmentStubSafety:
         return False
 
 
-def _startup_failure(category: StartupErrorCategory, message: str, exc: BaseException | None = None) -> StartupFailure:
+def _startup_failure(
+    category: StartupErrorCategory,
+    message: str,
+    exc: BaseException | None = None,
+) -> StartupFailure:
     return StartupFailure(category, message, exc)
 
 
@@ -50,26 +60,58 @@ def _module_available(name: str) -> bool:
         return True
 
 
+def _bind_constitutional_admission(container: RuntimeContainer) -> RuntimeContainer:
+    """Wrap the compatibility kernel in the composed snapshot authority."""
+    container.kernel = ConstitutionalCognitiveKernel.from_kernel(
+        container.kernel,
+        snapshot_admitter=container.admit_snapshot_bundle,
+    )
+    return container
+
+
 def compose_runtime(settings: RuntimeSettings) -> RuntimeContainer:
     """Construct the deployment graph from the already-parsed settings authority."""
     if settings.development_stub_mode:
         if settings.environment is VulcanEnvironment.production:
-            raise _startup_failure(StartupErrorCategory.SETTINGS_INVALID, "development stub mode is forbidden in production")
-        return RuntimeContainer.new(deployment=DevelopmentStubDeployment(), settings=settings)
-    if not _module_available("vulcan.config") or not _module_available("vulcan.orchestrator.deployment"):
-        raise _startup_failure(StartupErrorCategory.DEPLOYMENT_IMPORT_FAILED, "production deployment dependency import failed")
+            raise _startup_failure(
+                StartupErrorCategory.SETTINGS_INVALID,
+                "development stub mode is forbidden in production",
+            )
+        return _bind_constitutional_admission(
+            RuntimeContainer.new(
+                deployment=DevelopmentStubDeployment(),
+                settings=settings,
+            )
+        )
+    if not _module_available("vulcan.config") or not _module_available(
+        "vulcan.orchestrator.deployment"
+    ):
+        raise _startup_failure(
+            StartupErrorCategory.DEPLOYMENT_IMPORT_FAILED,
+            "production deployment dependency import failed",
+        )
     try:
         config_module = import_module("vulcan.config")
         deployment_module = import_module("vulcan.orchestrator.deployment")
         deployment = deployment_module.ProductionDeployment(config_module.get_config())
     except BaseException as exc:
-        raise _startup_failure(StartupErrorCategory.DEPLOYMENT_CONSTRUCTION_FAILED, "production deployment construction failed", exc) from exc
+        raise _startup_failure(
+            StartupErrorCategory.DEPLOYMENT_CONSTRUCTION_FAILED,
+            "production deployment construction failed",
+            exc,
+        ) from exc
     try:
-        return RuntimeContainer.new(deployment=deployment, settings=settings)
+        return _bind_constitutional_admission(
+            RuntimeContainer.new(deployment=deployment, settings=settings)
+        )
     except StartupFailure:
         raise
     except OSError as exc:
-        raise _startup_failure(StartupErrorCategory.FILESYSTEM_UNAVAILABLE, "runtime durable filesystem unavailable", exc) from exc
+        raise _startup_failure(
+            StartupErrorCategory.FILESYSTEM_UNAVAILABLE,
+            "runtime durable filesystem unavailable",
+            exc,
+        ) from exc
     except RuntimeError as exc:
         text = str(exc).lower()
         category = StartupErrorCategory.RUNTIME_UNHEALTHY

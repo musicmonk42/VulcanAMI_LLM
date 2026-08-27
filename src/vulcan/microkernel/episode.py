@@ -20,6 +20,7 @@ from .state_machine import EpisodeState, EpisodeTransitionError, ensure_transiti
 SCHEMA_VERSION = "cognitive-episode.v1"
 GENESIS_DIGEST = "0" * 64
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
+_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{2,127}$")
 
 
 class Clock(Protocol):
@@ -50,6 +51,12 @@ def _freeze_mapping(value: Mapping[str, str] | None) -> Mapping[str, str]:
     return MappingProxyType(dict(value or {}))
 
 
+def _episode_id(value: str) -> str:
+    if not isinstance(value, str) or _ID.fullmatch(value) is None:
+        raise ValueError("invalid episode_id")
+    return value
+
+
 @dataclass(frozen=True)
 class ActorBinding:
     actor_id: str
@@ -57,7 +64,11 @@ class ActorBinding:
     authority: str
 
     def to_json(self) -> dict[str, str]:
-        return {"actor_id": self.actor_id, "authority": self.authority, "principal_digest": self.principal_digest}
+        return {
+            "actor_id": self.actor_id,
+            "authority": self.authority,
+            "principal_digest": self.principal_digest,
+        }
 
 
 @dataclass(frozen=True)
@@ -65,10 +76,18 @@ class RequestBinding:
     request_id: str
     input_digest: str
     projection_digest: str | None = None
-    retention_policy: str = "raw-request-working-memory-only; durable-episode-digests-and-approved-projections"
+    retention_policy: str = (
+        "raw-request-working-memory-only; "
+        "durable-episode-digests-and-approved-projections"
+    )
 
     def to_json(self) -> dict[str, str | None]:
-        return {"input_digest": self.input_digest, "projection_digest": self.projection_digest, "request_id": self.request_id, "retention_policy": self.retention_policy}
+        return {
+            "input_digest": self.input_digest,
+            "projection_digest": self.projection_digest,
+            "request_id": self.request_id,
+            "retention_policy": self.retention_policy,
+        }
 
 
 @dataclass(frozen=True)
@@ -100,7 +119,11 @@ class ArtifactRef:
     kind: str
 
     def to_json(self) -> dict[str, str]:
-        return {"artifact_id": self.artifact_id, "digest": self.digest, "kind": self.kind}
+        return {
+            "artifact_id": self.artifact_id,
+            "digest": self.digest,
+            "kind": self.kind,
+        }
 
 
 @dataclass(frozen=True)
@@ -119,7 +142,11 @@ class TransitionEvent:
     def __post_init__(self) -> None:
         object.__setattr__(self, "snapshot_ids", tuple(self.snapshot_ids))
         object.__setattr__(self, "evidence_refs", tuple(self.evidence_refs))
-        object.__setattr__(self, "event_digest", canonical_digest(self.to_json(include_digest=False)))
+        object.__setattr__(
+            self,
+            "event_digest",
+            canonical_digest(self.to_json(include_digest=False)),
+        )
 
     def to_json(self, *, include_digest: bool = True) -> dict[str, object]:
         payload: dict[str, object] = {
@@ -161,66 +188,195 @@ class CognitiveEpisode:
     digest: str = field(init=False)
 
     def __post_init__(self) -> None:
+        _episode_id(self.episode_id)
         object.__setattr__(self, "interpretation", _freeze_mapping(self.interpretation))
-        for name in ("claims", "evidence", "derivations", "candidate_plans", "effects", "consolidation_refs", "transitions"):
+        for name in (
+            "claims",
+            "evidence",
+            "derivations",
+            "candidate_plans",
+            "effects",
+            "consolidation_refs",
+            "transitions",
+        ):
             object.__setattr__(self, name, tuple(getattr(self, name)))
-        object.__setattr__(self, "digest", canonical_digest(self.to_json(include_digest=False)))
+        object.__setattr__(
+            self,
+            "digest",
+            canonical_digest(self.to_json(include_digest=False)),
+        )
 
     @classmethod
-    def create(cls, *, actor: ActorBinding, request_id: str, input_digest: str | None = None, raw_request: bytes | str | None = None,
-               conversation_id: str | None = None, parent: EpisodeRef | None = None, snapshot_bundle: SnapshotBundleRef | None = None,
-               projection_digest: str | None = None, clock: Clock = utc_now) -> "CognitiveEpisode":
+    def create(
+        cls,
+        *,
+        actor: ActorBinding,
+        request_id: str,
+        input_digest: str | None = None,
+        raw_request: bytes | str | None = None,
+        conversation_id: str | None = None,
+        parent: EpisodeRef | None = None,
+        snapshot_bundle: SnapshotBundleRef | None = None,
+        projection_digest: str | None = None,
+        episode_id: str | None = None,
+        clock: Clock = utc_now,
+    ) -> "CognitiveEpisode":
         if input_digest is None:
             if raw_request is None:
                 raise ValueError("input_digest or raw_request is required")
             raw = raw_request.encode("utf-8") if isinstance(raw_request, str) else raw_request
             input_digest = _digest_bytes(raw)
-        episode = cls(episode_id=str(uuid4()), actor=actor, request=RequestBinding(request_id, input_digest, projection_digest), conversation_id=conversation_id, parent=parent, snapshot_bundle=snapshot_bundle)
-        return episode._append_event(EpisodeState.PERCEIVED, reason="created", authority=actor.authority, clock=clock)
+        resolved_episode_id = _episode_id(episode_id or str(uuid4()))
+        episode = cls(
+            episode_id=resolved_episode_id,
+            actor=actor,
+            request=RequestBinding(request_id, input_digest, projection_digest),
+            conversation_id=conversation_id,
+            parent=parent,
+            snapshot_bundle=snapshot_bundle,
+        )
+        return episode._append_event(
+            EpisodeState.PERCEIVED,
+            reason="created",
+            authority=actor.authority,
+            clock=clock,
+        )
 
-    def transition(self, target: EpisodeState, *, reason: str, authority: str, clock: Clock = utc_now,
-                   snapshot_ids: Sequence[str] = (), evidence_refs: Sequence[ArtifactRef] = (),
-                   interpretation: Mapping[str, str] | None = None, claims: Sequence[ArtifactRef] = (), evidence: Sequence[ArtifactRef] = (),
-                   derivations: Sequence[ArtifactRef] = (), candidate_plans: Sequence[ArtifactRef] = (), authorization: ArtifactRef | None = None,
-                   effects: Sequence[ArtifactRef] = (), response: ArtifactRef | None = None, consolidation_refs: Sequence[ArtifactRef] = ()) -> "CognitiveEpisode":
+    def bind_snapshot_bundle(self, snapshot_bundle: SnapshotBundleRef) -> "CognitiveEpisode":
+        """Bind the admitted state bundle before the first semantic transition.
+
+        Runtime admission creates the episode identifier before all mutable state
+        authorities can be leased. Binding is therefore allowed exactly once while
+        the episode is still at its genesis ``PERCEIVED`` state. It is not a second
+        authority transition; it completes admission and changes the episode digest.
+        """
+        if self.state is not EpisodeState.PERCEIVED or len(self.transitions) != 1:
+            raise EpisodeTransitionError(
+                "snapshot bundle must be bound before the first semantic transition"
+            )
+        if self.snapshot_bundle is not None:
+            raise EpisodeTransitionError("snapshot bundle already bound")
+        return replace(self, snapshot_bundle=snapshot_bundle)
+
+    def transition(
+        self,
+        target: EpisodeState,
+        *,
+        reason: str,
+        authority: str,
+        clock: Clock = utc_now,
+        snapshot_ids: Sequence[str] = (),
+        evidence_refs: Sequence[ArtifactRef] = (),
+        interpretation: Mapping[str, str] | None = None,
+        claims: Sequence[ArtifactRef] = (),
+        evidence: Sequence[ArtifactRef] = (),
+        derivations: Sequence[ArtifactRef] = (),
+        candidate_plans: Sequence[ArtifactRef] = (),
+        authorization: ArtifactRef | None = None,
+        effects: Sequence[ArtifactRef] = (),
+        response: ArtifactRef | None = None,
+        consolidation_refs: Sequence[ArtifactRef] = (),
+    ) -> "CognitiveEpisode":
         if not authority:
             raise EpisodeTransitionError("transition authority is required")
         if self.snapshot_bundle is not None:
-            allowed = {self.snapshot_bundle.bundle_id, self.snapshot_bundle.state_digest}
+            allowed = {
+                self.snapshot_bundle.bundle_id,
+                self.snapshot_bundle.state_digest,
+            }
             unknown = [sid for sid in snapshot_ids if sid not in allowed]
-            if unknown and "rebase" not in reason.lower() and "transition" not in reason.lower():
-                raise EpisodeTransitionError("mixed snapshot versions require explicit transition/rebase event")
+            if (
+                unknown
+                and "rebase" not in reason.lower()
+                and "transition" not in reason.lower()
+            ):
+                raise EpisodeTransitionError(
+                    "mixed snapshot versions require explicit transition/rebase event"
+                )
         ensure_transition(self.state, target)
         prior_digest = self.digest
         updated = replace(
             self,
             state=target,
-            interpretation=_freeze_mapping(interpretation) if interpretation is not None else self.interpretation,
+            interpretation=(
+                _freeze_mapping(interpretation)
+                if interpretation is not None
+                else self.interpretation
+            ),
             claims=(*self.claims, *tuple(claims)),
             evidence=(*self.evidence, *tuple(evidence)),
             derivations=(*self.derivations, *tuple(derivations)),
             candidate_plans=(*self.candidate_plans, *tuple(candidate_plans)),
-            authorization=authorization if authorization is not None else self.authorization,
+            authorization=(
+                authorization if authorization is not None else self.authorization
+            ),
             effects=(*self.effects, *tuple(effects)),
             response=response if response is not None else self.response,
-            consolidation_refs=(*self.consolidation_refs, *tuple(consolidation_refs)),
+            consolidation_refs=(
+                *self.consolidation_refs,
+                *tuple(consolidation_refs),
+            ),
         )
-        return updated._append_event(target, reason=reason, authority=authority, clock=clock, snapshot_ids=tuple(snapshot_ids), evidence_refs=tuple(evidence_refs), prior_digest=prior_digest)
+        return updated._append_event(
+            target,
+            reason=reason,
+            authority=authority,
+            clock=clock,
+            snapshot_ids=tuple(snapshot_ids),
+            evidence_refs=tuple(evidence_refs),
+            prior_digest=prior_digest,
+            from_state=self.state,
+        )
 
-    def _append_event(self, target: EpisodeState, *, reason: str, authority: str, clock: Clock, snapshot_ids: Sequence[str] = (), evidence_refs: Sequence[ArtifactRef] = (), prior_digest: str | None = None) -> "CognitiveEpisode":
-        event = TransitionEvent(str(uuid4()), self.state, target, clock(), reason, authority, prior_digest or (self.digest if self.transitions else GENESIS_DIGEST), tuple(snapshot_ids), tuple(evidence_refs))
+    def _append_event(
+        self,
+        target: EpisodeState,
+        *,
+        reason: str,
+        authority: str,
+        clock: Clock,
+        snapshot_ids: Sequence[str] = (),
+        evidence_refs: Sequence[ArtifactRef] = (),
+        prior_digest: str | None = None,
+        from_state: EpisodeState | None = None,
+    ) -> "CognitiveEpisode":
+        event = TransitionEvent(
+            str(uuid4()),
+            from_state if from_state is not None else self.state,
+            target,
+            clock(),
+            reason,
+            authority,
+            prior_digest or (self.digest if self.transitions else GENESIS_DIGEST),
+            tuple(snapshot_ids),
+            tuple(evidence_refs),
+        )
         return replace(self, transitions=(*self.transitions, event))
 
     def to_json(self, *, include_digest: bool = True) -> dict[str, object]:
         payload: dict[str, object] = {
-            "actor": self.actor.to_json(), "authorization": self.authorization.to_json() if self.authorization else None,
-            "candidate_plans": [x.to_json() for x in self.candidate_plans], "claims": [x.to_json() for x in self.claims],
-            "consolidation_refs": [x.to_json() for x in self.consolidation_refs], "conversation_id": self.conversation_id,
-            "derivations": [x.to_json() for x in self.derivations], "effects": [x.to_json() for x in self.effects],
-            "episode_id": self.episode_id, "evidence": [x.to_json() for x in self.evidence], "interpretation": dict(self.interpretation),
-            "parent": self.parent.to_json() if self.parent else None, "request": self.request.to_json(), "response": self.response.to_json() if self.response else None,
-            "schema_version": self.schema_version, "snapshot_bundle": self.snapshot_bundle.to_json() if self.snapshot_bundle else None,
-            "state": self.state.value, "transitions": [event.to_json() for event in self.transitions],
+            "actor": self.actor.to_json(),
+            "authorization": (
+                self.authorization.to_json() if self.authorization else None
+            ),
+            "candidate_plans": [x.to_json() for x in self.candidate_plans],
+            "claims": [x.to_json() for x in self.claims],
+            "consolidation_refs": [x.to_json() for x in self.consolidation_refs],
+            "conversation_id": self.conversation_id,
+            "derivations": [x.to_json() for x in self.derivations],
+            "effects": [x.to_json() for x in self.effects],
+            "episode_id": self.episode_id,
+            "evidence": [x.to_json() for x in self.evidence],
+            "interpretation": dict(self.interpretation),
+            "parent": self.parent.to_json() if self.parent else None,
+            "request": self.request.to_json(),
+            "response": self.response.to_json() if self.response else None,
+            "schema_version": self.schema_version,
+            "snapshot_bundle": (
+                self.snapshot_bundle.to_json() if self.snapshot_bundle else None
+            ),
+            "state": self.state.value,
+            "transitions": [event.to_json() for event in self.transitions],
         }
         if include_digest:
             payload["digest"] = self.digest
