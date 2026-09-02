@@ -223,7 +223,7 @@ Markdown==3.7
 markdown-it-py==4.0.0
 MarkupSafe==3.0.3
 marshmallow==4.1.0
-matplotlib==3.9.2
+matplotlib==3.11.1
 mccabe==0.7.0
 mdurl==0.1.2
 merklelib==1.0
