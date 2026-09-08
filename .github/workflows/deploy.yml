@@ -1,12 +1,6 @@
-name: Deploy to Environments
+name: Advisory Legacy Deployment (manual only)
 
 on:
-  push:
-    branches:
-      - main
-      - develop
-    tags:
-      - 'v*.*.*'
   workflow_dispatch:
     inputs:
       environment:

@@ -1,4 +1,4 @@
-name: blocking-ci
+name: constitutional-ci
 
 on:
   pull_request:
@@ -9,25 +9,29 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: constitutional-ci-${{ github.ref }}
   cancel-in-progress: true
 
 env:
-  PYTHON_VERSION: '3.14'
+  PYTHON_VERSION: '3.11'
 
 jobs:
   dependency-light-unit-contract:
-    name: dependency-light unit and contract evidence
+    name: constitutional unit and contract evidence
     runs-on: ubuntu-latest
     steps:
       - name: Checkout pinned
         uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b
-      - name: Install dependency-light test tooling
-        run: python -m pip install pytest
-      - name: Run dependency-light contracts
-        run: python -m pytest -q tests/core/ tests/architecture/test_ami_constitution.py tests/assurance/test_control_catalog.py tests/assurance/test_capability_registry.py
+      - name: Set up constitutional Python
+        uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install hashed constitutional toolchain
+        run: python -m pip install --require-hashes -r requirements-constitutional.txt
+      - name: Run dependency-light constitutional contracts
+        run: python scripts/ci/run_constitutional_gate.py --check unit
       - name: Write evidence
-        run: python scripts/ci/write_evidence.py --job dependency-light-unit-contract --command "pytest dependency-light contracts" --output evidence/dependency-light-unit-contract.json
+        run: python scripts/ci/write_evidence.py --job dependency-light-unit-contract --command "dependency-light constitutional contracts" --output evidence/dependency-light-unit-contract.json
       - name: Upload evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
@@ -36,13 +40,16 @@ jobs:
           if-no-files-found: error
 
   full-integration:
-    name: full integration evidence
+    name: authoritative episode constitutional integration
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b
-      - run: python -m pip install pytest
-      - run: python -m pytest -q tests/security/test_language_contracts.py tests/architecture/test_inventory.py
-      - run: python scripts/ci/write_evidence.py --job full-integration --command "pytest language contracts and inventory" --output evidence/full-integration.json
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: python -m pip install --require-hashes -r requirements-constitutional.txt
+      - run: python scripts/ci/run_constitutional_gate.py --check integration
+      - run: python scripts/ci/write_evidence.py --job full-integration --command "authoritative episode constitutional integration" --output evidence/full-integration.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: full-integration-evidence
@@ -50,63 +57,50 @@ jobs:
           if-no-files-found: error
 
   architecture-fitness:
-    name: architecture fitness evidence
+    name: architecture and workflow reproducibility
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b
-      - run: python scripts/architecture_inventory.py --check
-      - run: python scripts/ci/workflow_lint.py
-      - run: python scripts/ci/write_evidence.py --job architecture-fitness --command "inventory check and workflow lint" --output evidence/architecture-fitness.json
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c
         with:
-          name: architecture-fitness-evidence
-          path: evidence/architecture-fitness.json
-          if-no-files-found: error
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: python -m pip install --require-hashes -r requirements-constitutional.txt
+      - run: python scripts/architecture_inventory.py --check
+      - run: python scripts/ci/run_constitutional_gate.py --check workflow
+      - run: python scripts/ci/write_evidence.py --job architecture-fitness --command "inventory and workflow reproducibility" --output evidence/architecture-fitness.json
 
   static-typing:
-    name: static typing evidence
+    name: mypy constitutional assurance surface
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b
-      - run: python -m compileall -q src
-      - run: python scripts/ci/write_evidence.py --job static-typing --command "compileall src" --output evidence/static-typing.json
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c
         with:
-          name: static-typing-evidence
-          path: evidence/static-typing.json
-          if-no-files-found: error
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: python -m pip install --require-hashes -r requirements-constitutional.txt
+      - run: python scripts/ci/run_constitutional_gate.py --check typing
+      - run: python scripts/ci/write_evidence.py --job static-typing --command "mypy scripts/ci" --output evidence/static-typing.json
 
   lint-format:
-    name: lint and format evidence
+    name: Black and isort check mode
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b
-      - run: git diff --check
-      - run: python scripts/ci/write_evidence.py --job lint-format --command "git diff --check" --output evidence/lint-format.json
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c
         with:
-          name: lint-format-evidence
-          path: evidence/lint-format.json
-          if-no-files-found: error
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: python -m pip install --require-hashes -r requirements-constitutional.txt
+      - run: python scripts/ci/run_constitutional_gate.py --check format
+      - run: python scripts/ci/write_evidence.py --job lint-format --command "black and isort check mode" --output evidence/lint-format.json
 
   optimized-python:
-    name: optimized Python parity evidence
+    name: normal and optimized Python security parity
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b
-      - run: python -m pip install pytest
-      - run: python -m pytest -q tests/core/
-      - run: python -O -m pytest -q tests/core/
-      - run: python scripts/ci/write_evidence.py --job optimized-python --command "pytest tests/core under normal and optimized Python" --output evidence/optimized-python.json
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c
         with:
-          name: optimized-python-evidence
-          path: evidence/optimized-python.json
-          if-no-files-found: error
-
-  research-optional-nonblocking:
-    name: optional research checks nonblocking advisory
-    runs-on: ubuntu-latest
-    continue-on-error: ${{ true }}
-    steps:
-      - run: echo "Optional research-only job; do not configure as a required branch check."
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: python -m pip install --require-hashes -r requirements-constitutional.txt
+      - run: python scripts/ci/run_constitutional_gate.py --check security
+      - run: python scripts/ci/write_evidence.py --job optimized-python --command "security contracts under normal and optimized Python" --output evidence/optimized-python.json

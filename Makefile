@@ -794,3 +794,10 @@ all: install lint test docker-build ## Run full build pipeline
 ################################################################################
 # End of Makefile
 ################################################################################
+
+.PHONY: install-constitutional constitutional-gate
+install-constitutional: ## Install the hash-locked Python 3.11 constitutional gate
+	python -m pip install --require-hashes -r requirements-constitutional.txt
+
+constitutional-gate: ## Run the local constitutional assurance gate
+	python scripts/ci/run_constitutional_gate.py

@@ -10,7 +10,7 @@ from vulcan.runtime.case import CognitiveCase, CognitiveCaseStatus
 from vulcan.runtime.constitutional_kernel import ConstitutionalCognitiveKernel
 from vulcan.runtime.finalization import FinalizationDecision, FinalizationResult
 from vulcan.runtime.kernel import CognitiveKernel, KernelRequest
-from vulcan.runtime.semantic import Utterance
+from vulcan.runtime.semantic import Utterance, canonical_digest
 
 
 class _Finalizer:
@@ -127,3 +127,10 @@ def test_case_identifier_and_episode_identifier_are_one_identity():
     assert case.case_id.startswith("case-")
     assert case.episode is not None
     assert case.episode.episode_id == case.case_id
+
+
+def test_compatibility_digest_canonicalizes_lists_and_tuples_identically():
+    list_payload = {"claim_digests": ["a" * 64, "b" * 64]}
+    tuple_payload = {"claim_digests": ("a" * 64, "b" * 64)}
+
+    assert canonical_digest(list_payload) == canonical_digest(tuple_payload)

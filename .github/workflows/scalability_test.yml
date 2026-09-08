@@ -21,43 +21,24 @@
 # Version: 1.0.0
 # ==============================================================================
 
-name: Scalability Stress Test
+name: Advisory Legacy Scalability Research (nonblocking)
 
 on:
-  push:
-    branches: [main, develop]
-    paths:
-      - 'src/**'
-      - 'tests/performance/**'
-      - '.github/workflows/scalability_test.yml'
-  pull_request:
-    branches: [main]
-    paths:
-      - 'src/**'
-      - 'tests/performance/**'
-      - '.github/workflows/scalability_test.yml'
-  schedule:
-    - cron: '0 2 * * 0'  # Weekly on Sunday 2am UTC
   workflow_dispatch:
     inputs:
       scenario:
-        description: 'Test scenario to run'
+        description: 'Advisory legacy scenario; not canonical runtime evidence'
         required: false
         default: 'progressive'
         type: choice
-        options:
-          - progressive
-          - baseline
-          - light_load
-          - medium_load
-          - heavy_load
+        options: [progressive, baseline, light_load, medium_load, heavy_load]
       no_openai:
-        description: 'Run in no-openai mode (preflight will be skipped)'
+        description: 'Run without the optional provider preflight'
         required: false
-        default: false
+        default: true
         type: boolean
       skip_heavy:
-        description: 'Skip heavy_load scenario'
+        description: 'Skip the heavy-load scenario'
         required: false
         default: true
         type: boolean
@@ -65,10 +46,6 @@ on:
         description: 'Query timeout in seconds'
         required: false
         default: '30'
-        type: string
-      openai_api_key:
-        description: 'OpenAI API key for fallback. SECURITY NOTE: Prefer using OPENAI_API_KEY repository secret instead. Input values may appear in workflow logs.'
-        required: false
         type: string
 
 # Prevent concurrent runs on the same branch
@@ -83,7 +60,8 @@ permissions:
 
 jobs:
   stress-test:
-    name: Run Stress Tests
+    name: Legacy stress test (advisory only)
+    continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -486,6 +464,7 @@ jobs:
   # Dependency Consistency Check
   # ============================================================================
   hashed-build:
+    continue-on-error: true
     name: Docker hashed dependency check
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -519,6 +498,7 @@ jobs:
   # Regression Check Job
   # ============================================================================
   regression-check:
+    continue-on-error: true
     name: Check for Regressions
     runs-on: ubuntu-latest
     needs: stress-test

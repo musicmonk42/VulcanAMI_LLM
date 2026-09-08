@@ -1,0 +1,253 @@
+# Minimal constitutional assurance dependencies, resolved for Python 3.11.
+# Extracted from requirements-hashed.txt; update both locks together.
+--only-binary=:all:
+
+black==25.1.0 \
+    --hash=sha256:030b9759066a4ee5e5aca28c3c77f9c64789cdd4de8ac1df642c40b708be6171 \
+    --hash=sha256:055e59b198df7ac0b7efca5ad7ff2516bca343276c466be72eb04a3bcc1f82d7 \
+    --hash=sha256:0e519ecf93120f34243e6b0054db49c00a35f84f195d5bce7e9f5cfc578fc2da \
+    --hash=sha256:172b1dbff09f86ce6f4eb8edf9dede08b1fce58ba194c87d7a4f1a5aa2f5b3c2 \
+    --hash=sha256:1e2978f6df243b155ef5fa7e558a43037c3079093ed5d10fd84c43900f2d8ecc \
+    --hash=sha256:33496d5cd1222ad73391352b4ae8da15253c5de89b93a80b3e2c8d9a19ec2666 \
+    --hash=sha256:3b48735872ec535027d979e8dcb20bf4f70b5ac75a8ea99f127c106a7d7aba9f \
+    --hash=sha256:4b60580e829091e6f9238c848ea6750efed72140b91b048770b64e74fe04908b \
+    --hash=sha256:759e7ec1e050a15f89b770cefbf91ebee8917aac5c20483bc2d80a6c3a04df32 \
+    --hash=sha256:8f0b18a02996a836cc9c9c78e5babec10930862827b1b724ddfe98ccf2f2fe4f \
+    --hash=sha256:95e8176dae143ba9097f351d174fdaf0ccd29efb414b362ae3fd72bf0f710717 \
+    --hash=sha256:96c1c7cd856bba8e20094e36e0f948718dc688dba4a9d78c3adde52b9e6c2299 \
+    --hash=sha256:a1ee0a0c330f7b5130ce0caed9936a904793576ef4d2b98c40835d6a65afa6a0 \
+    --hash=sha256:a22f402b410566e2d1c950708c77ebf5ebd5d0d88a6a2e87c86d9fb48afa0d18 \
+    --hash=sha256:a39337598244de4bae26475f77dda852ea00a93bd4c728e09eacd827ec929df0 \
+    --hash=sha256:afebb7098bfbc70037a053b91ae8437c3857482d3a690fefc03e9ff7aa9a5fd3 \
+    --hash=sha256:bacabb307dca5ebaf9c118d2d2f6903da0d62c9faa82bd21a33eecc319559355 \
+    --hash=sha256:bce2e264d59c91e52d8000d507eb20a9aca4a778731a08cfff7e5ac4a4bb7096 \
+    --hash=sha256:d9e6827d563a2c820772b32ce8a42828dc6790f095f441beef18f96aa6f8294e \
+    --hash=sha256:db8ea9917d6f8fc62abd90d944920d95e73c83a5ee3383493e35d271aca872e9 \
+    --hash=sha256:ea0213189960bda9cf99be5b8c8ce66bb054af5e9e861249cd23471bd7b0b3ba \
+    --hash=sha256:f3df5f1bf91d36002b0a75389ca8663510cf0531cca8aa5c1ef695b46d98655f
+    # via -r requirements.txt
+
+click==8.3.1 \
+    --hash=sha256:12ff4785d337a1bb490bb7e9c2b1ee5da3112e94a8622f26a6c77f5d2fc6842a \
+    --hash=sha256:981153a64e25f12d547d3426c367a4857371575ee7ad18df2a6183ab0545b2a6
+    # via
+    #   -r requirements.txt
+    #   black
+    #   dask
+    #   feast
+    #   flask
+    #   nltk
+    #   ray
+    #   safety
+    #   typer
+    #   typer-slim
+    #   uvicorn
+
+iniconfig==2.3.0 \
+    --hash=sha256:c76315c77db068650d49c5b56314774a7804df16fee4402c1f19d6d15d8c4730 \
+    --hash=sha256:f631c04d2c48c52b84d0d0549c99ff3859c98df65b3101406327ecc7d53fbf12
+    # via
+    #   -r requirements.txt
+    #   pytest
+
+isort==6.0.1 \
+    --hash=sha256:1cb5df28dfbc742e490c5e41bad6da41b805b0a8be7bc93cd0fb2a8a890ac450 \
+    --hash=sha256:2dc5d7f65c9678d94c88dfc29161a320eec67328bc97aad576874cb4be1e9615
+    # via
+    #   -r requirements.txt
+    #   pylint
+
+mypy==1.18.2 \
+    --hash=sha256:01199871b6110a2ce984bde85acd481232d17413868c9807e95c1b0739a58914 \
+    --hash=sha256:030c52d0ea8144e721e49b1f68391e39553d7451f0c3f8a7565b59e19fcb608b \
+    --hash=sha256:06a398102a5f203d7477b2923dda3634c36727fa5c237d8f859ef90c42a9924b \
+    --hash=sha256:07b8b0f580ca6d289e69209ec9d3911b4a26e5abfde32228a288eb79df129fcc \
+    --hash=sha256:0e2785a84b34a72ba55fb5daf079a1003a34c05b22238da94fcae2bbe46f3544 \
+    --hash=sha256:1331eb7fd110d60c24999893320967594ff84c38ac6d19e0a76c5fd809a84c86 \
+    --hash=sha256:1379451880512ffce14505493bd9fe469e0697543717298242574882cf8cdb8d \
+    --hash=sha256:20c02215a080e3a2be3aa50506c67242df1c151eaba0dcbc1e4e557922a26075 \
+    --hash=sha256:22a1748707dd62b58d2ae53562ffc4d7f8bcc727e8ac7cbc69c053ddc874d47e \
+    --hash=sha256:22f27105f1525ec024b5c630c0b9f36d5c1cc4d447d61fe51ff4bd60633f47ac \
+    --hash=sha256:25a9c8fb67b00599f839cf472713f54249a62efd53a54b565eb61956a7e3296b \
+    --hash=sha256:33eca32dd124b29400c31d7cf784e795b050ace0e1f91b8dc035672725617e34 \
+    --hash=sha256:3ca30b50a51e7ba93b00422e486cbb124f1c56a535e20eff7b2d6ab72b3b2e37 \
+    --hash=sha256:448acd386266989ef11662ce3c8011fd2a7b632e0ec7d61a98edd8e27472225b \
+    --hash=sha256:592ec214750bc00741af1f80cbf96b5013d81486b7bb24cb052382c19e40b428 \
+    --hash=sha256:5d6c838e831a062f5f29d11c9057c6009f60cb294fea33a98422688181fe2893 \
+    --hash=sha256:62f0e1e988ad41c2a110edde6c398383a889d95b36b3e60bcf155f5164c4fdce \
+    --hash=sha256:664dc726e67fa54e14536f6e1224bcfce1d9e5ac02426d2326e2bb4e081d1ce8 \
+    --hash=sha256:6ca1e64b24a700ab5ce10133f7ccd956a04715463d30498e64ea8715236f9c9c \
+    --hash=sha256:749b5f83198f1ca64345603118a6f01a4e99ad4bf9d103ddc5a3200cc4614adf \
+    --hash=sha256:776bb00de1778caf4db739c6e83919c1d85a448f71979b6a0edd774ea8399341 \
+    --hash=sha256:7a780ca61fc239e4865968ebc5240bb3bf610ef59ac398de9a7421b54e4a207e \
+    --hash=sha256:7ab28cc197f1dd77a67e1c6f35cd1f8e8b73ed2217e4fc005f9e6a504e46e7ba \
+    --hash=sha256:7fb95f97199ea11769ebe3638c29b550b5221e997c63b14ef93d2e971606ebed \
+    --hash=sha256:807d9315ab9d464125aa9fcf6d84fde6e1dc67da0b6f80e7405506b8ac72bc7f \
+    --hash=sha256:8795a039bab805ff0c1dfdb8cd3344642c2b99b8e439d057aba30850b8d3423d \
+    --hash=sha256:a2afc0fa0b0e91b4599ddfe0f91e2c26c2b5a5ab263737e998d6817874c5f7c8 \
+    --hash=sha256:a3c47adf30d65e89b2dcd2fa32f3aeb5e94ca970d2c15fcb25e297871c8e4764 \
+    --hash=sha256:a431a6f1ef14cf8c144c6b14793a23ec4eae3db28277c358136e79d7d062f62d \
+    --hash=sha256:aa5e07ac1a60a253445797e42b8b2963c9675563a94f11291ab40718b016a7a0 \
+    --hash=sha256:c1eab0cf6294dafe397c261a75f96dc2c31bffe3b944faa24db5def4e2b0f77c \
+    --hash=sha256:c2b9c7e284ee20e7598d6f42e13ca40b4928e6957ed6813d1ab6348aa3f47133 \
+    --hash=sha256:c3ad2afadd1e9fea5cf99a45a822346971ede8685cc581ed9cd4d42eaf940986 \
+    --hash=sha256:d6985ed057513e344e43a26cc1cd815c7a94602fb6a3130a34798625bc2f07b6 \
+    --hash=sha256:d8068d0afe682c7c4897c0f7ce84ea77f6de953262b12d07038f4d296d547074 \
+    --hash=sha256:d924eef3795cc89fecf6bedc6ed32b33ac13e8321344f6ddbf8ee89f706c05cb \
+    --hash=sha256:ed4482847168439651d3feee5833ccedbf6657e964572706a2adb1f7fa4dfe2e \
+    --hash=sha256:f9e171c465ad3901dc652643ee4bffa8e9fef4d7d0eece23b428908c77a76a66
+    # via
+    #   -r requirements.txt
+    #   sqlalchemy
+
+mypy-extensions==1.1.0 \
+    --hash=sha256:1be4cccdb0f2482337c4743e60421de3a356cd97508abadd57d47403e94f5505 \
+    --hash=sha256:52e68efc3284861e772bbcd66823fde5ae21fd2fdb51c62a211403730b916558
+    # via
+    #   -r requirements.txt
+    #   black
+    #   mypy
+
+packaging==25.0 \
+    --hash=sha256:29572ef2b1f17581046b3a2227d5c611fb25ec70ca1ba8554b24b0e69331a484 \
+    --hash=sha256:d443872c98d677bf60f6a1f2f8c1cb748e8fe762d2bf9d3148b5599295b0fc4f
+    # via
+    #   -r requirements.txt
+    #   aioresponses
+    #   black
+    #   build
+    #   dask
+    #   dparse
+    #   faiss-cpu
+    #   google-cloud-aiplatform
+    #   google-cloud-bigquery
+    #   gunicorn
+    #   huggingface-hub
+    #   langchain-core
+    #   langsmith
+    #   lazy-loader
+    #   limits
+    #   matplotlib
+    #   onnxruntime
+    #   optuna
+    #   plotly
+    #   pooch
+    #   pytest
+    #   ray
+    #   safety
+    #   safety-schemas
+    #   spacy
+    #   statsmodels
+    #   tensorboardx
+    #   thinc
+    #   transformers
+    #   weasel
+
+pathspec==0.12.1 \
+    --hash=sha256:a0d503e138a4c123b27490a4f7beda6a01c6f288df0e4a8b79c7eb0dc7b4cc08 \
+    --hash=sha256:a482d51503a1ab33b1c67a6c3813a26953dbdc71c31dacaef9a838c4e29f5712
+    # via
+    #   -r requirements.txt
+    #   black
+    #   mypy
+
+platformdirs==4.5.0 \
+    --hash=sha256:70ddccdd7c99fc5942e9fc25636a8b34d04c24b335100223152c2803e4063312 \
+    --hash=sha256:e578a81bb873cbb89a41fcc904c7ef523cc18284b7e3b3ccf06aca1403b7ebd3
+    # via
+    #   -r requirements.txt
+    #   black
+    #   pooch
+    #   pylint
+
+pluggy==1.6.0 \
+    --hash=sha256:7dcc130b76258d33b90f61b658791dede3486c3e6bfb003ee5c9bfb396dd22f3 \
+    --hash=sha256:e920276dd6813095e9377c0bc5566d94c932c33b27a3e3945d8389c374dd4746
+    # via
+    #   -r requirements.txt
+    #   pytest
+    #   pytest-cov
+
+pygments==2.19.2 \
+    --hash=sha256:636cb2477cec7f8952536970bc533bc43743542f70392ae026374600add5b887 \
+    --hash=sha256:86540386c03d588bb81d44bc3928634ff26449851e99741617ecb9037ee5ec0b
+    # via
+    #   -r requirements.txt
+    #   feast
+    #   pytest
+    #   rich
+
+pytest==9.0.1 \
+    --hash=sha256:3e9c069ea73583e255c3b21cf46b8d3c56f6e3a1a8f6da94ccb0fcf57b9d73c8 \
+    --hash=sha256:67be0030d194df2dfa7b556f2e56fb3c3315bd5c8822c6951162b92b32ce7dad
+    # via
+    #   -r requirements.txt
+    #   pytest-asyncio
+    #   pytest-benchmark
+    #   pytest-cov
+    #   pytest-html
+    #   pytest-metadata
+    #   pytest-mock
+    #   pytest-timeout
+
+pytest-asyncio==1.3.0 \
+    --hash=sha256:611e26147c7f77640e6d0a92a38ed17c3e9848063698d5c93d5aa7aa11cebff5 \
+    --hash=sha256:d7f52f36d231b80ee124cd216ffb19369aa168fc10095013c6b014a34d3ee9e5
+    # via -r requirements.txt
+
+pytest-timeout==2.4.0 \
+    --hash=sha256:7e68e90b01f9eff71332b25001f85c75495fc4e3a836701876183c4bcfd0540a \
+    --hash=sha256:c42667e5cdadb151aeb5b26d114aff6bdf5a907f176a007a30b940d3d865b5c2
+    # via -r requirements.txt
+
+typing-extensions==4.15.0 \
+    --hash=sha256:0cea48d173cc12fa28ecabc3b837ea3cf6f38c6d1136f85cbaaf598984861466 \
+    --hash=sha256:f0fa19c6845758ab08074a0cfa8b7aecb71c999ca73d62883bc25cc018c4e548
+    # via
+    #   -r requirements.txt
+    #   aioredis
+    #   aiosignal
+    #   aiosqlite
+    #   alembic
+    #   anyio
+    #   azure-core
+    #   azure-identity
+    #   azure-keyvault-secrets
+    #   azure-storage-blob
+    #   beautifulsoup4
+    #   chromadb
+    #   eth-typing
+    #   exceptiongroup
+    #   fastapi
+    #   flask-limiter
+    #   galois
+    #   google-cloud-aiplatform
+    #   google-genai
+    #   google-generativeai
+    #   graphene
+    #   gymnasium
+    #   huggingface-hub
+    #   langchain-core
+    #   librosa
+    #   limits
+    #   mypy
+    #   openai
+    #   opentelemetry-sdk
+    #   pydantic
+    #   pydantic-core
+    #   pyopenssl
+    #   pytest-asyncio
+    #   python-utils
+    #   reactivex
+    #   referencing
+    #   safety
+    #   safety-schemas
+    #   sentence-transformers
+    #   sqlalchemy
+    #   starlette
+    #   torch
+    #   typeguard
+    #   typer
+    #   typer-slim
+    #   typing-inspection
+

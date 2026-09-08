@@ -21,11 +21,13 @@ Existence in source is never equivalent to M3.
 
 ## Current slice
 
-This PR advances authoritative cognitive episodes and snapshot admission toward M3 for the bounded deterministic request path. It does not yet make the new Graphix compiler, Graphix Epistemic ledger, or independent nine-authority ports canonical.
+Repository assurance is now **M2 — Tested locally**: the Python 3.11 constitutional gate, workflow lint, real type/format checks, authoritative-episode integration, and optimized-Python parity are executable from one documented dependency set. It remains below M4 until the committed workflows run successfully on configured GitHub runners and the exact built artifact passes restart qualification.
+
+The preceding episode-foundation PR advances authoritative cognitive episodes and snapshot admission toward M3 for the bounded deterministic request path. It does not yet make the new Graphix compiler, Graphix Epistemic ledger, or independent nine-authority ports canonical.
 
 ## Wave 0 — Recover executable truth
 
-### 0.1 Repository assurance
+### 0.1 Repository assurance — M2 (local evidence; hosted qualification pending)
 
 - protect `main`;
 - establish a reproducible minimal constitutional test command;

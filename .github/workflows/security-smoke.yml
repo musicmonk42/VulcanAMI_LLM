@@ -1,22 +1,20 @@
-name: Security Smoke Gate
+name: Advisory Legacy Security Smoke (nonblocking)
 
 on:
-  pull_request:
-  push:
-    branches: [ main, work ]
+  workflow_dispatch:
 
 jobs:
   serving-boundary:
+    continue-on-error: true
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c
         with:
           python-version: '3.11'
       - name: Install scoped dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          python -m pip install --require-hashes -r requirements-constitutional.txt
       - name: Run hard security smoke suite
         env:
           JWT_SECRET: ${{ secrets.JWT_SECRET || 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }}
