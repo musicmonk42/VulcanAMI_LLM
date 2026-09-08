@@ -126,9 +126,36 @@ class CognitiveCase:
         case.record("created")
         return case
 
+    @classmethod
+    def from_admitted_episode(
+        cls,
+        *,
+        episode: CognitiveEpisode,
+        bundle: "SnapshotBundle",
+    ) -> "CognitiveCase":
+        """Create the compatibility projection after authoritative admission."""
+        if episode.snapshot_bundle != bundle.bundle_ref():
+            raise ValueError("episode and snapshot bundle do not match")
+        if episode.episode_id != bundle.episode_id:
+            raise ValueError("episode and snapshot identities do not match")
+        case = cls(
+            request_id=episode.request.request_id,
+            conversation_id=episode.conversation_id,
+            input_hash=episode.request.input_digest,
+            case_id=episode.episode_id,
+            state_snapshot_id=bundle.digest,
+            episode=episode,
+            _snapshot_bundle=bundle,
+        )
+        case.record("created")
+        case.record("snapshot_admitted", bundle.bundle_id)
+        return case
+
     def record(self, stage: str, detail: str | None = None) -> None:
         if self.terminal_status is not CognitiveCaseStatus.OPEN:
-            raise RuntimeError("cannot append an event after a cognitive case is closed")
+            raise RuntimeError(
+                "cannot append an event after a cognitive case is closed"
+            )
         self.events.append(CaseEvent(stage, datetime.now(timezone.utc), detail))
 
     @property
@@ -148,7 +175,10 @@ class CognitiveCase:
         return self._snapshot_bundle
 
     def bind_snapshot_bundle(self, bundle: "SnapshotBundle") -> None:
-        """Complete admission by binding one real state bundle exactly once."""
+        """Migration adapter for pre-admission callers; never used in production.
+
+        Remove when direct callers construct cases through EpisodeAdmissionService.
+        """
         if self.terminal_status is not CognitiveCaseStatus.OPEN:
             raise RuntimeError("cannot bind a snapshot bundle to a closed case")
         if self._snapshot_bundle is not None:
@@ -157,7 +187,9 @@ class CognitiveCase:
             raise ValueError("snapshot bundle/case identity mismatch")
         if self.episode is None:
             raise RuntimeError("authoritative episode is unavailable")
-        self.episode = self.episode.bind_snapshot_bundle(bundle.bundle_ref())
+        self.episode = self.episode.bind_snapshot_bundle_for_migration(
+            bundle.bundle_ref()
+        )
         self._snapshot_bundle = bundle
         self.state_snapshot_id = bundle.digest
         self.record("snapshot_admitted", bundle.bundle_id)
@@ -187,22 +219,66 @@ class CognitiveCase:
             proposed_claims,
             case_id=self.case_id,
         )
-        self._evidence.extend(evidence)
-        self._derivations.append(derivation)
-        self._claims.append(claim)
-        self._ensure_interpreted()
+        if self.episode is None:
+            raise RuntimeError("authoritative episode is unavailable")
+        # Construct and validate every immutable transition first. Only after all
+        # transitions succeed is the compatibility projection mutated.
+        admitted = self.episode
+        next_episode = admitted
+        snapshot_ids = (self.state_snapshot_id,) if self.state_snapshot_id else ()
+        if (
+            next_episode.state is EpisodeState.PERCEIVED
+            and self.interpretation is not None
+        ):
+            next_episode = next_episode.transition(
+                EpisodeState.INTERPRETED,
+                reason="validated semantic ingress",
+                authority="CognitiveKernel",
+                snapshot_ids=snapshot_ids,
+                interpretation={
+                    "parser_identity": str(
+                        getattr(self.interpretation, "parser_identity", "unknown")
+                    ),
+                    "candidate_count": str(
+                        len(getattr(self.interpretation, "candidates", ()))
+                    ),
+                    "ontology_version": str(
+                        getattr(self.interpretation, "ontology_version", "unknown")
+                    ),
+                },
+            )
         if self.accepted_interpretation is not None:
-            self._advance(EpisodeState.GROUNDED, "accepted interpretation grounded")
-            self._advance(EpisodeState.DELIBERATING, "bounded plan deliberated")
-            claims, derivations, evidence_refs = self._ledger_refs()
-            self._advance(
+            next_episode = next_episode.transition(
+                EpisodeState.GROUNDED,
+                reason="accepted interpretation grounded",
+                authority="CognitiveKernel",
+                snapshot_ids=snapshot_ids,
+            )
+            next_episode = next_episode.transition(
+                EpisodeState.DELIBERATING,
+                reason="bounded plan deliberated",
+                authority="CognitiveKernel",
+                snapshot_ids=snapshot_ids,
+            )
+            claims, derivations, evidence_refs = self._ledger_refs_for(
+                proposed_claims, proposed_derivations, proposed_evidence
+            )
+            next_episode = next_episode.transition(
                 EpisodeState.EPISTEMICALLY_COMMITTED,
-                "validated compatibility ledger committed to episode",
+                reason="validated compatibility ledger committed to episode",
+                authority="CognitiveKernel",
+                snapshot_ids=snapshot_ids,
                 claims=claims,
                 derivations=derivations,
                 evidence=evidence_refs,
                 evidence_refs=evidence_refs,
             )
+        self._evidence.extend(evidence)
+        self._derivations.append(derivation)
+        self._claims.append(claim)
+        self.episode = next_episode
+        for event in next_episode.transitions[len(admitted.transitions) :]:
+            self.record("episode_transition", event.to_state.value)
 
     def record_finalization(self, decision: str) -> None:
         if self.terminal_status is not CognitiveCaseStatus.OPEN:
@@ -233,9 +309,7 @@ class CognitiveCase:
             "parser_identity": str(
                 getattr(self.interpretation, "parser_identity", "unknown")
             ),
-            "candidate_count": str(
-                len(getattr(self.interpretation, "candidates", ()))
-            ),
+            "candidate_count": str(len(getattr(self.interpretation, "candidates", ()))),
             "ontology_version": str(
                 getattr(self.interpretation, "ontology_version", "unknown")
             ),
@@ -273,11 +347,15 @@ class CognitiveCase:
         tuple[ArtifactRef, ...],
         tuple[ArtifactRef, ...],
     ]:
+        return self._ledger_refs_for(self.claims, self.derivations, self.evidence)
+
+    @staticmethod
+    def _ledger_refs_for(claim_items, derivation_items, evidence_items):
         from .semantic import canonical_digest
 
         claims = tuple(
             ArtifactRef(claim.claim_id, canonical_digest(claim), "semantic-claim.v2")
-            for claim in self.claims
+            for claim in claim_items
         )
         derivations = tuple(
             ArtifactRef(
@@ -285,7 +363,7 @@ class CognitiveCase:
                 canonical_digest(derivation),
                 "semantic-derivation.v2",
             )
-            for derivation in self.derivations
+            for derivation in derivation_items
         )
         evidence = tuple(
             ArtifactRef(
@@ -293,7 +371,7 @@ class CognitiveCase:
                 item.content_digest,
                 "semantic-evidence.v2",
             )
-            for item in self.evidence
+            for item in evidence_items
         )
         return claims, derivations, evidence
 
@@ -394,9 +472,13 @@ class CognitiveCase:
             target,
             reason,
             response=response,
-            claims=tuple(ref for ref in claims if ref.artifact_id not in existing_claims),
+            claims=tuple(
+                ref for ref in claims if ref.artifact_id not in existing_claims
+            ),
             derivations=tuple(
-                ref for ref in derivations if ref.artifact_id not in existing_derivations
+                ref
+                for ref in derivations
+                if ref.artifact_id not in existing_derivations
             ),
             evidence=tuple(
                 ref for ref in evidence if ref.artifact_id not in existing_evidence

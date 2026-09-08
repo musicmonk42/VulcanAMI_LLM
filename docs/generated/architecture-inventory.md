@@ -1,6 +1,6 @@
 # Generated architecture inventory
 
-Digest: `551181e721d46efb2fc9399cd3cafd9643dd43c2baffe6c2667b2ed44e33b78c`
+Digest: `a56312a30ff3783b69a20b29e99a07d454d5c924655b7b698eb19f88d4208851`
 
 This file is generated from `docs/generated/architecture-inventory.json`.
 
@@ -154,7 +154,7 @@ Count: 425
 
 ## Import Identities
 
-Count: 1769
+Count: 1775
 
 - `tests/security/test_output_firewall.py:1` module='vulcan.runtime.output', reachability='test-only'
 - `tests/test_probabilistic_routing.py:10` module='src.vulcan.reasoning.probabilistic_reasoning', reachability='test-only'
@@ -173,7 +173,6 @@ Count: 1769
 - `src/vulcan/runtime/audit.py:10` module='vulcan.persistence.audit.reconcile', reachability='production-reachable'
 - `tests/test_learning_outbox.py:10` module='vulcan.runtime.audit', reachability='test-only'
 - `tests/runtime/test_production_composition.py:10` module='vulcan.runtime.composition', reachability='test-only'
-- `tests/runtime/test_authoritative_episode_path.py:10` module='vulcan.runtime.constitutional_kernel', reachability='test-only'
 - `tests/security/test_persistent_audit_alignment.py:10` module='vulcan.runtime.finalization', reachability='test-only'
 - `tests/security/test_real_response_safety_composition.py:10` module='vulcan.runtime.kernel', reachability='test-only'
 - `tests/security/test_runtime_convergence.py:10` module='vulcan.runtime.kernel', reachability='test-only'
@@ -184,6 +183,7 @@ Count: 1769
 - `src/vulcan/tests/test_meta_learning.py:5` module='vulcan.learning.meta_learning', reachability='test-only'
 - `src/vulcan/tests/test_continual_learning.py:6` module='vulcan.learning.continual_learning', reachability='test-only'
 - `tests/test_phase9d_governed_drive_e2e.py:6` module='vulcan.world_model.meta_reasoning.governed_transaction', reachability='test-only'
+- `tests/runtime/test_authoritative_episode_path.py:7` module='vulcan.microkernel.snapshots', reachability='test-only'
 - `src/vulcan/processing.py:100` module='src.vulcan.simple_mode', reachability='unknown'
 - `tests/test_philosophical_reasoning_registration.py:100` module='vulcan.reasoning.reasoning_types', reachability='test-only'
 - `src/vulcan/reasoning/analogical/base_reasoner.py:1003` module='vulcan.reasoning.analogical.types', reachability='unknown'
@@ -197,6 +197,7 @@ Count: 1769
 - `src/vulcan/distillation/__init__.py:102` module='vulcan.distillation.promotion_gate', reachability='unknown'
 - `src/vulcan/tests/test_unified_chat_imports.py:102` module='vulcan.endpoints', reachability='test-only'
 - `src/vulcan/tests/test_planning_endpoint.py:102` module='vulcan.endpoints.planning', reachability='test-only'
+- `tests/microkernel/test_episode.py:102` module='vulcan.microkernel.episode', reachability='test-only'
 - `tests/security/test_runtime_convergence.py:102` module='vulcan.runtime.app', reachability='test-only'
 - `src/vulcan/llm/__init__.py:89` module='vulcan.llm.openai_client', reachability='unknown'
 - `src/vulcan/tests/test_metrics_centralization.py:93` module='vulcan.metrics', reachability='test-only'
@@ -205,8 +206,7 @@ Count: 1769
 - `src/api_server.py:103` module='vulcan.reasoning.unified', reachability='unknown'
 - `src/vulcan/world_model/world_model_core.py:1037` module='vulcan.world_model.llm_guidance', reachability='unknown'
 - `src/vulcan/server/startup/manager.py:1039` module='vulcan.utils_main.http_session', reachability='unknown'
-- `src/vulcan/routing/telemetry_recorder.py:104` module='src.vulcan.memory.hierarchical', reachability='unknown'
-- ... 1719 more in JSON
+- ... 1725 more in JSON
 
 ## Singletons
 

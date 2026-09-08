@@ -53,7 +53,7 @@ class CognitiveKernel:
     async def handle(self, request: KernelRequest, case: CognitiveCase) -> KernelResult:
         if case.terminal_status is not CognitiveCaseStatus.OPEN: raise RuntimeError("kernel received a closed cognitive case")
         if request.utterance.digest != case.input_hash or request.conversation_id != case.conversation_id: raise ValueError("request/case correlation mismatch")
-        self.calls += 1; case.state_snapshot_id=self._snapshot_id(); case.record("semantic_ingress")
+        self.calls += 1; case.state_snapshot_id=case.state_snapshot_id or self._snapshot_id(); case.record("semantic_ingress")
         alignment_lease = self._alignment.lease() if self._alignment is not None else None
         alignment_lease_closed = False
         terminal_commit_started = False

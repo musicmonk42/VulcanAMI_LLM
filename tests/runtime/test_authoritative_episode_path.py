@@ -4,7 +4,11 @@ from types import SimpleNamespace
 
 import pytest
 
-from vulcan.microkernel.snapshots import AttributeSnapshotProvider, construct_snapshot_bundle
+from vulcan.microkernel.snapshots import (
+    AttributeSnapshotProvider,
+    construct_snapshot_bundle,
+)
+from vulcan.microkernel.episode import CognitiveEpisode
 from vulcan.microkernel.state_machine import EpisodeState
 from vulcan.runtime.case import CognitiveCase, CognitiveCaseStatus
 from vulcan.runtime.constitutional_kernel import ConstitutionalCognitiveKernel
@@ -45,13 +49,14 @@ def _kernel() -> ConstitutionalCognitiveKernel:
 @pytest.mark.asyncio
 async def test_successful_request_binds_snapshot_and_consolidates_episode():
     utterance = Utterance.from_text("2 + 3 * 4")
-    case = CognitiveCase.create(
+    kernel = _kernel()
+    case = kernel.create_case(
         request_id="request-1",
         conversation_id="conversation-1",
         input_digest=utterance.digest,
     )
 
-    result = await _kernel().handle(
+    result = await kernel.handle(
         KernelRequest(utterance, "conversation-1"),
         case,
     )
@@ -99,13 +104,14 @@ async def test_successful_request_binds_snapshot_and_consolidates_episode():
 @pytest.mark.asyncio
 async def test_abstention_is_an_authoritative_terminal_episode():
     utterance = Utterance.from_text("tell me a secret")
-    case = CognitiveCase.create(
+    kernel = _kernel()
+    case = kernel.create_case(
         request_id="request-2",
         conversation_id=None,
         input_digest=utterance.digest,
     )
 
-    result = await _kernel().handle(KernelRequest(utterance, None), case)
+    result = await kernel.handle(KernelRequest(utterance, None), case)
 
     assert result.status is CognitiveCaseStatus.ABSTAINED
     assert case.episode is not None
@@ -134,3 +140,161 @@ def test_compatibility_digest_canonicalizes_lists_and_tuples_identically():
     tuple_payload = {"claim_digests": ("a" * 64, "b" * 64)}
 
     assert canonical_digest(list_payload) == canonical_digest(tuple_payload)
+
+
+class _CountingLease:
+    def __init__(self):
+        self.closes = 0
+
+    def close(self):
+        self.closes += 1
+
+
+def test_admission_failure_releases_bundle_once():
+    lease = _CountingLease()
+
+    def wrong_identity(episode_id):
+        bundle = _admitter(episode_id)
+        object.__setattr__(bundle, "episode_id", "case-wrong")
+        object.__setattr__(bundle, "leases", (lease,))
+        return bundle
+
+    kernel = ConstitutionalCognitiveKernel.from_kernel(
+        CognitiveKernel(state_authority=object(), finalizer=_Finalizer()),
+        snapshot_admitter=wrong_identity,
+    )
+    with pytest.raises(ValueError, match="identity mismatch"):
+        kernel.create_case(
+            request_id="request-admission", conversation_id=None, input_digest="d" * 64
+        )
+    assert lease.closes == 1
+
+
+@pytest.mark.asyncio
+async def test_constitutional_kernel_rejects_direct_case_bypass():
+    utterance = Utterance.from_text("2+2")
+    case = CognitiveCase.create(
+        request_id="request-bypass", conversation_id=None, input_digest=utterance.digest
+    )
+    with pytest.raises(RuntimeError, match="unadmitted"):
+        await _kernel().handle(KernelRequest(utterance, None), case)
+
+
+@pytest.mark.asyncio
+async def test_concurrent_admissions_have_distinct_genesis_bound_episodes():
+    kernel = _kernel()
+    utterance = Utterance.from_text("2+2")
+    cases = [
+        kernel.create_case(
+            request_id=f"request-{i}",
+            conversation_id=None,
+            input_digest=utterance.digest,
+        )
+        for i in range(12)
+    ]
+    genesis = [case.episode.digest for case in cases]
+    await __import__("asyncio").gather(
+        *(kernel.handle(KernelRequest(utterance, None), case) for case in cases)
+    )
+    assert len({case.case_id for case in cases}) == len(cases)
+    assert len(set(genesis)) == len(cases)
+    assert all(case.snapshot_bundle.released for case in cases)
+
+
+def test_invalid_and_duplicate_artifact_references_fail_closed():
+    from vulcan.microkernel.episode import ArtifactRef
+
+    with pytest.raises(ValueError):
+        ArtifactRef("response-ok", "not-a-digest", "response-ir.v3")
+    ref = ArtifactRef("claim-valid", "d" * 64, "semantic-claim.v2")
+    case = CognitiveCase.create(
+        request_id="request-duplicates", conversation_id=None, input_digest="d" * 64
+    )
+    with pytest.raises(ValueError, match="duplicate"):
+        __import__("dataclasses").replace(case.episode, claims=(ref, ref))
+
+
+@pytest.mark.asyncio
+async def test_cancellation_releases_admitted_leases_exactly_once():
+    import asyncio
+
+    lease = _CountingLease()
+
+    def admitted(episode_id):
+        bundle = _admitter(episode_id)
+        object.__setattr__(bundle, "leases", (lease,))
+        return bundle
+
+    class CancelInput:
+        async def propose(self, utterance):
+            raise asyncio.CancelledError
+
+    kernel = ConstitutionalCognitiveKernel.from_kernel(
+        CognitiveKernel(
+            state_authority=object(),
+            finalizer=_Finalizer(),
+            language_input=CancelInput(),
+        ),
+        snapshot_admitter=admitted,
+    )
+    utterance = Utterance.from_text("2+2")
+    case = kernel.create_case(
+        request_id="request-cancel", conversation_id=None, input_digest=utterance.digest
+    )
+    with pytest.raises(asyncio.CancelledError):
+        await kernel.handle(KernelRequest(utterance, None), case)
+    assert case.episode.state is EpisodeState.CANCELLED
+    assert lease.closes == 1
+
+
+def test_failed_episode_transition_does_not_mutate_compatibility_ledger(monkeypatch):
+    from vulcan.runtime.semantic import (
+        accept,
+        build_graphix_plan,
+        compile_graphix_plan,
+        execute_graphix_plan,
+        validate_proposal,
+        DeterministicLanguageInput,
+    )
+    import asyncio
+
+    utterance = Utterance.from_text("2+2")
+    case = _kernel().create_case(
+        request_id="request-atomic", conversation_id=None, input_digest=utterance.digest
+    )
+    bundle = asyncio.run(DeterministicLanguageInput().propose(utterance))
+    case.interpretation = validate_proposal(utterance, bundle)
+    case.accepted_interpretation = accept(case.interpretation)
+    plan = build_graphix_plan(
+        case.accepted_interpretation,
+        request_digest=utterance.digest,
+        state_snapshot_id=case.state_snapshot_id,
+        domain_snapshot_id="domain:none",
+    )
+    compiled = compile_graphix_plan(
+        plan,
+        request_digest=utterance.digest,
+        state_snapshot_id=case.state_snapshot_id,
+        domain_snapshot_id="domain:none",
+    )
+    claim, derivation, evidence = execute_graphix_plan(
+        compiled,
+        request_digest=utterance.digest,
+        state_snapshot_id=case.state_snapshot_id,
+        domain_snapshot_id="domain:none",
+        case_id=case.case_id,
+        domain=None,
+    )
+    before = case.episode
+    original = CognitiveEpisode.transition
+
+    def fail_grounded(self, target, **kwargs):
+        if target is EpisodeState.GROUNDED:
+            raise RuntimeError("injected transition failure")
+        return original(self, target, **kwargs)
+
+    monkeypatch.setattr(CognitiveEpisode, "transition", fail_grounded)
+    with pytest.raises(RuntimeError, match="injected"):
+        case.append_ledger(claim=claim, derivation=derivation, evidence=evidence)
+    assert case.episode == before
+    assert case.claims == case.derivations == case.evidence == ()

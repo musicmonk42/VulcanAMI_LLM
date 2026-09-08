@@ -175,7 +175,7 @@ def create_app()->FastAPI:
         return public_capability_response()
     async def chat(request:Request):
         _principal(request,'reason:write'); rt=await _runtime(request); data=await _body(request); body=ReasonRequest.model_validate(data)
-        utterance=Utterance.from_text(body.message); case=CognitiveCase.create(request_id=_request_id(request), conversation_id=body.conversation_id, input_digest=utterance.digest)
+        utterance=Utterance.from_text(body.message); case=rt.kernel.create_case(request_id=_request_id(request), conversation_id=body.conversation_id, input_digest=utterance.digest)
         result=await rt.kernel.handle(KernelRequest(utterance, body.conversation_id), case); out=result.transport(case_id=case.case_id,runtime_id=rt.runtime_id,snapshot_id=case.state_snapshot_id); out['status']=result.status.value; return out
     for _p in ('/v1/chat','/v1/chat/orchestrated','/vulcan/v1/chat'):
         app.post(_p)(chat)
