@@ -458,6 +458,15 @@ class GovernedMemoryService:
         self.readiness(); return ("governed-preference-memory",)
     def diagnostics(self):
         return {"memory_owner_id": self._repository._owner_id, "audit_owner_id": self._repository._audit.owner_id if self._repository._audit else None}
+    def snapshot_state(self):
+        """Return a content digest and revision for all behaviorally relevant rows."""
+        with self._repository._lock:
+            if self._repository._closed:
+                raise RuntimeError("memory repository closed")
+            tables = ("memory_revisions", "memory_heads", "memory_idempotency", "memory_journal", "memory_audit_outbox")
+            state = {table: self._repository._db.execute(f"SELECT * FROM {table} ORDER BY rowid").fetchall() for table in tables}
+            revision = self._repository._db.execute("SELECT COALESCE(MAX(sequence),0) FROM memory_journal").fetchone()[0]
+            return str(revision), {"enabled": True, "database_digest": _digest(state)}
 class DisabledMemoryService:
     def remember(self,*args,**kwargs):return MemoryCommitResult(MemoryReason.MEMORY_DISABLED)
     def retrieve(self,*args,**kwargs):return ()
@@ -469,6 +478,7 @@ class DisabledMemoryService:
     def readiness(self):return None
     def capabilities(self):return ()
     def close(self):return None
+    def snapshot_state(self):return "0", {"enabled":False,"records":0}
 
 def compose_governed_memory(config: MemoryRuntimeConfig, *, audit: AuditPort | BorrowedAudit | None = None)->GovernedMemoryPort:
     config = config.validated()

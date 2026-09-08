@@ -23,7 +23,8 @@ from .semantic import DeterministicLanguageInput, LanguageInputPort
 from .self_improvement import SelfImprovementRuntime, compose_self_improvement_runtime
 from .settings import RuntimeSettings
 from .health import HealthFailureCategory, HealthStateMachine, ProcessState, bounded_disk_check, categorize_failure
-from vulcan.microkernel.snapshots import AttributeSnapshotProvider, MAX_EPISODE_LIFETIME, SnapshotBundle, construct_snapshot_bundle
+from vulcan.microkernel.snapshots import MAX_EPISODE_LIFETIME, SnapshotBundle, construct_snapshot_bundle
+from .state_authorities import ContentBoundStateAuthority, StateAuthoritySet, disabled_authority
 
 
 LanguageMode = Literal["disabled", "deterministic_only", "transformer_proposal"]
@@ -67,6 +68,7 @@ class RuntimeContainer:
     health: HealthStateMachine | None = None
     max_episode_lifetime_seconds: int = int(MAX_EPISODE_LIFETIME.total_seconds())
     episode_store: Any = None
+    state_authorities: StateAuthoritySet | None = None
 
     async def close(self) -> None:
         """Release every owned resource once, preserving the first failure.
@@ -186,19 +188,11 @@ class RuntimeContainer:
         """Pin every mutable state authority for one bounded episode lifetime."""
         if self.closed:
             raise RuntimeError("canonical runtime is closed")
-        providers = (
-            AttributeSnapshotProvider(self.world_state, owner_name="world_state"),
-            AttributeSnapshotProvider(self.world_state, owner_name="self_state"),
-            AttributeSnapshotProvider(self.world_state, owner_name="social_state"),
-            AttributeSnapshotProvider(self.world_state, owner_name="normative_state"),
-            AttributeSnapshotProvider(self.domain_registry, owner_name="domain_registry"),
-            AttributeSnapshotProvider(self.memory, owner_name="memory"),
-            AttributeSnapshotProvider(self.learning_owner, owner_name="capability_manifest"),
-            AttributeSnapshotProvider(self.self_improvement, owner_name="csiu_policy"),
-            AttributeSnapshotProvider(self.alignment, owner_name="alignment"),
-        )
+        if self.state_authorities is None:
+            raise RuntimeError("required faithful state authorities are unavailable")
+        self.state_authorities.validate()
         from datetime import timedelta
-        return construct_snapshot_bundle(episode_id=episode_id, providers=providers, lifetime=timedelta(seconds=self.max_episode_lifetime_seconds))
+        return construct_snapshot_bundle(episode_id=episode_id, providers=self.state_authorities.providers(), lifetime=timedelta(seconds=self.max_episode_lifetime_seconds))
 
     def capabilities(self) -> tuple[str, ...]:
         """Return only capabilities supplied by the composed kernel object."""
@@ -273,6 +267,30 @@ class RuntimeContainer:
                                      language_input=language_input, language_output=language_output, memory=memory, audit=audit, alignment=alignment)
             container = cls(str(uuid4()), deployment, world_state, kernel, safety, memory,
                        language_input, language_output, config, audit, alignment, domain_registry, Path(root), self_improvement, learning_owner, settings, False, HealthStateMachine(), int(MAX_EPISODE_LIFETIME.total_seconds()))
+            def domain_state():
+                lease = domain_registry.lease()
+                return lease.domain_snapshot_id, {"snapshot_id": lease.domain_snapshot_id}, lease
+            def alignment_state():
+                lease = alignment.lease()
+                return str(lease.revision), {"policy_digest": lease.policy_digest}, lease
+            def memory_state():
+                revision, state = memory.snapshot_state()
+                return revision, state, None
+            container.state_authorities = StateAuthoritySet(
+                world=disabled_authority("world", reason="legacy world model has no faithful constitutional state export"),
+                self_state=disabled_authority("self", reason="canonical self-state authority is not implemented"),
+                social=disabled_authority("social", reason="canonical social-state authority is not implemented"),
+                normative=disabled_authority("normative", reason="normative decisions are owned by alignment, not legacy world state"),
+                domain=ContentBoundStateAuthority(kind="domain", owner="domain-registry", schema="vulcan-domain-snapshot.v1", release="constitutional-v1", read=domain_state),
+                memory=ContentBoundStateAuthority(kind="memory", owner="governed-memory", schema="vulcan-memory-snapshot.v1", release="constitutional-v1", read=memory_state),
+                capability=ContentBoundStateAuthority(kind="capability", owner="cognitive-kernel", schema="vulcan-capability-manifest.v1", release="constitutional-v1", read=lambda: ("1", {"capabilities": sorted(kernel.capabilities())}, None)),
+                csiu=ContentBoundStateAuthority(kind="csiu", owner="csiu-policy", schema="vulcan-csiu-policy.v1", release="constitutional-v1", read=lambda: ("1", {"enabled": settings.csiu_enabled, "mode": "proposal-only"}, None)),
+                alignment=ContentBoundStateAuthority(kind="alignment", owner="alignment-registry", schema="vulcan-alignment-snapshot.v1", release="constitutional-v1", read=alignment_state),
+            )
+            container.state_authorities.validate()
+            # Exercise and release every reader before accepting traffic.
+            startup_probe = container.admit_snapshot_bundle("startup-faithfulness-probe")
+            startup_probe.close()
             container.health.admit()
             return container
         except Exception:

@@ -1,6 +1,6 @@
 # Generated architecture inventory
 
-Digest: `c8fa8e76923d16724c1573e0dbeacb13b858d0efa2ca0ca28792d7fe34029dfc`
+Digest: `6200c65e540a125d1d077828dae2d5856db437c5ca00913a3a0e6381fbda60fc`
 
 This file is generated from `docs/generated/architecture-inventory.json`.
 
@@ -154,7 +154,7 @@ Count: 425
 
 ## Import Identities
 
-Count: 1787
+Count: 1794
 
 - `tests/security/test_output_firewall.py:1` module='vulcan.runtime.output', reachability='test-only'
 - `tests/test_probabilistic_routing.py:10` module='src.vulcan.reasoning.probabilistic_reasoning', reachability='test-only'
@@ -170,6 +170,8 @@ Count: 1787
 - `tests/security/test_local_language_governance.py:10` module='vulcan.local_language.tokenizer', reachability='test-only'
 - `src/vulcan/tests/test_consolidation.py:10` module='vulcan.memory.base', reachability='test-only'
 - `src/vulcan/runtime/kernel.py:10` module='vulcan.memory.governed', reachability='production-reachable'
+- `src/vulcan/runtime/state_authorities.py:10` module='vulcan.microkernel.snapshots', reachability='production-reachable'
+- `tests/runtime/test_authoritative_episode_path.py:10` module='vulcan.microkernel.state_machine', reachability='test-only'
 - `src/vulcan/runtime/audit.py:10` module='vulcan.persistence.audit.reconcile', reachability='production-reachable'
 - `tests/test_learning_outbox.py:10` module='vulcan.runtime.audit', reachability='test-only'
 - `tests/runtime/test_production_composition.py:10` module='vulcan.runtime.composition', reachability='test-only'
@@ -204,9 +206,7 @@ Count: 1787
 - `src/vulcan/world_model/world_model_core.py:1020` module='vulcan.world_model.creative_handler', reachability='unknown'
 - `src/api_server.py:103` module='vulcan.reasoning.unified', reachability='unknown'
 - `src/vulcan/world_model/world_model_core.py:1037` module='vulcan.world_model.llm_guidance', reachability='unknown'
-- `src/vulcan/server/startup/manager.py:1039` module='vulcan.utils_main.http_session', reachability='unknown'
-- `src/vulcan/routing/telemetry_recorder.py:104` module='src.vulcan.memory.hierarchical', reachability='unknown'
-- ... 1737 more in JSON
+- ... 1744 more in JSON
 
 ## Singletons
 
@@ -231,8 +231,9 @@ Count: 16
 
 ## Workers
 
-Count: 453
+Count: 454
 
+- `tests/runtime/test_state_authorities.py:203` call='Thread', reachability='test-only'
 - `src/vulcan/server/startup/manager.py:657` call='Thread', reachability='unknown'
 - `src/vulcan/learning/rlhf_feedback.py:1040` call='asyncio.create_task', reachability='unknown'
 - `src/vulcan/safety/neural_safety.py:1052` call='asyncio.create_task', reachability='unknown'
@@ -282,8 +283,7 @@ Count: 453
 - `src/vulcan/safety/neural_safety.py:919` call='asyncio.create_task', reachability='unknown'
 - `tests/test_scheduler_node.py:92` call='asyncio.create_task', reachability='test-only'
 - `src/unified_runtime/execution_engine.py:920` call='asyncio.create_task', reachability='unknown'
-- `src/vulcan/learning/rlhf_feedback.py:955` call='asyncio.create_task', reachability='unknown'
-- ... 403 more in JSON
+- ... 404 more in JSON
 
 ## Fallbacks
 
@@ -534,7 +534,7 @@ Count: 18
 
 ## Ownership Graph
 
-Count: 300
+Count: 302
 
 - `src/vulcan/persistence/alignment.py:` owner_domain='alignment', reachability='unknown'
 - `src/vulcan/runtime/alignment.py:` owner_domain='alignment', reachability='production-reachable'
@@ -586,7 +586,7 @@ Count: 300
 - `src/vulcan/local_language/governance.py:` owner_domain='language', reachability='unknown'
 - `src/vulcan/local_language/release.py:` owner_domain='language', reachability='unknown'
 - `src/vulcan/local_language/tokenizer.py:` owner_domain='language', reachability='unknown'
-- ... 250 more in JSON
+- ... 252 more in JSON
 
 ## Text Entrypoints
 

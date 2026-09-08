@@ -88,9 +88,18 @@ Make commit digests cover complete propositions, qualifiers, citations, uncertai
 
 **Exit gate:** changing any meaning-bearing field changes the commit digest, and canonical round trips preserve semantic equality.
 
-### 1.3 Explicit state-authority ports
+### 1.3 Explicit state-authority ports — M3 (canonical admission; artifact qualification pending)
 
 Replace reflective production snapshot fallback with explicit `lease_snapshot()` implementations for world, self, social, normative, domain, memory, capability, CSIU, and alignment state.
+
+The composed request path now owns exactly one `StateAuthoritySet`; startup
+exercises all nine explicit readers, and episode admission binds independently
+versioned, content-derived references. Unimplemented world, self, social, and
+normative authorities are explicit disabled schemas rather than aliases of the
+legacy world model. Reflective adaptation remains test/migration-only. Isolation,
+pinning, expiry, release, restart, failure, and concurrency have local M2 evidence.
+Gate C remains incomplete until the exact built runtime and restart behavior pass
+qualification; this source and local-test result must not be reported as M4.
 
 **Exit gate:** startup fails closed when an authority cannot produce a faithful content-bound snapshot.
 
