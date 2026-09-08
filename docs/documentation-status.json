@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "documents": [
+    {"path": "CURRENT_DIRECTION.md", "status": "normative", "purpose": "current program direction and required reading order"},
+    {"path": "AGENTS.md", "status": "normative", "purpose": "repository change and authority rules"},
+    {"path": "docs/roadmap/constitutional-convergence-plan.md", "status": "normative", "purpose": "ordered convergence work and maturity vocabulary"},
+    {"path": "docs/architecture/adr-005-cognitive-authority.md", "status": "normative", "purpose": "authority lattice"},
+    {"path": "docs/architecture/adr-008-constitutional-transaction-kernel.md", "status": "normative", "purpose": "target transaction architecture"},
+    {"path": "docs/architecture/cognitive-episode.md", "status": "current", "purpose": "implemented episode boundary"},
+    {"path": "docs/architecture/neutral-process-theory.md", "status": "research-only", "purpose": "falsifiable research hypothesis outside the authority path"},
+    {"path": "docs/architecture/ami-invariants.yaml", "status": "normative", "purpose": "machine-readable constitutional invariants"},
+    {"path": "docs/architecture/adr-003-canonical-runtime.md", "status": "current", "purpose": "canonical runtime composition decision"},
+    {"path": "docs/architecture/adr-004-complete-vulcan-ami.md", "status": "superseded", "purpose": "earlier completion framing superseded by constitutional convergence"},
+    {"path": "docs/architecture/adr-006-authoritative-transactions.md", "status": "current", "purpose": "authoritative persistence transaction requirements"},
+    {"path": "docs/architecture/adr-006-local-language-interface.md", "status": "current", "purpose": "proposal-only language interface boundary"},
+    {"path": "docs/architecture/adr-007-memory-transactional-outbox.md", "status": "current", "purpose": "memory outbox decision"},
+    {"path": "docs/architecture/audit-v2.md", "status": "current", "purpose": "current audit implementation contract pending episode derivation"},
+    {"path": "docs/architecture/ADR-001-metaprogramming.md", "status": "historical", "purpose": "legacy metaprogramming decision"},
+    {"path": "docs/architecture/IMPLEMENTATION-SUMMARY.md", "status": "historical", "purpose": "legacy implementation snapshot, not production evidence"},
+    {"path": "docs/architecture/SECURITY-metaprogramming.md", "status": "historical", "purpose": "legacy metaprogramming security notes"},
+    {"path": "docs/architecture/sequence-6-baseline-audit.md", "status": "historical", "purpose": "point-in-time baseline audit"}
+  ]
+}

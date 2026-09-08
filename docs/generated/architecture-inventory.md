@@ -1,8 +1,44 @@
 # Generated architecture inventory
 
-Digest: `b2ae3d649cbaae0cb901ea05957156679ebee4567768aa81e73ca295ca191071`
+Digest: `185e3369cce61f719cb77a5994fca4af3c2f3cf00d7a88018261c8a1b4c41d52`
 
 This file is generated from `docs/generated/architecture-inventory.json`.
+
+## Architecture truth map
+
+| Component | Path | Sole owner | Ceiling | Reachability | State authority | Snapshot | Persistence | Audit | Tests | Maturity | Compatibility | Removal condition |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| `architecture-assurance` | `src/vulcan/assurance` | ArchitectureAssuranceOwner | NONE | not-reachable | none; reports repository evidence only | not applicable | generated files committed in git | deterministic inventory digest | `tests/assurance/test_architecture_status.py` | **M2** | current | replace only with an equally strict deterministic truth-map gate |
+| `constitutional-microkernel` | `src/vulcan/microkernel` | CognitiveKernel | EXECUTED_EFFECT | canonical | immutable CognitiveEpisode | SnapshotBundle admission contract | delegated typed persistence ports | content-bound episode transition chain | `tests/microkernel/test_episode.py`<br>`tests/runtime/test_authoritative_episode_path.py` | **M3** | canonical | not removable; direct-kernel uncomposed mode retires after all callers use RuntimeContainer |
+| `constitutional-runtime` | `src/vulcan/runtime` | RuntimeContainer.CognitiveKernel | EXECUTED_EFFECT | canonical | CognitiveEpisode lifecycle; compatibility case data is projection-only | RuntimeContainer.admit_snapshot_bundle with bounded providers | runtime persistence ports; durable epistemic head is not yet canonical | episode transition artifacts plus compatibility audit projection | `tests/runtime/test_authoritative_episode_path.py`<br>`tests/runtime/test_production_composition.py` | **M3** | canonical | not removable; legacy composition adapters within this component retire at roadmap Wave 2.1 |
+| `graphix-pipeline` | `src/vulcan/graphix` | GraphixProposalOwner | VALIDATED_CANDIDATE | not-reachable | none; proposal and validation artifacts only | snapshot references in envelopes; live convergence pending | Graphix stores are non-canonical at this boundary | compiler and epistemic unit-test artifacts | `tests/graphix/test_compiler_pipeline.py`<br>`tests/graphix/test_epistemic_dialect.py` | **M2** | pre-canonical | remove this status after roadmap Waves 1.2 and 1.6 make Graphix canonical |
+| `legacy-api-gateway` | `src/api_gateway.py` | LegacyGatewayCompatibilityOwner | UNTRUSTED_PROPOSAL | reachable-compatibility | none authorized by the constitutional runtime | none | legacy subsystem owners; not canonical | legacy route tests only |  | **M1** | compatibility | retire after docker/api/Dockerfile and every deployment consumer use vulcan.runtime.app |
+| `legacy-dqs-service` | `src/dqs_service.py` | LegacyDqsCompatibilityOwner | UNTRUSTED_PROPOSAL | reachable-compatibility | none authorized by the constitutional runtime | none | legacy subsystem owners; not canonical | none qualified |  | **M1** | compatibility | quarantine from production composition or adapt behind an authorized canonical port |
+| `legacy-pii-service` | `src/pii_service.py` | LegacyPiiCompatibilityOwner | VALIDATED_CANDIDATE | reachable-compatibility | none authorized by the constitutional runtime | none | legacy subsystem owners; not canonical | fail-safe unit tests only | `tests/test_pii_service_failsafe.py` | **M2** | compatibility | quarantine from production composition or adapt behind an authorized canonical port |
+| `legacy-platform` | `src/full_platform.py` | LegacyPlatformCompatibilityOwner | UNTRUSTED_PROPOSAL | not-reachable | none | none | none authorized | historical tests only | `tests/test_platform_shell.py` | **M1** | historical | retire when all consumers migrate to vulcan.runtime.app |
+
+## Normative documentation index
+
+| Document | Status | Purpose |
+|---|---|---|
+| [`AGENTS.md`](../../AGENTS.md) | **normative** | repository change and authority rules |
+| [`CURRENT_DIRECTION.md`](../../CURRENT_DIRECTION.md) | **normative** | current program direction and required reading order |
+| [`docs/architecture/ADR-001-metaprogramming.md`](../architecture/ADR-001-metaprogramming.md) | **historical** | legacy metaprogramming decision |
+| [`docs/architecture/IMPLEMENTATION-SUMMARY.md`](../architecture/IMPLEMENTATION-SUMMARY.md) | **historical** | legacy implementation snapshot, not production evidence |
+| [`docs/architecture/SECURITY-metaprogramming.md`](../architecture/SECURITY-metaprogramming.md) | **historical** | legacy metaprogramming security notes |
+| [`docs/architecture/adr-003-canonical-runtime.md`](../architecture/adr-003-canonical-runtime.md) | **current** | canonical runtime composition decision |
+| [`docs/architecture/adr-004-complete-vulcan-ami.md`](../architecture/adr-004-complete-vulcan-ami.md) | **superseded** | earlier completion framing superseded by constitutional convergence |
+| [`docs/architecture/adr-005-cognitive-authority.md`](../architecture/adr-005-cognitive-authority.md) | **normative** | authority lattice |
+| [`docs/architecture/adr-006-authoritative-transactions.md`](../architecture/adr-006-authoritative-transactions.md) | **current** | authoritative persistence transaction requirements |
+| [`docs/architecture/adr-006-local-language-interface.md`](../architecture/adr-006-local-language-interface.md) | **current** | proposal-only language interface boundary |
+| [`docs/architecture/adr-007-memory-transactional-outbox.md`](../architecture/adr-007-memory-transactional-outbox.md) | **current** | memory outbox decision |
+| [`docs/architecture/adr-008-constitutional-transaction-kernel.md`](../architecture/adr-008-constitutional-transaction-kernel.md) | **normative** | target transaction architecture |
+| [`docs/architecture/ami-invariants.yaml`](../architecture/ami-invariants.yaml) | **normative** | machine-readable constitutional invariants |
+| [`docs/architecture/audit-v2.md`](../architecture/audit-v2.md) | **current** | current audit implementation contract pending episode derivation |
+| [`docs/architecture/cognitive-episode.md`](../architecture/cognitive-episode.md) | **current** | implemented episode boundary |
+| [`docs/architecture/neutral-process-theory.md`](../architecture/neutral-process-theory.md) | **research-only** | falsifiable research hypothesis outside the authority path |
+| [`docs/architecture/sequence-6-baseline-audit.md`](../architecture/sequence-6-baseline-audit.md) | **historical** | point-in-time baseline audit |
+| [`docs/roadmap/constitutional-convergence-plan.md`](../roadmap/constitutional-convergence-plan.md) | **normative** | ordered convergence work and maturity vocabulary |
 
 ## Entrypoints
 
@@ -97,13 +133,13 @@ Count: 425
 - `src/vulcan/endpoints/status.py:107` handler='cognitive_status', method='GET', reachability='unknown', route='/v1/cognitive/status'
 - `src/platform/routes_health_ext.py:18` handler='component_health', method='GET', reachability='unknown', route='/health/components'
 - `src/full_platform.py:3587` handler='component_health', method='GET', reachability='unknown', route='/health/components'
-- `src/api_gateway.py:310` handler='component_health', method='GET', reachability='unknown', route='/health/components'
+- `src/api_gateway.py:310` handler='component_health', method='GET', reachability='production-reachable', route='/health/components'
 - `src/vulcan/endpoints/planning.py:32` handler='create_plan', method='POST', reachability='unknown', route='/v1/plan'
 - `src/vulcan/endpoints/status.py:510` handler='debug_deployment', method='GET', reachability='unknown', route='/debug/deployment'
 - `src/platform/routes_vulcan.py:124` handler='debug_parent_deployment', method='GET', reachability='unknown', route='/debug/deployment'
 - `src/full_platform.py:4048` handler='debug_parent_deployment', method='GET', reachability='unknown', route='/debug/deployment'
 - `src/governance/app.py:498` handler='deploy_proposal', method='ROUTE', reachability='unknown', route='/proposals/<proposal_id>/deploy'
-- `src/pii_service.py:391` handler='detect_pii', method='POST', reachability='unknown', route='/detect'
+- `src/pii_service.py:391` handler='detect_pii', method='POST', reachability='production-reachable', route='/detect'
 - `src/vulcan/runtime/app.py:183` handler='domains', method='POST', reachability='production-reachable', route='/v1/admin/domains'
 - `src/vulcan/endpoints/world_model.py:84` handler='execute_causal_intervention', method='POST', reachability='unknown', route='/intervene'
 - `src/vulcan/endpoints/execution.py:30` handler='execute_step', method='POST', reachability='unknown', route='/v1/step'
@@ -118,7 +154,7 @@ Count: 425
 
 ## Import Identities
 
-Count: 1755
+Count: 1756
 
 - `tests/security/test_output_firewall.py:1` module='vulcan.runtime.output', reachability='test-only'
 - `tests/test_probabilistic_routing.py:10` module='src.vulcan.reasoning.probabilistic_reasoning', reachability='test-only'
@@ -170,7 +206,7 @@ Count: 1755
 - `src/vulcan/server/startup/manager.py:1039` module='vulcan.utils_main.http_session', reachability='unknown'
 - `src/vulcan/routing/telemetry_recorder.py:104` module='src.vulcan.memory.hierarchical', reachability='unknown'
 - `src/vulcan/api_gateway.py:104` module='vulcan.planning', reachability='unknown'
-- ... 1705 more in JSON
+- ... 1706 more in JSON
 
 ## Singletons
 
@@ -426,8 +462,8 @@ Count: 431
 - `src/api_server.py:143` call='os.environ.get', key='ALLOW_EPHEMERAL_SECRET', reachability='unknown'
 - `src/governance/app.py:229` call='os.environ.get', key='ALLOW_LEGACY_AUTH', reachability='unknown'
 - `src/ai_providers.py:1101` call='os.environ.get', key='ANTHROPIC_API_KEY', reachability='unknown'
-- `src/api_gateway.py:662` call='os.environ.get', key='API_HOST', reachability='unknown'
-- `src/api_gateway.py:663` call='os.environ.get', key='API_PORT', reachability='unknown'
+- `src/api_gateway.py:662` call='os.environ.get', key='API_HOST', reachability='production-reachable'
+- `src/api_gateway.py:663` call='os.environ.get', key='API_PORT', reachability='production-reachable'
 - `src/audit_log.py:419` call='os.environ.get', key='APP_VERSION', reachability='unknown'
 - `src/audit_log.py:135` call='os.environ.get', key='ASYNC_LOGGING', reachability='unknown'
 - `src/audit_log.py:112` call='os.environ.get', key='AUDIT_LOG_BATCH_SIZE', reachability='unknown'
@@ -454,22 +490,22 @@ Count: 431
 - `src/vulcan/tests/conftest.py:46` call='os.environ.get', key='CI', reachability='test-only'
 - `tests/test_000_imports_sanity.py:48` call='os.environ.get', key='CI', reachability='test-only'
 - `src/ai_providers.py:1107` call='os.environ.get', key='COHERE_API_KEY', reachability='unknown'
-- `src/dqs_service.py:127` call='os.environ.get', key='CORS_ORIGINS', reachability='unknown'
-- `src/pii_service.py:133` call='os.environ.get', key='CORS_ORIGINS', reachability='unknown'
-- `src/api_gateway.py:140` call='os.environ.get', key='CORS_ORIGINS', reachability='unknown'
+- `src/dqs_service.py:127` call='os.environ.get', key='CORS_ORIGINS', reachability='production-reachable'
+- `src/pii_service.py:133` call='os.environ.get', key='CORS_ORIGINS', reachability='production-reachable'
+- `src/api_gateway.py:140` call='os.environ.get', key='CORS_ORIGINS', reachability='production-reachable'
 - `src/vulcan/security_fixes.py:458` call='os.environ.get', key='DEBUG', reachability='unknown'
 - `src/audit_log.py:119` call='os.environ.get', key='DLT_ANCHOR_CRITICAL', reachability='unknown'
 - `src/audit_log.py:126` call='os.environ.get', key='DLT_BATCH_SIZE', reachability='unknown'
 - `src/audit_log.py:123` call='os.environ.get', key='DLT_RETRY_COUNT', reachability='unknown'
-- `src/dqs_service.py:420` call='os.environ.get', key='DQS_HOST', reachability='unknown'
-- `src/dqs_service.py:421` call='os.environ.get', key='DQS_PORT', reachability='unknown'
+- `src/dqs_service.py:420` call='os.environ.get', key='DQS_HOST', reachability='production-reachable'
+- `src/dqs_service.py:421` call='os.environ.get', key='DQS_PORT', reachability='production-reachable'
 - `src/vulcan/llm/hybrid_executor.py:1199` call='os.environ.get', key='ENABLE_DISTILLATION', reachability='unknown'
 - `src/governance/app.py:681` call='os.environ.get', key='FLASK_DEBUG', reachability='unknown'
 - `src/vulcan/security_fixes.py:453` call='os.environ.get', key='FLASK_ENV', reachability='unknown'
 - `src/governance/app.py:691` call='os.environ.get', key='FLASK_HOST', reachability='unknown'
 - `src/governance/app.py:698` call='os.environ.get', key='FLASK_PORT', reachability='unknown'
 - `src/governance/app.py:50` call='os.environ.get', key='FORCE_HTTPS', reachability='unknown'
-- `src/api_gateway.py:90` call='os.environ.get', key='GATEWAY_MODE', reachability='unknown'
+- `src/api_gateway.py:90` call='os.environ.get', key='GATEWAY_MODE', reachability='production-reachable'
 - `src/vulcan/memory/hierarchical.py:1656` call='os.environ.get', key='GITHUB_ACTIONS', reachability='unknown'
 - ... 381 more in JSON
 
