@@ -35,6 +35,12 @@ class DummyOwner:
     def close(self): return None
     def capabilities(self): return ()
     def capability_matrix(self): return ()
+    domain_snapshot_id = "d" * 64
+    def lease(self):
+        return SimpleNamespace(domain_snapshot_id=self.domain_snapshot_id, policy_digest="a" * 64,
+                               revision=1, close=lambda: None)
+    def active_metadata(self): return {"policy_digest": "a" * 64, "revision": 1}
+    def snapshot_state(self): return "0", {"enabled": True, "digest": "b" * 64}
 
 
 def lightweight_container(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -105,6 +111,17 @@ def test_missing_world_fails_with_original_category(monkeypatch, tmp_path):
         compose_runtime(settings(tmp_path))
     assert excinfo.value.category is StartupErrorCategory.WORLD_MISSING
     assert excinfo.value.public_code == "world_missing"
+
+
+def test_startup_fails_closed_when_a_state_reader_is_unavailable(monkeypatch, tmp_path):
+    import vulcan.runtime.container as container
+    lightweight_container(monkeypatch)
+    class BrokenMemory(DummyOwner):
+        def snapshot_state(self):
+            raise RuntimeError("faithful memory snapshot unavailable")
+    monkeypatch.setattr(container, "compose_governed_memory", lambda *args, **kwargs: BrokenMemory())
+    with pytest.raises(RuntimeError, match="faithful memory snapshot unavailable"):
+        container.RuntimeContainer.new(deployment=Deployment(), settings=settings(tmp_path))
 
 
 def test_missing_safety_fails_with_original_category(monkeypatch, tmp_path):

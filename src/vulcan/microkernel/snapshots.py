@@ -149,22 +149,6 @@ def default_snapshot_ref(kind: str, owner: str, revision: object, payload: objec
     digest = _digest({"kind": kind, "owner": owner, "revision": str(revision), "payload": payload})
     return SnapshotRef(kind, digest, "opaque-state.v1", owner, str(revision), acquired_at, acquired_at, expires_at, release_id)
 
-class AttributeSnapshotProvider:
-    def __init__(self, owner: object, *, owner_name: str):
-        self.owner = owner
-        self.owner_name = owner_name
-    def lease_snapshot(self, *, kind: str, episode_id: str, acquired_at: datetime, expires_at: datetime):
-        lease_fn = getattr(self.owner, "lease", None)
-        lease = lease_fn() if callable(lease_fn) else None
-        target = lease if lease is not None else self.owner
-        digest = getattr(target, f"{kind}_snapshot_id", None) or getattr(target, "policy_digest", None) or getattr(target, "digest", None) or getattr(target, "snapshot_id", None)
-        revision = getattr(target, "revision", None) or getattr(target, "version", None) or "0"
-        if isinstance(digest, str) and _HEX64.fullmatch(digest):
-            ref = SnapshotRef(kind, digest, "opaque-state.v1", self.owner_name, str(revision), acquired_at, acquired_at, expires_at, f"lease:{episode_id}")
-        else:
-            ref = default_snapshot_ref(kind, self.owner_name, revision, repr(digest), acquired_at=acquired_at, expires_at=expires_at, release_id=f"lease:{episode_id}")
-        return ref, lease
-
 def construct_snapshot_bundle(*, episode_id: str, providers: Sequence[SnapshotProvider], clock: Clock = utc_now, lifetime: timedelta = MAX_EPISODE_LIFETIME) -> SnapshotBundle:
     if len(providers) != 9:
         raise ValueError("exactly nine state authority providers are required")

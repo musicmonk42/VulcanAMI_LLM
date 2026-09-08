@@ -134,6 +134,25 @@ retires the runtime semantic claim contract. `AuthoritativeClaimLedger` remains
 the in-memory compatibility ledger until Wave 1.6 replaces it with a durable
 Graphix Epistemic head.
 
+## Faithful state-authority admission
+
+The old state-admission boundary reflectively inspected arbitrary legacy objects,
+guessed fields, synthesized fallback digests from `repr`, and reused legacy world,
+learning, and self-improvement objects as unrelated authorities. The new boundary
+is the explicit nine-member `StateAuthoritySet`. Each member serializes a declared
+state document together with its owner, independent revision, release, schema,
+and validity window; composition probes and releases all nine before admitting
+traffic. Missing or failing readers abort startup.
+
+The legacy world, self, social, and normative projections are explicitly disabled
+until their owners expose complete constitutional state. Domain Registry,
+Governed Memory, Cognitive Kernel capability truth, the dedicated proposal-only
+CSIU policy configuration, and Alignment Registry have named owners. A disabled
+authority is itself versioned content-bound state, not a digest of `None`.
+`vulcan.testing.snapshots.AttributeSnapshotProvider` is the sole compatibility
+adapter and is forbidden in production composition; remove it when migration and
+direct-kernel tests construct `StateAuthoritySet` instances.
+
 ## Rejected alternatives
 
 ### Start a new framework

@@ -5,10 +5,8 @@ from types import SimpleNamespace
 import pytest
 
 from vulcan.microkernel.episode import CognitiveEpisode
-from vulcan.microkernel.snapshots import (
-    AttributeSnapshotProvider,
-    construct_snapshot_bundle,
-)
+from vulcan.microkernel.snapshots import construct_snapshot_bundle
+from vulcan.testing.snapshots import AttributeSnapshotProvider
 from vulcan.microkernel.state_machine import EpisodeState
 from vulcan.runtime.case import CognitiveCase, CognitiveCaseStatus
 from vulcan.runtime.constitutional_kernel import ConstitutionalCognitiveKernel
