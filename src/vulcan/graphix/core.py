@@ -86,6 +86,9 @@ class ExtensionDeclaration:
         _require_digest("extension.digest", self.digest)
         frozen = _freeze_extension(self.value)
         object.__setattr__(self, "value", frozen)
+        from vulcan.graphix.codec import extension_digest
+        expected = extension_digest(frozen, namespace=self.namespace, schema_version=self.schema_version)
+        if self.digest != expected: raise DigestMismatchError("extension digest does not match schema context and value")
 
 @dataclass(frozen=True, slots=True)
 class GraphixEnvelope:
@@ -138,7 +141,11 @@ def _enum(cls: type[Enum], value: object, name: str) -> Enum:
     except ValueError as exc: raise GraphixCoreError(f"invalid {name}") from exc
 
 def _freeze_extension(value: Mapping[str, object]) -> Mapping[str, object]:
-    from vulcan.graphix.codec import extension_digest, validate_json_value
+    from vulcan.graphix.codec import validate_json_value
     validate_json_value(value, allow_extension_objects=True)
-    if extension_digest(value) == "sha256:" + "0"*64: raise GraphixCoreError("unreachable digest")
-    return MappingProxyType(dict(value))
+    return MappingProxyType({key: _freeze_json(item) for key, item in value.items()})
+
+def _freeze_json(value: object) -> object:
+    if isinstance(value, Mapping): return MappingProxyType({key: _freeze_json(item) for key, item in value.items()})
+    if isinstance(value, (list, tuple)): return tuple(_freeze_json(item) for item in value)
+    return value

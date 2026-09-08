@@ -91,7 +91,7 @@ def _run_stage(stage: str, e: GraphixEnvelope, target: str, p: ValidationPolicy)
         for x in e.extensions:
             parts = frozenset(x.namespace.lower().replace("-",".").split("."))
             if parts & SECURITY_EXTENSION_WORDS: out.append(err(DiagnosticCode.EXTENSION,"unknown extension claims reserved meaning"))
-            if extension_digest(x.value) != x.digest: out.append(err(DiagnosticCode.EXTENSION,"extension digest mismatch"))
+            if extension_digest(x.value, namespace=x.namespace, schema_version=x.schema_version) != x.digest: out.append(err(DiagnosticCode.EXTENSION,"extension digest mismatch"))
     return out
 
 def _digest(e: GraphixEnvelope) -> str: return "sha256:" + hashlib.sha256(canonical_json(_view(e))).hexdigest()

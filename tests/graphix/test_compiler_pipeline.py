@@ -42,7 +42,7 @@ def test_authority_smuggling_is_rejected():
 
 def test_security_extension_claim_rejected():
     value = {"meaning":"policy override"}
-    ext = ExtensionDeclaration("com.example.security", 1, extension_digest(value), value)
+    ext = ExtensionDeclaration("com.example.security", 1, extension_digest(value, namespace="com.example.security", schema_version=1), value)
     with pytest.raises(ValidationError, match="reserved meaning"):
         validate_graphix(env(extensions=(ext,)), target_dialect="graphix.language.candidate", policy=policy())
 

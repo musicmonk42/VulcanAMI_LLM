@@ -97,3 +97,34 @@ def test_compatibility_projection_and_schema():
     schema = json.loads(Path("schemas/graphix/epistemic-v1.json").read_text())
     assert schema["additionalProperties"] is False
     assert "confidence" not in json.dumps(schema).lower()
+
+def test_complete_semantics_are_digest_bound_and_round_trip_canonically():
+    citation = Citation("citation:one", uri="https://example.test/source", title="Source", artifact_id="artifact:source", artifact_digest=D2)
+    ev = evidence(kind=EvidenceKind.RETRIEVAL, citations=(citation,))
+    rich_claim = replace(claim(status=ClaimStatus.RETRIEVED), proposition=Proposition("prop:one", "subject", "predicate", "object", {"unit":"m"}), uncertainty=UncertaintyDescriptor(UncertaintyKind.INTERVAL, interval_low="1/3", interval_high="2/3"), limitations=(Limitation("limitation:one", "Domain limited", ("claim:one",)),))
+    rich = commit(claims=(rich_claim,), evidence=(ev,), assumptions=(Assumption("assumption:one", "prop:one"),), counterexamples=(Counterexample("counterexample:one", "evidence:one", "claim:one"),), contradictions=(Contradiction("contradiction:one", ("claim:one", "claim:one")),), prior_commit_digest=D2)
+    encoded = dumps_commit(rich)
+    assert rich.commit_digest == "sha256:255481fbd5219a20c6c9ef74922f735fd62e199a25eb96bc8748573c8f10f625"
+    assert dumps_commit(loads_commit(encoded)) == encoded
+    document = commit_to_dict(rich)
+    mutations = (
+        lambda d: d["claims"][0]["proposition"].update(subject="changed"),
+        lambda d: d["claims"][0]["proposition"]["qualifiers"].update(unit="ft"),
+        lambda d: d["evidence"][0]["citations"][0].update(title="changed"),
+        lambda d: d["claims"][0]["uncertainty"].update(interval_high="3/4"),
+        lambda d: d["claims"][0]["limitations"][0].update(description="changed"),
+        lambda d: d["assumptions"][0].update(assumption_id="assumption:changed"),
+        lambda d: d["counterexamples"][0].update(counterexample_id="counterexample:changed"),
+        lambda d: d["contradictions"][0].update(contradiction_id="contradiction:changed"),
+        lambda d: d.update(authority_principal_id="principal:changed"),
+        lambda d: d.update(prior_commit_digest=D),
+    )
+    for mutate in mutations:
+        changed = json.loads(json.dumps(document)); mutate(changed); changed["commit_digest"] = ""
+        assert commit_from_dict(changed).commit_digest != rich.commit_digest
+
+def test_canonical_commit_decode_rejects_tamper_and_unknown_fields():
+    document = commit_to_dict(commit()); document["claims"][0]["proposition"]["subject"] = "tampered"
+    with pytest.raises(EvidenceIntegrityError): loads_commit(json.dumps(document))
+    document = commit_to_dict(commit()); document["unexpected"] = True
+    with pytest.raises(EpistemicContractError): loads_commit(json.dumps(document))

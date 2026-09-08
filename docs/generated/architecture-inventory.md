@@ -1,6 +1,6 @@
 # Generated architecture inventory
 
-Digest: `2fdcd42424be749f951eb44ccd28b9e45465a2319e02c2d4fcc12ec13ed322fd`
+Digest: `c8fa8e76923d16724c1573e0dbeacb13b858d0efa2ca0ca28792d7fe34029dfc`
 
 This file is generated from `docs/generated/architecture-inventory.json`.
 
@@ -154,7 +154,7 @@ Count: 425
 
 ## Import Identities
 
-Count: 1786
+Count: 1787
 
 - `tests/security/test_output_firewall.py:1` module='vulcan.runtime.output', reachability='test-only'
 - `tests/test_probabilistic_routing.py:10` module='src.vulcan.reasoning.probabilistic_reasoning', reachability='test-only'
@@ -206,7 +206,7 @@ Count: 1786
 - `src/vulcan/world_model/world_model_core.py:1037` module='vulcan.world_model.llm_guidance', reachability='unknown'
 - `src/vulcan/server/startup/manager.py:1039` module='vulcan.utils_main.http_session', reachability='unknown'
 - `src/vulcan/routing/telemetry_recorder.py:104` module='src.vulcan.memory.hierarchical', reachability='unknown'
-- ... 1736 more in JSON
+- ... 1737 more in JSON
 
 ## Singletons
 
