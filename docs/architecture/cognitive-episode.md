@@ -70,6 +70,21 @@ audit-retention policy.
 
 ## Lease ownership
 
+## Derived audit projection
+
+The durable transition transaction also writes an outbox artifact containing
+the authoritative episode digest chain.  Production composition delivers these
+artifacts as idempotent `episode.transitioned` audit events.  Canonical audit
+validates the referenced chain but does not decide or promote lifecycle state;
+that authority remains exclusively in the microkernel state machine and the
+EpisodeStore CAS.  Historical `case.*` events remain readable only as migration
+records and never establish a current episode head.
+
+Constitutional commands add distinct command-evidence and policy-reference
+artifacts to each transition. EpisodeStore schema v2 deterministically rebuilds
+legacy v1 outbox payloads from immutable transition rows and redelivers them;
+the migration never rewrites an authoritative episode.
+
 The handler releases the admitted snapshot bundle after terminal handling, including failures and cancellations. The episode retains the immutable bundle reference and digest, not live leases.
 
 ## Migration and rollback

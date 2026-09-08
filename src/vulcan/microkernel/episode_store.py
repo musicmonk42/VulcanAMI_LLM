@@ -28,7 +28,7 @@ from .episode import (
 )
 from .state_machine import EpisodeState, EpisodeTransitionError, ensure_transition
 
-_SCHEMA_VERSION = 1
+_SCHEMA_VERSION = 2
 
 
 class EpisodeStoreError(RuntimeError):
@@ -198,12 +198,32 @@ def _validate_successor(prior: CognitiveEpisode, successor: CognitiveEpisode) ->
 
 
 def _outbox_payload(episode: CognitiveEpisode, event: TransitionEvent) -> str:
+    snapshot_digest = (
+        episode.snapshot_bundle.state_digest
+        if episode.snapshot_bundle is not None
+        else "0" * 64
+    )
     return json.dumps(
         {
             "episode_id": episode.episode_id,
+            "transition_digest": event.event_digest,
+            "transition": event.to_json(),
+            "from_state": event.from_state.value,
+            "to_state": event.to_state.value,
+            "prior_episode_digest": event.prior_digest,
+            "resulting_episode_digest": episode.digest,
+            # Read compatibility for v1 EpisodeStore sink consumers.  Remove
+            # after all external sinks consume resulting_episode_digest.
             "episode_digest": episode.digest,
-            "event": event.to_json(),
-            "state": episode.state.value,
+            "snapshot_bundle_digest": snapshot_digest,
+            "authority_references": [event.authority],
+            "policy_references": [
+                ref.to_json()
+                for ref in event.evidence_refs
+                if ref.kind == "constitutional-policy-reference.v1"
+            ],
+            "evidence_references": [ref.to_json() for ref in event.evidence_refs],
+            "transaction_id": event.event_id,
         },
         sort_keys=True,
         separators=(",", ":"),
@@ -260,8 +280,26 @@ class EpisodeStore:
                 );
                 """)
             version = connection.execute("PRAGMA user_version").fetchone()[0]
-            if version not in (0, _SCHEMA_VERSION):
+            if version not in (0, 1, _SCHEMA_VERSION):
                 raise EpisodeIntegrityError("unsupported episode store schema version")
+            if version == 1:
+                rows = connection.execute(
+                    """SELECT o.id, t.episode_document
+                       FROM episode_outbox o
+                       JOIN episode_transitions t
+                         ON t.episode_id=o.episode_id AND t.digest=o.transition_digest"""
+                ).fetchall()
+                for row in rows:
+                    migrated_episode = episode_from_document(row["episode_document"])
+                    connection.execute(
+                        "UPDATE episode_outbox SET payload=?, delivered_at=NULL WHERE id=?",
+                        (
+                            _outbox_payload(
+                                migrated_episode, migrated_episode.transitions[-1]
+                            ),
+                            row["id"],
+                        ),
+                    )
             connection.execute(f"PRAGMA user_version={_SCHEMA_VERSION}")
         os.chmod(database_path, 0o600)
         self.verify_all()
@@ -527,7 +565,7 @@ class EpisodeStore:
             ):
                 raise EpisodeIntegrityError("outbox payload does not match transition")
             self._hit("before_outbox_delivery")
-            self._outbox_sink("episode.transition", payload)
+            self._outbox_sink("episode.transitioned", payload)
             self._hit("after_outbox_delivery")
             with self._connection() as connection:
                 connection.execute(

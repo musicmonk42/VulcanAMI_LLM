@@ -35,6 +35,7 @@ class DummyOwner:
     def close(self): return None
     def capabilities(self): return ()
     def capability_matrix(self): return ()
+    def append_episode_transition(self, event_type, data): return None
     domain_snapshot_id = "d" * 64
     def lease(self):
         return SimpleNamespace(domain_snapshot_id=self.domain_snapshot_id, policy_digest="a" * 64,

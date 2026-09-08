@@ -51,9 +51,17 @@ same transaction. Startup verifies and replays all heads, competing writers fail
 closed, and transport is withheld unless the durable terminal head matches the
 request aggregate. Failpoint, restart, replay, cancellation, privacy, tamper,
 and concurrency tests provide M2 evidence. It remains below M4 until the exact
-built artifact passes restart/crash qualification, and audit derivation remains
-Wave 1.5 because `CanonicalAudit` does not yet consume the episode outbox in the
-composed runtime.
+built artifact passes restart/crash qualification. Audit derivation is now the
+completed Wave 1.5 slice described below.
+
+Episode-derived audit is **M3 — Canonical for the composed request path**: the
+EpisodeStore transaction is now the sole lifecycle commit boundary and its
+transactional outbox drives idempotent `episode.transitioned` audit effects.
+Audit replay exposes and verifies the prior/resulting episode digest chain;
+legacy `case.*` lifecycle validation remains historical-read compatibility only.
+Crash-window, duplicate, ordering, tamper, migration, and reconciliation tests
+provide M2 evidence.  This remains below M4 until the exact built artifact and
+restart behavior are qualified.
 
 The constitutional transaction service is **M3 — Canonical for the composed request path**: typed commands bind
 kernel principal/release, current grant, validation/evidence, policy, snapshot,
@@ -118,7 +126,7 @@ Complete the migration begun in this PR. Remove independent lifecycle and commit
 
 **Exit gate:** no response is released unless its episode reached `COMMUNICATED`; no successful episode finishes without `CONSOLIDATED`.
 
-### 1.5 Audit derivation
+### 1.5 Audit derivation — M3 (canonical projection; artifact qualification pending)
 
 Make canonical audit consume validated episode transition artifacts rather than enforcing a separate case state machine.
 

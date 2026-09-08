@@ -42,7 +42,7 @@ def test_restart_reconstructs_identical_digest_and_reconciles_outbox(tmp_path):
 
     assert restarted.load(original.episode_id).digest == original.digest
     assert restarted.replay(original.episode_id).digest == original.digest
-    assert delivered[0][0] == "episode.transition"
+    assert delivered[0][0] == "episode.transitioned"
     assert delivered[0][1]["episode_digest"] == original.digest
     assert (
         EpisodeStore(
@@ -251,6 +251,34 @@ def test_database_permissions_and_symlink_rejection(tmp_path):
     link.symlink_to(path)
     with pytest.raises(EpisodeIntegrityError, match="symlink"):
         EpisodeStore(link)
+
+
+def test_v1_outbox_schema_migrates_and_redelivers_canonical_event(tmp_path):
+    path = tmp_path / "episodes.sqlite3"
+    original = episode()
+    EpisodeStore(path).create(original)
+    with sqlite3.connect(path) as connection:
+        old_payload = json.dumps(
+            {
+                "episode_id": original.episode_id,
+                "episode_digest": original.digest,
+                "event": original.transitions[-1].to_json(),
+                "state": original.state.value,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        connection.execute(
+            "UPDATE episode_outbox SET payload=?, delivered_at='2026-01-01T00:00:00Z'",
+            (old_payload,),
+        )
+        connection.execute("PRAGMA user_version=1")
+    delivered = []
+
+    EpisodeStore(path, outbox_sink=lambda kind, body: delivered.append((kind, body)))
+
+    assert delivered[0][0] == "episode.transitioned"
+    assert delivered[0][1]["transition_digest"] == original.transitions[-1].event_digest
 
 
 @pytest.mark.parametrize(

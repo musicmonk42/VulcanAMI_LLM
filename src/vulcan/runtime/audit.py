@@ -8,6 +8,7 @@ from typing import Any
 from vulcan.persistence.audit.events import EVENT_FAMILY_BY_TYPE, TERMINAL_CASE_EVENTS, PREPARED_EVENTS, COMMIT_EVENTS, ABORT_EVENTS, validate_event_data
 from vulcan.persistence.audit.index import AuditPage, add_event as _index_add_event, empty_index as _empty_index, paginate_sequences as _paginate_sequences, read_index as _read_index, write_index as _write_index, FIELD_BY_INDEX
 from vulcan.persistence.audit.reconcile import reconcile_transactions
+from vulcan.microkernel.state_machine import EpisodeState, ensure_transition
 
 SCHEMA_VERSION="vulcan-audit/2"; LEGACY_SCHEMA_VERSION="vulcan-audit/1"
 MAX_LINE_BYTES=64_000; MAX_DEPTH=8; MAX_ITEMS=256; MAX_STRING=2048
@@ -16,7 +17,7 @@ _FIELDS={"schema_version","sequence","event_type","timestamp","previous_hash","d
 _V2_FIELDS=_FIELDS|{"segment","segment_sequence"}
 _CLOSE_FIELDS={"schema_version","record_type","segment","first_sequence","last_sequence","event_count","previous_segment_digest","last_event_hash","segment_digest","timestamp"}
 _MANIFEST_FIELDS={"schema_version","active_segment","next_sequence","previous_event_hash","closed_segments","legacy_source_digest","created_at","updated_at"}
-_EVENT=re.compile(r"(?:case|capability|domain|alignment|runtime|memory|csiu|improvement|learning|audit|release|consent|relationship)\.[a-z][a-z0-9_]{0,31}")
+_EVENT=re.compile(r"(?:episode|case|capability|domain|alignment|runtime|memory|csiu|improvement|learning|audit|release|consent|relationship)\.[a-z][a-z0-9_]{0,31}")
 _ALLOWED=set(EVENT_FAMILY_BY_TYPE)
 _TRANS={None:{"case.started"},"case.started":{"case.interpreted","case.failed"},"case.interpreted":{"case.plan_compiled","case.failed"},"case.plan_compiled":{"case.ledger_committed","case.failed"},"case.ledger_committed":{"case.alignment_decided","case.failed"},"case.alignment_decided":{"case.finalized","case.abstained","case.failed"},"case.finalized":{"case.completed","case.abstained","case.blocked","case.finalization_error","case.cancelled","case.failed"},"case.abstained":set(),"case.completed":set(),"case.failed":set()}
 
@@ -82,7 +83,7 @@ class CanonicalAudit:
     def __init__(self,path: str|os.PathLike[str], *, segment_max_bytes:int=DEFAULT_SEGMENT_BYTES, segment_max_events:int=DEFAULT_SEGMENT_EVENTS, durability:AuditDurabilityProfile=AuditDurabilityProfile(), failpoint:Failpoint|None=None):
         self.legacy_path=Path(path); self.root=self.legacy_path if self.legacy_path.suffix=="" else self.legacy_path.with_suffix(self.legacy_path.suffix+".d")
         self.segment_max_bytes=segment_max_bytes; self.segment_max_events=segment_max_events; self.durability=durability; self.failpoint=failpoint or Failpoint(); self.lock_path=self.root.with_suffix(self.root.suffix+".lock")
-        self._lock=threading.RLock(); self._closed=False; self._seq=0; self._prev="0"*64; self._case_state={}; self._tx_prepared=set(); self._tx_terminal=set(); self._active=1; self._seg_events=0; self._index=_empty_index(); self.owner_id=f"audit:{self.root}"
+        self._lock=threading.RLock(); self._closed=False; self._seq=0; self._prev="0"*64; self._case_state={}; self._episode_heads={}; self._episode_transitions={}; self._tx_prepared=set(); self._tx_terminal=set(); self._active=1; self._seg_events=0; self._index=_empty_index(); self.owner_id=f"audit:{self.root}"
         try:
             self.root.parent.mkdir(parents=True,exist_ok=True); _reject_path(self.root); _reject_path(self.lock_path)
             self._lfd=os.open(self.lock_path, os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
@@ -150,6 +151,14 @@ class CanonicalAudit:
         if event_type.startswith("case."): _case_data(event_type,frozen)
         with self._lock:
             if self._closed: raise AuditError("audit closed")
+            if event_type == "episode.transitioned":
+                transition_digest=frozen["transition_digest"]
+                existing=self._episode_transitions.get(transition_digest)
+                if existing is not None:
+                    if existing.data != frozen:
+                        raise AuditError("duplicate transition digest has different data")
+                    return existing
+                self._validate_episode_transition(frozen)
             tx=frozen.get("transaction_id")
             if event_type in PREPARED_EVENTS:
                 if tx in self._tx_prepared: raise AuditError("duplicate transaction prepare")
@@ -173,7 +182,79 @@ class CanonicalAudit:
             if event_type in PREPARED_EVENTS: self._tx_prepared.add(tx)
             if event_type in COMMIT_EVENTS or event_type in ABORT_EVENTS: self._tx_terminal.add(tx)
             if event_type.startswith("case."): self._case_state[frozen["case_id"]]=event_type
-            return AuditEvent(**ev)
+            result=AuditEvent(**ev)
+            if event_type == "episode.transitioned":
+                self._episode_heads[frozen["episode_id"]]=(
+                    frozen["to_state"], frozen["resulting_episode_digest"]
+                )
+                self._episode_transitions[frozen["transition_digest"]]=result
+            return result
+
+    def _validate_episode_transition(self, data:dict[str,Any])->None:
+        transition=data["transition"]
+        if not isinstance(transition,dict): raise AuditError("invalid transition artifact")
+        expected_fields={"at","authority","event_id","event_digest","evidence_refs","from_state","prior_digest","reason","snapshot_ids","to_state"}
+        if set(transition)!=expected_fields: raise AuditError("invalid transition artifact fields")
+        if not isinstance(transition["snapshot_ids"],list) or not all(
+            isinstance(item,str) and re.fullmatch(r"[A-Za-z0-9_.:-]{1,128}",item)
+            for item in transition["snapshot_ids"]
+        ):
+            raise AuditError("invalid transition snapshot references")
+        try:
+            transition_at=datetime.fromisoformat(transition["at"].replace("Z","+00:00"))
+        except (AttributeError, ValueError) as exc:
+            raise AuditError("invalid transition timestamp") from exc
+        if transition_at.tzinfo is None or transition_at.utcoffset() != timezone.utc.utcoffset(transition_at):
+            raise AuditError("invalid transition timestamp")
+        unsigned=dict(transition); supplied=unsigned.pop("event_digest")
+        if supplied != _sha(_canonical(unsigned)) or supplied != data["transition_digest"]:
+            raise AuditError("transition artifact digest mismatch")
+        if (
+            transition["event_id"] != data["transaction_id"]
+            or transition["from_state"] != data["from_state"]
+            or transition["to_state"] != data["to_state"]
+            or transition["prior_digest"] != data["prior_episode_digest"]
+            or data["authority_references"] != [transition["authority"]]
+            or transition["evidence_refs"] != data["evidence_references"]
+            or data.get("episode_digest") != data["resulting_episode_digest"]
+        ):
+            raise AuditError("transition artifact references mismatch")
+        expected_policies=[
+            ref for ref in transition["evidence_refs"]
+            if isinstance(ref,dict) and ref.get("kind") == "constitutional-policy-reference.v1"
+        ]
+        if data["policy_references"] != expected_policies:
+            raise AuditError("transition policy references mismatch")
+        if (
+            data["snapshot_bundle_digest"] != "0" * 64
+            and data["snapshot_bundle_digest"] not in transition["snapshot_ids"]
+        ):
+            raise AuditError("transition snapshot reference mismatch")
+        episode_id=data["episode_id"]
+        head=self._episode_heads.get(episode_id)
+        if head is None:
+            if not (
+                data["from_state"] == EpisodeState.PERCEIVED.value
+                and data["to_state"] == EpisodeState.PERCEIVED.value
+                and data["prior_episode_digest"] == "0" * 64
+            ):
+                raise AuditError("episode audit chain must start at genesis")
+            return
+        state,digest=head
+        if data["prior_episode_digest"] != digest:
+            raise AuditError("episode audit prior digest mismatch")
+        if data["from_state"] != state:
+            raise AuditError("episode audit from-state mismatch")
+        try:
+            ensure_transition(EpisodeState(state), EpisodeState(data["to_state"]))
+        except (ValueError, KeyError) as exc:
+            raise AuditError("invalid authoritative episode transition") from exc
+
+    def append_episode_transition(self,event_type:str,data:dict[str,Any])->AuditEvent:
+        """Idempotent EpisodeStore outbox sink; no lifecycle decisions occur here."""
+        if event_type != "episode.transitioned":
+            raise AuditError("unsupported episode outbox event")
+        return self.append(event_type,data)
     def _read_manifest(self):
         o=_loads(self._manifest().read_bytes());
         if set(o)!=_MANIFEST_FIELDS or o["schema_version"]!=SCHEMA_VERSION: raise AuditError("manifest mismatch")
@@ -208,7 +289,7 @@ class CanonicalAudit:
             self._index=idx; self._persist_index()
         else: self._index=idx
     def verify(self):
-        _reject_path(self.root, True); m=self._read_manifest(); seq=0; prev="0"*64; states={}; tx_prepared=set(); tx_terminal=set(); terminal_counts={}; closed_cases=set(); seg_prev="0"*64; rebuilt_index=_empty_index(); events_for_reconcile=[]
+        _reject_path(self.root, True); m=self._read_manifest(); seq=0; prev="0"*64; states={}; episode_heads={}; episode_transitions={}; tx_prepared=set(); tx_terminal=set(); terminal_counts={}; closed_cases=set(); seg_prev="0"*64; rebuilt_index=_empty_index(); events_for_reconcile=[]
         for n in range(1,m["active_segment"]+1):
             p=self._seg(n); _reject_path(p); data=p.read_bytes() if p.exists() else b""
             if data and not data.endswith(b"\n"): raise AuditError("incomplete final line")
@@ -225,12 +306,24 @@ class CanonicalAudit:
                 if o["segment"]!=n or o["segment_sequence"]!=count+1 or o["sequence"]!=seq+1: raise AuditError("sequence gap or reuse")
                 if o["previous_hash"]!=prev or o["event_hash"]!=_hash_event(o): raise AuditError("audit hash mismatch")
                 d=_bound(o["data"])
+                try: validate_event_data(o["event_type"], d)
+                except ValueError as exc: raise AuditError(str(exc)) from exc
                 if o["event_type"].startswith("case."):
                     _case_data(o["event_type"],d); cid=d["case_id"]
                     if o["event_type"] not in _TRANS.get(states.get(cid),set()): raise AuditError("invalid case lifecycle")
                     if n < m["active_segment"]: closed_cases.add(cid)
                     if o["event_type"] in TERMINAL_CASE_EVENTS: terminal_counts[cid]=terminal_counts.get(cid,0)+1
                     states[cid]=o["event_type"]
+                if o["event_type"] == "episode.transitioned":
+                    prior_heads=self._episode_heads
+                    self._episode_heads=episode_heads
+                    try: self._validate_episode_transition(d)
+                    finally: self._episode_heads=prior_heads
+                    td=d["transition_digest"]
+                    if td in episode_transitions: raise AuditError("duplicate episode transition")
+                    event=AuditEvent(**o)
+                    episode_transitions[td]=event
+                    episode_heads[d["episode_id"]]=(d["to_state"],d["resulting_episode_digest"])
                 tx=d.get("transaction_id")
                 if o["event_type"] in PREPARED_EVENTS: tx_prepared.add(tx)
                 if o["event_type"] in COMMIT_EVENTS or o["event_type"] in ABORT_EVENTS: tx_terminal.add(tx)
@@ -246,7 +339,7 @@ class CanonicalAudit:
             else: raise AuditError("manifest sequence mismatch")
         try: reconcile_transactions(tuple(events_for_reconcile))
         except ValueError as exc: raise AuditError(str(exc)) from exc
-        self._seq=seq; self._prev=prev; self._case_state=states; self._tx_prepared=tx_prepared; self._tx_terminal=tx_terminal; self._active=m["active_segment"]; self._seg_events=sum(1 for _ in (self._seg(self._active).read_bytes().splitlines() if self._seg(self._active).exists() else [])); self._index=rebuilt_index
+        self._seq=seq; self._prev=prev; self._case_state=states; self._episode_heads=episode_heads; self._episode_transitions=episode_transitions; self._tx_prepared=tx_prepared; self._tx_terminal=tx_terminal; self._active=m["active_segment"]; self._seg_events=sum(1 for _ in (self._seg(self._active).read_bytes().splitlines() if self._seg(self._active).exists() else [])); self._index=rebuilt_index
         source=self._source_digest(); existing=_read_index(self._index_path(), source_digest=source, canonical=_canonical, sha=_sha, loads=_loads)
         if existing is None or existing != rebuilt_index:
             self._persist_index()
@@ -291,7 +384,10 @@ class CanonicalAudit:
         try: page,next_cursor=_paginate_sequences(seqs,cursor=cursor,limit=limit)
         except ValueError as exc: raise AuditError(str(exc)) from exc
         return AuditPage(self._event_by_sequence(set(page)), next_cursor)
-    def events_for_case(self,case_id): return self._events_matching("case.","case_id",case_id)
+    def events_for_episode(self,episode_id): return self._events_matching("episode.","episode_id",episode_id)
+    def events_for_case(self,case_id):
+        """Read-migration alias returning canonical and historical lifecycle rows."""
+        return self._events_matching("case.","episode_id",case_id)
     def events_for_domain(self,domain): return self._events_matching("domain.","domain",domain)
     def events_for_alignment(self,policy_id): return self._events_matching("alignment.","policy_id",policy_id)
     def events_for_memory_record(self,record_id): return self._events_matching("memory.","record_id",record_id)

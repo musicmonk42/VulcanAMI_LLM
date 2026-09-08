@@ -404,6 +404,11 @@ class CognitiveEpisode:
             reason="created",
             authority=actor.authority,
             clock=clock,
+            snapshot_ids=(
+                (snapshot_bundle.bundle_id, snapshot_bundle.state_digest)
+                if snapshot_bundle is not None
+                else ()
+            ),
         )
 
     def bind_snapshot_bundle_for_migration(
