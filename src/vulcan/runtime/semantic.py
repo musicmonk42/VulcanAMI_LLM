@@ -339,7 +339,7 @@ def _canonical(value: Any) -> Any:
     if is_dataclass(value): return _canonical(asdict(value))
     if isinstance(value, Enum): return value.value
     if isinstance(value, datetime): return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
-    if isinstance(value, tuple): return [_canonical(v) for v in value]
+    if isinstance(value, (list, tuple)): return [_canonical(v) for v in value]
     if isinstance(value, dict): return {str(k): _canonical(v) for k, v in sorted(value.items())}
     if isinstance(value, (str, int, bool)) or value is None: return value
     raise TypeError(f"unsupported canonical type: {type(value).__name__}")

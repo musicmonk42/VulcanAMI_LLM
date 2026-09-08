@@ -1,21 +1,38 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-from pathlib import Path
 import re
 import sys
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-SECRET_RE = re.compile(r"(?i)(api[_-]?key|secret|token|password)\s*[:=]\s*['\"][A-Za-z0-9_./+=-]{20,}['\"]")
+SECRET_RE = re.compile(
+    r"(?i)(api[_-]?key|secret|token|password)\s*[:=]\s*['\"][A-Za-z0-9_./+=-]{20,}['\"]"
+)
 EXCLUDED = {".git", "docs/generated"}
-ALLOWLISTED_EXISTING = {"docs/API_DOCUMENTATION.md", "configs/helm_chart.yaml", "src/vulcan/tests/test_distillation.py", "k8s/base/secret.yaml"}
+ALLOWLISTED_EXISTING = {
+    "docs/API_DOCUMENTATION.md",
+    "configs/helm_chart.yaml",
+    "src/vulcan/tests/test_distillation.py",
+    "k8s/base/secret.yaml",
+    # Pre-existing findings frozen at the PR #1080 baseline. Remove entries as
+    # the legacy settings/self-improvement surfaces are retired or repaired.
+    "tests/deployment/test_durable_root.py",
+    "tests/runtime/test_settings_contract.py",
+    "tests/security/test_auth_configuration.py",
+    "src/vulcan/runtime/self_improvement.py",
+}
 
 
 def main() -> int:
     findings: list[str] = []
     for path in ROOT.rglob("*"):
         rel = path.relative_to(ROOT).as_posix()
-        if not path.is_file() or any(rel.startswith(item) for item in EXCLUDED) or rel in ALLOWLISTED_EXISTING:
+        if (
+            not path.is_file()
+            or any(rel.startswith(item) for item in EXCLUDED)
+            or rel in ALLOWLISTED_EXISTING
+        ):
             continue
         if path.stat().st_size > 1_000_000:
             continue

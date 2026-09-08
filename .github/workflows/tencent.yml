@@ -13,13 +13,11 @@
 #
 # 3. Change the values for the TKE_IMAGE_URL, TKE_REGION, TKE_CLUSTER_ID and DEPLOYMENT_NAME environment variables (below).
 
-name: Tencent Kubernetes Engine
+name: Advisory Tencent Deployment (manual only)
 
 on:
-  push:
-    branches: [ "main" ]
+  workflow_dispatch:
 
-# Environment variables available to all jobs and steps in this workflow
 env:
   TKE_IMAGE_URL: ccr.ccs.tencentyun.com/demo/mywebapp
   TKE_REGION: ap-guangzhou

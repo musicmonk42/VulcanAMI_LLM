@@ -1,12 +1,12 @@
 # Generated architecture inventory
 
-Digest: `9bfa5043f83bd95d2ec7bd05b2037fe1fc9261d2b07532c227c09f49eba7e48f`
+Digest: `b2ae3d649cbaae0cb901ea05957156679ebee4567768aa81e73ca295ca191071`
 
 This file is generated from `docs/generated/architecture-inventory.json`.
 
 ## Entrypoints
 
-Count: 405
+Count: 406
 
 - `src/vulcan/tests/test_multimodal_reasoning.py:999` kind='python_main_guard', reachability='test-only'
 - `src/vulcan/tests/test_curiosity_engine_integration.py:1000` kind='python_main_guard', reachability='test-only'
@@ -21,6 +21,7 @@ Count: 405
 - `src/governance_loop.py:938` kind='python_main_guard', reachability='unknown'
 - `src/generate_transparency_report.py:1023` kind='python_main_guard', reachability='unknown'
 - `src/vulcan/tests/test_extracted_modules.py:1035` kind='python_main_guard', reachability='test-only'
+- `scripts/ci/verify_dependency_inputs.py:103` kind='python_main_guard', reachability='research-only'
 - `src/vulcan/tests/test_symbolic_core.py:1040` kind='python_main_guard', reachability='test-only'
 - `src/vulcan/tests/test_knowledge_crystallizer_core.py:1045` kind='python_main_guard', reachability='test-only'
 - `src/run_validation_test.py:999` kind='python_main_guard', reachability='unknown'
@@ -57,8 +58,7 @@ Count: 405
 - `src/vulcan/tests/test_exploration_budget.py:1158` kind='python_main_guard', reachability='test-only'
 - `src/vulcan/tests/test_principle_learner.py:1163` kind='python_main_guard', reachability='test-only'
 - `src/vulcan/tests/test_dynamics_model.py:1169` kind='python_main_guard', reachability='test-only'
-- `src/vulcan/tests/test_prediction_engine.py:1172` kind='python_main_guard', reachability='test-only'
-- ... 355 more in JSON
+- ... 356 more in JSON
 
 ## Routes
 
@@ -118,7 +118,7 @@ Count: 425
 
 ## Import Identities
 
-Count: 1719
+Count: 1755
 
 - `tests/security/test_output_firewall.py:1` module='vulcan.runtime.output', reachability='test-only'
 - `tests/test_probabilistic_routing.py:10` module='src.vulcan.reasoning.probabilistic_reasoning', reachability='test-only'
@@ -126,7 +126,8 @@ Count: 1719
 - `tests/assurance/test_capability_registry.py:10` module='vulcan.assurance.capabilities', reachability='test-only'
 - `tests/core/test_core_primitives.py:10` module='vulcan.core.decisions', reachability='test-only'
 - `src/vulcan/endpoints/__init__.py:10` module='vulcan.endpoints.distillation', reachability='unknown'
-- `tests/graphix/test_core.py:10` module='vulcan.graphix.codec', reachability='test-only'
+- `src/vulcan/graphix/validation/pipeline.py:10` module='vulcan.graphix.codec', reachability='unknown'
+- `tests/graphix/test_epistemic_dialect.py:10` module='vulcan.graphix.epistemic', reachability='test-only'
 - `tests/test_progressive_research.py:10` module='vulcan.learning_owner', reachability='test-only'
 - `tests/test_world_model_research.py:10` module='vulcan.learning_owner', reachability='test-only'
 - `tests/security/test_local_language_governance.py:10` module='vulcan.local_language.tokenizer', reachability='test-only'
@@ -135,6 +136,7 @@ Count: 1719
 - `src/vulcan/runtime/audit.py:10` module='vulcan.persistence.audit.reconcile', reachability='production-reachable'
 - `tests/test_learning_outbox.py:10` module='vulcan.runtime.audit', reachability='test-only'
 - `tests/runtime/test_production_composition.py:10` module='vulcan.runtime.composition', reachability='test-only'
+- `tests/runtime/test_authoritative_episode_path.py:10` module='vulcan.runtime.constitutional_kernel', reachability='test-only'
 - `tests/security/test_persistent_audit_alignment.py:10` module='vulcan.runtime.finalization', reachability='test-only'
 - `tests/security/test_real_response_safety_composition.py:10` module='vulcan.runtime.kernel', reachability='test-only'
 - `tests/security/test_runtime_convergence.py:10` module='vulcan.runtime.kernel', reachability='test-only'
@@ -168,9 +170,7 @@ Count: 1719
 - `src/vulcan/server/startup/manager.py:1039` module='vulcan.utils_main.http_session', reachability='unknown'
 - `src/vulcan/routing/telemetry_recorder.py:104` module='src.vulcan.memory.hierarchical', reachability='unknown'
 - `src/vulcan/api_gateway.py:104` module='vulcan.planning', reachability='unknown'
-- `src/api_server.py:104` module='vulcan.reasoning.reasoning_types', reachability='unknown'
-- `src/vulcan/utils_main/__init__.py:104` module='vulcan.utils_main.network', reachability='unknown'
-- ... 1669 more in JSON
+- ... 1705 more in JSON
 
 ## Singletons
 
@@ -498,7 +498,7 @@ Count: 18
 
 ## Ownership Graph
 
-Count: 296
+Count: 300
 
 - `src/vulcan/persistence/alignment.py:` owner_domain='alignment', reachability='unknown'
 - `src/vulcan/runtime/alignment.py:` owner_domain='alignment', reachability='production-reachable'
@@ -544,13 +544,13 @@ Count: 296
 - `tests/persistence/test_domain_registry_v2.py:` owner_domain='domain', reachability='test-only'
 - `tests/security/test_persistent_domain_registry.py:` owner_domain='domain', reachability='test-only'
 - `tests/test_domain_specific_formatting.py:` owner_domain='domain', reachability='test-only'
+- `src/vulcan/graphix/language.py:` owner_domain='language', reachability='unknown'
 - `src/vulcan/local_language/__init__.py:` owner_domain='language', reachability='unknown'
 - `src/vulcan/local_language/adapter.py:` owner_domain='language', reachability='unknown'
 - `src/vulcan/local_language/governance.py:` owner_domain='language', reachability='unknown'
 - `src/vulcan/local_language/release.py:` owner_domain='language', reachability='unknown'
 - `src/vulcan/local_language/tokenizer.py:` owner_domain='language', reachability='unknown'
-- `src/vulcan/tests/test_language_interface_integration.py:` owner_domain='language', reachability='test-only'
-- ... 246 more in JSON
+- ... 250 more in JSON
 
 ## Text Entrypoints
 
