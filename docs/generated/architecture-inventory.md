@@ -1,6 +1,6 @@
 # Generated architecture inventory
 
-Digest: `185e3369cce61f719cb77a5994fca4af3c2f3cf00d7a88018261c8a1b4c41d52`
+Digest: `551181e721d46efb2fc9399cd3cafd9643dd43c2baffe6c2667b2ed44e33b78c`
 
 This file is generated from `docs/generated/architecture-inventory.json`.
 
@@ -154,12 +154,13 @@ Count: 425
 
 ## Import Identities
 
-Count: 1756
+Count: 1769
 
 - `tests/security/test_output_firewall.py:1` module='vulcan.runtime.output', reachability='test-only'
 - `tests/test_probabilistic_routing.py:10` module='src.vulcan.reasoning.probabilistic_reasoning', reachability='test-only'
 - `tests/test_wm_request_handling.py:10` module='src.vulcan.world_model.request_handling', reachability='test-only'
 - `tests/assurance/test_capability_registry.py:10` module='vulcan.assurance.capabilities', reachability='test-only'
+- `src/vulcan/microkernel/snapshots.py:10` module='vulcan.constitution.primitives', reachability='production-reachable'
 - `tests/core/test_core_primitives.py:10` module='vulcan.core.decisions', reachability='test-only'
 - `src/vulcan/endpoints/__init__.py:10` module='vulcan.endpoints.distillation', reachability='unknown'
 - `src/vulcan/graphix/validation/pipeline.py:10` module='vulcan.graphix.codec', reachability='unknown'
@@ -205,8 +206,7 @@ Count: 1756
 - `src/vulcan/world_model/world_model_core.py:1037` module='vulcan.world_model.llm_guidance', reachability='unknown'
 - `src/vulcan/server/startup/manager.py:1039` module='vulcan.utils_main.http_session', reachability='unknown'
 - `src/vulcan/routing/telemetry_recorder.py:104` module='src.vulcan.memory.hierarchical', reachability='unknown'
-- `src/vulcan/api_gateway.py:104` module='vulcan.planning', reachability='unknown'
-- ... 1706 more in JSON
+- ... 1719 more in JSON
 
 ## Singletons
 

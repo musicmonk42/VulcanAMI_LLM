@@ -8,12 +8,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
-from hashlib import sha256
-import json
 import re
 from types import MappingProxyType
 from typing import Mapping, Protocol, Sequence
 from uuid import uuid4
+
+from vulcan.constitution.primitives import Digest, EpisodeId, canonical_json as _canonical_json
 
 from .state_machine import EpisodeState, EpisodeTransitionError, ensure_transition
 
@@ -32,7 +32,7 @@ def utc_now() -> datetime:
 
 
 def _digest_bytes(value: bytes) -> str:
-    return sha256(value).hexdigest()
+    return Digest.of_bytes(value).hex
 
 
 def digest_text(text: str) -> str:
@@ -40,7 +40,7 @@ def digest_text(text: str) -> str:
 
 
 def _canon(value: object) -> str:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return _canonical_json(value).decode("utf-8")
 
 
 def canonical_digest(value: object) -> str:
@@ -52,9 +52,7 @@ def _freeze_mapping(value: Mapping[str, str] | None) -> Mapping[str, str]:
 
 
 def _episode_id(value: str) -> str:
-    if not isinstance(value, str) or _ID.fullmatch(value) is None:
-        raise ValueError("invalid episode_id")
-    return value
+    return str(EpisodeId(value))
 
 
 @dataclass(frozen=True)

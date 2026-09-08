@@ -3,10 +3,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from hashlib import sha256
-import json
 from types import MappingProxyType
 from typing import Mapping
+
+from vulcan.constitution.primitives import Digest, canonical_json as encode_canonical_json
 
 
 class PrincipalKind(str, Enum):
@@ -23,11 +23,12 @@ class PrincipalKind(str, Enum):
 
 
 def canonical_json(value: object) -> str:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    """Compatibility projection for the principal v1 persistence schema."""
+    return encode_canonical_json(value).decode("utf-8")
 
 
 def digest(value: object) -> str:
-    return sha256(canonical_json(value).encode("utf-8")).hexdigest()
+    return Digest.of_bytes(canonical_json(value).encode("utf-8")).hex
 
 
 def _freeze_metadata(value: Mapping[str, str] | None) -> Mapping[str, str]:

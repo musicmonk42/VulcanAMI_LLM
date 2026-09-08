@@ -21,6 +21,14 @@ Existence in source is never equivalent to M3.
 
 ## Current slice
 
+Constitutional primitives are **M2 — Tested**: Graphix and the microkernel now
+share one dependency-light authority lattice, digest value object, identifier
+constructors, UTC representation, and strict canonical JSON implementation.
+Legacy microkernel snapshot and episode bare-hex fields remain named projection
+boundaries and are removed when their persisted v1 schemas migrate to the
+canonical `sha256:<hex>` wire form. This representation-only slice does not
+change which runtime component may promote authority.
+
 Repository assurance is now **M2 — Tested locally**: the Python 3.11 constitutional gate, workflow lint, real type/format checks, authoritative-episode integration, and optimized-Python parity are executable from one documented dependency set. It remains below M4 until the committed workflows run successfully on configured GitHub runners and the exact built artifact passes restart qualification.
 
 The preceding episode-foundation PR advances authoritative cognitive episodes and snapshot admission toward M3 for the bounded deterministic request path. It does not yet make the new Graphix compiler, Graphix Epistemic ledger, or independent nine-authority ports canonical.

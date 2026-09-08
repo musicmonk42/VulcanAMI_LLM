@@ -2,19 +2,19 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime
 from enum import Enum
-import hashlib
 import re
 from types import MappingProxyType
 from typing import Mapping, Sequence
+
+from vulcan.constitution.primitives import Digest, canonical_timestamp, require_utc
 
 from vulcan.graphix.codec import canonical_json, validate_json_value
 from vulcan.graphix.core import GraphixCoreError
 
 EPISTEMIC_SCHEMA_VERSION = "graphix.epistemic/1"
 _ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{2,127}$")
-_DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 MAX_REFS = 32
 
 class EpistemicContractError(GraphixCoreError): pass
@@ -139,18 +139,20 @@ def _detect_cycles(derivations: Sequence[Derivation]) -> None:
     for n in graph: visit(n)
 
 def commit_to_dict(c: EpistemicCommit, *, include_digest: bool=True) -> dict[str, object]:
-    def dt(x): return x.astimezone(timezone.utc).isoformat().replace("+00:00","Z")
+    def dt(x): return canonical_timestamp(x)
     out={"schema_version":EPISTEMIC_SCHEMA_VERSION,"commit_id":c.commit_id,"episode_id":c.episode_id,"case_id":c.case_id,"snapshot_digest":c.snapshot_digest,"authority_principal_id":c.authority_principal_id,"committed_at":dt(c.committed_at),"prior_commit_digest":c.prior_commit_digest,"claims":[{"claim_id":cl.claim_id,"proposition_id":cl.proposition.proposition_id,"status":cl.status.value,"episode_id":cl.episode_id,"snapshot_digest":cl.snapshot_digest,"evidence_ids":list(cl.evidence_ids),"derivation_ids":list(cl.derivation_ids),"contested_by":list(cl.contested_by)} for cl in c.claims],"evidence":[{"evidence_id":e.evidence_id,"kind":e.kind.value,"episode_id":e.episode_id,"snapshot_digest":e.snapshot_digest,"content_digest":e.content_digest,"provenance_id":e.provenance_id,"observed_at":dt(e.observed_at),"valid_until":None if e.valid_until is None else dt(e.valid_until),"citations":[ci.citation_id for ci in e.citations],"source_episode_id":e.source_episode_id} for e in c.evidence],"derivations":[{"derivation_id":d.derivation_id,"input_claim_ids":list(d.input_claim_ids),"evidence_ids":list(d.evidence_ids),"rule_id":d.rule_id,"output_claim_id":d.output_claim_id} for d in c.derivations]}
     if include_digest: out["commit_digest"]=c.commit_digest
     return out
 
-def digest_commit(c: EpistemicCommit, *, include_digest: bool=True) -> str: return "sha256:"+hashlib.sha256(canonical_json(commit_to_dict(c, include_digest=include_digest))).hexdigest()
-def content_digest(value: object) -> str: return "sha256:"+hashlib.sha256(canonical_json(value)).hexdigest()
+def digest_commit(c: EpistemicCommit, *, include_digest: bool=True) -> str: return str(Digest.of_bytes(canonical_json(commit_to_dict(c, include_digest=include_digest))))
+def content_digest(value: object) -> str: return str(Digest.of_bytes(canonical_json(value)))
 def project_semantic_claim(*, claim_id: str, episode_id: str, snapshot_digest: str, subject: str, predicate: str, object_value: str, evidence_id: str | None = None) -> Claim:
     return Claim(claim_id, Proposition("prop:"+claim_id.split(":")[-1], subject, predicate, object_value), ClaimStatus.OBSERVED if evidence_id else ClaimStatus.HYPOTHESIS, episode_id, snapshot_digest, () if evidence_id is None else (evidence_id,))
 def _id(name: str, value: str) -> None:
     if not isinstance(value,str) or _ID_RE.fullmatch(value) is None: raise EpistemicContractError(f"invalid {name}")
 def _digest(name: str, value: str) -> None:
-    if not isinstance(value,str) or _DIGEST_RE.fullmatch(value) is None: raise EvidenceIntegrityError(f"invalid {name}")
+    try: Digest(value)
+    except (TypeError, ValueError) as exc: raise EvidenceIntegrityError(f"invalid {name}") from exc
 def _aware(value: datetime, name: str) -> None:
-    if not isinstance(value, datetime) or value.tzinfo is None: raise TemporalValidityError(f"{name} must be timezone-aware")
+    try: require_utc(value, name=name)
+    except ValueError as exc: raise TemporalValidityError(str(exc)) from exc
