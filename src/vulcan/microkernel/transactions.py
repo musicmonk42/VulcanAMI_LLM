@@ -178,12 +178,17 @@ class ConstitutionalTransactionService:
             ),
             "constitutional-command-evidence.v1",
         )
+        policy_reference = ArtifactRef(
+            f"policy-reference:{head.episode_id}:{len(head.transitions)}",
+            auth.policy_digest,
+            "constitutional-policy-reference.v1",
+        )
         successor = head.transition(
             target,
             reason=reason,
             authority=auth.principal.identity_digest,
             snapshot_ids=(auth.snapshot_digest,),
-            evidence_refs=(evidence,),
+            evidence_refs=(evidence, policy_reference),
             **updates,
         )
         try:

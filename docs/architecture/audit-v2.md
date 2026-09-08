@@ -1,5 +1,14 @@
 # Segmented canonical audit v2
 
+New cognitive lifecycle records are `episode.transitioned` projections
+delivered from the EpisodeStore transactional outbox. Canonical audit verifies
+their prior/resulting episode digest chain and deduplicates by transition digest;
+the embedded transition artifact is independently digest-checked and its
+snapshot, authority, policy, and evidence references must match the envelope.
+Audit does not decide lifecycle validity. The `case.*` schemas and lifecycle map are
+retained only to read historical archives and are disconnected from the composed
+request path.
+
 `vulcan-audit/2` is the authoritative runtime audit format. `CanonicalAudit` keeps exclusive writer ownership with an advisory lock next to a descriptor-safe audit directory and rejects symlinks or path replacement for the root, manifest, lock, and segment files.
 
 The manifest (`manifest.json`) records the active numbered segment, next event sequence, last event hash, closed segment records, and an optional `vulcan-audit/1` source digest. Segment files are immutable after rotation. Each event contains a global sequence, per-segment sequence, previous event hash, canonical JSON payload, and SHA-256 event hash. Segment rotation writes a segment close record containing the previous segment digest and the closed segment digest, then atomically replaces the manifest.

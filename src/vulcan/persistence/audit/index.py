@@ -7,7 +7,7 @@ import json
 
 INDEX_VERSION = "vulcan-audit-index/1"
 INDEX_KEYS = ("episode","transaction","actor_digest","capability","policy","domain","memory_record","proposal","release","incident")
-FIELD_BY_INDEX = {"episode":"case_id","transaction":"transaction_id","actor_digest":"actor_digest","capability":"capability","policy":"policy_id","domain":"domain","memory_record":"record_id","proposal":"proposal_digest","release":"release_id","incident":"incident_id"}
+FIELD_BY_INDEX = {"episode":"episode_id","transaction":"transaction_id","actor_digest":"actor_digest","capability":"capability","policy":"policy_id","domain":"domain","memory_record":"record_id","proposal":"proposal_digest","release":"release_id","incident":"incident_id"}
 
 @dataclass(frozen=True, slots=True)
 class AuditPage:
@@ -22,6 +22,10 @@ def add_event(index: dict[str, dict[str, list[int]]], sequence: int, data: dict[
         value = data.get(field)
         if isinstance(value, str):
             index[name].setdefault(value, []).append(sequence)
+    # Historical case events remain queryable under the canonical episode index.
+    case_id = data.get("case_id")
+    if isinstance(case_id, str):
+        index["episode"].setdefault(case_id, []).append(sequence)
 
 def index_digest(source_digest: str, index: dict[str, dict[str, list[int]]], canonical) -> str:
     import hashlib

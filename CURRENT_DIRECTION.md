@@ -26,7 +26,10 @@ The repository contains strong components, but several generations of architectu
 6. remove the legacy deployment and mutable-case authority seams;
 7. only then add persistent lineage, action/reafference, causal autobiography, and NPT instrumentation.
 
-This PR establishes the first executable slice: canonical `case-*` identity, snapshot-bound episode admission, explicit lifecycle transitions, terminal consolidation, and durable documentation of the destination.
+The canonical path now also derives lifecycle audit from the EpisodeStore
+transactional outbox. `CanonicalAudit` projects committed
+`episode.transitioned` artifacts and retains `case.*` solely for historical
+reads; it is no longer a competing live lifecycle authority.
 
 ## Governing equation
 

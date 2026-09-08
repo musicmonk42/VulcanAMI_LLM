@@ -69,9 +69,15 @@ def _bind_constitutional_admission(container: RuntimeContainer) -> RuntimeContai
         return container
     if container.durable_root is None:
         raise RuntimeError("durable episode root is unavailable")
+    if container.audit is None:
+        raise RuntimeError("canonical audit owner is unavailable")
     store = EpisodeStore(
         container.durable_root / "episodes" / "episodes.sqlite3",
+        outbox_sink=container.audit.append_episode_transition,
     )
+    # `case.*` writes are a historical adapter only.  The composed path projects
+    # lifecycle audit exclusively from transactions already committed by store.
+    container.kernel.disable_legacy_case_audit()
     container.episode_store = store
     container.kernel = ConstitutionalCognitiveKernel.from_kernel(
         container.kernel,

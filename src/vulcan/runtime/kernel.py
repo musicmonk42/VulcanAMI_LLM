@@ -123,6 +123,14 @@ class CognitiveKernel:
         self._transactions = service
         self._kernel_principal = principal
 
+    def disable_legacy_case_audit(self) -> None:
+        """Retire mutable ``case.*`` lifecycle writes on the composed path.
+
+        The audit owner remains available to other authority owners through the
+        container; only this legacy lifecycle projection is disconnected.
+        """
+        self._audit = None
+
     def _command(
         self,
         case: CognitiveCase,

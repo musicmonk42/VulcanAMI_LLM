@@ -191,6 +191,36 @@ direct-kernel tests construct `StateAuthoritySet` instances.
 
 ## Rejected alternatives
 
+## Episode-derived audit slice
+
+The old audit boundary accepted `case.*` calls from mutable orchestration and
+independently decided whether that case lifecycle was valid using `_TRANS`.
+Consequently an audit state could be appended before, or without, the
+corresponding durable episode commit.  The new boundary is the EpisodeStore
+transaction: each committed genesis or CAS advancement creates one canonical
+`episode.transitioned` outbox artifact, and `CanonicalAudit` idempotently
+projects that artifact without promoting lifecycle state.
+
+Every projected event binds the episode and transition identities, from/to
+state, prior and resulting episode digests, admitted snapshot digest,
+authority/policy/evidence references, and transaction ID.  Audit replay checks
+the transition artifact's own canonical digest plus the same prior-digest and
+microkernel state-machine chain. Policy references are explicit digest-bound
+artifacts in the authoritative episode transition rather than inferred audit
+metadata. The composed kernel
+no longer emits `case.*`; those schemas, `_TRANS`, and `events_for_case` remain
+the named historical-read adapter and are removed after retained v1/v2 audit
+archives have completed their governed retention or migration period.
+
+The outbox delivery contract is at-least-once and the audit effect is exactly
+once by transition digest.  A crash after episode commit leaves an undelivered
+row for startup reconciliation; a crash after append but before marking that
+row delivered retries safely against the identical audit event.
+
+EpisodeStore schema v2 migrates v1 outbox payloads from their immutable episode
+transition rows and marks them pending for canonical redelivery. This migration
+does not alter episode heads or transition history.
+
 ### Start a new framework
 
 Rejected because it would duplicate authority, memory, audit, Graphix, alignment, and governance while leaving Vulcan unfinished.
