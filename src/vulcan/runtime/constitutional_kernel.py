@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from hashlib import sha256
@@ -13,6 +14,8 @@ from vulcan.microkernel.episode import ActorBinding, CognitiveEpisode
 from vulcan.microkernel.episode_store import EpisodeStore
 from vulcan.microkernel.snapshots import SnapshotBundle
 from vulcan.microkernel.state_machine import EpisodeState
+from vulcan.microkernel.principals import Principal, PrincipalKind
+from vulcan.microkernel.transactions import ConstitutionalTransactionService
 
 from .case import CognitiveCase
 from .kernel import KernelRequest, KernelResult
@@ -34,7 +37,7 @@ class EpisodeAdmissionService:
     """Own the fail-closed episode/snapshot genesis transaction."""
 
     snapshot_admitter: SnapshotAdmitter
-    store: EpisodeStore | None = None
+    store: EpisodeStore
 
     def admit(
         self,
@@ -65,9 +68,7 @@ class EpisodeAdmissionService:
             )
             if self.store is not None:
                 self.store.create(episode)
-            return CognitiveCase.from_admitted_episode(
-                episode=episode, bundle=bundle, store=self.store
-            )
+            return CognitiveCase.from_admitted_episode(episode=episode, bundle=bundle)
         except BaseException:
             bundle.close()
             raise
@@ -96,6 +97,23 @@ class ConstitutionalCognitiveKernel:
     ) -> "ConstitutionalCognitiveKernel":
         if not callable(snapshot_admitter):
             raise TypeError("snapshot_admitter must be callable")
+        # Direct-kernel callers retain a named compatibility store, but still use
+        # durable SQLite transactions. Production composition always supplies its
+        # governed durable-root store.
+        if episode_store is None:
+            path = tempfile.NamedTemporaryFile(
+                prefix="vulcan-episode-compat-", suffix=".sqlite3", delete=False
+            ).name
+            episode_store = EpisodeStore(path)
+        service = ConstitutionalTransactionService(episode_store)
+        principal = Principal(
+            PrincipalKind.SYSTEM_KERNEL,
+            "constitutional-cognitive-kernel",
+            sha256(b"vulcan-constitutional-kernel-v1").hexdigest(),
+        )
+        binder = getattr(kernel, "bind_transaction_service", None)
+        if callable(binder):
+            binder(service, principal)
         return cls(kernel, EpisodeAdmissionService(snapshot_admitter, episode_store))
 
     @property

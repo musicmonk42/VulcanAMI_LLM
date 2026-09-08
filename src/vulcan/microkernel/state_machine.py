@@ -1,4 +1,5 @@
 """Authoritative CognitiveEpisode lifecycle state machine."""
+
 from __future__ import annotations
 
 from enum import Enum
@@ -25,24 +26,89 @@ class EpisodeState(str, Enum):
         return self in TERMINAL_STATES
 
 
-TERMINAL_STATES = frozenset({
-    EpisodeState.CONSOLIDATED,
-    EpisodeState.ABSTAINED,
-    EpisodeState.BLOCKED,
-    EpisodeState.FAILED,
-    EpisodeState.CANCELLED,
-})
+TERMINAL_STATES = frozenset(
+    {
+        EpisodeState.CONSOLIDATED,
+        EpisodeState.ABSTAINED,
+        EpisodeState.BLOCKED,
+        EpisodeState.FAILED,
+        EpisodeState.CANCELLED,
+    }
+)
 
 ALLOWED_TRANSITIONS: dict[EpisodeState, frozenset[EpisodeState]] = {
-    EpisodeState.PERCEIVED: frozenset({EpisodeState.INTERPRETED, EpisodeState.ABSTAINED, EpisodeState.BLOCKED, EpisodeState.FAILED, EpisodeState.CANCELLED}),
-    EpisodeState.INTERPRETED: frozenset({EpisodeState.GROUNDED, EpisodeState.ABSTAINED, EpisodeState.BLOCKED, EpisodeState.FAILED, EpisodeState.CANCELLED}),
-    EpisodeState.GROUNDED: frozenset({EpisodeState.DELIBERATING, EpisodeState.ABSTAINED, EpisodeState.BLOCKED, EpisodeState.FAILED, EpisodeState.CANCELLED}),
-    EpisodeState.DELIBERATING: frozenset({EpisodeState.EPISTEMICALLY_COMMITTED, EpisodeState.ABSTAINED, EpisodeState.BLOCKED, EpisodeState.FAILED, EpisodeState.CANCELLED}),
-    EpisodeState.EPISTEMICALLY_COMMITTED: frozenset({EpisodeState.NORMATIVELY_AUTHORIZED, EpisodeState.ABSTAINED, EpisodeState.BLOCKED, EpisodeState.FAILED, EpisodeState.CANCELLED}),
-    EpisodeState.NORMATIVELY_AUTHORIZED: frozenset({EpisodeState.EXECUTED, EpisodeState.ABSTAINED, EpisodeState.BLOCKED, EpisodeState.FAILED, EpisodeState.CANCELLED}),
-    EpisodeState.EXECUTED: frozenset({EpisodeState.OBSERVED, EpisodeState.FAILED, EpisodeState.CANCELLED}),
-    EpisodeState.OBSERVED: frozenset({EpisodeState.COMMUNICATED, EpisodeState.FAILED, EpisodeState.CANCELLED}),
-    EpisodeState.COMMUNICATED: frozenset({EpisodeState.CONSOLIDATED, EpisodeState.FAILED, EpisodeState.CANCELLED}),
+    EpisodeState.PERCEIVED: frozenset(
+        {
+            EpisodeState.INTERPRETED,
+            EpisodeState.ABSTAINED,
+            EpisodeState.BLOCKED,
+            EpisodeState.FAILED,
+            EpisodeState.CANCELLED,
+        }
+    ),
+    EpisodeState.INTERPRETED: frozenset(
+        {
+            EpisodeState.GROUNDED,
+            EpisodeState.ABSTAINED,
+            EpisodeState.BLOCKED,
+            EpisodeState.FAILED,
+            EpisodeState.CANCELLED,
+        }
+    ),
+    EpisodeState.GROUNDED: frozenset(
+        {
+            EpisodeState.DELIBERATING,
+            EpisodeState.ABSTAINED,
+            EpisodeState.BLOCKED,
+            EpisodeState.FAILED,
+            EpisodeState.CANCELLED,
+        }
+    ),
+    EpisodeState.DELIBERATING: frozenset(
+        {
+            EpisodeState.EPISTEMICALLY_COMMITTED,
+            EpisodeState.ABSTAINED,
+            EpisodeState.BLOCKED,
+            EpisodeState.FAILED,
+            EpisodeState.CANCELLED,
+        }
+    ),
+    EpisodeState.EPISTEMICALLY_COMMITTED: frozenset(
+        {
+            EpisodeState.NORMATIVELY_AUTHORIZED,
+            EpisodeState.ABSTAINED,
+            EpisodeState.BLOCKED,
+            EpisodeState.FAILED,
+            EpisodeState.CANCELLED,
+        }
+    ),
+    # Publication is communication, not an executed external effect.  An
+    # authorized response therefore advances directly to COMMUNICATED; only an
+    # effect authorization may enter EXECUTED.
+    EpisodeState.NORMATIVELY_AUTHORIZED: frozenset(
+        {
+            EpisodeState.EXECUTED,
+            EpisodeState.COMMUNICATED,
+            EpisodeState.ABSTAINED,
+            EpisodeState.BLOCKED,
+            EpisodeState.FAILED,
+            EpisodeState.CANCELLED,
+        }
+    ),
+    EpisodeState.EXECUTED: frozenset(
+        {EpisodeState.OBSERVED, EpisodeState.FAILED, EpisodeState.CANCELLED}
+    ),
+    EpisodeState.OBSERVED: frozenset(
+        {
+            EpisodeState.COMMUNICATED,
+            EpisodeState.CONSOLIDATED,
+            EpisodeState.FAILED,
+            EpisodeState.CANCELLED,
+        }
+    ),
+    EpisodeState.COMMUNICATED: frozenset(
+        {EpisodeState.CONSOLIDATED, EpisodeState.FAILED, EpisodeState.CANCELLED}
+    ),
     EpisodeState.CONSOLIDATED: frozenset(),
     EpisodeState.ABSTAINED: frozenset(),
     EpisodeState.BLOCKED: frozenset(),
@@ -57,4 +123,6 @@ class EpisodeTransitionError(ValueError):
 
 def ensure_transition(current: EpisodeState, target: EpisodeState) -> None:
     if target not in ALLOWED_TRANSITIONS[current]:
-        raise EpisodeTransitionError(f"invalid CognitiveEpisode transition {current.value} -> {target.value}")
+        raise EpisodeTransitionError(
+            f"invalid CognitiveEpisode transition {current.value} -> {target.value}"
+        )

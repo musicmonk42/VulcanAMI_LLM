@@ -6,11 +6,10 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from hashlib import sha256
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 from uuid import uuid4
 
 if TYPE_CHECKING:
-    from vulcan.microkernel.episode_store import EpisodeStore
     from vulcan.microkernel.snapshots import SnapshotBundle
 
     from .semantic import (
@@ -58,10 +57,9 @@ class CaseEvent:
 class CognitiveCase:
     """Mutable compatibility workspace backed by one immutable episode.
 
-    The current semantic kernel still populates request-local Python objects. This
-    class translates those objects into digest-bound episode artifacts at the
-    existing ledger and close boundaries, so compatibility state no longer creates
-    an independent lifecycle authority.
+    The semantic kernel still populates request-local Python objects. This class
+    validates and projects those objects only. It cannot advance, persist, or
+    terminalize the authoritative episode.
     """
 
     request_id: str
@@ -88,7 +86,6 @@ class CognitiveCase:
     events: list[CaseEvent] = field(default_factory=list)
     episode: CognitiveEpisode | None = field(default=None, repr=False)
     _snapshot_bundle: "SnapshotBundle | None" = field(default=None, repr=False)
-    _episode_store: "EpisodeStore | None" = field(default=None, repr=False)
 
     @classmethod
     def create(
@@ -134,7 +131,6 @@ class CognitiveCase:
         *,
         episode: CognitiveEpisode,
         bundle: "SnapshotBundle",
-        store: "EpisodeStore | None" = None,
     ) -> "CognitiveCase":
         """Create the compatibility projection after authoritative admission."""
         if episode.snapshot_bundle != bundle.bundle_ref():
@@ -149,7 +145,6 @@ class CognitiveCase:
             state_snapshot_id=bundle.digest,
             episode=episode,
             _snapshot_bundle=bundle,
-            _episode_store=store,
         )
         case.record("created")
         case.record("snapshot_admitted", bundle.bundle_id)
@@ -209,7 +204,7 @@ class CognitiveCase:
         derivation: "Derivation",
         evidence: tuple["EvidenceArtifact", ...] = (),
     ) -> None:
-        """Validate compatibility objects and bind them into the episode."""
+        """Validate and update the request-local compatibility projection."""
         if self.terminal_status is not CognitiveCaseStatus.OPEN:
             raise RuntimeError("cannot mutate a closed case ledger")
         from .semantic import validate_ledger
@@ -223,80 +218,9 @@ class CognitiveCase:
             proposed_claims,
             case_id=self.case_id,
         )
-        if self.episode is None:
-            raise RuntimeError("authoritative episode is unavailable")
-        # Construct and validate every immutable transition first. Only after all
-        # transitions succeed is the compatibility projection mutated.
-        admitted = self.episode
-        next_episode = admitted
-        durable_steps: list[CognitiveEpisode] = []
-        snapshot_ids = (self.state_snapshot_id,) if self.state_snapshot_id else ()
-        if (
-            next_episode.state is EpisodeState.PERCEIVED
-            and self.interpretation is not None
-        ):
-            next_episode = next_episode.transition(
-                EpisodeState.INTERPRETED,
-                reason="validated semantic ingress",
-                authority="CognitiveKernel",
-                snapshot_ids=snapshot_ids,
-                interpretation={
-                    "parser_identity": str(
-                        getattr(self.interpretation, "parser_identity", "unknown")
-                    ),
-                    "candidate_count": str(
-                        len(getattr(self.interpretation, "candidates", ()))
-                    ),
-                    "ontology_version": str(
-                        getattr(self.interpretation, "ontology_version", "unknown")
-                    ),
-                },
-            )
-            durable_steps.append(next_episode)
-        if self.accepted_interpretation is not None:
-            next_episode = next_episode.transition(
-                EpisodeState.GROUNDED,
-                reason="accepted interpretation grounded",
-                authority="CognitiveKernel",
-                snapshot_ids=snapshot_ids,
-            )
-            durable_steps.append(next_episode)
-            next_episode = next_episode.transition(
-                EpisodeState.DELIBERATING,
-                reason="bounded plan deliberated",
-                authority="CognitiveKernel",
-                snapshot_ids=snapshot_ids,
-            )
-            durable_steps.append(next_episode)
-            claims, derivations, evidence_refs = self._ledger_refs_for(
-                proposed_claims, proposed_derivations, proposed_evidence
-            )
-            next_episode = next_episode.transition(
-                EpisodeState.EPISTEMICALLY_COMMITTED,
-                reason="validated compatibility ledger committed to episode",
-                authority="CognitiveKernel",
-                snapshot_ids=snapshot_ids,
-                claims=claims,
-                derivations=derivations,
-                evidence=evidence_refs,
-                evidence_refs=evidence_refs,
-            )
-            durable_steps.append(next_episode)
-        if self._episode_store is not None:
-            prior = admitted
-            for durable_step in durable_steps:
-                self._persist_step(prior, durable_step)
-                prior = durable_step
-                # Durable authority advances one transition at a time. Keeping the
-                # adapter synchronized lets failure terminalization continue from
-                # the actual head without publishing compatibility ledger state.
-                self.episode = durable_step
         self._evidence.extend(evidence)
         self._derivations.append(derivation)
         self._claims.append(claim)
-        self.episode = next_episode
-        for event in next_episode.transitions[len(admitted.transitions) :]:
-            self.record("episode_transition", event.to_state.value)
 
     def record_finalization(self, decision: str) -> None:
         if self.terminal_status is not CognitiveCaseStatus.OPEN:
@@ -313,74 +237,21 @@ class CognitiveCase:
     ) -> None:
         if self.terminal_status is not CognitiveCaseStatus.OPEN:
             raise RuntimeError("cognitive case closed more than once")
-        self._terminalize_episode(status, failure_kind or status.value)
+        if self.episode is None or not self.episode.state.is_terminal:
+            raise RuntimeError("transaction service must terminalize the episode first")
+        expected = _TERMINAL_EPISODE_STATE[status]
+        if self.episode.state is not expected:
+            raise RuntimeError("case and episode terminal states disagree")
         self.failure_kind = failure_kind
         self.record("terminal", status.value)
         self.terminal_status = status
 
-    def _ensure_interpreted(self) -> None:
-        if self.episode is None or self.episode.state is not EpisodeState.PERCEIVED:
-            return
-        if self.interpretation is None:
-            return
-        mapping = {
-            "parser_identity": str(
-                getattr(self.interpretation, "parser_identity", "unknown")
-            ),
-            "candidate_count": str(len(getattr(self.interpretation, "candidates", ()))),
-            "ontology_version": str(
-                getattr(self.interpretation, "ontology_version", "unknown")
-            ),
-        }
-        self._advance(
-            EpisodeState.INTERPRETED,
-            "validated semantic ingress",
-            interpretation=mapping,
-        )
-
-    def _advance(
-        self,
-        target: EpisodeState,
-        reason: str,
-        **updates: Any,
-    ) -> None:
-        if self.episode is None:
-            raise RuntimeError("authoritative episode is unavailable")
-        if self.episode.state is target:
-            return
-        snapshot_ids = (self.state_snapshot_id,) if self.state_snapshot_id else ()
-        prior = self.episode
-        next_episode = prior.transition(
-            target,
-            reason=reason,
-            authority="CognitiveKernel",
-            snapshot_ids=snapshot_ids,
-            **updates,
-        )
-        if self._episode_store is not None:
-            self._persist_step(prior, next_episode)
-        self.episode = next_episode
-        self.record("episode_transition", target.value)
-
-    def _persist_step(
-        self, prior: CognitiveEpisode, next_episode: CognitiveEpisode
-    ) -> None:
-        if self._episode_store is None:
-            return
-        try:
-            self._episode_store.advance(self.case_id, prior.digest, next_episode)
-        except BaseException:
-            # An after-commit failure is intentionally indistinguishable from a
-            # lost acknowledgement. Re-read the authority before propagating so
-            # cleanup never attempts to terminalize from a stale projection.
-            try:
-                durable = self._episode_store.load(self.case_id)
-            except BaseException:
-                pass
-            else:
-                if durable.digest == next_episode.digest:
-                    self.episode = durable
-            raise
+    def project_episode(self, episode: CognitiveEpisode) -> None:
+        """Project an already committed transaction-service result."""
+        if episode.episode_id != self.case_id:
+            raise ValueError("episode projection identity mismatch")
+        self.episode = episode
+        self.record("episode_transition", episode.state.value)
 
     def _ledger_refs(
         self,
@@ -432,100 +303,6 @@ class CognitiveCase:
                 )
             ),
             "response-ir.v3",
-        )
-
-    def _terminalize_episode(self, status: CognitiveCaseStatus, reason: str) -> None:
-        if self.episode is None:
-            raise RuntimeError("authoritative episode is unavailable")
-        if self.episode.state.is_terminal:
-            expected = _TERMINAL_EPISODE_STATE[status]
-            if self.episode.state is not expected:
-                raise RuntimeError("case and episode terminal states disagree")
-            return
-
-        self._ensure_interpreted()
-        claims, derivations, evidence = self._ledger_refs()
-        response = self._response_ref()
-
-        if status is CognitiveCaseStatus.SUCCESS:
-            if self.episode.state is not EpisodeState.EPISTEMICALLY_COMMITTED:
-                raise RuntimeError("successful case lacks an epistemic episode commit")
-            if response is None or self.finalization_status != "allow":
-                raise RuntimeError("successful case lacks an allowed response artifact")
-            from .semantic import canonical_digest
-
-            authorization = ArtifactRef(
-                f"authorization-{self.case_id}",
-                canonical_digest(
-                    {
-                        "case_id": self.case_id,
-                        "finalization": self.finalization_status,
-                        "claim_digests": [ref.digest for ref in claims],
-                    }
-                ),
-                "response-authorization.compat.v1",
-            )
-            self._advance(
-                EpisodeState.NORMATIVELY_AUTHORIZED,
-                "alignment and safety allowed response publication",
-                authorization=authorization,
-            )
-            self._advance(
-                EpisodeState.EXECUTED,
-                "authorized response artifact executed",
-                response=response,
-                effects=(response,),
-            )
-            self._advance(
-                EpisodeState.OBSERVED,
-                "rendered response artifact observed and digest bound",
-                evidence_refs=(response,),
-            )
-            self._advance(
-                EpisodeState.COMMUNICATED,
-                "response released to transport",
-                response=response,
-            )
-            consolidation = ArtifactRef(
-                f"consolidation-{self.case_id}",
-                canonical_digest(
-                    {
-                        "episode": self.episode.digest,
-                        "claims": [ref.digest for ref in claims],
-                        "derivations": [ref.digest for ref in derivations],
-                        "evidence": [ref.digest for ref in evidence],
-                        "response": response.digest,
-                    }
-                ),
-                "episode-consolidation.v1",
-            )
-            self._advance(
-                EpisodeState.CONSOLIDATED,
-                "authoritative episode consolidated",
-                consolidation_refs=(consolidation,),
-            )
-            return
-
-        target = _TERMINAL_EPISODE_STATE[status]
-        existing_claims = {ref.artifact_id for ref in self.episode.claims}
-        existing_derivations = {ref.artifact_id for ref in self.episode.derivations}
-        existing_evidence = {ref.artifact_id for ref in self.episode.evidence}
-        self._advance(
-            target,
-            reason,
-            response=response,
-            claims=tuple(
-                ref for ref in claims if ref.artifact_id not in existing_claims
-            ),
-            derivations=tuple(
-                ref
-                for ref in derivations
-                if ref.artifact_id not in existing_derivations
-            ),
-            evidence=tuple(
-                ref for ref in evidence if ref.artifact_id not in existing_evidence
-            ),
-            evidence_refs=evidence,
         )
 
 

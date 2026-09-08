@@ -55,6 +55,15 @@ built artifact passes restart/crash qualification, and audit derivation remains
 Wave 1.5 because `CanonicalAudit` does not yet consume the episode outbox in the
 composed runtime.
 
+The constitutional transaction service is **M3 — Canonical for the composed request path**: typed commands bind
+kernel principal/release, current grant, validation/evidence, policy, snapshot,
+and expected episode-head digests and commit through durable CAS. Adversarial
+principal, stale replay, restart, cancellation, and concurrent-writer tests fail
+closed. Publication binds exact output and is communication rather than an
+executed external effect. The compatibility case is projection-only and every
+composed live transition is submitted by the kernel to the service. This remains
+below M4 until the exact built artifact passes crash/restart qualification.
+
 ## Wave 0 — Recover executable truth
 
 ### 0.1 Repository assurance — M2 (local evidence; hosted qualification pending)
@@ -103,7 +112,7 @@ qualification; this source and local-test result must not be reported as M4.
 
 **Exit gate:** startup fails closed when an authority cannot produce a faithful content-bound snapshot.
 
-### 1.4 Episode authority — M3 (composed request path; artifact qualification pending)
+### 1.4 Episode authority — M3 (typed command path canonical; artifact qualification pending)
 
 Complete the migration begun in this PR. Remove independent lifecycle and commitment authority from `CognitiveCase`.
 

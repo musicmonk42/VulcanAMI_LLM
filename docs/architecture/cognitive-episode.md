@@ -29,15 +29,29 @@ Terminal non-success outcomes are `ABSTAINED`, `BLOCKED`, `FAILED`, and `CANCELL
 
 A successful `CognitiveCase` may close only after the episode reaches `CONSOLIDATED`. An abstention, block, failure, or cancellation must transition the episode to its corresponding terminal state before the compatibility projection closes.
 
-Every transition records the prior episode digest, reason, authority, admitted snapshot identity, and relevant artifact references. In this migration slice, claims, evidence, derivations, response authorization, response publication, and consolidation are bound into the immutable episode by digest. The compiled compatibility plan is not yet retained on `CognitiveCase`; binding a canonical plan artifact is an explicit next-step requirement.
+Every transition records the prior episode digest, reason, kernel principal digest, admitted snapshot identity, and relevant artifact references. Claims, evidence, derivations, candidate plan, response authorization, exact response publication, and consolidation are bound into the immutable episode by digest.
 
 ## Current compatibility ledger
 
-The lists held by `CognitiveCase` are a migration projection used by `runtime.semantic`. The kernel validates them, creates immutable artifact references, and immediately binds those references to the episode. They are not the final durable epistemic authority.
+The lists held by `CognitiveCase` are a projection used by `runtime.semantic`. They validate request-local compatibility objects but cannot transition or persist an episode. The kernel projects those objects into immutable references submitted to the transaction service. They are not the final durable epistemic authority.
 
 The planned replacement is one durable Graphix Epistemic commit head. Until that lands, changes must not describe the compatibility ledger as final or allow it to bypass episode transitions.
 
 ## Durable retention policy
+
+## Command and publication semantics
+
+New authoritative transitions are expressed as typed
+`ConstitutionalTransactionService` commands. Each command binds the kernel
+principal and release, its current authority grant, validation/evidence and
+policy digests, the admitted snapshot digest, and the expected prior episode
+digest. The durable store compare-and-swap is the commit point.
+
+Communication is not a real-world effect. Response publication requires a
+`response-publication-authorization.v1` artifact binding the exact rendered text
+and governing decisions, then advances directly to `COMMUNICATED`. `EXECUTED`
+and `OBSERVED` are reserved for an independently authorized external effect with
+an `execution-receipt.v1` artifact.
 
 Raw request bytes may exist only in working memory long enough to compute a digest and approved projection digest. Durable episode and audit stores persist `input_digest`, optional approved `projection_digest`, artifact references, and canonical digests. They must not persist raw prompts, raw provider text, secrets, hidden prompts, or private reasoning traces.
 

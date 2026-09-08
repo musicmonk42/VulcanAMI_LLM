@@ -73,8 +73,6 @@ async def test_successful_request_binds_snapshot_and_consolidates_episode():
         EpisodeState.DELIBERATING,
         EpisodeState.EPISTEMICALLY_COMMITTED,
         EpisodeState.NORMATIVELY_AUTHORIZED,
-        EpisodeState.EXECUTED,
-        EpisodeState.OBSERVED,
         EpisodeState.COMMUNICATED,
         EpisodeState.CONSOLIDATED,
     ]
@@ -85,15 +83,14 @@ async def test_successful_request_binds_snapshot_and_consolidates_episode():
         EpisodeState.DELIBERATING,
         EpisodeState.EPISTEMICALLY_COMMITTED,
         EpisodeState.NORMATIVELY_AUTHORIZED,
-        EpisodeState.EXECUTED,
-        EpisodeState.OBSERVED,
         EpisodeState.COMMUNICATED,
     ]
     assert case.episode.claims
     assert case.episode.derivations
     assert case.episode.authorization is not None
     assert case.episode.response is not None
-    assert case.episode.effects == (case.episode.response,)
+    assert case.episode.effects == ()
+    assert all(len(event.authority) == 64 for event in case.episode.transitions[1:])
     assert case.episode.consolidation_refs
     assert case.snapshot_bundle is not None
     assert case.snapshot_bundle.released is True
@@ -245,7 +242,7 @@ async def test_cancellation_releases_admitted_leases_exactly_once():
     assert lease.closes == 1
 
 
-def test_failed_episode_transition_does_not_mutate_compatibility_ledger(monkeypatch):
+def test_compatibility_ledger_cannot_invoke_episode_transition(monkeypatch):
     import asyncio
 
     from vulcan.runtime.semantic import (
@@ -285,18 +282,25 @@ def test_failed_episode_transition_does_not_mutate_compatibility_ledger(monkeypa
         domain=None,
     )
     before = case.episode
-    original = CognitiveEpisode.transition
 
-    def fail_grounded(self, target, **kwargs):
-        if target is EpisodeState.GROUNDED:
-            raise RuntimeError("injected transition failure")
-        return original(self, target, **kwargs)
+    def deny_case_promotion(self, target, **kwargs):
+        raise RuntimeError("compatibility case attempted authority promotion")
 
-    monkeypatch.setattr(CognitiveEpisode, "transition", fail_grounded)
-    with pytest.raises(RuntimeError, match="injected"):
-        case.append_ledger(claim=claim, derivation=derivation, evidence=evidence)
+    monkeypatch.setattr(CognitiveEpisode, "transition", deny_case_promotion)
+    case.append_ledger(claim=claim, derivation=derivation, evidence=evidence)
     assert case.episode == before
-    assert case.claims == case.derivations == case.evidence == ()
+    assert case.claims == (claim,)
+    assert case.derivations == (derivation,)
+    assert case.evidence == evidence
+
+
+def test_cognitive_case_has_no_authority_promotion_or_persistence_logic():
+    import inspect
+
+    source = inspect.getsource(CognitiveCase)
+    assert ".transition(" not in source
+    assert ".advance(" not in source
+    assert "response-authorization.compat.v1" not in source
 
 
 def _durable_kernel(path, *, finalizer=None, failpoint=None):
