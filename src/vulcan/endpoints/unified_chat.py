@@ -2448,7 +2448,7 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
 
     runtime = _runtime(request)
     utterance = Utterance.from_text(body.message)
-    case = CognitiveCase.create(
+    case = runtime.kernel.create_case(
         request_id=getattr(request.state, "request_id", str(uuid.uuid4())),
         conversation_id=body.conversation_id,
         input_digest=utterance.digest,

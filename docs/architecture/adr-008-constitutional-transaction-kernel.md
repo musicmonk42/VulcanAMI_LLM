@@ -61,6 +61,8 @@ Only the microkernel may perform promotion. Cognitive organs propose; the kernel
 
 ## This PR
 
+The atomic-admission migration slice changes the transaction boundary. Formerly, the runtime created a snapshot-free episode/case projection and the wrapper later mutated its digest by binding a bundle. Now `EpisodeAdmissionService` owns ID generation, bundle admission and validation, snapshot-bound genesis construction, and only then compatibility projection. A failed admission has no visible case and releases acquired leases exactly once.
+
 This migration slice:
 
 - gives the case and episode one canonical `case-*` identity;
@@ -69,7 +71,9 @@ This migration slice:
 - advances successful requests through the complete episode lifecycle to `CONSOLIDATED`;
 - records abstentions and failures as authoritative terminal episode states;
 - binds compatibility-ledger artifacts into the episode by digest;
-- releases snapshot leases on every completed handling path.
+- releases snapshot leases on every completed handling path;
+- composes the legacy semantic kernel as a delegate without copying its resource ownership, and rejects direct production bypass with an unadmitted case;
+- requires typed, evidence-bound snapshot rebase commands rather than magic reason strings.
 
 ## Deliberate compatibility boundary
 

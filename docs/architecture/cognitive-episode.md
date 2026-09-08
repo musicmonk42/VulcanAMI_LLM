@@ -4,9 +4,9 @@
 
 ## Identity and admission
 
-The public case identity and episode identity are one canonical `case-*` identifier. The runtime creates that identity before reasoning, admits a bounded `SnapshotBundle`, and binds the bundle to the episode while it is still at its genesis `PERCEIVED` state.
+The public case identity and episode identity are one canonical `case-*` identifier. `EpisodeAdmissionService` creates that identity, admits and validates a bounded `SnapshotBundle`, and constructs the episode with the bundle reference already present in its genesis `PERCEIVED` event. The compatibility case is projected only after that construction succeeds; production never performs a later bind.
 
-Production composition wraps `CognitiveKernel` with `RuntimeContainer.admit_snapshot_bundle`. Direct-kernel tests remain an explicitly uncomposed compatibility path; they do not establish or claim production snapshot admission. Constitutional-path tests supply explicit bounded providers while production state-authority ports are completed.
+Production composition delegates to `CognitiveKernel` through an explicit kernel protocol and `RuntimeContainer.admit_snapshot_bundle`; it does not copy the delegate attributes or own its resources. Direct use of the constitutional kernel with a preconstructed, unadmitted case fails closed.
 
 ## Lifecycle
 
@@ -48,5 +48,7 @@ The handler releases the admitted snapshot bundle after terminal handling, inclu
 ## Migration and rollback
 
 `vulcan.runtime.case.episode_from_case` is the explicit adapter for callers that still hold a `CognitiveCase`. Rollback may retain the adapter, but no durable schema or runtime route may introduce a separate cognitive lifecycle authority.
+
+`CognitiveEpisode.bind_snapshot_bundle_for_migration` and `CognitiveCase.bind_snapshot_bundle` are migration-only adapters. Remove both when all test and external callers use `EpisodeAdmissionService`; neither is on the production route.
 
 See [`adr-008-constitutional-transaction-kernel.md`](adr-008-constitutional-transaction-kernel.md) and [`../roadmap/constitutional-convergence-plan.md`](../roadmap/constitutional-convergence-plan.md).

@@ -16,8 +16,10 @@ def clock():
 class Lease:
     def __init__(self):
         self.closed = False
+        self.close_count = 0
     def close(self):
         self.closed = True
+        self.close_count += 1
 
 class Provider:
     def __init__(self, kind, digest=None, bad_digest=False):
@@ -46,19 +48,20 @@ def test_snapshot_bundle_is_immutable_and_canonical():
         bundle.bundle_id = "changed"
 
 
-def test_mixed_snapshot_rejection_requires_explicit_rebase_event():
+def test_mixed_snapshot_rejection_cannot_be_bypassed_by_reason_text():
     bundle = construct_snapshot_bundle(episode_id="ep1", providers=providers(), clock=clock, lifetime=timedelta(minutes=5))
     ep = CognitiveEpisode.create(actor=actor(), request_id="r", input_digest="c" * 64, snapshot_bundle=bundle.bundle_ref(), clock=clock)
     with pytest.raises(EpisodeTransitionError, match="mixed snapshot"):
         ep.transition(EpisodeState.INTERPRETED, reason="normal", authority="microkernel", snapshot_ids=["9" * 64], clock=clock)
-    ep.transition(EpisodeState.INTERPRETED, reason="explicit rebase to new bundle", authority="microkernel", snapshot_ids=["9" * 64], clock=clock)
+    with pytest.raises(EpisodeTransitionError, match="typed authorized rebase"):
+        ep.transition(EpisodeState.INTERPRETED, reason="explicit rebase to new bundle", authority="microkernel", snapshot_ids=["9" * 64], clock=clock)
 
 
 def test_lease_cleanup_releases_all_pins_once():
     ps = providers()
     bundle = construct_snapshot_bundle(episode_id="ep1", providers=ps, clock=clock, lifetime=timedelta(minutes=5))
     bundle.close(); bundle.close()
-    assert all(p.lease.closed for p in ps)
+    assert all(p.lease.closed and p.lease.close_count == 1 for p in ps)
     with pytest.raises(RuntimeError, match="released"):
         bundle.validate_active(NOW)
 

@@ -4,6 +4,7 @@ The episode is the authoritative request-scoped cognitive contract. Raw input is
 accepted only at construction time for digesting and is never retained in the
 serialized aggregate.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
@@ -13,7 +14,14 @@ from types import MappingProxyType
 from typing import Mapping, Protocol, Sequence
 from uuid import uuid4
 
-from vulcan.constitution.primitives import Digest, EpisodeId, canonical_json as _canonical_json
+from vulcan.constitution.primitives import (
+    ArtifactId,
+    Digest,
+    EpisodeId,
+    PrincipalId,
+    SnapshotId,
+    canonical_json as _canonical_json,
+)
 
 from .state_machine import EpisodeState, EpisodeTransitionError, ensure_transition
 
@@ -61,6 +69,12 @@ class ActorBinding:
     principal_digest: str
     authority: str
 
+    def __post_init__(self) -> None:
+        PrincipalId(self.actor_id)
+        Digest.from_legacy_hex(self.principal_digest)
+        if not isinstance(self.authority, str) or not _ID.fullmatch(self.authority):
+            raise ValueError("invalid actor authority")
+
     def to_json(self) -> dict[str, str]:
         return {
             "actor_id": self.actor_id,
@@ -79,6 +93,19 @@ class RequestBinding:
         "durable-episode-digests-and-approved-projections"
     )
 
+    def __post_init__(self) -> None:
+        if (
+            not isinstance(self.request_id, str)
+            or not self.request_id
+            or any(ord(character) < 32 for character in self.request_id)
+        ):
+            raise ValueError("invalid request identity")
+        Digest.from_legacy_hex(self.input_digest)
+        if self.projection_digest is not None:
+            Digest.from_legacy_hex(self.projection_digest)
+        if not isinstance(self.retention_policy, str) or not self.retention_policy:
+            raise ValueError("retention policy is required")
+
     def to_json(self) -> dict[str, str | None]:
         return {
             "input_digest": self.input_digest,
@@ -94,8 +121,8 @@ class SnapshotBundleRef:
     state_digest: str
 
     def __post_init__(self) -> None:
-        if not self.bundle_id or not _HEX64.fullmatch(self.state_digest):
-            raise ValueError("validated snapshot bundle identity is required")
+        SnapshotId(self.bundle_id)
+        Digest.from_legacy_hex(self.state_digest)
 
     def to_json(self) -> dict[str, str]:
         return {"bundle_id": self.bundle_id, "state_digest": self.state_digest}
@@ -105,6 +132,10 @@ class SnapshotBundleRef:
 class EpisodeRef:
     episode_id: str
     digest: str
+
+    def __post_init__(self) -> None:
+        EpisodeId(self.episode_id)
+        Digest.from_legacy_hex(self.digest)
 
     def to_json(self) -> dict[str, str]:
         return {"digest": self.digest, "episode_id": self.episode_id}
@@ -116,12 +147,51 @@ class ArtifactRef:
     digest: str
     kind: str
 
+    def __post_init__(self) -> None:
+        ArtifactId(self.artifact_id)
+        Digest.from_legacy_hex(self.digest)
+        if not isinstance(self.kind, str) or not _ID.fullmatch(self.kind):
+            raise ValueError("invalid artifact kind")
+
     def to_json(self) -> dict[str, str]:
         return {
             "artifact_id": self.artifact_id,
             "digest": self.digest,
             "kind": self.kind,
         }
+
+
+@dataclass(frozen=True)
+class SnapshotRebaseCommand:
+    """Typed evidence for a microkernel-authorized snapshot rebase."""
+
+    old_bundle: SnapshotBundleRef
+    new_bundle: SnapshotBundleRef
+    reason_code: str
+    authority_evidence: ArtifactRef
+    prior_episode_digest: str
+
+    def __post_init__(self) -> None:
+        if self.old_bundle == self.new_bundle:
+            raise ValueError("snapshot rebase must change the bundle")
+        if not isinstance(self.reason_code, str) or not _ID.fullmatch(self.reason_code):
+            raise ValueError("invalid snapshot rebase reason code")
+        Digest.from_legacy_hex(self.prior_episode_digest)
+        if self.authority_evidence.kind != "snapshot-rebase-authorization.v1":
+            raise ValueError("invalid snapshot rebase authority evidence kind")
+
+    def authorizes(
+        self,
+        current: SnapshotBundleRef,
+        snapshot_ids: Sequence[str],
+        episode_digest: str,
+    ) -> bool:
+        return (
+            self.old_bundle == current
+            and self.prior_episode_digest == episode_digest
+            and self.new_bundle.bundle_id in snapshot_ids
+            and self.new_bundle.state_digest in snapshot_ids
+        )
 
 
 @dataclass(frozen=True)
@@ -138,6 +208,10 @@ class TransitionEvent:
     event_digest: str = field(init=False)
 
     def __post_init__(self) -> None:
+        ArtifactId(self.event_id)
+        Digest.from_legacy_hex(self.prior_digest)
+        if not self.reason or not self.authority:
+            raise ValueError("transition reason and authority are required")
         object.__setattr__(self, "snapshot_ids", tuple(self.snapshot_ids))
         object.__setattr__(self, "evidence_refs", tuple(self.evidence_refs))
         object.__setattr__(
@@ -198,6 +272,62 @@ class CognitiveEpisode:
             "transitions",
         ):
             object.__setattr__(self, name, tuple(getattr(self, name)))
+        reference_groups = (
+            "claims",
+            "evidence",
+            "derivations",
+            "candidate_plans",
+            "effects",
+            "consolidation_refs",
+        )
+        for name in reference_groups:
+            refs = getattr(self, name)
+            identities = [ref.artifact_id for ref in refs]
+            if len(identities) != len(set(identities)):
+                raise ValueError(f"duplicate artifact reference in {name}")
+        semantic_refs = (
+            *self.claims,
+            *self.evidence,
+            *self.derivations,
+            *self.candidate_plans,
+            *self.consolidation_refs,
+        )
+        semantic_ids = [ref.artifact_id for ref in semantic_refs]
+        if len(semantic_ids) != len(set(semantic_ids)):
+            raise ValueError("artifact identity reused across semantic roles")
+        if self.authorization is not None and not self.authorization.kind.endswith(
+            "authorization.compat.v1"
+        ):
+            raise ValueError("authorization artifact has the wrong kind")
+        if self.response is not None and self.response.kind != "response-ir.v3":
+            raise ValueError("response artifact has the wrong kind")
+        if any(ref.kind != "response-ir.v3" for ref in self.effects):
+            raise ValueError("compatibility effect has the wrong kind")
+        if any(
+            ref.kind != "episode-consolidation.v1" for ref in self.consolidation_refs
+        ):
+            raise ValueError("consolidation artifact has the wrong kind")
+        if (
+            self.state
+            in {
+                EpisodeState.NORMATIVELY_AUTHORIZED,
+                EpisodeState.EXECUTED,
+                EpisodeState.OBSERVED,
+                EpisodeState.COMMUNICATED,
+                EpisodeState.CONSOLIDATED,
+            }
+            and self.authorization is None
+        ):
+            raise ValueError("authorized success state requires authorization evidence")
+        if self.state in {
+            EpisodeState.EXECUTED,
+            EpisodeState.OBSERVED,
+            EpisodeState.COMMUNICATED,
+            EpisodeState.CONSOLIDATED,
+        } and (self.response is None or self.response not in self.effects):
+            raise ValueError("executed success state requires a response effect")
+        if self.state is EpisodeState.CONSOLIDATED and not self.consolidation_refs:
+            raise ValueError("consolidated state requires a consolidation artifact")
         object.__setattr__(
             self,
             "digest",
@@ -222,7 +352,11 @@ class CognitiveEpisode:
         if input_digest is None:
             if raw_request is None:
                 raise ValueError("input_digest or raw_request is required")
-            raw = raw_request.encode("utf-8") if isinstance(raw_request, str) else raw_request
+            raw = (
+                raw_request.encode("utf-8")
+                if isinstance(raw_request, str)
+                else raw_request
+            )
             input_digest = _digest_bytes(raw)
         resolved_episode_id = _episode_id(episode_id or str(uuid4()))
         episode = cls(
@@ -240,8 +374,10 @@ class CognitiveEpisode:
             clock=clock,
         )
 
-    def bind_snapshot_bundle(self, snapshot_bundle: SnapshotBundleRef) -> "CognitiveEpisode":
-        """Bind the admitted state bundle before the first semantic transition.
+    def bind_snapshot_bundle_for_migration(
+        self, snapshot_bundle: SnapshotBundleRef
+    ) -> "CognitiveEpisode":
+        """Legacy pre-admission adapter; remove with all pre-#1080 callers.
 
         Runtime admission creates the episode identifier before all mutable state
         authorities can be leased. Binding is therefore allowed exactly once while
@@ -255,6 +391,9 @@ class CognitiveEpisode:
         if self.snapshot_bundle is not None:
             raise EpisodeTransitionError("snapshot bundle already bound")
         return replace(self, snapshot_bundle=snapshot_bundle)
+
+    # Compatibility alias. Production composition never calls this method.
+    bind_snapshot_bundle = bind_snapshot_bundle_for_migration
 
     def transition(
         self,
@@ -274,28 +413,38 @@ class CognitiveEpisode:
         effects: Sequence[ArtifactRef] = (),
         response: ArtifactRef | None = None,
         consolidation_refs: Sequence[ArtifactRef] = (),
+        rebase: "SnapshotRebaseCommand | None" = None,
     ) -> "CognitiveEpisode":
         if not authority:
             raise EpisodeTransitionError("transition authority is required")
+        if rebase is not None and (
+            self.snapshot_bundle is None
+            or not rebase.authorizes(self.snapshot_bundle, snapshot_ids, self.digest)
+        ):
+            raise EpisodeTransitionError("invalid typed snapshot rebase")
         if self.snapshot_bundle is not None:
             allowed = {
                 self.snapshot_bundle.bundle_id,
                 self.snapshot_bundle.state_digest,
             }
             unknown = [sid for sid in snapshot_ids if sid not in allowed]
-            if (
-                unknown
-                and "rebase" not in reason.lower()
-                and "transition" not in reason.lower()
+            if unknown and (
+                rebase is None
+                or not rebase.authorizes(
+                    self.snapshot_bundle, snapshot_ids, self.digest
+                )
             ):
                 raise EpisodeTransitionError(
-                    "mixed snapshot versions require explicit transition/rebase event"
+                    "mixed snapshot versions require a typed authorized rebase"
                 )
         ensure_transition(self.state, target)
         prior_digest = self.digest
         updated = replace(
             self,
             state=target,
+            snapshot_bundle=(
+                rebase.new_bundle if rebase is not None else self.snapshot_bundle
+            ),
             interpretation=(
                 _freeze_mapping(interpretation)
                 if interpretation is not None
@@ -321,7 +470,10 @@ class CognitiveEpisode:
             authority=authority,
             clock=clock,
             snapshot_ids=tuple(snapshot_ids),
-            evidence_refs=tuple(evidence_refs),
+            evidence_refs=(
+                *tuple(evidence_refs),
+                *((rebase.authority_evidence,) if rebase is not None else ()),
+            ),
             prior_digest=prior_digest,
             from_state=self.state,
         )
