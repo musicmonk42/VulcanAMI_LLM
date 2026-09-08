@@ -41,6 +41,19 @@ The planned replacement is one durable Graphix Epistemic commit head. Until that
 
 Raw request bytes may exist only in working memory long enough to compute a digest and approved projection digest. Durable episode and audit stores persist `input_digest`, optional approved `projection_digest`, artifact references, and canonical digests. They must not persist raw prompts, raw provider text, secrets, hidden prompts, or private reasoning traces.
 
+`vulcan.microkernel.episode_store.EpisodeStore` is the durable lifecycle
+authority. It stores canonical episode documents, immutable transition rows,
+one compare-and-swap head per episode, and an audit outbox row in the same
+SQLite transaction. Startup verifies every document, transition chain, replayed
+head, and pending outbox delivery. Delivery is at-least-once: projection sinks
+must deduplicate by transition digest. Database failpoints bracket writes, head
+CAS, commit, and outbox delivery for restart qualification.
+
+Retention is digest-only and artifact-reference-only. Episode rows are retained
+for the deployment's governance retention period; deletion/compaction is not
+implemented in this slice and must not occur independently of the future
+audit-retention policy.
+
 ## Lease ownership
 
 The handler releases the admitted snapshot bundle after terminal handling, including failures and cancellations. The episode retains the immutable bundle reference and digest, not live leases.

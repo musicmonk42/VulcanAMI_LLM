@@ -1,11 +1,14 @@
 """Single composition function for the production runtime."""
+
 from __future__ import annotations
 
 from importlib import import_module, util
 from types import SimpleNamespace
 
-from .container import RuntimeContainer
+from vulcan.microkernel.episode_store import EpisodeStore
+
 from .constitutional_kernel import ConstitutionalCognitiveKernel
+from .container import RuntimeContainer
 from .errors import StartupErrorCategory, StartupFailure
 from .settings import RuntimeSettings, VulcanEnvironment
 
@@ -64,9 +67,16 @@ def _bind_constitutional_admission(container: RuntimeContainer) -> RuntimeContai
     """Wrap the compatibility kernel in the composed snapshot authority."""
     if isinstance(container.kernel, ConstitutionalCognitiveKernel):
         return container
+    if container.durable_root is None:
+        raise RuntimeError("durable episode root is unavailable")
+    store = EpisodeStore(
+        container.durable_root / "episodes" / "episodes.sqlite3",
+    )
+    container.episode_store = store
     container.kernel = ConstitutionalCognitiveKernel.from_kernel(
         container.kernel,
         snapshot_admitter=container.admit_snapshot_bundle,
+        episode_store=store,
     )
     return container
 

@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 if TYPE_CHECKING:
+    from vulcan.microkernel.episode_store import EpisodeStore
     from vulcan.microkernel.snapshots import SnapshotBundle
 
     from .semantic import (
@@ -87,6 +88,7 @@ class CognitiveCase:
     events: list[CaseEvent] = field(default_factory=list)
     episode: CognitiveEpisode | None = field(default=None, repr=False)
     _snapshot_bundle: "SnapshotBundle | None" = field(default=None, repr=False)
+    _episode_store: "EpisodeStore | None" = field(default=None, repr=False)
 
     @classmethod
     def create(
@@ -132,6 +134,7 @@ class CognitiveCase:
         *,
         episode: CognitiveEpisode,
         bundle: "SnapshotBundle",
+        store: "EpisodeStore | None" = None,
     ) -> "CognitiveCase":
         """Create the compatibility projection after authoritative admission."""
         if episode.snapshot_bundle != bundle.bundle_ref():
@@ -146,6 +149,7 @@ class CognitiveCase:
             state_snapshot_id=bundle.digest,
             episode=episode,
             _snapshot_bundle=bundle,
+            _episode_store=store,
         )
         case.record("created")
         case.record("snapshot_admitted", bundle.bundle_id)
@@ -225,6 +229,7 @@ class CognitiveCase:
         # transitions succeed is the compatibility projection mutated.
         admitted = self.episode
         next_episode = admitted
+        durable_steps: list[CognitiveEpisode] = []
         snapshot_ids = (self.state_snapshot_id,) if self.state_snapshot_id else ()
         if (
             next_episode.state is EpisodeState.PERCEIVED
@@ -247,6 +252,7 @@ class CognitiveCase:
                     ),
                 },
             )
+            durable_steps.append(next_episode)
         if self.accepted_interpretation is not None:
             next_episode = next_episode.transition(
                 EpisodeState.GROUNDED,
@@ -254,12 +260,14 @@ class CognitiveCase:
                 authority="CognitiveKernel",
                 snapshot_ids=snapshot_ids,
             )
+            durable_steps.append(next_episode)
             next_episode = next_episode.transition(
                 EpisodeState.DELIBERATING,
                 reason="bounded plan deliberated",
                 authority="CognitiveKernel",
                 snapshot_ids=snapshot_ids,
             )
+            durable_steps.append(next_episode)
             claims, derivations, evidence_refs = self._ledger_refs_for(
                 proposed_claims, proposed_derivations, proposed_evidence
             )
@@ -273,6 +281,16 @@ class CognitiveCase:
                 evidence=evidence_refs,
                 evidence_refs=evidence_refs,
             )
+            durable_steps.append(next_episode)
+        if self._episode_store is not None:
+            prior = admitted
+            for durable_step in durable_steps:
+                self._persist_step(prior, durable_step)
+                prior = durable_step
+                # Durable authority advances one transition at a time. Keeping the
+                # adapter synchronized lets failure terminalization continue from
+                # the actual head without publishing compatibility ledger state.
+                self.episode = durable_step
         self._evidence.extend(evidence)
         self._derivations.append(derivation)
         self._claims.append(claim)
@@ -331,14 +349,38 @@ class CognitiveCase:
         if self.episode.state is target:
             return
         snapshot_ids = (self.state_snapshot_id,) if self.state_snapshot_id else ()
-        self.episode = self.episode.transition(
+        prior = self.episode
+        next_episode = prior.transition(
             target,
             reason=reason,
             authority="CognitiveKernel",
             snapshot_ids=snapshot_ids,
             **updates,
         )
+        if self._episode_store is not None:
+            self._persist_step(prior, next_episode)
+        self.episode = next_episode
         self.record("episode_transition", target.value)
+
+    def _persist_step(
+        self, prior: CognitiveEpisode, next_episode: CognitiveEpisode
+    ) -> None:
+        if self._episode_store is None:
+            return
+        try:
+            self._episode_store.advance(self.case_id, prior.digest, next_episode)
+        except BaseException:
+            # An after-commit failure is intentionally indistinguishable from a
+            # lost acknowledgement. Re-read the authority before propagating so
+            # cleanup never attempts to terminalize from a stale projection.
+            try:
+                durable = self._episode_store.load(self.case_id)
+            except BaseException:
+                pass
+            else:
+                if durable.digest == next_episode.digest:
+                    self.episode = durable
+            raise
 
     def _ledger_refs(
         self,

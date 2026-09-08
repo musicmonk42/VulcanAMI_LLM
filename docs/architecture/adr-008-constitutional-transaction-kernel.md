@@ -96,6 +96,28 @@ Costs and risks:
 - audit retains a duplicate lifecycle map until its planned convergence;
 - the current Graphix compiler and Graphix Epistemic store are not yet the live path.
 
+## Durable episode authority slice
+
+The old episode transaction boundary ended at assignment of an immutable Python
+object to the mutable `CognitiveCase`; process loss erased the authoritative
+head, and legacy audit finalization could precede that assignment. The new sole
+authority boundary is the microkernel `EpisodeStore`: snapshot-bound genesis and
+every subsequent episode transition use a per-episode SQLite compare-and-swap
+head, and the immutable transition, new head, and audit-outbox item commit in one
+database transaction. The composed handler verifies the required durable head
+after an explicit cancellation point and before returning a transportable
+result. Terminal compatibility audit events are appended only after that
+durable terminal commit.
+
+`CognitiveCase` remains the named working-state adapter, while
+`ConstitutionalCognitiveKernel` remains the production admission/transport
+adapter. Remove both when the semantic kernel consumes durable episodes
+directly. The legacy `CanonicalAudit` lifecycle remains a compatibility
+projection until Wave 1.5 makes it consume episode outbox records; undelivered
+rows are retained and startup reconciliation delivers them when that sink is
+configured. This slice does not make the compatibility semantic ledger or
+Graphix Epistemic durable authority.
+
 ## Rejected alternatives
 
 ### Start a new framework

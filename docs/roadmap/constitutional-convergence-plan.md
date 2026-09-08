@@ -35,6 +35,17 @@ The preceding episode-foundation PR advances authoritative cognitive episodes an
 
 Atomic episode admission is **M3 — Canonical for the composed request path**: every supported production handler asks the composed kernel admission service to create a snapshot-bound genesis episode before the compatibility case becomes visible. Admission and cancellation release leases, direct unadmitted bypass fails closed, and compatibility ledger mutation rolls back when an episode transition fails. The legacy semantic ledger and migration-only post-genesis bind adapters keep overall episode authority below complete Wave 1 convergence, and exact artifact/restart qualification remains below M4.
 
+Durable episode authority is **M3 — Canonical for the composed request path**:
+the admitted genesis and every live transition now advance one SQLite
+compare-and-swap head with an immutable transition and audit-outbox row in the
+same transaction. Startup verifies and replays all heads, competing writers fail
+closed, and transport is withheld unless the durable terminal head matches the
+request aggregate. Failpoint, restart, replay, cancellation, privacy, tamper,
+and concurrency tests provide M2 evidence. It remains below M4 until the exact
+built artifact passes restart/crash qualification, and audit derivation remains
+Wave 1.5 because `CanonicalAudit` does not yet consume the episode outbox in the
+composed runtime.
+
 ## Wave 0 — Recover executable truth
 
 ### 0.1 Repository assurance — M2 (local evidence; hosted qualification pending)
@@ -74,7 +85,7 @@ Replace reflective production snapshot fallback with explicit `lease_snapshot()`
 
 **Exit gate:** startup fails closed when an authority cannot produce a faithful content-bound snapshot.
 
-### 1.4 Episode authority
+### 1.4 Episode authority — M3 (composed request path; artifact qualification pending)
 
 Complete the migration begun in this PR. Remove independent lifecycle and commitment authority from `CognitiveCase`.
 
