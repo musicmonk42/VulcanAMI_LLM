@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from hashlib import sha256
@@ -9,7 +10,9 @@ from typing import Protocol
 from uuid import uuid4
 
 from vulcan.microkernel.episode import ActorBinding, CognitiveEpisode
+from vulcan.microkernel.episode_store import EpisodeStore
 from vulcan.microkernel.snapshots import SnapshotBundle
+from vulcan.microkernel.state_machine import EpisodeState
 
 from .case import CognitiveCase
 from .kernel import KernelRequest, KernelResult
@@ -31,6 +34,7 @@ class EpisodeAdmissionService:
     """Own the fail-closed episode/snapshot genesis transaction."""
 
     snapshot_admitter: SnapshotAdmitter
+    store: EpisodeStore | None = None
 
     def admit(
         self,
@@ -59,7 +63,11 @@ class EpisodeAdmissionService:
                 episode_id=episode_id,
                 snapshot_bundle=bundle.bundle_ref(),
             )
-            return CognitiveCase.from_admitted_episode(episode=episode, bundle=bundle)
+            if self.store is not None:
+                self.store.create(episode)
+            return CognitiveCase.from_admitted_episode(
+                episode=episode, bundle=bundle, store=self.store
+            )
         except BaseException:
             bundle.close()
             raise
@@ -84,10 +92,11 @@ class ConstitutionalCognitiveKernel:
         kernel: KernelDelegate,
         *,
         snapshot_admitter: SnapshotAdmitter,
+        episode_store: EpisodeStore | None = None,
     ) -> "ConstitutionalCognitiveKernel":
         if not callable(snapshot_admitter):
             raise TypeError("snapshot_admitter must be callable")
-        return cls(kernel, EpisodeAdmissionService(snapshot_admitter))
+        return cls(kernel, EpisodeAdmissionService(snapshot_admitter, episode_store))
 
     @property
     def calls(self) -> int:
@@ -111,6 +120,35 @@ class ConstitutionalCognitiveKernel:
         if case.episode.snapshot_bundle != case.snapshot_bundle.bundle_ref():
             raise RuntimeError("case snapshot projection diverged from episode")
         try:
-            return await self._delegate.handle(request, case)
+            result = await self._delegate.handle(request, case)
+            # Explicit cancellation boundary: a finalized response is still not
+            # transport-released until the durable head check below completes.
+            await asyncio.sleep(0)
+            if self.admission.store is not None:
+                durable = self.admission.store.load(case.case_id)
+                if case.episode is None or durable.digest != case.episode.digest:
+                    raise RuntimeError(
+                        "transport withheld: durable episode head diverged"
+                    )
+                if not durable.state.is_terminal:
+                    raise RuntimeError(
+                        "transport withheld: durable episode is not terminal"
+                    )
+                if result.status is not case.terminal_status:
+                    raise RuntimeError("transport withheld: result status diverged")
+                required_by_status = {
+                    "success": EpisodeState.CONSOLIDATED,
+                    "abstained": EpisodeState.ABSTAINED,
+                    "blocked": EpisodeState.BLOCKED,
+                    "finalization_error": EpisodeState.FAILED,
+                    "failed": EpisodeState.FAILED,
+                    "cancelled": EpisodeState.CANCELLED,
+                }
+                required = required_by_status.get(result.status.value)
+                if required is None or durable.state is not required:
+                    raise RuntimeError(
+                        "transport withheld: durable terminal state missing"
+                    )
+            return result
         finally:
             case.release_snapshot_bundle()

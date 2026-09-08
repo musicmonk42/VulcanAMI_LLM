@@ -66,6 +66,7 @@ class RuntimeContainer:
     closed: bool = False
     health: HealthStateMachine | None = None
     max_episode_lifetime_seconds: int = int(MAX_EPISODE_LIFETIME.total_seconds())
+    episode_store: Any = None
 
     async def close(self) -> None:
         """Release every owned resource once, preserving the first failure.
@@ -91,6 +92,7 @@ class RuntimeContainer:
             self.self_improvement,
             self.learning_owner,
             self.domain_registry,
+            self.episode_store,
             self.kernel,
             self.safety,
             self.world_state,

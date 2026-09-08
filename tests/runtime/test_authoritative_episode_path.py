@@ -4,11 +4,11 @@ from types import SimpleNamespace
 
 import pytest
 
+from vulcan.microkernel.episode import CognitiveEpisode
 from vulcan.microkernel.snapshots import (
     AttributeSnapshotProvider,
     construct_snapshot_bundle,
 )
-from vulcan.microkernel.episode import CognitiveEpisode
 from vulcan.microkernel.state_machine import EpisodeState
 from vulcan.runtime.case import CognitiveCase, CognitiveCaseStatus
 from vulcan.runtime.constitutional_kernel import ConstitutionalCognitiveKernel
@@ -248,15 +248,16 @@ async def test_cancellation_releases_admitted_leases_exactly_once():
 
 
 def test_failed_episode_transition_does_not_mutate_compatibility_ledger(monkeypatch):
+    import asyncio
+
     from vulcan.runtime.semantic import (
+        DeterministicLanguageInput,
         accept,
         build_graphix_plan,
         compile_graphix_plan,
         execute_graphix_plan,
         validate_proposal,
-        DeterministicLanguageInput,
     )
-    import asyncio
 
     utterance = Utterance.from_text("2+2")
     case = _kernel().create_case(
@@ -298,3 +299,106 @@ def test_failed_episode_transition_does_not_mutate_compatibility_ledger(monkeypa
         case.append_ledger(claim=claim, derivation=derivation, evidence=evidence)
     assert case.episode == before
     assert case.claims == case.derivations == case.evidence == ()
+
+
+def _durable_kernel(path, *, finalizer=None, failpoint=None):
+    from vulcan.microkernel.episode_store import EpisodeStore
+
+    store = EpisodeStore(path, failpoint=failpoint)
+    inner = CognitiveKernel(
+        state_authority=SimpleNamespace(version="world-1"),
+        finalizer=finalizer or _Finalizer(),
+    )
+    return (
+        ConstitutionalCognitiveKernel.from_kernel(
+            inner, snapshot_admitter=_admitter, episode_store=store
+        ),
+        store,
+    )
+
+
+@pytest.mark.asyncio
+async def test_response_is_withheld_when_episode_persistence_fails(tmp_path):
+    armed = {"value": False}
+
+    def fail(name):
+        if armed["value"] and name == "before_commit":
+            raise OSError("episode disk unavailable")
+
+    kernel, store = _durable_kernel(tmp_path / "episodes.sqlite3", failpoint=fail)
+    utterance = Utterance.from_text("2+2")
+    case = kernel.create_case(
+        request_id="request-persist-failure",
+        conversation_id=None,
+        input_digest=utterance.digest,
+    )
+    genesis = case.episode.digest
+    armed["value"] = True
+
+    with pytest.raises(OSError, match="disk unavailable"):
+        await kernel.handle(KernelRequest(utterance, None), case)
+
+    assert store.load(case.case_id).digest == genesis
+    assert case.terminal_status is CognitiveCaseStatus.OPEN
+
+
+@pytest.mark.asyncio
+async def test_cancellation_after_finalization_before_transport_keeps_durable_head(
+    tmp_path,
+):
+    import asyncio
+
+    class CancelAtTransportFinalizer:
+        async def finalize(self, artifact):
+            task = asyncio.current_task()
+            assert task is not None
+            task.get_loop().call_soon(task.cancel)
+            return FinalizationResult(
+                FinalizationDecision.ALLOW, artifact, artifact.text
+            )
+
+    kernel, store = _durable_kernel(
+        tmp_path / "episodes.sqlite3", finalizer=CancelAtTransportFinalizer()
+    )
+    utterance = Utterance.from_text("2+2")
+    case = kernel.create_case(
+        request_id="request-cancel-before-transport",
+        conversation_id=None,
+        input_digest=utterance.digest,
+    )
+
+    with pytest.raises(asyncio.CancelledError):
+        await kernel.handle(KernelRequest(utterance, None), case)
+
+    assert case.episode.state is EpisodeState.CONSOLIDATED
+    assert store.load(case.case_id).digest == case.episode.digest
+    assert case.snapshot_bundle.released is True
+
+
+@pytest.mark.asyncio
+async def test_transport_rejects_nonterminal_delegate_result(tmp_path):
+    class InvalidDelegate:
+        async def handle(self, request, case):
+            from vulcan.runtime.kernel import KernelResult
+
+            return KernelResult(
+                "not-authorized", None, CognitiveCaseStatus.OPEN, "allow"
+            )
+
+        def capabilities(self):
+            return ()
+
+    from vulcan.microkernel.episode_store import EpisodeStore
+
+    store = EpisodeStore(tmp_path / "episodes.sqlite3")
+    kernel = ConstitutionalCognitiveKernel.from_kernel(
+        InvalidDelegate(), snapshot_admitter=_admitter, episode_store=store
+    )
+    utterance = Utterance.from_text("2+2")
+    case = kernel.create_case(
+        request_id="request-nonterminal",
+        conversation_id=None,
+        input_digest=utterance.digest,
+    )
+    with pytest.raises(RuntimeError, match="not terminal"):
+        await kernel.handle(KernelRequest(utterance, None), case)
