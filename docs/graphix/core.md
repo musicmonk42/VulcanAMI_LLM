@@ -8,7 +8,11 @@ The envelope carries closed enum fields for authority level, epistemic status, p
 
 JSON decoding is strict: duplicate keys, unknown envelope fields, non-finite or oversized numbers, control characters, executable-looking keys, and digest mismatches fail closed. Canonical serialization uses UTF-8 JSON with sorted keys and compact separators.
 
-Extensions are bounded, reverse-DNS namespaced declarations. They may contain display metadata only and must not carry policy, command, code, callable, import, or authority semantics.
+Extensions are bounded, reverse-DNS namespaced declarations. Their digest covers
+the canonical value, namespace, and schema version, and construction and decoding
+both reject a supplied digest that does not match that complete context. They may
+contain display metadata only and must not carry policy, command, code, callable,
+import, or authority semantics.
 
 ## Dialect registry
 

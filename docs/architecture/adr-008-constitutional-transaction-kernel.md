@@ -118,6 +118,22 @@ rows are retained and startup reconciliation delivers them when that sink is
 configured. This slice does not make the compatibility semantic ledger or
 Graphix Epistemic durable authority.
 
+## Graphix semantic-integrity repair
+
+The old Graphix representation boundary accepted an extension digest without
+checking it against its declared schema context, and Epistemic commit digests
+omitted multiple meaning-bearing fields. The repaired boundary validates Core
+extension digests at object construction and decode, and defines one complete,
+canonical Epistemic commit document whose supplied digest is verified on load.
+This is an M2 representation and validation change only: the microkernel remains
+the sole authority promoter, and the canonical runtime and durable authority
+boundaries do not change.
+
+`project_semantic_claim` remains the named legacy claim adapter until Wave 2.2
+retires the runtime semantic claim contract. `AuthoritativeClaimLedger` remains
+the in-memory compatibility ledger until Wave 1.6 replaces it with a durable
+Graphix Epistemic head.
+
 ## Rejected alternatives
 
 ### Start a new framework

@@ -48,8 +48,9 @@ def verify_envelope_digest(envelope: GraphixEnvelope, content: bytes) -> None:
     expected = Digest.of_bytes(content)
     if envelope.content_digest != expected: raise DigestMismatchError("content digest does not match payload")
 
-def extension_digest(value: Mapping[str, object]) -> str:
-    return str(Digest.of_bytes(canonical_json(value)))
+def extension_digest(value: Mapping[str, object], *, namespace: str, schema_version: int) -> str:
+    """Digest an extension value together with its declared schema context."""
+    return str(Digest.of_bytes(canonical_json({"namespace": namespace, "schema_version": schema_version, "value": value})))
 
 def canonical_json(value: object) -> bytes:
     return _constitutional_json(_canonical(value, 0, [0]))

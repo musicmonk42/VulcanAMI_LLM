@@ -29,6 +29,15 @@ boundaries and are removed when their persisted v1 schemas migrate to the
 canonical `sha256:<hex>` wire form. This representation-only slice does not
 change which runtime component may promote authority.
 
+Graphix semantic integrity is **M2 — Tested**: Core extension declarations bind
+their namespace and schema version as well as their canonical value, and
+Graphix Epistemic commit digests cover propositions, qualifiers, full citations,
+uncertainty, limitations, assumptions, counterexamples, contradictions,
+authority, snapshot, and prior commit. Strict canonical round-trip and tamper
+tests pass without relying on assertions. Graphix remains below M3 because the
+compatibility semantic ledger, not the durable Graphix Epistemic head, is still
+on the composed request path.
+
 Repository assurance is now **M2 — Tested locally**: the Python 3.11 constitutional gate, workflow lint, real type/format checks, authoritative-episode integration, and optimized-Python parity are executable from one documented dependency set. It remains below M4 until the committed workflows run successfully on configured GitHub runners and the exact built artifact passes restart qualification.
 
 The preceding episode-foundation PR advances authoritative cognitive episodes and snapshot admission toward M3 for the bounded deterministic request path. It does not yet make the new Graphix compiler, Graphix Epistemic ledger, or independent nine-authority ports canonical.
@@ -73,7 +82,7 @@ The repository now has a machine-readable component truth map and documentation-
 
 Create one constitutional package for digest types, IDs, authority levels, epistemic statuses, canonical time, and canonical serialization. Adapt old wire formats explicitly.
 
-### 1.2 Graphix Epistemic digest repair
+### 1.2 Graphix Epistemic digest repair — M2 (integrity contracts tested; canonical wiring pending)
 
 Make commit digests cover complete propositions, qualifiers, citations, uncertainty, limitations, assumptions, counterexamples, contradictions, derivation rules, authority, snapshot, and prior commit.
 

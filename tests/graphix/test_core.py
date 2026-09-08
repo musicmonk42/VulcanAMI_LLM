@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from vulcan.graphix.codec import dumps_envelope, extension_digest, loads_envelope, verify_envelope_digest
-from vulcan.graphix.core import DigestMismatchError, ExtensionCollisionError, ForbiddenExecutableSemanticsError, GraphixEnvelope, PrincipalRelease, SourceKind, SourceReference, UnknownFieldError
+from vulcan.graphix.core import DigestMismatchError, ExtensionCollisionError, ForbiddenExecutableSemanticsError, GraphixEnvelope, PrincipalRelease, SourceKind, SourceReference, UnknownFieldError, ExtensionDeclaration
 from vulcan.graphix.registry import DialectRegistration, DialectRegistry
 
 PAYLOAD = b'{"claim":"bounded"}'
@@ -102,7 +102,14 @@ def test_registry_unknown_version_startup_only_and_migration():
         reg.register(DialectRegistration("core.other", 1, "release-2026.07.20"))
 
 def test_extension_digest_is_canonical():
-    assert extension_digest({"b": 2, "a": 1}) == extension_digest({"a": 1, "b": 2})
+    first = extension_digest({"b": 2, "a": 1}, namespace="org.example.display", schema_version=1)
+    second = extension_digest({"a": 1, "b": 2}, namespace="org.example.display", schema_version=1)
+    assert first == second
+    ExtensionDeclaration("org.example.display", 1, first, {"a": 1, "b": 2})
+    with pytest.raises(DigestMismatchError):
+        ExtensionDeclaration("org.example.display", 2, first, {"a": 1, "b": 2})
+    with pytest.raises(DigestMismatchError):
+        ExtensionDeclaration("org.example.display", 1, first, {"a": 1, "b": 3})
 
 
 def test_schema_declares_closed_required_envelope_fields():
