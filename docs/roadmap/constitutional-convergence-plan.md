@@ -38,9 +38,11 @@ The preceding episode-foundation PR advances authoritative cognitive episodes an
 
 **Exit gate:** the microkernel, Graphix, runtime, persistence, security, and built-image suites pass repeatedly from a clean checkout.
 
-### 0.2 Executable architecture inventory
+### 0.2 Executable architecture inventory — M2 (deterministic local gate)
 
 Generate a matrix of component owner, authority ceiling, runtime reachability, state authority, snapshot implementation, persistence, audit, tests, and maturity.
+
+The repository now has a machine-readable component truth map and documentation-status manifest, with deterministic JSON/Markdown generation. The local gate fails closed on ambiguous ownership, unknown reachability, missing evidence, documentation drift, and public claims below M3. This is documentation assurance only: it changes no runtime authority and remains below M4 until the exact built artifact and restart behavior are qualified.
 
 **Exit gate:** no unexplained production-reachable component and no public capability below M3.
 
