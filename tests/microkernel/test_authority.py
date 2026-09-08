@@ -47,6 +47,15 @@ def test_monotonic_promotion_and_complete_evidence_required():
     with pytest.raises(ValueError):
         EvidenceRecord(p.identity_digest, "bad", POLICY, now())
 
+def test_untyped_authority_values_fail_closed():
+    p = principal()
+    with pytest.raises(AuthorityError):
+        promote_authority(current="UNTRUSTED_PROPOSAL", target=AuthorityLevel.EXECUTED_EFFECT, principal=p, evidence=evidence(p))
+    forged = grant(AuthorityLevel.EXECUTED_EFFECT, p)
+    object.__setattr__(forged, "level", "EXECUTED_EFFECT")
+    with pytest.raises(AuthorityError):
+        require_authority(principal=p, grant=forged, operation=Operation.EXECUTE_EFFECT, episode_id="e1", resource_digest=RESOURCE, audit=AuditSink(), clock=now)
+
 
 def test_default_deny_unknown_operation_and_low_authority_effect():
     p = principal()

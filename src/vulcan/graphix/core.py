@@ -6,13 +6,14 @@ semantics, dynamic imports, class paths, shell commands, or raw model authority.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime
 from enum import Enum
 import re
 from types import MappingProxyType
-from typing import Mapping, Sequence
+from typing import Mapping
 
-_DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
+from vulcan.constitution.primitives import AuthorityLevel, Digest
+
 _TOKEN_RE = re.compile(r"^[a-z][a-z0-9_.-]{1,63}$")
 _ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{2,127}$")
 _RELEASE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:+/@-]{2,127}$")
@@ -31,12 +32,6 @@ class ForbiddenExecutableSemanticsError(GraphixCoreError): pass
 class ExtensionCollisionError(GraphixCoreError): pass
 class UnsupportedDialectError(GraphixCoreError): pass
 
-class AuthorityLevel(str, Enum):
-    UNTRUSTED_PROPOSAL = "UNTRUSTED_PROPOSAL"
-    VALIDATED_CANDIDATE = "VALIDATED_CANDIDATE"
-    COMMITTED_BELIEF = "COMMITTED_BELIEF"
-    AUTHORIZED_PLAN = "AUTHORIZED_PLAN"
-    EXECUTED_EFFECT = "EXECUTED_EFFECT"
 class EpistemicStatus(str, Enum):
     OBSERVED = "OBSERVED"
     INFERRED = "INFERRED"
@@ -134,7 +129,8 @@ class GraphixEnvelope:
 def _require_match(name: str, value: str, pattern: re.Pattern[str]) -> None:
     if not isinstance(value, str) or pattern.fullmatch(value) is None: raise GraphixCoreError(f"invalid {name}")
 def _require_digest(name: str, value: str) -> None:
-    if not isinstance(value, str) or _DIGEST_RE.fullmatch(value) is None: raise DigestMismatchError(f"invalid {name}")
+    try: Digest(value)
+    except (TypeError, ValueError) as exc: raise DigestMismatchError(f"invalid {name}") from exc
 def _require_positive_version(name: str, value: int) -> None:
     if not isinstance(value, int) or isinstance(value, bool) or value < 1 or value > 9999: raise GraphixCoreError(f"invalid {name}")
 def _enum(cls: type[Enum], value: object, name: str) -> Enum:

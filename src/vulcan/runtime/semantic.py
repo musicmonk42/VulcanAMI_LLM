@@ -5,9 +5,7 @@ arithmetic from those spans before a request can reach the evaluator.
 """
 from __future__ import annotations
 import ast
-import hashlib
 import html
-import json
 import math
 import operator
 import re
@@ -18,6 +16,8 @@ from enum import Enum
 from fractions import Fraction
 from typing import Any, Protocol
 from uuid import uuid4
+
+from vulcan.constitution.primitives import Digest, canonical_json
 
 SCHEMA_VERSION = "semantic-ingress/2"
 LEDGER_VERSION = "semantic-ledger/2"
@@ -59,7 +59,7 @@ class Utterance:
         normalized = unicodedata.normalize("NFC", text)
         if not re.fullmatch(r"[A-Za-z0-9_-]{2,35}", locale):
             raise ValueError("invalid locale")
-        return cls(normalized, hashlib.sha256(normalized.encode("utf-8")).hexdigest(), locale)
+        return cls(normalized, Digest.of_bytes(normalized.encode("utf-8")).hex, locale)
 
 @dataclass(frozen=True)
 class SourceSpan:
@@ -344,4 +344,5 @@ def _canonical(value: Any) -> Any:
     if isinstance(value, (str, int, bool)) or value is None: return value
     raise TypeError(f"unsupported canonical type: {type(value).__name__}")
 def canonical_digest(value: object) -> str:
-    return hashlib.sha256(json.dumps(_canonical(value), ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")).hexdigest()
+    """Legacy bare-hex adapter for semantic-ledger v2 fields."""
+    return Digest.of_bytes(canonical_json(_canonical(value))).hex

@@ -51,3 +51,22 @@ objects. They bind principal identity, release digest, operation, episode,
 resource digest, expiry, and nonce; replay is denied by the issuer. Persisted
 approval signatures remain a future migration and these object tokens are not a
 cryptographic proof across process or persistence boundaries.
+
+## Constitutional primitive convergence
+
+The old representation boundary independently declared authority enums in
+Graphix and the microkernel, and each subsystem validated and serialized
+digests, identifiers, JSON, and timestamps itself. The new representation
+boundary is `vulcan.constitution.primitives`: both subsystems consume the same
+ordered `AuthorityLevel`, and canonical new digest wire values use
+`sha256:<64 lowercase hex>`. Canonical timestamps are UTC `Z` timestamps at
+millisecond precision. This changes representation only; the microkernel
+remains the sole authority promoter and Graphix remains proposal-producing.
+
+The retained episode and semantic `canonical_digest` functions, snapshot
+`_digest`, and principals `canonical_json` are compatibility adapters for their
+v1/v2 bare-hex persisted fields. They delegate to the constitutional
+implementation and are removed when those schemas have a versioned migration
+to prefixed digests. Graphix `codec.canonical_json` remains a bounded dialect
+adapter (including its ban on executable keys) and is removed as a general
+encoder when every dialect validates before calling the constitutional encoder.

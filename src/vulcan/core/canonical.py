@@ -4,13 +4,12 @@ from __future__ import annotations
 from dataclasses import is_dataclass, asdict
 from datetime import datetime
 from enum import Enum
-import hashlib
-import json
 import math
 import unicodedata
 from collections.abc import Mapping, Sequence
 
 from vulcan.core.time import format_utc
+from vulcan.constitution.primitives import Digest, canonical_json as encode_canonical_json
 
 MAX_DEPTH = 24
 MAX_ITEMS = 10_000
@@ -18,7 +17,8 @@ MAX_STRING = 16_384
 
 
 def sha256_bytes(payload: bytes) -> str:
-    return hashlib.sha256(payload).hexdigest()
+    """Legacy bare-hex adapter for pre-constitutional persisted schemas."""
+    return Digest.of_bytes(payload).hex
 
 
 def _normalize(value: object, *, depth: int, count: list[int]) -> object:
@@ -68,8 +68,8 @@ def canonicalize(value: object) -> object:
 
 
 def canonical_json(value: object) -> bytes:
-    normalized = canonicalize(value)
-    return json.dumps(normalized, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode("utf-8")
+    """Compatibility adapter for enums, dataclasses, and NFC-normalized v1 data."""
+    return encode_canonical_json(canonicalize(value))
 
 
 def canonical_digest(value: object) -> str:

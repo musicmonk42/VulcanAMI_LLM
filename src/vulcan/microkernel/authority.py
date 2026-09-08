@@ -5,24 +5,9 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 
+from vulcan.constitution.primitives import AuthorityLevel
+
 from .principals import Principal, digest
-
-
-class AuthorityLevel(str, Enum):
-    UNTRUSTED_PROPOSAL = "untrusted_proposal"
-    VALIDATED_CANDIDATE = "validated_candidate"
-    COMMITTED_BELIEF = "committed_belief"
-    AUTHORIZED_PLAN = "authorized_plan"
-    EXECUTED_EFFECT = "executed_effect"
-
-
-_AUTHORITY_ORDER = {
-    AuthorityLevel.UNTRUSTED_PROPOSAL: 0,
-    AuthorityLevel.VALIDATED_CANDIDATE: 1,
-    AuthorityLevel.COMMITTED_BELIEF: 2,
-    AuthorityLevel.AUTHORIZED_PLAN: 3,
-    AuthorityLevel.EXECUTED_EFFECT: 4,
-}
 
 
 class Operation(str, Enum):
@@ -102,9 +87,11 @@ class AuditSink:
 
 
 def promote_authority(*, current: AuthorityLevel, target: AuthorityLevel, principal: Principal, evidence: EvidenceRecord) -> AuthorityGrant:
+    if not isinstance(current, AuthorityLevel) or not isinstance(target, AuthorityLevel):
+        raise AuthorityError("authority promotion requires typed authority levels")
     if not principal.is_kernel:
         raise AuthorityError("only SYSTEM_KERNEL may promote authority")
-    if _AUTHORITY_ORDER[target] < _AUTHORITY_ORDER[current]:
+    if not target.dominates(current):
         raise AuthorityError("authority promotion must be monotonic")
     return AuthorityGrant(principal.identity_digest, target, digest(evidence.to_json()))
 
@@ -122,8 +109,8 @@ def operation_from_value(value: object) -> Operation:
 
 def require_authority(*, principal: Principal, grant: AuthorityGrant, operation: Operation | str, episode_id: str, resource_digest: str, audit: AuditSink, clock) -> None:
     op = operation_from_value(operation)
-    granted = grant.principal_digest == principal.identity_digest and _AUTHORITY_ORDER[grant.level] >= _AUTHORITY_ORDER[_OPERATION_MINIMUM[op]]
+    granted = isinstance(grant.level, AuthorityLevel) and grant.principal_digest == principal.identity_digest and grant.level.dominates(_OPERATION_MINIMUM[op])
     if op in _HIGH_RISK:
-        audit.record(AuditEvent("granted" if granted else "denied", principal.identity_digest, op.value, grant.level.value, episode_id, resource_digest, "capability_authorization", clock()))
+        audit.record(AuditEvent("granted" if granted else "denied", principal.identity_digest, op.value, grant.level.value if isinstance(grant.level, AuthorityLevel) else "INVALID", episode_id, resource_digest, "capability_authorization", clock()))
     if not granted:
         raise AuthorityError("capability denied")

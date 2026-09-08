@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Protocol
 
+from vulcan.constitution.primitives import canonical_timestamp, parse_timestamp, require_utc
+
 UTC_PRECISION = "milliseconds"
 
 
@@ -13,27 +15,16 @@ class Clock(Protocol):
 
 
 def canonical_utc(value: datetime) -> datetime:
-    if value.tzinfo is None:
-        raise ValueError("timestamp must be timezone-aware")
-    utc = value.astimezone(timezone.utc)
+    utc = require_utc(value)
     return utc.replace(microsecond=(utc.microsecond // 1000) * 1000)
 
 
 def format_utc(value: datetime) -> str:
-    utc = canonical_utc(value)
-    text = utc.isoformat(timespec="milliseconds")
-    return text.replace("+00:00", "Z")
+    return canonical_timestamp(value)
 
 
 def parse_utc(value: str) -> datetime:
-    if not value.endswith("Z"):
-        raise ValueError("timestamp must end with Z")
-    parsed = datetime.fromisoformat(value[:-1] + "+00:00")
-    if parsed.tzinfo != timezone.utc:
-        raise ValueError("timestamp must be UTC")
-    if parsed.microsecond % 1000 != 0:
-        raise ValueError("timestamp precision must be milliseconds")
-    return parsed
+    return parse_timestamp(value)
 
 
 @dataclass(frozen=True, slots=True)

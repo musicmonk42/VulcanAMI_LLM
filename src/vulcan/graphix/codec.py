@@ -1,10 +1,12 @@
 """Strict duplicate-key-free canonical JSON codec for Graphix Core."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 import json, math, unicodedata
 from collections.abc import Mapping, Sequence
 from typing import Final
+
+from vulcan.constitution.primitives import Digest, canonical_json as _constitutional_json, canonical_timestamp, parse_timestamp
 
 from vulcan.graphix.core import (AuthorityLevel, DigestMismatchError, EpistemicStatus, ExtensionDeclaration, ForbiddenExecutableSemanticsError, GraphixCoreError, GraphixEnvelope, PrincipalRelease, PrivacyClass, SourceKind, SourceReference, UnknownFieldError)
 
@@ -43,16 +45,14 @@ def dumps_envelope(envelope: GraphixEnvelope) -> bytes:
     return canonical_json(envelope_to_dict(envelope))
 
 def verify_envelope_digest(envelope: GraphixEnvelope, content: bytes) -> None:
-    import hashlib
-    expected = "sha256:" + hashlib.sha256(content).hexdigest()
+    expected = Digest.of_bytes(content)
     if envelope.content_digest != expected: raise DigestMismatchError("content digest does not match payload")
 
 def extension_digest(value: Mapping[str, object]) -> str:
-    import hashlib
-    return "sha256:" + hashlib.sha256(canonical_json(value)).hexdigest()
+    return str(Digest.of_bytes(canonical_json(value)))
 
 def canonical_json(value: object) -> bytes:
-    return json.dumps(_canonical(value, 0, [0]), sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode("utf-8")
+    return _constitutional_json(_canonical(value, 0, [0]))
 
 def validate_json_value(value: object, *, allow_extension_objects: bool = False) -> None:
     _canonical(value, 0, [0])
@@ -85,6 +85,7 @@ def _canonical(value: object, depth: int, count: list[int]) -> object:
 def _string(value: object) -> str:
     if not isinstance(value, str): raise GraphixCoreError("JSON object key must be string")
     out = unicodedata.normalize("NFC", value)
+    if out != value: raise GraphixCoreError("noncanonical Unicode rejected; NFC is required")
     if len(out) > MAX_STRING: raise GraphixCoreError("string length bound exceeded")
     if any(ord(ch) < 0x20 for ch in out): raise GraphixCoreError("control character rejected")
     return out
@@ -123,8 +124,8 @@ def _int(v: object) -> int:
     if not isinstance(v, int) or isinstance(v, bool): raise GraphixCoreError("expected integer")
     return v
 def _parse_dt(v: str) -> datetime:
-    dt = datetime.fromisoformat(v.replace("Z", "+00:00"))
-    if dt.tzinfo is None: raise GraphixCoreError("timestamp must be timezone-aware")
-    return dt.astimezone(timezone.utc)
+    try: return parse_timestamp(v)
+    except ValueError as exc: raise GraphixCoreError(str(exc)) from exc
 def _dt(v: datetime) -> str:
-    return v.astimezone(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    try: return canonical_timestamp(v)
+    except ValueError as exc: raise GraphixCoreError(str(exc)) from exc

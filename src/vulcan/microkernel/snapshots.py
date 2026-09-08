@@ -3,11 +3,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from hashlib import sha256
-import json
 import re
 from typing import Callable, Protocol, Sequence
 from uuid import uuid4
+
+from vulcan.constitution.primitives import Digest, canonical_json
 
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
 SCHEMA_VERSION = "snapshot-bundle.v1"
@@ -22,10 +22,10 @@ def utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 def _canon(value: object) -> bytes:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode("utf-8")
+    return canonical_json(value)
 
 def _digest(value: object) -> str:
-    return sha256(_canon(value)).hexdigest()
+    return Digest.of_bytes(_canon(value)).hex
 
 def _utc(value: datetime, name: str) -> datetime:
     if not isinstance(value, datetime) or value.tzinfo is None:
