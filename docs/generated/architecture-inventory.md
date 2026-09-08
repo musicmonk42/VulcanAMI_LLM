@@ -1,6 +1,6 @@
 # Generated architecture inventory
 
-Digest: `6200c65e540a125d1d077828dae2d5856db437c5ca00913a3a0e6381fbda60fc`
+Digest: `5250dd1937fdd73591ea970d6d175c6432672e98001a104bf3c386164aaa79c6`
 
 This file is generated from `docs/generated/architecture-inventory.json`.
 
@@ -154,7 +154,7 @@ Count: 425
 
 ## Import Identities
 
-Count: 1794
+Count: 1809
 
 - `tests/security/test_output_firewall.py:1` module='vulcan.runtime.output', reachability='test-only'
 - `tests/test_probabilistic_routing.py:10` module='src.vulcan.reasoning.probabilistic_reasoning', reachability='test-only'
@@ -169,7 +169,6 @@ Count: 1794
 - `tests/test_world_model_research.py:10` module='vulcan.learning_owner', reachability='test-only'
 - `tests/security/test_local_language_governance.py:10` module='vulcan.local_language.tokenizer', reachability='test-only'
 - `src/vulcan/tests/test_consolidation.py:10` module='vulcan.memory.base', reachability='test-only'
-- `src/vulcan/runtime/kernel.py:10` module='vulcan.memory.governed', reachability='production-reachable'
 - `src/vulcan/runtime/state_authorities.py:10` module='vulcan.microkernel.snapshots', reachability='production-reachable'
 - `tests/runtime/test_authoritative_episode_path.py:10` module='vulcan.microkernel.state_machine', reachability='test-only'
 - `src/vulcan/runtime/audit.py:10` module='vulcan.persistence.audit.reconcile', reachability='production-reachable'
@@ -206,7 +205,8 @@ Count: 1794
 - `src/vulcan/world_model/world_model_core.py:1020` module='vulcan.world_model.creative_handler', reachability='unknown'
 - `src/api_server.py:103` module='vulcan.reasoning.unified', reachability='unknown'
 - `src/vulcan/world_model/world_model_core.py:1037` module='vulcan.world_model.llm_guidance', reachability='unknown'
-- ... 1744 more in JSON
+- `src/vulcan/server/startup/manager.py:1039` module='vulcan.utils_main.http_session', reachability='unknown'
+- ... 1759 more in JSON
 
 ## Singletons
 
@@ -399,7 +399,7 @@ Count: 400
 
 ## Persistence
 
-Count: 363
+Count: 374
 
 - `tests/persistence/test_memory_outbox_v2.py:103` kind='call', reachability='test-only', value='SQLiteMemoryRepository'
 - `src/vulcan/runtime/alignment.py:107` kind='call', reachability='production-reachable', value='fcntl.flock'
@@ -451,7 +451,7 @@ Count: 363
 - `src/vulcan/world_model/meta_reasoning/governed_transaction.py:317` kind='call', reachability='unknown', value='fcntl.flock'
 - `src/agent_registry.py:313` kind='call', reachability='unknown', value='sqlite3.connect'
 - `tests/memory/test_memory_lifecycle_v3.py:33` kind='call', reachability='test-only', value='SQLiteMemoryRepository'
-- ... 313 more in JSON
+- ... 324 more in JSON
 
 ## Environment Readers
 

@@ -62,6 +62,7 @@ CHECKS: dict[str, tuple[tuple[str, ...], ...]] = {
             "-q",
             "tests/runtime/test_authoritative_episode_path.py",
             "tests/microkernel/test_episode_store.py",
+            "tests/microkernel/test_constitutional_transactions.py",
             "tests/architecture/test_ami_constitution.py",
             "tests/ci/test_workflow_gates.py",
         ),
@@ -75,6 +76,7 @@ CHECKS: dict[str, tuple[tuple[str, ...], ...]] = {
             "tests/security/test_language_contracts.py",
             "tests/runtime/test_authoritative_episode_path.py",
             "tests/microkernel/test_episode_store.py",
+            "tests/microkernel/test_constitutional_transactions.py",
             "tests/architecture/test_ami_constitution.py",
         ),
         (
@@ -86,6 +88,7 @@ CHECKS: dict[str, tuple[tuple[str, ...], ...]] = {
             "tests/security/test_language_contracts.py",
             "tests/runtime/test_authoritative_episode_path.py",
             "tests/microkernel/test_episode_store.py",
+            "tests/microkernel/test_constitutional_transactions.py",
             "tests/architecture/test_ami_constitution.py",
         ),
     ),

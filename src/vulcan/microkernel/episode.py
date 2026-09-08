@@ -295,14 +295,24 @@ class CognitiveEpisode:
         semantic_ids = [ref.artifact_id for ref in semantic_refs]
         if len(semantic_ids) != len(set(semantic_ids)):
             raise ValueError("artifact identity reused across semantic roles")
-        if self.authorization is not None and not self.authorization.kind.endswith(
-            "authorization.compat.v1"
-        ):
+        if self.authorization is not None and self.authorization.kind not in {
+            "response-publication-authorization.v1",
+            "effect-authorization.v1",
+            "response-authorization.compat.v1",
+        }:
             raise ValueError("authorization artifact has the wrong kind")
         if self.response is not None and self.response.kind != "response-ir.v3":
             raise ValueError("response artifact has the wrong kind")
-        if any(ref.kind != "response-ir.v3" for ref in self.effects):
-            raise ValueError("compatibility effect has the wrong kind")
+        if any(
+            ref.kind != "execution-receipt.v1"
+            and not (
+                ref.kind == "response-ir.v3"
+                and self.authorization is not None
+                and self.authorization.kind == "response-authorization.compat.v1"
+            )
+            for ref in self.effects
+        ):
+            raise ValueError("effect has the wrong kind")
         if any(
             ref.kind != "episode-consolidation.v1" for ref in self.consolidation_refs
         ):
@@ -319,13 +329,35 @@ class CognitiveEpisode:
             and self.authorization is None
         ):
             raise ValueError("authorized success state requires authorization evidence")
-        if self.state in {
-            EpisodeState.EXECUTED,
-            EpisodeState.OBSERVED,
-            EpisodeState.COMMUNICATED,
-            EpisodeState.CONSOLIDATED,
-        } and (self.response is None or self.response not in self.effects):
-            raise ValueError("executed success state requires a response effect")
+        if self.state is EpisodeState.COMMUNICATED and (
+            self.response is None
+            or self.authorization is None
+            or self.authorization.kind
+            not in {
+                "response-publication-authorization.v1",
+                "response-authorization.compat.v1",
+            }
+        ):
+            raise ValueError(
+                "communication requires response publication authorization"
+            )
+        if (
+            self.state is EpisodeState.CONSOLIDATED
+            and self.authorization is not None
+            and self.authorization.kind == "response-publication-authorization.v1"
+            and self.response is None
+        ):
+            raise ValueError("published consolidation requires a response artifact")
+        if self.state in {EpisodeState.EXECUTED, EpisodeState.OBSERVED} and (
+            self.authorization is None
+            or self.authorization.kind
+            not in {
+                "effect-authorization.v1",
+                "response-authorization.compat.v1",
+            }
+            or not self.effects
+        ):
+            raise ValueError("executed effect requires authorization and a receipt")
         if self.state is EpisodeState.CONSOLIDATED and not self.consolidation_refs:
             raise ValueError("consolidated state requires a consolidation artifact")
         object.__setattr__(

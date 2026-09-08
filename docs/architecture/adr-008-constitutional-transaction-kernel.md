@@ -98,6 +98,42 @@ Costs and risks:
 
 ## Durable episode authority slice
 
+## Constitutional transaction service slice
+
+The old promotion boundary was the mutable `CognitiveCase`: it constructed
+string-labelled transitions and a compatibility response authorization, then
+persisted each resulting episode. The new command boundary is
+`ConstitutionalTransactionService`. Its commands accept a typed principal and
+current grant, validation/evidence and policy digests, the admitted snapshot
+digest, and the expected durable episode head. The service re-reads that head
+and advances it by compare-and-swap. Only a `SYSTEM_KERNEL` principal can pass
+this boundary.
+
+Response publication is distinct from external action. A publication
+authorization binds the committed epistemic head, alignment decision and policy
+revision, finalizer decision, exact rendered-text digest, privacy and consent
+contexts, and the kernel principal/release. Publication advances from
+`NORMATIVELY_AUTHORIZED` to `COMMUNICATED`; it does not manufacture an
+`EXECUTED_EFFECT`. The latter requires a typed effect authorization and an
+execution receipt before observation.
+
+`CognitiveCase`, its runtime-semantic lists, and the direct `CognitiveEpisode`
+transition API remain named compatibility adapters. `CognitiveCase` now only
+projects already committed heads; it contains no lifecycle promotion or
+persistence logic. Remove it when the semantic runtime consumes episodes and a
+durable Graphix Epistemic head directly. The
+`response-authorization.compat.v1` response-as-effect branch remains solely to
+replay pre-migration documents. The composed request path now submits every live
+transition through the transaction service, making this slice M3; exact built
+artifact and crash/restart qualification are still required for M4.
+
+`CognitiveKernel._bind_direct_compatibility` is the named adapter for legacy
+unit callers that instantiate the delegate without production composition. It
+creates an isolated filesystem-backed episode store and synthetic snapshot
+reference, then uses the same transaction service. It is unreachable from the
+composed runtime and is removed when all direct callers use
+`EpisodeAdmissionService`.
+
 The old episode transaction boundary ended at assignment of an immutable Python
 object to the mutable `CognitiveCase`; process loss erased the authoritative
 head, and legacy audit finalization could precede that assignment. The new sole
