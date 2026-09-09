@@ -279,16 +279,25 @@ class Claim:
     )
     contested_by: tuple[str, ...] = ()
     limitations: tuple[Limitation, ...] = ()
+    supersedes: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         _artifact_id("claim_id", self.claim_id)
         _episode_id("episode_id", self.episode_id)
         _digest("snapshot_digest", self.snapshot_digest)
         object.__setattr__(self, "status", ClaimStatus(self.status))
-        for name in ("evidence_ids", "derivation_ids", "contested_by", "limitations"):
+        for name in (
+            "evidence_ids",
+            "derivation_ids",
+            "contested_by",
+            "limitations",
+            "supersedes",
+        ):
             object.__setattr__(self, name, tuple(getattr(self, name)))
             _bounded(name, getattr(self, name))
-        _unique("claim limitation ids", (item.limitation_id for item in self.limitations))
+        _unique(
+            "claim limitation ids", (item.limitation_id for item in self.limitations)
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -298,6 +307,10 @@ class EpistemicCommit:
     case_id: str
     snapshot_digest: str
     authority_principal_id: str
+    authority_release_digest: str
+    validation_digest: str
+    policy_digest: str
+    authority_evidence_digest: str
     committed_at: datetime
     claims: tuple[Claim, ...]
     evidence: tuple[EvidenceArtifact, ...] = ()
@@ -315,6 +328,13 @@ class EpistemicCommit:
         _episode_id("case_id", self.case_id)
         _digest("snapshot_digest", self.snapshot_digest)
         _principal_id("authority_principal_id", self.authority_principal_id)
+        for name in (
+            "authority_release_digest",
+            "validation_digest",
+            "policy_digest",
+            "authority_evidence_digest",
+        ):
+            _digest(name, getattr(self, name))
         _aware(self.committed_at, "committed_at")
         if self.prior_commit_digest is not None:
             _digest("prior_commit_digest", self.prior_commit_digest)
@@ -367,11 +387,12 @@ def _validate_commit(c: EpistemicCommit) -> None:
     ):
         raise ReferenceValidationError("duplicate ids")
     for evidence in c.evidence:
-        if evidence.episode_id != c.episode_id and evidence.source_episode_id is None:
-            raise ReferenceValidationError(
-                "cross-episode evidence requires explicit source_episode_id"
-            )
-        if evidence.snapshot_digest != c.snapshot_digest:
+        if evidence.episode_id != c.episode_id:
+            raise ReferenceValidationError("evidence target episode mismatch")
+        if (
+            evidence.source_episode_id is None
+            and evidence.snapshot_digest != c.snapshot_digest
+        ):
             raise ReferenceValidationError("evidence snapshot mismatch")
         if evidence.valid_until is not None and evidence.valid_until <= c.committed_at:
             raise TemporalValidityError("expired evidence")
@@ -485,6 +506,10 @@ def commit_to_dict(
         "snapshot_digest": c.snapshot_digest,
         "authority_principal_id": c.authority_principal_id,
         "authority_level": c.authority_level.value,
+        "authority_release_digest": c.authority_release_digest,
+        "validation_digest": c.validation_digest,
+        "policy_digest": c.policy_digest,
+        "authority_evidence_digest": c.authority_evidence_digest,
         "committed_at": canonical_timestamp(c.committed_at),
         "prior_commit_digest": c.prior_commit_digest,
         "claims": [
@@ -504,6 +529,7 @@ def commit_to_dict(
                 "derivation_ids": list(claim.derivation_ids),
                 "uncertainty": _uncertainty_to_dict(claim.uncertainty),
                 "contested_by": list(claim.contested_by),
+                "supersedes": list(claim.supersedes),
                 "limitations": [
                     {
                         "limitation_id": item.limitation_id,
@@ -606,6 +632,10 @@ def commit_from_dict(value: Mapping[str, object]) -> EpistemicCommit:
         "snapshot_digest",
         "authority_principal_id",
         "authority_level",
+        "authority_release_digest",
+        "validation_digest",
+        "policy_digest",
+        "authority_evidence_digest",
         "committed_at",
         "prior_commit_digest",
         "claims",
@@ -659,16 +689,50 @@ def commit_from_dict(value: Mapping[str, object]) -> EpistemicCommit:
         contradictions=contradictions,
         prior_commit_digest=value["prior_commit_digest"],
         authority_level=AuthorityLevel(value["authority_level"]),
+        authority_release_digest=value["authority_release_digest"],
+        validation_digest=value["validation_digest"],
+        policy_digest=value["policy_digest"],
+        authority_evidence_digest=value["authority_evidence_digest"],
         commit_digest=value["commit_digest"],
     )
 
 
 def _claim_from_dict(value: Mapping[str, object]) -> Claim:
-    _exact_fields(value, {"claim_id", "proposition", "status", "episode_id", "snapshot_digest", "evidence_ids", "derivation_ids", "uncertainty", "contested_by", "limitations"}, "claim")
+    _exact_fields(
+        value,
+        {
+            "claim_id",
+            "proposition",
+            "status",
+            "episode_id",
+            "snapshot_digest",
+            "evidence_ids",
+            "derivation_ids",
+            "uncertainty",
+            "contested_by",
+            "limitations",
+            "supersedes",
+        },
+        "claim",
+    )
     proposition = _mapping(value["proposition"], "proposition")
-    _exact_fields(proposition, {"proposition_id", "subject", "predicate", "object_value", "qualifiers"}, "proposition")
+    _exact_fields(
+        proposition,
+        {"proposition_id", "subject", "predicate", "object_value", "qualifiers"},
+        "proposition",
+    )
     uncertainty = _mapping(value["uncertainty"], "uncertainty")
-    _exact_fields(uncertainty, {"kind", "distribution_digest", "interval_low", "interval_high", "calibration_id"}, "uncertainty")
+    _exact_fields(
+        uncertainty,
+        {
+            "kind",
+            "distribution_digest",
+            "interval_low",
+            "interval_high",
+            "calibration_id",
+        },
+        "uncertainty",
+    )
     limitations = tuple(
         Limitation(
             item["limitation_id"],
@@ -701,11 +765,27 @@ def _claim_from_dict(value: Mapping[str, object]) -> Claim:
         ),
         tuple(value["contested_by"]),
         limitations,
+        tuple(value["supersedes"]),
     )
 
 
 def _evidence_from_dict(value: Mapping[str, object]) -> EvidenceArtifact:
-    _exact_fields(value, {"evidence_id", "kind", "episode_id", "snapshot_digest", "content_digest", "provenance_id", "observed_at", "valid_until", "citations", "source_episode_id"}, "evidence")
+    _exact_fields(
+        value,
+        {
+            "evidence_id",
+            "kind",
+            "episode_id",
+            "snapshot_digest",
+            "content_digest",
+            "provenance_id",
+            "observed_at",
+            "valid_until",
+            "citations",
+            "source_episode_id",
+        },
+        "evidence",
+    )
     citations = tuple(
         Citation(**_mapping(item, "citation"))
         for item in _sequence(value["citations"], "citations")

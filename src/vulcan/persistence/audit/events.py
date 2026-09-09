@@ -6,7 +6,7 @@ from typing import Literal
 import re
 
 Digest = str
-EventFamily = Literal["audit","episode","case","capability","domain","alignment","memory","csiu","learning","improvement","release","consent","relationship","runtime"]
+EventFamily = Literal["audit","episode","epistemic","case","capability","domain","alignment","memory","csiu","learning","improvement","release","consent","relationship","runtime"]
 
 HEX64 = re.compile(r"[0-9a-f]{64}")
 SAFE_ID = re.compile(r"[A-Za-z0-9_.:-]{1,128}")
@@ -16,6 +16,7 @@ EVENT_FAMILY_BY_TYPE = {
     "audit.migration_boundary": "audit",
     "runtime.ready": "runtime",
     "episode.transitioned": "episode",
+    "epistemic.committed": "epistemic",
     "case.started": "case", "case.interpreted": "case", "case.plan_compiled": "case", "case.ledger_committed": "case", "case.alignment_decided": "case", "case.finalized": "case", "case.completed": "case", "case.abstained": "case", "case.blocked": "case", "case.finalization_error": "case", "case.cancelled": "case", "case.failed": "case",
     "capability.activation_prepared": "capability", "capability.activation_committed": "capability", "capability.activation_aborted": "capability",
     "domain.activation_prepared": "domain", "domain.activation_committed": "domain", "domain.activation_aborted": "domain",
@@ -60,6 +61,16 @@ SCHEMAS: dict[EventFamily, AuditEventSchema] = {
                 "resulting_episode_digest", "episode_digest", "snapshot_bundle_digest",
             }
         ),
+    ),
+    "epistemic": AuditEventSchema(
+        "epistemic",
+        frozenset(
+            {
+                "event_id", "commit_id", "commit_digest", "episode_id",
+                "case_id", "snapshot_digest", "policy_digest",
+            }
+        ),
+        frozenset({"commit_digest", "snapshot_digest", "policy_digest"}),
     ),
     "case": AuditEventSchema("case", frozenset({"case_id","request_digest"}), frozenset({"request_digest","response_ir_digest","rendered_text_digest","actor_digest"})),
     "capability": AuditEventSchema("capability", frozenset({"transaction_id","capability","actor_digest"}), frozenset({"actor_digest"})),

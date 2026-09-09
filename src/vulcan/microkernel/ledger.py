@@ -1,4 +1,10 @@
-"""Authoritative in-memory claim ledger for Graphix Epistemic commits."""
+"""Noncanonical in-memory Graphix test compatibility ledger.
+
+Production commitment is owned by ``EpistemicStore`` through the
+``ConstitutionalTransactionService``. Remove this adapter when the remaining
+Graphix dialect unit callers use a temporary durable store.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -6,17 +12,27 @@ from typing import Callable
 
 from vulcan.graphix.epistemic import EpistemicCommit, EpistemicContractError
 
-class LedgerError(EpistemicContractError): pass
-class ClaimNotCommittedError(LedgerError): pass
-class FailpointTriggered(LedgerError): pass
+
+class LedgerError(EpistemicContractError):
+    pass
+
+
+class ClaimNotCommittedError(LedgerError):
+    pass
+
+
+class FailpointTriggered(LedgerError):
+    pass
+
 
 @dataclass
 class AuthoritativeClaimLedger:
-    """Single-authority append-only commit ledger.
+    """Deprecated, noncanonical append-only test projection.
 
     Failpoints bracket the externally observable append transition so tests can
     prove restart reconciliation without simulating success.
     """
+
     _commits: dict[str, EpistemicCommit] = field(default_factory=dict)
     _claims: dict[str, str] = field(default_factory=dict)
     failpoint: Callable[[str, EpistemicCommit], None] | None = None
@@ -26,7 +42,11 @@ class AuthoritativeClaimLedger:
             if self._commits[commit.commit_id].commit_digest != commit.commit_digest:
                 raise LedgerError("commit id collision")
             return commit.commit_digest
-        if commit.prior_commit_digest is not None and commit.prior_commit_digest not in {c.commit_digest for c in self._commits.values()}:
+        if (
+            commit.prior_commit_digest is not None
+            and commit.prior_commit_digest
+            not in {c.commit_digest for c in self._commits.values()}
+        ):
             raise LedgerError("unknown prior commit")
         self._trip("before_append", commit)
         self._commits[commit.commit_id] = commit

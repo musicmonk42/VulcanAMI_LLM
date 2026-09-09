@@ -68,6 +68,7 @@ class RuntimeContainer:
     health: HealthStateMachine | None = None
     max_episode_lifetime_seconds: int = int(MAX_EPISODE_LIFETIME.total_seconds())
     episode_store: Any = None
+    epistemic_store: Any = None
     state_authorities: StateAuthoritySet | None = None
 
     async def close(self) -> None:
@@ -95,6 +96,7 @@ class RuntimeContainer:
             self.learning_owner,
             self.domain_registry,
             self.episode_store,
+            self.epistemic_store,
             self.kernel,
             self.safety,
             self.world_state,

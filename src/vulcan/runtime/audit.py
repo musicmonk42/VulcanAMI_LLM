@@ -17,7 +17,7 @@ _FIELDS={"schema_version","sequence","event_type","timestamp","previous_hash","d
 _V2_FIELDS=_FIELDS|{"segment","segment_sequence"}
 _CLOSE_FIELDS={"schema_version","record_type","segment","first_sequence","last_sequence","event_count","previous_segment_digest","last_event_hash","segment_digest","timestamp"}
 _MANIFEST_FIELDS={"schema_version","active_segment","next_sequence","previous_event_hash","closed_segments","legacy_source_digest","created_at","updated_at"}
-_EVENT=re.compile(r"(?:episode|case|capability|domain|alignment|runtime|memory|csiu|improvement|learning|audit|release|consent|relationship)\.[a-z][a-z0-9_]{0,31}")
+_EVENT=re.compile(r"(?:episode|epistemic|case|capability|domain|alignment|runtime|memory|csiu|improvement|learning|audit|release|consent|relationship)\.[a-z][a-z0-9_]{0,31}")
 _ALLOWED=set(EVENT_FAMILY_BY_TYPE)
 _TRANS={None:{"case.started"},"case.started":{"case.interpreted","case.failed"},"case.interpreted":{"case.plan_compiled","case.failed"},"case.plan_compiled":{"case.ledger_committed","case.failed"},"case.ledger_committed":{"case.alignment_decided","case.failed"},"case.alignment_decided":{"case.finalized","case.abstained","case.failed"},"case.finalized":{"case.completed","case.abstained","case.blocked","case.finalization_error","case.cancelled","case.failed"},"case.abstained":set(),"case.completed":set(),"case.failed":set()}
 
@@ -83,7 +83,7 @@ class CanonicalAudit:
     def __init__(self,path: str|os.PathLike[str], *, segment_max_bytes:int=DEFAULT_SEGMENT_BYTES, segment_max_events:int=DEFAULT_SEGMENT_EVENTS, durability:AuditDurabilityProfile=AuditDurabilityProfile(), failpoint:Failpoint|None=None):
         self.legacy_path=Path(path); self.root=self.legacy_path if self.legacy_path.suffix=="" else self.legacy_path.with_suffix(self.legacy_path.suffix+".d")
         self.segment_max_bytes=segment_max_bytes; self.segment_max_events=segment_max_events; self.durability=durability; self.failpoint=failpoint or Failpoint(); self.lock_path=self.root.with_suffix(self.root.suffix+".lock")
-        self._lock=threading.RLock(); self._closed=False; self._seq=0; self._prev="0"*64; self._case_state={}; self._episode_heads={}; self._episode_transitions={}; self._tx_prepared=set(); self._tx_terminal=set(); self._active=1; self._seg_events=0; self._index=_empty_index(); self.owner_id=f"audit:{self.root}"
+        self._lock=threading.RLock(); self._closed=False; self._seq=0; self._prev="0"*64; self._case_state={}; self._episode_heads={}; self._episode_transitions={}; self._epistemic_commits={}; self._tx_prepared=set(); self._tx_terminal=set(); self._active=1; self._seg_events=0; self._index=_empty_index(); self.owner_id=f"audit:{self.root}"
         try:
             self.root.parent.mkdir(parents=True,exist_ok=True); _reject_path(self.root); _reject_path(self.lock_path)
             self._lfd=os.open(self.lock_path, os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
@@ -159,6 +159,12 @@ class CanonicalAudit:
                         raise AuditError("duplicate transition digest has different data")
                     return existing
                 self._validate_episode_transition(frozen)
+            if event_type == "epistemic.committed":
+                existing=self._epistemic_commits.get(frozen["event_id"])
+                if existing is not None:
+                    if existing.data != frozen:
+                        raise AuditError("duplicate epistemic event id has different data")
+                    return existing
             tx=frozen.get("transaction_id")
             if event_type in PREPARED_EVENTS:
                 if tx in self._tx_prepared: raise AuditError("duplicate transaction prepare")
@@ -188,6 +194,8 @@ class CanonicalAudit:
                     frozen["to_state"], frozen["resulting_episode_digest"]
                 )
                 self._episode_transitions[frozen["transition_digest"]]=result
+            if event_type == "epistemic.committed":
+                self._epistemic_commits[frozen["event_id"]]=result
             return result
 
     def _validate_episode_transition(self, data:dict[str,Any])->None:
@@ -255,6 +263,11 @@ class CanonicalAudit:
         if event_type != "episode.transitioned":
             raise AuditError("unsupported episode outbox event")
         return self.append(event_type,data)
+    def append_epistemic_commit(self,event_id:str,data:dict[str,Any])->AuditEvent:
+        """Idempotent sink for the durable epistemic outbox."""
+        if data.get("event_id") != event_id:
+            raise AuditError("epistemic outbox event identity mismatch")
+        return self.append("epistemic.committed",data)
     def _read_manifest(self):
         o=_loads(self._manifest().read_bytes());
         if set(o)!=_MANIFEST_FIELDS or o["schema_version"]!=SCHEMA_VERSION: raise AuditError("manifest mismatch")
@@ -289,7 +302,7 @@ class CanonicalAudit:
             self._index=idx; self._persist_index()
         else: self._index=idx
     def verify(self):
-        _reject_path(self.root, True); m=self._read_manifest(); seq=0; prev="0"*64; states={}; episode_heads={}; episode_transitions={}; tx_prepared=set(); tx_terminal=set(); terminal_counts={}; closed_cases=set(); seg_prev="0"*64; rebuilt_index=_empty_index(); events_for_reconcile=[]
+        _reject_path(self.root, True); m=self._read_manifest(); seq=0; prev="0"*64; states={}; episode_heads={}; episode_transitions={}; epistemic_commits={}; tx_prepared=set(); tx_terminal=set(); terminal_counts={}; closed_cases=set(); seg_prev="0"*64; rebuilt_index=_empty_index(); events_for_reconcile=[]
         for n in range(1,m["active_segment"]+1):
             p=self._seg(n); _reject_path(p); data=p.read_bytes() if p.exists() else b""
             if data and not data.endswith(b"\n"): raise AuditError("incomplete final line")
@@ -324,6 +337,10 @@ class CanonicalAudit:
                     event=AuditEvent(**o)
                     episode_transitions[td]=event
                     episode_heads[d["episode_id"]]=(d["to_state"],d["resulting_episode_digest"])
+                if o["event_type"] == "epistemic.committed":
+                    event_id=d["event_id"]
+                    if event_id in epistemic_commits: raise AuditError("duplicate epistemic commit event")
+                    epistemic_commits[event_id]=AuditEvent(**o)
                 tx=d.get("transaction_id")
                 if o["event_type"] in PREPARED_EVENTS: tx_prepared.add(tx)
                 if o["event_type"] in COMMIT_EVENTS or o["event_type"] in ABORT_EVENTS: tx_terminal.add(tx)
@@ -339,7 +356,7 @@ class CanonicalAudit:
             else: raise AuditError("manifest sequence mismatch")
         try: reconcile_transactions(tuple(events_for_reconcile))
         except ValueError as exc: raise AuditError(str(exc)) from exc
-        self._seq=seq; self._prev=prev; self._case_state=states; self._episode_heads=episode_heads; self._episode_transitions=episode_transitions; self._tx_prepared=tx_prepared; self._tx_terminal=tx_terminal; self._active=m["active_segment"]; self._seg_events=sum(1 for _ in (self._seg(self._active).read_bytes().splitlines() if self._seg(self._active).exists() else [])); self._index=rebuilt_index
+        self._seq=seq; self._prev=prev; self._case_state=states; self._episode_heads=episode_heads; self._episode_transitions=episode_transitions; self._epistemic_commits=epistemic_commits; self._tx_prepared=tx_prepared; self._tx_terminal=tx_terminal; self._active=m["active_segment"]; self._seg_events=sum(1 for _ in (self._seg(self._active).read_bytes().splitlines() if self._seg(self._active).exists() else [])); self._index=rebuilt_index
         source=self._source_digest(); existing=_read_index(self._index_path(), source_digest=source, canonical=_canonical, sha=_sha, loads=_loads)
         if existing is None or existing != rebuilt_index:
             self._persist_index()

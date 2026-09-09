@@ -72,6 +72,17 @@ executed external effect. The compatibility case is projection-only and every
 composed live transition is submitted by the kernel to the service. This remains
 below M4 until the exact built artifact passes crash/restart qualification.
 
+Durable per-episode epistemic authority is **M3 — Canonical for the composed
+request path**: `EpistemicStore` now persists canonical Graphix Epistemic
+commits, one CAS head per episode, scoped claim/evidence indexes, and an audit
+outbox before the episode projects committed artifacts. Startup verifies commit
+digests, chains, heads, references, and provenance and rebuilds only derived
+indexes. Concurrent-writer, independent-episode, crash-window, restart, replay,
+cross-snapshot reuse, contestation/supersession, corruption, and audit-retry
+tests provide M2 evidence. `runtime.semantic` remains behind a named candidate
+adapter, so full one-Graphix-path convergence is incomplete; exact artifact and
+restart qualification remain below M4.
+
 ## Wave 0 — Recover executable truth
 
 ### 0.1 Repository assurance — M2 (local evidence; hosted qualification pending)
@@ -132,7 +143,7 @@ Make canonical audit consume validated episode transition artifacts rather than 
 
 **Exit gate:** replaying audit reconstructs the same episode digest, and audit cannot report a state the episode never entered.
 
-### 1.6 Durable epistemic head
+### 1.6 Durable epistemic head — M3 (canonical request path; artifact qualification pending)
 
 Replace the mutable request ledger and in-memory authoritative ledger with a durable Graphix Epistemic commit chain using DB-first persistence and an idempotent outbox.
 

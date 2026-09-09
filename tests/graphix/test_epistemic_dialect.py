@@ -21,7 +21,7 @@ def claim(cid="claim:one", status=ClaimStatus.PROVEN, ev=("evidence:one",), deri
     return Claim(cid, Proposition("prop:" + cid.split(":")[-1], "s", "p", "o"), status, "episode:one", D, ev, deriv, contested_by=contested)
 
 def commit(**kw):
-    base = dict(commit_id="commit:one", episode_id="episode:one", case_id="case:one", snapshot_digest=D, authority_principal_id="principal:kernel", committed_at=NOW, claims=(claim(),), evidence=(evidence(),))
+    base = dict(commit_id="commit:one", episode_id="episode:one", case_id="case:one", snapshot_digest=D, authority_principal_id="principal:kernel", authority_release_digest=D, validation_digest=D, policy_digest=D, authority_evidence_digest=D, committed_at=NOW, claims=(claim(),), evidence=(evidence(),))
     base.update(kw)
     return EpistemicCommit(**base)
 
@@ -39,7 +39,7 @@ def test_dangling_and_cross_episode_references_fail_closed():
     cross = replace(evidence(), episode_id="episode:two")
     with pytest.raises(ReferenceValidationError):
         commit(evidence=(cross,))
-    explicit = replace(cross, source_episode_id="episode:two-original")
+    explicit = replace(cross, episode_id="episode:one", source_episode_id="episode:two-original")
     assert commit(evidence=(explicit,)).evidence[0].source_episode_id == "episode:two-original"
 
 def test_circular_derivation_fails_closed():
@@ -104,7 +104,7 @@ def test_complete_semantics_are_digest_bound_and_round_trip_canonically():
     rich_claim = replace(claim(status=ClaimStatus.RETRIEVED), proposition=Proposition("prop:one", "subject", "predicate", "object", {"unit":"m"}), uncertainty=UncertaintyDescriptor(UncertaintyKind.INTERVAL, interval_low="1/3", interval_high="2/3"), limitations=(Limitation("limitation:one", "Domain limited", ("claim:one",)),))
     rich = commit(claims=(rich_claim,), evidence=(ev,), assumptions=(Assumption("assumption:one", "prop:one"),), counterexamples=(Counterexample("counterexample:one", "evidence:one", "claim:one"),), contradictions=(Contradiction("contradiction:one", ("claim:one", "claim:one")),), prior_commit_digest=D2)
     encoded = dumps_commit(rich)
-    assert rich.commit_digest == "sha256:255481fbd5219a20c6c9ef74922f735fd62e199a25eb96bc8748573c8f10f625"
+    assert rich.commit_digest == "sha256:09e1877243b345a70129f50dd49229b769506f09326038426ac10acaec55e8dc"
     assert dumps_commit(loads_commit(encoded)) == encoded
     document = commit_to_dict(rich)
     mutations = (

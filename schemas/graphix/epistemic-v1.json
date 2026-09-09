@@ -12,6 +12,10 @@
     "snapshot_digest",
     "authority_principal_id",
     "authority_level",
+    "authority_release_digest",
+    "validation_digest",
+    "policy_digest",
+    "authority_evidence_digest",
     "committed_at",
     "claims",
     "evidence",
@@ -103,6 +107,18 @@
       "items": {
         "$ref": "#/$defs/contradiction"
       }
+    },
+    "authority_release_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "validation_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "policy_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "authority_evidence_digest": {
+      "$ref": "#/$defs/digest"
     }
   },
   "$defs": {
@@ -151,6 +167,7 @@
         "derivation_ids",
         "uncertainty",
         "contested_by",
+        "supersedes",
         "limitations"
       ],
       "properties": {
@@ -198,6 +215,13 @@
           "maxItems": 32,
           "items": {
             "$ref": "#/$defs/limitation"
+          }
+        },
+        "supersedes": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "$ref": "#/$defs/id"
           }
         }
       }

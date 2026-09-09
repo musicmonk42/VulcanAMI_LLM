@@ -166,9 +166,9 @@ the sole authority promoter, and the canonical runtime and durable authority
 boundaries do not change.
 
 `project_semantic_claim` remains the named legacy claim adapter until Wave 2.2
-retires the runtime semantic claim contract. `AuthoritativeClaimLedger` remains
-the in-memory compatibility ledger until Wave 1.6 replaces it with a durable
-Graphix Epistemic head.
+retires the runtime semantic claim contract. `AuthoritativeClaimLedger` is now
+a noncanonical in-memory test adapter; the durable production authority is the
+per-episode store described below.
 
 ## Faithful state-authority admission
 
@@ -188,6 +188,48 @@ authority is itself versioned content-bound state, not a digest of `None`.
 `vulcan.testing.snapshots.AttributeSnapshotProvider` is the sole compatibility
 adapter and is forbidden in production composition; remove it when migration and
 direct-kernel tests construct `StateAuthoritySet` instances.
+
+## Durable per-episode epistemic authority slice
+
+The old epistemic boundary was the mutable request-local lists on
+`CognitiveCase`, with `AuthoritativeClaimLedger` available as an in-memory
+Graphix helper. Episode transitions could therefore project claim references
+without a durable Graphix Epistemic commit. The new sole epistemic boundary is
+the SQLite-backed `EpistemicStore`, invoked only by
+`ConstitutionalTransactionService`: canonical commit bytes, the per-episode
+compare-and-swap head, scoped claim/evidence indexes, and an idempotent audit
+outbox are committed DB-first. There is intentionally no global cognition head
+and no cross-episode total-order chain.
+
+Each commit binds the episode/case identity, admitted snapshot, kernel principal
+and release, validation evidence, and policy digest. Startup revalidates every
+canonical digest, per-episode chain, head, semantic reference, and cross-episode
+provenance link before rebuilding derived indexes. Cross-episode reuse retains
+the source episode's evidence content, snapshot, and provenance; it does not
+promote that evidence into shared world knowledge.
+
+`adapt_runtime_semantic_candidate` is the named compatibility adapter retained
+for `runtime.semantic` claims, evidence, and derivations. It is proposal-only
+and is removed when the runtime emits Graphix Epistemic candidates directly.
+`CognitiveCase` remains a request-local projection for alignment and rendering;
+remove it when those consumers query committed Graphix artifacts. The misnamed
+`AuthoritativeClaimLedger` remains noncanonical for legacy dialect tests only
+and is removed when those callers use temporary durable stores. The epistemic
+DB and episode DB remain distinct owners: a committed epistemic head is
+projected into the episode before policy or rendering, and failures withhold
+output. Promotion into durable world/domain knowledge remains a future
+transaction.
+
+The epistemic audit effect uses the outbox event ID as its idempotency key.
+`CanonicalAudit.append_epistemic_commit` returns the existing identical event
+both before and after restart and rejects the same ID with different data. The
+publication authorization binds the exact current epistemic commit digest,
+rather than the enclosing episode digest. Compatibility semantic objects are
+rechecked against full object digests embedded in the committed Graphix
+candidate before alignment or rendering can observe them.
+The former artifact-reference-only transaction method fails closed whenever a
+durable epistemic store is composed, preventing an alternate production commit
+route.
 
 ## Rejected alternatives
 

@@ -13,6 +13,10 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from vulcan.memory.governed import GovernedMemoryPort
 from .case import CognitiveCase, CognitiveCaseStatus
+from .epistemic_adapter import (
+    adapt_runtime_semantic_candidate,
+    verify_runtime_semantic_projection,
+)
 from .finalization import FinalizationDecision, ResponseFinalizerPort
 from vulcan.safety.safety_types import ResponseSafetyContext
 from vulcan.constitution.primitives import AuthorityLevel
@@ -23,6 +27,7 @@ from vulcan.microkernel.episode import (
     canonical_digest as episode_digest,
 )
 from vulcan.microkernel.episode_store import EpisodeStore
+from vulcan.microkernel.epistemic_store import EpistemicStore
 from vulcan.microkernel.principals import Principal, PrincipalKind
 from vulcan.microkernel.transactions import (
     CommandAuthority,
@@ -199,7 +204,10 @@ class CognitiveKernel:
                 hashlib.sha256(b"direct-kernel-compatibility-v1").hexdigest(),
             )
             self.bind_transaction_service(
-                ConstitutionalTransactionService(self._direct_compatibility_store),
+                ConstitutionalTransactionService(
+                    self._direct_compatibility_store,
+                    EpistemicStore(path + ".epistemic"),
+                ),
                 principal,
             )
         self._direct_compatibility_store.create(case.episode)
@@ -357,27 +365,46 @@ class CognitiveKernel:
                         },
                     )
                 case.append_ledger(claim=claim, derivation=derivation)
-                claims, derivations, evidence_refs = case._ledger_refs()
+                epistemic_auth = self._command(
+                    case,
+                    policy_digest,
+                    canonical_digest(
+                        {
+                            "claims": [canonical_digest(item) for item in case.claims],
+                            "derivations": [
+                                canonical_digest(item) for item in case.derivations
+                            ],
+                            "evidence": [
+                                canonical_digest(item) for item in case.evidence
+                            ],
+                        }
+                    ),
+                    AuthorityLevel.COMMITTED_BELIEF,
+                )
+                prior = self._transactions.epistemic_head(case.case_id)
+                candidate = adapt_runtime_semantic_candidate(
+                    episode_id=case.case_id,
+                    case_id=case.case_id,
+                    snapshot_digest=case.state_snapshot_id or "",
+                    claims=case.claims,
+                    evidence=case.evidence,
+                    derivations=case.derivations,
+                    authority=epistemic_auth,
+                    prior_commit_digest=None if prior is None else prior.commit_digest,
+                )
                 self._apply(
                     case,
-                    self._transactions.commit_epistemic_artifact(
+                    self._transactions.commit_epistemic_candidate(
                         case.case_id,
-                        self._command(
-                            case,
-                            policy_digest,
-                            canonical_digest(
-                                {
-                                    "claims": [r.digest for r in claims],
-                                    "derivations": [r.digest for r in derivations],
-                                    "evidence": [r.digest for r in evidence_refs],
-                                }
-                            ),
-                            AuthorityLevel.COMMITTED_BELIEF,
-                        ),
-                        claims=claims,
-                        derivations=derivations,
-                        evidence=evidence_refs,
+                        epistemic_auth,
+                        candidate,
                     ),
+                )
+                verify_runtime_semantic_projection(
+                    self._transactions.epistemic_head(case.case_id),
+                    claims=case.claims,
+                    evidence=case.evidence,
+                    derivations=case.derivations,
                 )
                 if self._audit:
                     self._audit.append(
@@ -502,28 +529,45 @@ class CognitiveKernel:
                 case.append_ledger(
                     claim=claim, derivation=derivation, evidence=evidence
                 )
-                claims, derivations, evidence_refs = case._ledger_refs()
                 ledger_digest = canonical_digest(
                     {
-                        "claims": [r.digest for r in claims],
-                        "derivations": [r.digest for r in derivations],
-                        "evidence": [r.digest for r in evidence_refs],
+                        "claims": [canonical_digest(item) for item in case.claims],
+                        "derivations": [
+                            canonical_digest(item) for item in case.derivations
+                        ],
+                        "evidence": [canonical_digest(item) for item in case.evidence],
                     }
+                )
+                epistemic_auth = self._command(
+                    case,
+                    policy_digest,
+                    ledger_digest,
+                    AuthorityLevel.COMMITTED_BELIEF,
+                )
+                prior = self._transactions.epistemic_head(case.case_id)
+                candidate = adapt_runtime_semantic_candidate(
+                    episode_id=case.case_id,
+                    case_id=case.case_id,
+                    snapshot_digest=case.state_snapshot_id or "",
+                    claims=case.claims,
+                    evidence=case.evidence,
+                    derivations=case.derivations,
+                    authority=epistemic_auth,
+                    prior_commit_digest=None if prior is None else prior.commit_digest,
                 )
                 self._apply(
                     case,
-                    self._transactions.commit_epistemic_artifact(
+                    self._transactions.commit_epistemic_candidate(
                         case.case_id,
-                        self._command(
-                            case,
-                            policy_digest,
-                            ledger_digest,
-                            AuthorityLevel.COMMITTED_BELIEF,
-                        ),
-                        claims=claims,
-                        derivations=derivations,
-                        evidence=evidence_refs,
+                        epistemic_auth,
+                        candidate,
                     ),
+                )
+                verify_runtime_semantic_projection(
+                    self._transactions.epistemic_head(case.case_id),
+                    claims=case.claims,
+                    evidence=case.evidence,
+                    derivations=case.derivations,
                 )
                 if self._audit:
                     self._audit.append(
@@ -663,8 +707,11 @@ class CognitiveKernel:
                     if len(policy_digest) == 64
                     else episode_digest({"policy": policy_digest or "default-deny"})
                 )
+                epistemic_head = self._transactions.epistemic_head(case.case_id)
+                if epistemic_head is None:
+                    raise RuntimeError("durable epistemic head is unavailable")
                 authorization = PublicationAuthorization(
-                    case.episode.digest,
+                    epistemic_head.commit_digest.removeprefix("sha256:"),
                     canonical_digest(
                         {
                             "accepted": decision.accepted,
@@ -764,8 +811,11 @@ class CognitiveKernel:
                         if len(policy_digest) == 64
                         else episode_digest({"policy": policy_digest or "default-deny"})
                     )
+                    epistemic_head = self._transactions.epistemic_head(case.case_id)
+                    if epistemic_head is None:
+                        raise RuntimeError("durable epistemic head is unavailable")
                     publication = PublicationAuthorization(
-                        case.episode.digest,
+                        epistemic_head.commit_digest.removeprefix("sha256:"),
                         canonical_digest(
                             {
                                 "accepted": decision.accepted,

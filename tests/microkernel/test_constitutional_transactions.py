@@ -20,6 +20,7 @@ from vulcan.microkernel.episode import (
     canonical_digest,
 )
 from vulcan.microkernel.episode_store import EpisodeStore
+from vulcan.microkernel.epistemic_store import EpistemicStore
 from vulcan.microkernel.capability_tokens import CapabilityTokenIssuer
 from vulcan.microkernel.principals import Principal, PrincipalKind, digest
 from vulcan.microkernel.transactions import (
@@ -64,6 +65,22 @@ def command(store, p, level=AuthorityLevel.EXECUTED_EFFECT):
 
 def ref(name, kind="claim.v1"):
     return ArtifactRef(name, canonical_digest({"name": name}), kind)
+
+
+def test_durable_composition_rejects_compatibility_commit_bypass(tmp_path):
+    episodes = EpisodeStore(tmp_path / "episodes.sqlite3")
+    admitted(episodes)
+    service = ConstitutionalTransactionService(
+        episodes, EpistemicStore(tmp_path / "epistemic.sqlite3")
+    )
+    with pytest.raises(AuthorityError, match="compatibility"):
+        service.commit_epistemic_artifact(
+            "case-constitutional",
+            command(episodes, principal()),
+            claims=(ref("claim:one"),),
+            evidence=(),
+            derivations=(),
+        )
 
 
 def test_publication_is_digest_bound_communication_not_executed_effect(tmp_path):
