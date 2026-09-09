@@ -38,6 +38,13 @@ metadata, not a personal-identity or consciousness claim. Episode genesis and
 lineage admission are one database transaction; exact-artifact restart
 qualification remains open.
 
+The first durable effect protocol is now M2 in a deterministic reversible
+sandbox. It commits intent and consumes a fully scoped capability before an
+attempt, records receipts or restart ambiguity through an outbox, and requires
+operator reconciliation for non-idempotent ambiguity. It is not yet M3: the
+composed request path does not authorize effects or project them into episode
+and lineage heads.
+
 ## Governing equation
 
 ```text

@@ -1,6 +1,6 @@
 # Generated architecture inventory
 
-Digest: `d784652d0f6627fc804442c48764e810fa7e1cdc2f9bff193152b5ad4e488cbe`
+Digest: `4de0fce8514003e7139dd63ecb3e2d605ec90c8520a3848600a0cc725bd698d7`
 
 This file is generated from `docs/generated/architecture-inventory.json`.
 
@@ -36,6 +36,7 @@ This file is generated from `docs/generated/architecture-inventory.json`.
 | [`docs/architecture/ami-invariants.yaml`](../architecture/ami-invariants.yaml) | **normative** | machine-readable constitutional invariants |
 | [`docs/architecture/audit-v2.md`](../architecture/audit-v2.md) | **current** | current audit implementation contract pending episode derivation |
 | [`docs/architecture/cognitive-episode.md`](../architecture/cognitive-episode.md) | **current** | implemented episode boundary |
+| [`docs/architecture/effect-protocol.md`](../architecture/effect-protocol.md) | **current** | tested durable sandbox effect boundary pending canonical wiring |
 | [`docs/architecture/neutral-process-theory.md`](../architecture/neutral-process-theory.md) | **research-only** | falsifiable research hypothesis outside the authority path |
 | [`docs/architecture/persistent-agent-lineage.md`](../architecture/persistent-agent-lineage.md) | **current** | implemented neutral causal-lineage boundary |
 | [`docs/architecture/sequence-6-baseline-audit.md`](../architecture/sequence-6-baseline-audit.md) | **historical** | point-in-time baseline audit |
@@ -155,7 +156,7 @@ Count: 422
 
 ## Import Identities
 
-Count: 1898
+Count: 1901
 
 - `tests/security/test_output_firewall.py:1` module='vulcan.runtime.output', reachability='test-only'
 - `tests/test_probabilistic_routing.py:10` module='src.vulcan.reasoning.probabilistic_reasoning', reachability='test-only'
@@ -207,7 +208,7 @@ Count: 1898
 - `src/vulcan/world_model/world_model_core.py:1020` module='vulcan.world_model.creative_handler', reachability='unknown'
 - `src/api_server.py:103` module='vulcan.reasoning.unified', reachability='unknown'
 - `src/vulcan/world_model/world_model_core.py:1037` module='vulcan.world_model.llm_guidance', reachability='unknown'
-- ... 1848 more in JSON
+- ... 1851 more in JSON
 
 ## Singletons
 
@@ -288,7 +289,7 @@ Count: 455
 
 ## Fallbacks
 
-Count: 4430
+Count: 4431
 
 - `src/vulcan/endpoints/self_improvement.py:98` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/vulcan/safety/rollback_audit.py:99` kind='except_exception', reachability='unknown', review='unreviewed'
@@ -315,6 +316,7 @@ Count: 4430
 - `src/vulcan/reasoning/selection/warm_pool.py:1006` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/unified_runtime/node_handlers.py:1007` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/vulcan/learning/__init__.py:1007` kind='except_exception', reachability='unknown', review='unreviewed'
+- `src/vulcan/microkernel/effects.py:1001` kind='except_exception', reachability='production-reachable', review='unreviewed'
 - `src/vulcan/reasoning/multimodal_reasoning.py:1006` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/vulcan/safety/safety_status_endpoint.py:97` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/vulcan/world_model/self_improvement_engine.py:97` kind='except_exception', reachability='unknown', review='unreviewed'
@@ -339,8 +341,7 @@ Count: 4430
 - `src/generate_transparency_report.py:1014` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/vulcan/knowledge_crystallizer/principle_extractor.py:1018` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/vulcan/curiosity_engine/curiosity_engine_core.py:1012` kind='except_exception', reachability='unknown', review='unreviewed'
-- `src/memory/governed_unlearning.py:1019` kind='except_exception', reachability='unknown', review='unreviewed'
-- ... 4380 more in JSON
+- ... 4381 more in JSON
 
 ## Mocks
 
@@ -400,7 +401,7 @@ Count: 400
 
 ## Persistence
 
-Count: 418
+Count: 437
 
 - `src/vulcan/improvement/offline.py:101` kind='call', reachability='unknown', value='fcntl.flock'
 - `tests/persistence/test_memory_outbox_v2.py:103` kind='call', reachability='test-only', value='SQLiteMemoryRepository'
@@ -427,6 +428,7 @@ Count: 418
 - `src/vulcan/runtime/audit.py:135` kind='call', reachability='production-reachable', value='fcntl.flock'
 - `tests/faults/persistence/test_persistence_fault_matrix.py:136` kind='call', reachability='test-only', value='sqlite3.connect'
 - `src/listener.py:138` kind='call', reachability='unknown', value='sqlite3.connect'
+- `tests/microkernel/test_effect_protocol.py:142` kind='call', reachability='test-only', value='sqlite3.connect'
 - `tests/microkernel/test_episode_store.py:153` kind='call', reachability='test-only', value='sqlite3.connect'
 - `src/adversarial_tester.py:158` kind='call', reachability='unknown', value='sqlite3.connect'
 - `tests/security/test_governed_memory_architecture.py:17` kind='call', reachability='test-only', value='SQLiteMemoryRepository'
@@ -435,6 +437,7 @@ Count: 418
 - `tests/microkernel/test_lineage.py:184` kind='call', reachability='test-only', value='sqlite3.connect'
 - `tests/security/test_governed_memory_architecture.py:19` kind='call', reachability='test-only', value='SQLiteMemoryRepository'
 - `src/generate_transparency_report.py:192` kind='call', reachability='unknown', value='fcntl.flock'
+- `tests/microkernel/test_effect_protocol.py:192` kind='call', reachability='test-only', value='sqlite3.connect'
 - `src/vulcan/memory/governed.py:204` kind='call', reachability='unknown', value='fcntl.flock'
 - `tests/microkernel/test_lineage.py:206` kind='call', reachability='test-only', value='sqlite3.connect'
 - `src/vulcan/memory/governed.py:208` kind='call', reachability='unknown', value='sqlite3.connect'
@@ -450,9 +453,7 @@ Count: 418
 - `src/vulcan/safety/governance_alignment.py:248` kind='call', reachability='unknown', value='sqlite3.connect'
 - `tests/microkernel/test_lineage.py:256` kind='call', reachability='test-only', value='sqlite3.connect'
 - `tests/performance/performance_monitor.py:257` kind='call', reachability='test-only', value='self._get_sqlite_size'
-- `tests/performance/performance_monitor.py:258` kind='call', reachability='test-only', value='self._get_sqlite_wal_size'
-- `tests/microkernel/test_episode_store.py:260` kind='call', reachability='test-only', value='sqlite3.connect'
-- ... 368 more in JSON
+- ... 387 more in JSON
 
 ## Environment Readers
 
