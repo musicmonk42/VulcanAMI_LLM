@@ -223,7 +223,9 @@ def load_runtime_settings(env:Mapping[str,str]|None=None)->RuntimeSettings:
     lang=LanguageMode(_text(get("VULCAN_LANGUAGE_MODE"),"VULCAN_LANGUAGE_MODE","deterministic_only"))
     release=_path(get("VULCAN_LANGUAGE_RELEASE_PATH"),"VULCAN_LANGUAGE_RELEASE_PATH", lang is LanguageMode.transformer_proposal)
     jwt=_secret(get("VULCAN_JWT_SECRET"),"VULCAN_JWT_SECRET", required=True)
-    approval=_secret(get("VULCAN_APPROVAL_HMAC_SECRET"),"VULCAN_APPROVAL_HMAC_SECRET", required=environment is VulcanEnvironment.production)
+    # Compatibility-only input. Approval keys belong to the offline operator and
+    # are never required or consumed by the serving process.
+    approval=_secret(get("VULCAN_APPROVAL_HMAC_SECRET"),"VULCAN_APPROVAL_HMAC_SECRET", required=False)
     replicas=_int(get("VULCAN_RUNTIME_REPLICAS"),"VULCAN_RUNTIME_REPLICAS",1,1,1)
     self_imp=_bool(get("VULCAN_ENABLE_SELF_IMPROVEMENT"),"VULCAN_ENABLE_SELF_IMPROVEMENT",False)
     csiu_val=get("VULCAN_CSIU_ENABLED"); csiu = (not _bool(csiu_val,"VULCAN_CSIU_ENABLED",False)) if "INTRINSIC_CSIU_OFF" in env and "VULCAN_CSIU_ENABLED" not in env else _bool(csiu_val,"VULCAN_CSIU_ENABLED",True)
@@ -231,7 +233,7 @@ def load_runtime_settings(env:Mapping[str,str]|None=None)->RuntimeSettings:
     if environment is VulcanEnvironment.production and dev_stub: raise SettingsError("development stub mode is forbidden in production")
     if environment is VulcanEnvironment.production and (not csiu or not _bool(get("VULCAN_AUDIT_ENABLED"),"VULCAN_AUDIT_ENABLED",True)):
         raise SettingsError("production requires audit and CSIU")
-    if self_imp and approval is None: raise SettingsError("self-improvement requires approval HMAC secret")
+    if self_imp: raise SettingsError("serving-process self-improvement is retired; use the offline operator")
     mem_enabled=_bool(get("VULCAN_MEMORY_ENABLED"),"VULCAN_MEMORY_ENABLED",True)
     mem_backend=MemoryBackend(_text(get("VULCAN_MEMORY_BACKEND"),"VULCAN_MEMORY_BACKEND","sqlite" if mem_enabled else "disabled"))
     paths=durable_root_paths(durable)

@@ -16,7 +16,7 @@ from .settings import SettingsError, load_runtime_settings
 from .kernel import KernelRequest
 from .semantic import Utterance
 from vulcan.memory.governed import MemoryActorContext, MemoryKind, MemoryReadRequest, MemoryWriteProposal, MemoryReason
-from .api_models import ApprovalRejectBody, BundleBody, MemoryCorrectBody, MemoryWriteBody, ProposalBody, ReasonRequest
+from .api_models import BundleBody, MemoryCorrectBody, MemoryWriteBody, ProposalBody, ReasonRequest
 from .errors import ApiContractError, ApiErrorCategory, StartupErrorCategory, StartupFailure
 from .route_manifest import generate_route_manifest
 
@@ -202,43 +202,26 @@ def create_app()->FastAPI:
     @app.get('/v1/admin/improvements')
     async def improvements(request:Request):
         _principal(request,'self_improvement:read'); rt=await _runtime(request)
-        return {'runtime_id':rt.runtime_id,'owner_id':getattr(rt.self_improvement.journal,'owner_id',''),'pending':list(getattr(rt.self_improvement.drive.state,'pending_approvals',[]))[:64]}
+        root = rt.improvement_proposals.root
+        return {'runtime_id':rt.runtime_id,'authority':'proposal-only','proposal_ids':[p.stem for p in sorted(root.glob('*.json'))[:64] if not p.is_symlink()]}
     @app.get('/v1/admin/improvements/{proposal_id}')
     async def improvement_detail(proposal_id:str, request:Request):
         _principal(request,'self_improvement:read'); rt=await _runtime(request)
-        rows=[r for r in getattr(rt.self_improvement.drive.state,'pending_approvals',[]) if r.get('id')==proposal_id or r.get('proposal_id')==proposal_id]
-        if not rows: raise HTTPException(404,'proposal not found')
-        return rows[0]
-    @app.post('/v1/admin/improvements/{proposal_id}/approve')
-    async def improvement_approve(proposal_id:str, request:Request):
-        p=_principal(request,'self_improvement:approve'); rt=await _runtime(request)
-        _if_match(request); _idempotency_key(request)
-        data=ProposalBody.model_validate(await _body(request)); prop=data.proposal
-        if prop.get('proposal_id') not in {proposal_id, None}: raise ApiContractError(409, ApiErrorCategory.CONFLICT, 'proposal id mismatch')
-        from vulcan.world_model.meta_reasoning.governed_transaction import ImprovementProposal
-        proposal=ImprovementProposal.from_mapping(prop)
-        rec=await asyncio.to_thread(rt.self_improvement.approval_authority.approve, proposal, rt.self_improvement.policy, p.subject)
-        return {'approval_id':rec.approval_id,'proposal_digest':rec.proposal_digest,'state':rec.state,'verifier_id':rt.self_improvement.approval_authority.verifier_id}
-    @app.post('/v1/admin/improvements/{proposal_id}/reject')
-    async def improvement_reject(proposal_id:str, request:Request):
-        _principal(request,'self_improvement:approve'); rt=await _runtime(request); _if_match(request); _idempotency_key(request); data=ApprovalRejectBody.model_validate(await _body(request))
-        approval_id=str(data.approval_id or proposal_id)
-        await asyncio.to_thread(rt.self_improvement.approval_authority.reject, approval_id)
-        return {'approval_id':approval_id,'state':'rejected'}
-    @app.post('/v1/admin/improvements/{proposal_id}/resume')
-    async def improvement_resume(proposal_id:str, request:Request):
-        p=_principal(request,'self_improvement:approve'); rt=await _runtime(request); _if_match(request); _idempotency_key(request); data=ProposalBody.model_validate(await _body(request))
-        from vulcan.world_model.meta_reasoning.governed_transaction import ImprovementProposal, inspect_repository
-        prop=data.proposal
-        if prop.get('proposal_id') not in {proposal_id, None}: raise ApiContractError(409, ApiErrorCategory.CONFLICT, 'proposal id mismatch')
-        proposal=ImprovementProposal.from_mapping(prop)
-        snapshot=inspect_repository(rt.self_improvement.policy.repo_root, rt.self_improvement.policy.permitted_path_globs)
-        res=await asyncio.to_thread(rt.self_improvement.transaction.apply, proposal, snapshot, p.subject)
-        return {'status':res.status_code,'state':res.state,'proposal_digest':res.proposal_digest}
-    @app.get('/v1/admin/improvements/{proposal_id}/status')
-    async def improvement_status(proposal_id:str, request:Request):
-        _principal(request,'self_improvement:read'); rt=await _runtime(request)
-        return {'proposal_id':proposal_id,'csiu':rt.self_improvement.status_port.status(),'journal_owner':rt.self_improvement.journal.owner_id}
+        try: proposal=await asyncio.to_thread(rt.improvement_proposals.load, proposal_id)
+        except (OSError, ValueError): raise HTTPException(404,'proposal not found') from None
+        return proposal.public_record()
+    @app.post('/v1/admin/improvements/{proposal_id}')
+    async def improvement_emit(proposal_id:str, request:Request):
+        p=_principal(request,'self_improvement:propose'); rt=await _runtime(request)
+        _idempotency_key(request); data=ProposalBody.model_validate(await _body(request))
+        from vulcan.improvement.proposal import ImprovementProposal, ProposalError
+        try:
+            proposal=ImprovementProposal.from_mapping(data.proposal)
+            if proposal.proposal_id != proposal_id: raise ProposalError('proposal id mismatch')
+            digest=await asyncio.to_thread(rt.improvement_proposals.emit, proposal)
+            await asyncio.to_thread(rt.audit.record_event, 'improvement.proposed', {**proposal.public_record(), 'actor':p.subject})
+        except ProposalError as exc: raise ApiContractError(409, ApiErrorCategory.CONFLICT, str(exc)) from None
+        return {'proposal_id':proposal_id,'proposal_digest':digest,'state':'untrusted_proposal','authority':'offline-review-required'}
     @app.get('/v1/audit/improvements/{proposal_digest}')
     async def audit_improvement(proposal_digest:str, request:Request):
         _principal(request,'audit:read'); rt=await _runtime(request)

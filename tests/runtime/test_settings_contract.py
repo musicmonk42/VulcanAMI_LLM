@@ -30,7 +30,7 @@ def test_deprecated_jwt_aliases_are_bounded_and_redacted(tmp_path: Path, alias: 
     assert SECRET not in repr(settings)
     assert SECRET not in str(settings.public_dict())
 
-@pytest.mark.parametrize("canonical,alias", [("VULCAN_ENABLE_SELF_IMPROVEMENT", "ENABLE_SELF_IMPROVEMENT"), ("VULCAN_REQUEST_TIMEOUT_SECONDS", "HYBRID_EXECUTOR_TIMEOUT")])
+@pytest.mark.parametrize("canonical,alias", [("VULCAN_REQUEST_TIMEOUT_SECONDS", "HYBRID_EXECUTOR_TIMEOUT")])
 def test_deprecated_nonsecret_aliases_match_canonical_value(tmp_path: Path, canonical: str, alias: str) -> None:
     value = "1" if canonical == "VULCAN_ENABLE_SELF_IMPROVEMENT" else "1.0"
     settings = load_runtime_settings(env(tmp_path, **{canonical: value, alias: value, "VULCAN_APPROVAL_HMAC_SECRET": APPROVAL}))
@@ -48,13 +48,17 @@ def test_conflicting_aliases_fail_closed(tmp_path: Path) -> None:
     with pytest.raises(SettingsError, match="conflicting values for VULCAN_JWT_SECRET"):
         load_runtime_settings(env(tmp_path, GRAPHIX_JWT_SECRET="z" * 40))
 
-def test_production_requires_approval_secret_and_csiu(tmp_path: Path) -> None:
-    with pytest.raises(SettingsError, match="required"):
-        load_runtime_settings(env(tmp_path, VULCAN_ENV="production"))
+def test_production_does_not_require_offline_approval_secret_but_requires_csiu(tmp_path: Path) -> None:
+    settings = load_runtime_settings(env(tmp_path, VULCAN_ENV="production"))
+    assert settings.approval_hmac_secret is None
     with pytest.raises(SettingsError, match="production requires"):
         load_runtime_settings(env(tmp_path, VULCAN_ENV="production", VULCAN_APPROVAL_HMAC_SECRET=APPROVAL, VULCAN_CSIU_ENABLED="0"))
     settings = load_runtime_settings(env(tmp_path, VULCAN_ENV="production", VULCAN_APPROVAL_HMAC_SECRET=APPROVAL))
     assert settings.environment.value == "production"
+
+def test_serving_self_improvement_switch_is_retired(tmp_path: Path) -> None:
+    with pytest.raises(SettingsError, match="offline operator"):
+        load_runtime_settings(env(tmp_path, VULCAN_ENABLE_SELF_IMPROVEMENT="1"))
 
 @pytest.mark.parametrize("key,value", [("VULCAN_LANGUAGE_MODE", "provider"), ("VULCAN_MEMORY_BACKEND", "redis"), ("VULCAN_RUNTIME_REPLICAS", "2"), ("VULCAN_REQUEST_TIMEOUT_SECONDS", "999")])
 def test_invalid_enums_topology_and_bounds_rejected(tmp_path: Path, key: str, value: str) -> None:

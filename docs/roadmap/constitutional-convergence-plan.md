@@ -189,9 +189,30 @@ Port deterministic arithmetic and typed lookup onto the registered Graphix pipel
 
 Enforce an allowlist for serving imports and quarantine Arena, old orchestrators, broad experimental endpoints, and obsolete deployment surfaces behind research extras.
 
-### 2.4 Offline self-improvement
+### 2.4 Offline self-improvement — M3 serving boundary / M2 operator evidence
 
 Keep proposal generation and governed review, but move source installation out of the serving process. Use one approval issuer/verifier/store contract.
+
+`SelfImprovementRuntime` and its approval, CSIU, transaction, and installation
+graph are no longer composed or required for serving readiness.  Serving can
+only append immutable untrusted proposals and audit their metadata.  Static
+import-capability evidence proves that the canonical runtime imports no command,
+worktree, package, or install primitive.  CSIU admission uses the distinct
+`DisabledCSIUPolicyAuthority` until a real policy owner exists.
+The canonical serving-image stage physically removes the offline CLI and legacy
+source-application modules, while composition rejects legacy configurations
+that request in-process self-improvement.
+
+The offline operator validates proposal/source/policy bindings, requires one
+signed human approval schema, applies and tests in a detached worktree, signs a
+deployment package, and performs digest-checked install/rollback with audit
+evidence.  The serving non-modification boundary is M3; the offline workflow is
+M2 and remains below M4 until the exact operator and deployment artifacts pass
+crash/restart qualification.
+
+The `vulcan.runtime.self_improvement` import tombstone is removed after
+downstream migration. `GovernedSelfImprovementTransaction` is removed after its
+isolated single-file apply/gate behavior moves into the offline operator.
 
 **Wave exit gate:** the minimal canonical runtime starts, reasons, persists, restarts, and verifies audit without the legacy deployment graph or full research dependency set.
 

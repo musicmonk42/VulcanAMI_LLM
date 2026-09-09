@@ -28,7 +28,6 @@ class Owner:
 @pytest.mark.asyncio
 async def test_runtime_memory_audits_closes_restarts_and_borrows_audit(monkeypatch, tmp_path):
     import vulcan.runtime.container as container
-    monkeypatch.setattr(container, 'compose_self_improvement_runtime', lambda **kwargs: SimpleNamespace(drive=Owner(), capabilities=lambda: (), close=lambda: None))
     monkeypatch.setattr(container, 'ShadowLinUCBToolBandit', lambda: Owner())
     monkeypatch.setattr(container, 'LearningOwner', lambda **kwargs: Owner())
     monkeypatch.setattr(container, 'EnhancedSafetyResponseAdapter', lambda safety: Owner())

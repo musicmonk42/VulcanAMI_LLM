@@ -209,6 +209,40 @@ authority is itself versioned content-bound state, not a digest of `None`.
 adapter and is forbidden in production composition; remove it when migration and
 direct-kernel tests construct `StateAuthoritySet` instances.
 
+## Offline improvement authority slice
+
+The old boundary made `SelfImprovementRuntime` a mandatory serving owner.  It
+owned CSIU accounting, a second approval implementation, mutable pending state,
+and `GovernedSelfImprovementTransaction`; authenticated serving routes could
+approve and install candidate source into the running checkout.  The new
+transaction boundary ends at an immutable, `UNTRUSTED_PROPOSAL` outbox in the
+serving process.  No serving composition or readiness path imports or owns a
+source installer, approval issuer, command runner, worktree manager, deployment
+packager, or rollback capability.
+The canonical serving image also deletes the offline operator and quarantined
+legacy apply/drive modules after installation, and startup rejects a legacy
+deployment configuration that attempts to enable self-improvement.
+
+Privileged promotion is now an offline operator transaction.  One
+`ApprovalAuthority` issues, verifies, and stores the signed, proposal/policy/
+source-bound human approval schema.  The operator revalidates source identity
+and containment, applies the candidate in a detached isolated git worktree,
+runs bounded configured gates, signs a content-bound deployment package, and
+installs or rolls it back against compare-and-swap digests outside serving.
+Audit evidence records proposal, review, gates, package, deployment, and
+rollback without persisting prompts, rationale, provider text, or reasoning
+traces.
+
+`vulcan.runtime.self_improvement` is a named import tombstone and is removed
+when downstream users import the proposal contract directly.
+`GovernedSelfImprovementTransaction` is retained solely as the isolated
+single-file application/gate compatibility adapter; remove it when the offline
+operator owns a native multi-file patch transaction.  Legacy research drives
+remain noncanonical and are not production-importable.  The CSIU snapshot is
+owned by the explicit `DisabledCSIUPolicyAuthority`, not by an improvement
+runtime; replace it only when a real independently versioned CSIU policy owner
+is admitted.
+
 ## Durable per-episode epistemic authority slice
 
 The old epistemic boundary was the mutable request-local lists on

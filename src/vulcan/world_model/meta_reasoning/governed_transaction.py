@@ -408,11 +408,11 @@ def load_governed_policy(path: Path) -> ImprovementPolicy:
     return ImprovementPolicy(str(node.get("schema_version", "auto-apply-policy/2")), bool(node.get("enabled", False)), root, tuple(node.get("permitted_objective_types", [])), tuple(node.get("permitted_path_globs", [])), tuple(node.get("denied_path_globs", [])), int(node.get("max_files", 1)), int(node.get("max_candidate_bytes", 50000)), int(node.get("max_changed_lines", 200)), bool(node.get("approval_required", True)), {str(k): tuple(v) for k, v in dict(node.get("permitted_generators", {})).items()}, gates, float(node.get("timeout_s", 10)), int(node.get("output_limit", 20000)), bool(node.get("audit_required", True)), bool(node.get("clean_changed_file_set", True)), bool(node.get("allow_hardlinks", False)), digest)
 
 class GovernedSelfImprovementTransaction:
-    def __init__(self, policy: Optional[ImprovementPolicy], audit_owner: Any, approval_store: Optional[ApprovalStore] = None, gate_runner: Any = None):
-        self.policy = policy; self.audit = audit_owner; self.approval_store = approval_store; self.gate_runner = gate_runner or self._run_gate; self._unresolved = False
+    def __init__(self, policy: Optional[ImprovementPolicy], audit_owner: Any, approval_store: Optional[ApprovalStore] = None, gate_runner: Any = None, *, offline_authorized: bool = False):
+        self.policy = policy; self.audit = audit_owner; self.approval_store = approval_store; self.gate_runner = gate_runner or self._run_gate; self._unresolved = False; self.offline_authorized = offline_authorized
     def readiness(self) -> Tuple[bool, str]:
         if self._unresolved: return False, "unresolved improvement transaction"
-        if os.environ.get(DISABLED_ENV, "1") != "0": return False, "disabled by default"
+        if not self.offline_authorized and os.environ.get(DISABLED_ENV, "1") != "0": return False, "disabled by default"
         if not self.policy or not self.policy.enabled: return False, "policy disabled or missing"
         if not self.audit: return False, "audit owner missing"
         if not self.policy.verification_gates: return False, "verification gates missing"
@@ -460,7 +460,8 @@ class GovernedSelfImprovementTransaction:
         if p.schema_version != SCHEMA_VERSION: raise TransactionError("bad schema")
         if p.objective_type not in policy.permitted_objectives: raise TransactionError("unknown objective")
         rel = p.target_path
-        if rel not in snapshot.files or p.inspected_source_digest != snapshot.digest: raise TransactionError("target was not inspected")
+        if rel not in snapshot.files: raise TransactionError("target was not inspected")
+        if p.inspected_source_digest != snapshot.digest: raise TransactionError("inspected source digest mismatch")
         if _denied(rel) or _glob_any(rel, policy.denied_path_globs) or not _glob_any(rel, policy.permitted_path_globs): raise TransactionError("protected or unpermitted path")
         if not target.exists() or not target.is_file(): raise TransactionError("new file or directory rejected")
         if p.expected_original_sha256 != snapshot.files[rel] or _sha256(p.original_content.encode()) != p.expected_original_sha256: raise TransactionError("missing or mismatched original")

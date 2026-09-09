@@ -40,7 +40,7 @@ def runtime_with_owner(owner, *, root=None):
         alignment=owner,
         domain_registry=owner,
         durable_root=root,
-        self_improvement=SimpleNamespace(capabilities=lambda: (), readiness=lambda: True),
+        improvement_proposals=SimpleNamespace(),
         learning_owner=SimpleNamespace(owner_id="learning", capability=SimpleNamespace(value="shadow"), readiness=owner.readiness, capability_matrix=lambda: ()),
         settings=SimpleNamespace(public_diagnostics=False, environment=SimpleNamespace(value="production"), schema=lambda: {"schema_version":"test"}),
         health=h,
