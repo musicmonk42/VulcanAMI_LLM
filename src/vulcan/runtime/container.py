@@ -23,6 +23,8 @@ from vulcan.memory.composition import (
 )
 from vulcan.microkernel.episode_store import EpisodeStore
 from vulcan.microkernel.epistemic_store import EpistemicStore
+from vulcan.microkernel.lineage import LineageStore, LineageTransactionService
+from vulcan.microkernel.principals import Principal, PrincipalKind
 from vulcan.microkernel.snapshots import (
     MAX_EPISODE_LIFETIME,
     SnapshotBundle,
@@ -108,6 +110,7 @@ class RuntimeOwnerInputs:
     language_output_factory: Any = DeterministicLanguageOutput
     episode_store_factory: Any = EpisodeStore
     epistemic_store_factory: Any = EpistemicStore
+    lineage_store_factory: Any = LineageStore
     transaction_service_factory: Any = ConstitutionalTransactionService
 
 
@@ -134,6 +137,7 @@ class RuntimeContainer:
     max_episode_lifetime_seconds: int = int(MAX_EPISODE_LIFETIME.total_seconds())
     episode_store: Any = None
     epistemic_store: Any = None
+    lineage_store: Any = None
     state_authorities: StateAuthoritySet | None = None
     capability_authority: CapabilityManifestAuthority | None = None
     transaction_service: ConstitutionalTransactionService | None = None
@@ -167,6 +171,7 @@ class RuntimeContainer:
             "domain_lookup": self.domain_registry,
             "episode_store": self.episode_store,
             "epistemic_store": self.epistemic_store,
+            "lineage_store": self.lineage_store,
             "kernel": self.kernel,
             "transaction_service": self.transaction_service,
             "state_authorities": self.state_authorities,
@@ -604,6 +609,34 @@ class RuntimeContainer:
                 outbox_sink=audit.append_epistemic_commit,
             )
             _claim_owner(constructed, "epistemic_store", epistemic_store)
+            lineage_store = inputs.lineage_store_factory(
+                root / "episodes" / "episodes.sqlite3"
+            )
+            _claim_owner(constructed, "lineage_store", lineage_store)
+            lineage_principal = Principal(
+                PrincipalKind.SYSTEM_KERNEL,
+                "constitutional-cognitive-kernel",
+                hashlib.sha256(b"vulcan-constitutional-kernel-v1").hexdigest(),
+            )
+            lineage = LineageTransactionService(lineage_store, lineage_principal)
+            branch_id = "branch-primary"
+            instance_id = f"instance-{uuid4().hex}"
+            try:
+                existing_lineage = lineage_store.load(branch_id)
+            except Exception as exc:
+                from vulcan.microkernel.lineage import LineageError
+
+                if (
+                    not isinstance(exc, LineageError)
+                    or str(exc) != "unknown lineage branch"
+                ):
+                    raise
+                lineage.genesis("lineage-primary", branch_id, instance_id)
+            else:
+                if existing_lineage.suspended:
+                    lineage.resume(branch_id, existing_lineage.digest, instance_id)
+                else:
+                    lineage.restart(branch_id, existing_lineage.digest, instance_id)
             delegate.disable_legacy_case_audit()
             kernel = ConstitutionalCognitiveKernel.from_kernel(
                 delegate,
@@ -611,6 +644,8 @@ class RuntimeContainer:
                 episode_store=episode_store,
                 epistemic_store=epistemic_store,
                 transaction_service_factory=inputs.transaction_service_factory,
+                lineage=lineage,
+                lineage_branch_id=branch_id,
             )
             _claim_owner(constructed, "transaction_service", kernel.transaction_service)
             _claim_owner(constructed, "kernel", kernel)
@@ -637,6 +672,7 @@ class RuntimeContainer:
                 health=health,
                 episode_store=episode_store,
                 epistemic_store=epistemic_store,
+                lineage_store=lineage_store,
                 state_authorities=state_authorities,
                 capability_authority=capability_authority,
                 transaction_service=kernel.transaction_service,

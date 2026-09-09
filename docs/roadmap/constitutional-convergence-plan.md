@@ -108,6 +108,18 @@ tests provide M2 evidence. `runtime.semantic` remains behind a named candidate
 adapter, so full one-Graphix-path convergence is incomplete; exact artifact and
 restart qualification remain below M4.
 
+Persistent causal lineage is **M3 — Canonical for the composed request path**:
+one durable CAS head per branch records lineage, branch, and process-instance
+identity; monotonic ticks; prior/current state digests; nine authority snapshot
+refs; commitments; active/past episodes; and pending effects. Episode genesis
+binds the exact admitted lineage head, and terminal transport records completion.
+Restart, suspension, resume, fork, clone, merge, deterministic replay, stale
+writers, tamper, and atomic admission crash rollback have local M2 evidence.
+Episode genesis and lineage admission share one constitutional SQLite
+transaction. The `lineage-free-direct-kernel` adapter remains for isolated
+callers, and exact built-artifact restart qualification remains below M4. These
+are causal facts only, not identity or consciousness claims.
+
 ## Wave 0 — Recover executable truth
 
 ### 0.1 Repository assurance — M2 (local evidence; hosted qualification pending)
@@ -253,7 +265,7 @@ isolated single-file apply/gate behavior moves into the offline operator.
 
 ## Wave 3 — Build the continuous causal agent
 
-### 3.1 Persistent lineage
+### 3.1 Persistent lineage — M3 (canonical request path; qualification pending)
 
 Add lineage, branch, instance, monotonic tick, prior/current state digests, current snapshots, active commitments, episodes, and pending effects under one compare-and-swap head.
 

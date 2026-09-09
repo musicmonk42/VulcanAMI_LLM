@@ -1,6 +1,6 @@
 # Generated architecture inventory
 
-Digest: `d2e186cedb343db83ca523b4e7bd850af0d57c4d0095b84cad79a401af736131`
+Digest: `d784652d0f6627fc804442c48764e810fa7e1cdc2f9bff193152b5ad4e488cbe`
 
 This file is generated from `docs/generated/architecture-inventory.json`.
 
@@ -37,6 +37,7 @@ This file is generated from `docs/generated/architecture-inventory.json`.
 | [`docs/architecture/audit-v2.md`](../architecture/audit-v2.md) | **current** | current audit implementation contract pending episode derivation |
 | [`docs/architecture/cognitive-episode.md`](../architecture/cognitive-episode.md) | **current** | implemented episode boundary |
 | [`docs/architecture/neutral-process-theory.md`](../architecture/neutral-process-theory.md) | **research-only** | falsifiable research hypothesis outside the authority path |
+| [`docs/architecture/persistent-agent-lineage.md`](../architecture/persistent-agent-lineage.md) | **current** | implemented neutral causal-lineage boundary |
 | [`docs/architecture/sequence-6-baseline-audit.md`](../architecture/sequence-6-baseline-audit.md) | **historical** | point-in-time baseline audit |
 | [`docs/roadmap/constitutional-convergence-plan.md`](../roadmap/constitutional-convergence-plan.md) | **normative** | ordered convergence work and maturity vocabulary |
 
@@ -154,7 +155,7 @@ Count: 422
 
 ## Import Identities
 
-Count: 1885
+Count: 1898
 
 - `tests/security/test_output_firewall.py:1` module='vulcan.runtime.output', reachability='test-only'
 - `tests/test_probabilistic_routing.py:10` module='src.vulcan.reasoning.probabilistic_reasoning', reachability='test-only'
@@ -170,6 +171,7 @@ Count: 1885
 - `tests/security/test_local_language_governance.py:10` module='vulcan.local_language.tokenizer', reachability='test-only'
 - `src/vulcan/tests/test_consolidation.py:10` module='vulcan.memory.base', reachability='test-only'
 - `src/vulcan/runtime/composition.py:10` module='vulcan.memory.composition', reachability='production-reachable'
+- `tests/microkernel/test_lineage.py:10` module='vulcan.microkernel.episode', reachability='test-only'
 - `src/vulcan/runtime/state_authorities.py:10` module='vulcan.microkernel.snapshots', reachability='production-reachable'
 - `tests/persistence/test_episode_audit_projection.py:10` module='vulcan.microkernel.state_machine', reachability='test-only'
 - `src/vulcan/runtime/audit.py:10` module='vulcan.persistence.audit.reconcile', reachability='production-reachable'
@@ -205,8 +207,7 @@ Count: 1885
 - `src/vulcan/world_model/world_model_core.py:1020` module='vulcan.world_model.creative_handler', reachability='unknown'
 - `src/api_server.py:103` module='vulcan.reasoning.unified', reachability='unknown'
 - `src/vulcan/world_model/world_model_core.py:1037` module='vulcan.world_model.llm_guidance', reachability='unknown'
-- `src/vulcan/server/startup/manager.py:1039` module='vulcan.utils_main.http_session', reachability='unknown'
-- ... 1835 more in JSON
+- ... 1848 more in JSON
 
 ## Singletons
 
@@ -287,7 +288,7 @@ Count: 455
 
 ## Fallbacks
 
-Count: 4429
+Count: 4430
 
 - `src/vulcan/endpoints/self_improvement.py:98` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/vulcan/safety/rollback_audit.py:99` kind='except_exception', reachability='unknown', review='unreviewed'
@@ -339,7 +340,7 @@ Count: 4429
 - `src/vulcan/knowledge_crystallizer/principle_extractor.py:1018` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/vulcan/curiosity_engine/curiosity_engine_core.py:1012` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/memory/governed_unlearning.py:1019` kind='except_exception', reachability='unknown', review='unreviewed'
-- ... 4379 more in JSON
+- ... 4380 more in JSON
 
 ## Mocks
 
@@ -399,7 +400,7 @@ Count: 400
 
 ## Persistence
 
-Count: 398
+Count: 418
 
 - `src/vulcan/improvement/offline.py:101` kind='call', reachability='unknown', value='fcntl.flock'
 - `tests/persistence/test_memory_outbox_v2.py:103` kind='call', reachability='test-only', value='SQLiteMemoryRepository'
@@ -411,6 +412,7 @@ Count: 398
 - `src/vulcan/learning/outbox.py:111` kind='call', reachability='unknown', value='fcntl.flock'
 - `src/vulcan/safety/adversarial_integration.py:1166` kind='call', reachability='unknown', value='sqlite3.connect'
 - `tests/microkernel/test_epistemic_store.py:117` kind='call', reachability='test-only', value='sqlite3.connect'
+- `tests/microkernel/test_lineage.py:121` kind='call', reachability='test-only', value='sqlite3.connect'
 - `tests/microkernel/test_epistemic_store.py:123` kind='call', reachability='test-only', value='sqlite3.connect'
 - `src/vulcan/safety/rollback_audit.py:1230` kind='call', reachability='unknown', value='sqlite3.connect'
 - `tests/test_learning_outbox.py:125` kind='call', reachability='test-only', value='sqlite3.connect'
@@ -430,28 +432,27 @@ Count: 398
 - `tests/security/test_governed_memory_architecture.py:17` kind='call', reachability='test-only', value='SQLiteMemoryRepository'
 - `tests/microkernel/test_episode_store.py:170` kind='call', reachability='test-only', value='sqlite3.connect'
 - `tests/microkernel/test_episode_store.py:179` kind='call', reachability='test-only', value='sqlite3.connect'
+- `tests/microkernel/test_lineage.py:184` kind='call', reachability='test-only', value='sqlite3.connect'
 - `tests/security/test_governed_memory_architecture.py:19` kind='call', reachability='test-only', value='SQLiteMemoryRepository'
 - `src/generate_transparency_report.py:192` kind='call', reachability='unknown', value='fcntl.flock'
 - `src/vulcan/memory/governed.py:204` kind='call', reachability='unknown', value='fcntl.flock'
+- `tests/microkernel/test_lineage.py:206` kind='call', reachability='test-only', value='sqlite3.connect'
 - `src/vulcan/memory/governed.py:208` kind='call', reachability='unknown', value='sqlite3.connect'
 - `src/generate_transparency_report.py:211` kind='call', reachability='unknown', value='fcntl.flock'
 - `src/vulcan/memory/governed.py:213` kind='call', reachability='unknown', value='fcntl.flock'
 - `src/persistence.py:211` kind='call', reachability='unknown', value='sqlite3.connect'
 - `src/vulcan/world_model/meta_reasoning/csiu_enforcement.py:225` kind='call', reachability='unknown', value='fcntl.flock'
+- `tests/microkernel/test_lineage.py:230` kind='call', reachability='test-only', value='sqlite3.connect'
 - `tests/microkernel/test_epistemic_store.py:232` kind='call', reachability='test-only', value='sqlite3.connect'
 - `src/security_audit_engine.py:233` kind='call', reachability='unknown', value='sqlite3.connect'
 - `src/ai_providers.py:239` kind='call', reachability='unknown', value='sqlite3.connect'
 - `src/vulcan/world_model/meta_reasoning/governed_transaction.py:244` kind='call', reachability='unknown', value='fcntl.flock'
 - `src/vulcan/safety/governance_alignment.py:248` kind='call', reachability='unknown', value='sqlite3.connect'
+- `tests/microkernel/test_lineage.py:256` kind='call', reachability='test-only', value='sqlite3.connect'
 - `tests/performance/performance_monitor.py:257` kind='call', reachability='test-only', value='self._get_sqlite_size'
 - `tests/performance/performance_monitor.py:258` kind='call', reachability='test-only', value='self._get_sqlite_wal_size'
 - `tests/microkernel/test_episode_store.py:260` kind='call', reachability='test-only', value='sqlite3.connect'
-- `src/vulcan/safety/rollback_audit.py:256` kind='call', reachability='unknown', value='sqlite3.connect'
-- `src/vulcan/world_model/meta_reasoning/csiu_enforcement.py:270` kind='call', reachability='unknown', value='fcntl.flock'
-- `src/full_platform.py:279` kind='call', reachability='unknown', value='fcntl.flock'
-- `src/vulcan/world_model/meta_reasoning/governed_transaction.py:290` kind='call', reachability='unknown', value='fcntl.flock'
-- `src/vulcan/world_model/meta_reasoning/governed_transaction.py:302` kind='call', reachability='unknown', value='fcntl.flock'
-- ... 348 more in JSON
+- ... 368 more in JSON
 
 ## Environment Readers
 
@@ -523,8 +524,8 @@ Count: 20
 - `src/vulcan/orchestrator/agent_scoring.py:176` reachability='unknown', text='\n    Get the current capability distribution in the agent pool.\n\n    AGENT POOL CONFIGURATION FIX: This method provides observability into\n    which capabilitie'
 - `src/utils/faiss_config.py:1` reachability='unknown', text='\nFAISS Configuration and Initialization Module\n\nHandles FAISS import with proper CPU capability detection and informative\nmessaging about instruction set usage '
 - `src/memory/cost_optimizer.py:223` reachability='unknown', text="\n        Analyze current cost structure with defensive programming.\n\n        FIXED: Now provides fallback logic when memory system methods don't exist.\n        "
-- `src/vulcan/runtime/container.py:309` reachability='production-reachable', text='canonical capability authority is unavailable'
 - `src/full_platform.py:3107` reachability='unknown', text='Capability unavailable in production'
+- `src/vulcan/runtime/container.py:314` reachability='production-reachable', text='canonical capability authority is unavailable'
 - `src/vulcan/orchestrator/agent_scoring.py:20` reachability='unknown', text='\n    Assign an available agent with required capability.\n\n    Must be called with manager.lock held.\n\n    Args:\n        manager: AgentPoolManager instance\n     '
 - `src/vulcan/runtime/errors.py:43` reachability='production-reachable', text='capability_unavailable'
 - `src/vulcan/routing/agent_collaboration.py:599` reachability='unknown', text='AgentCapability not available, using string capability'

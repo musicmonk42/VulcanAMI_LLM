@@ -15,6 +15,8 @@ from vulcan.runtime.composition import (
     compose_runtime,
 )
 from vulcan.runtime.errors import StartupErrorCategory, StartupFailure
+from vulcan.runtime.kernel import KernelRequest
+from vulcan.runtime.semantic import Utterance
 from vulcan.runtime.settings import (
     OpaqueSecret,
     RuntimeSettings,
@@ -84,6 +86,14 @@ class Owner:
     def active_metadata(self):
         return {"policy_digest": "a" * 64, "revision": 1}
 
+    def decide(self, claims, evidence, derivations, policy):
+        return SimpleNamespace(
+            accepted=True,
+            reason_codes=("test-policy-allow",),
+            policy_digest="a" * 64,
+            policy_revision=1,
+        )
+
     def snapshot_state(self):
         return "0", {"enabled": True, "digest": "b" * 64}
 
@@ -134,6 +144,7 @@ async def test_typed_composition_is_ready_and_has_close_graph(tmp_path):
     runtime = compose_runtime(settings(tmp_path), spec())
     assert runtime.deployment is None
     assert runtime.transaction_service is not None
+    assert runtime.lineage_store is not None
     assert runtime.ownership_close_order[-2:] == ("safety", "world_proposal")
     assert len(runtime.ownership_close_order) == len(set(runtime.ownership_close_order))
     await runtime.readiness()
@@ -164,14 +175,65 @@ async def test_every_declared_factory_is_invoked_exactly_once(tmp_path):
 async def test_typed_composition_restarts_from_the_same_durable_root(tmp_path):
     configured = settings(tmp_path)
     first = compose_runtime(configured, spec())
+    first_lineage = first.lineage_store.load("branch-primary")
     await first.close()
     restarted = compose_runtime(configured, spec())
     try:
         await restarted.readiness()
         assert restarted.episode_store is not first.episode_store
         assert restarted.epistemic_store is not first.epistemic_store
+        restarted_lineage = restarted.lineage_store.load("branch-primary")
+        assert restarted_lineage.tick == first_lineage.tick + 1
+        assert restarted_lineage.instance_id != first_lineage.instance_id
     finally:
         await restarted.close()
+
+
+@pytest.mark.asyncio
+async def test_canonical_admission_binds_and_advances_lineage(tmp_path):
+    runtime = compose_runtime(settings(tmp_path), spec())
+    try:
+        prior = runtime.lineage_store.load("branch-primary")
+        case = runtime.kernel.create_case(
+            request_id="request-lineage",
+            conversation_id="conversation-is-not-lineage",
+            input_digest="a" * 64,
+        )
+        assert case.episode.lineage_head.digest == prior.digest
+        current = runtime.lineage_store.load("branch-primary")
+        assert current.tick == prior.tick + 1
+        assert len(current.current_authority_snapshots) == 9
+        assert current.active_episode_refs[0].episode_id == case.case_id
+        assert current.lineage_id != case.episode.conversation_id
+        case.snapshot_bundle.close()
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_canonical_terminal_episode_enters_lineage_history(tmp_path):
+    runtime = compose_runtime(settings(tmp_path), spec())
+    try:
+        utterance = Utterance.from_text("2 + 2")
+        case = runtime.kernel.create_case(
+            request_id="request-terminal-lineage",
+            conversation_id="conversation-terminal",
+            input_digest=utterance.digest,
+        )
+        result = await runtime.kernel.handle(
+            KernelRequest(utterance, "conversation-terminal"), case
+        )
+        assert result.finalization == "allow"
+        head = runtime.lineage_store.load("branch-primary")
+        assert not any(
+            ref.episode_id == case.case_id for ref in head.active_episode_refs
+        )
+        assert any(
+            ref.episode_id == case.case_id and ref.digest == case.episode.digest
+            for ref in head.past_episode_refs
+        )
+    finally:
+        await runtime.close()
 
 
 def test_missing_owner_fails_closed_with_category(tmp_path):

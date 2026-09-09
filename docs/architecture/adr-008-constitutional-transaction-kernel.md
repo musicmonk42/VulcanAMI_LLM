@@ -81,6 +81,21 @@ The current `runtime.semantic` ledger and Graphix-like plan remain migration pro
 
 ## Consequences
 
+## Persistent causal-lineage slice
+
+The old continuity boundary ended at a bounded episode. The new boundary places
+episodes inside a durable `LineageState` branch whose immutable event stream is
+advanced only by a kernel-owned `LineageTransactionService`. Admission binds the
+exact prior lineage head and nine authority refs; terminalization moves the
+episode from active to past history. Restart, suspend, resume, fork, clone, and
+merge are explicit CAS operations with distinct branch/instance identities.
+
+`lineage-free-direct-kernel` is retained for isolated direct-kernel tests and is
+removed when all callers compose durable lineage. Canonical composition places
+episode and lineage tables in one constitutional database so genesis and lineage
+admission commit atomically. Exact built-artifact qualification remains below M4. See
+[`persistent-agent-lineage.md`](persistent-agent-lineage.md).
+
 ## Canonical Graphix runtime slice
 
 The old semantic boundary let the production kernel import plan, compiler,

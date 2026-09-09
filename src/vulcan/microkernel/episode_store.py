@@ -94,6 +94,9 @@ def episode_from_document(document: str) -> CognitiveEpisode:
             schema_version=value["schema_version"],
             conversation_id=value["conversation_id"],
             parent=parent,
+            lineage_head=(
+                _artifact(value["lineage_head"]) if value.get("lineage_head") else None
+            ),
             snapshot_bundle=snapshot,
             interpretation=value["interpretation"],
             claims=tuple(_artifact(item) for item in value["claims"]),
@@ -227,6 +230,44 @@ def _outbox_payload(episode: CognitiveEpisode, event: TransitionEvent) -> str:
         },
         sort_keys=True,
         separators=(",", ":"),
+    )
+
+
+def _insert_episode_genesis(
+    connection: sqlite3.Connection, episode: CognitiveEpisode
+) -> None:
+    """Insert validated genesis inside an existing constitutional transaction."""
+    if len(episode.transitions) != 1:
+        raise EpisodeIntegrityError("create requires exactly one genesis transition")
+    document = episode.canonical_json()
+    episode_from_document(document)
+    event = episode.transitions[-1]
+    existing = connection.execute(
+        "SELECT digest FROM episode_heads WHERE episode_id=?", (episode.episode_id,)
+    ).fetchone()
+    if existing is not None:
+        if existing["digest"] == episode.digest:
+            return
+        raise EpisodeConflict("episode identity already has a different digest")
+    connection.execute(
+        "INSERT INTO episode_heads VALUES (?, ?, ?)",
+        (episode.episode_id, episode.digest, document),
+    )
+    connection.execute(
+        "INSERT INTO episode_transitions VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (
+            episode.episode_id,
+            0,
+            event.prior_digest,
+            episode.digest,
+            event.event_id,
+            json.dumps(event.to_json(), sort_keys=True, separators=(",", ":")),
+            document,
+        ),
+    )
+    connection.execute(
+        "INSERT INTO episode_outbox (episode_id, transition_digest, payload) VALUES (?, ?, ?)",
+        (episode.episode_id, episode.digest, _outbox_payload(episode, event)),
     )
 
 

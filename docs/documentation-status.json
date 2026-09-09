@@ -7,6 +7,7 @@
     {"path": "docs/architecture/adr-005-cognitive-authority.md", "status": "normative", "purpose": "authority lattice"},
     {"path": "docs/architecture/adr-008-constitutional-transaction-kernel.md", "status": "normative", "purpose": "target transaction architecture"},
     {"path": "docs/architecture/cognitive-episode.md", "status": "current", "purpose": "implemented episode boundary"},
+    {"path": "docs/architecture/persistent-agent-lineage.md", "status": "current", "purpose": "implemented neutral causal-lineage boundary"},
     {"path": "docs/architecture/neutral-process-theory.md", "status": "research-only", "purpose": "falsifiable research hypothesis outside the authority path"},
     {"path": "docs/architecture/ami-invariants.yaml", "status": "normative", "purpose": "machine-readable constitutional invariants"},
     {"path": "docs/architecture/adr-003-canonical-runtime.md", "status": "current", "purpose": "canonical runtime composition decision"},

@@ -10,6 +10,7 @@ from vulcan.learning_owner import LearningOwner
 from vulcan.memory.composition import compose_governed_memory
 from vulcan.microkernel.episode_store import EpisodeStore
 from vulcan.microkernel.epistemic_store import EpistemicStore
+from vulcan.microkernel.lineage import LineageStore
 from vulcan.microkernel.transactions import ConstitutionalTransactionService
 from vulcan.platform import require_canonical_serving_platform
 from vulcan.safety.response_adapter import EnhancedSafetyResponseAdapter
@@ -130,6 +131,7 @@ class CompositionSpecification:
     transaction_service_factory: Callable[..., Any] = ConstitutionalTransactionService
     episode_store_factory: Callable[..., Any] = EpisodeStore
     epistemic_store_factory: Callable[..., Any] = EpistemicStore
+    lineage_store_factory: Callable[..., Any] = LineageStore
     audit_projector_factory: Callable[..., Any] = CanonicalAudit
     governed_memory_factory: Callable[..., Any] = compose_governed_memory
     alignment_factory: Callable[..., Any] = AlignmentRegistry
@@ -217,6 +219,7 @@ def compose_runtime(
             language_output_factory=spec.language_output_factory,
             episode_store_factory=spec.episode_store_factory,
             epistemic_store_factory=spec.epistemic_store_factory,
+            lineage_store_factory=spec.lineage_store_factory,
             transaction_service_factory=spec.transaction_service_factory,
         )
         return RuntimeContainer.from_owner_inputs(inputs=inputs, settings=settings)
