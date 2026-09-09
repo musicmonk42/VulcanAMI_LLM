@@ -12,6 +12,7 @@ from typing import Any, Literal
 from uuid import uuid4
 
 from vulcan.constitution.primitives import Digest, canonical_json
+from vulcan.graphix.runtime import DeterministicLanguageInput, LanguageInputPort
 from vulcan.improvement.proposal import ImprovementProposalStore
 from vulcan.learning_bandit import ShadowLinUCBToolBandit
 from vulcan.learning_owner import LearningCapabilityStatus, LearningOwner
@@ -50,7 +51,6 @@ from .health import (
 )
 from .kernel import CognitiveKernel
 from .output import DeterministicLanguageOutput, LanguageOutputPort
-from .semantic import DeterministicLanguageInput, LanguageInputPort
 from .settings import RuntimeSettings
 from .state_authorities import (
     ContentBoundStateAuthority,
@@ -497,9 +497,11 @@ class RuntimeContainer:
 
             def live_capability_facts():
                 kernel_caps = tuple(delegate.capabilities())
+                from .capabilities import release_evidence_root
+
                 policy_digest = hashlib.sha256(
                     (
-                        Path(__file__).resolve().parents[3]
+                        release_evidence_root()
                         / "docs"
                         / "architecture"
                         / "ami-invariants.yaml"

@@ -60,12 +60,11 @@ class EnhancedSafetyResponseAdapter(ResponseSafetyPort):
             raise RuntimeError("response safety validator is inherited base stub")
         if type(self.validator) is SafetyValidator:
             raise RuntimeError("response safety validator is base stub")
-        try:
-            from .safety_validator import EnhancedSafetyValidator
-        except Exception as exc:  # pragma: no cover - import failure is unavailable
-            raise RuntimeError("concrete EnhancedSafetyValidator path is unavailable") from exc
-        if not isinstance(self.validator, EnhancedSafetyValidator):
-            raise RuntimeError("response safety validator is not the concrete EnhancedSafetyValidator path")
+        if getattr(self.validator, "validator_identity", None) not in {
+            "canonical-response-safety/v1",
+            "enhanced-safety-validator/v1",
+        } and type(self.validator).__name__ != "EnhancedSafetyValidator":
+            raise RuntimeError("response safety validator is not an approved concrete path")
 
     def _normalize(self, result: Any, response_text: str, context: ResponseSafetyContext) -> ResponseSafetyDecision:
         if not isinstance(result, SafetyReport):

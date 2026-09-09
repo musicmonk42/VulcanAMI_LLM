@@ -22,7 +22,7 @@ def test_helm_runtime_conformance_selected_image_security_and_storage() -> None:
     required = [
         "replicas: 1",
         f"image: \"ghcr.io/musicmonk42/vulcanami_llm-api:e2e@{DIGEST}\"",
-        "uvicorn vulcan.runtime.app:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1",
+        "python -m uvicorn vulcan.runtime.app:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1",
         "path: /health/live",
         "path: /health/ready",
         "runAsUser: 1001",

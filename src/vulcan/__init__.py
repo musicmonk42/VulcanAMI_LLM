@@ -8,6 +8,11 @@ side effect of ``import vulcan``.
 
 from __future__ import annotations
 
+if __name__ != "vulcan":
+    raise ImportError(
+        "vulcan is the sole package identity; 'src.vulcan' is not supported"
+    )
+
 __version__ = "2.0.0"
 __author__ = "Vulcan AI Team"
 

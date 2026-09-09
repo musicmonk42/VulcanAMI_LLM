@@ -16,7 +16,7 @@ from vulcan.microkernel.episode import CognitiveEpisode
 from vulcan.microkernel.state_machine import EpisodeState
 from vulcan.microkernel.transactions import PublicationAuthorization
 
-from .semantic import (
+from vulcan.graphix.runtime import (
     Claim,
     EpistemicStatus,
     RenderArtifact,

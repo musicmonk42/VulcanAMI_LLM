@@ -5,6 +5,7 @@ Static evidence is an input to this owner, never an advertisement by itself.
 
 from __future__ import annotations
 
+import os
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from enum import Enum
@@ -16,8 +17,18 @@ from vulcan.assurance.capabilities import CapabilityRegistry, CapabilityStatus
 from vulcan.constitution.primitives import Digest, canonical_json
 from vulcan.microkernel.snapshots import SnapshotRef
 
-ROOT = Path(__file__).resolve().parents[3]
-CONFIG_PATH = ROOT / "config" / "capabilities.yaml"
+_SOURCE_ROOT = Path(__file__).resolve().parents[3]
+
+
+def release_evidence_root() -> Path:
+    """Locate immutable release evidence without assuming a source checkout."""
+    configured = os.environ.get("VULCAN_RELEASE_EVIDENCE_ROOT")
+    if configured:
+        root = Path(configured)
+        if not root.is_absolute() or root.is_symlink():
+            raise ValueError("invalid release evidence root")
+        return root.resolve(strict=True)
+    return _SOURCE_ROOT
 
 
 class LiveCapabilityStatus(str, Enum):
@@ -90,9 +101,10 @@ def composed_runtime_ports() -> set[str]:
 
 
 def load_capability_registry(now: datetime | None = None) -> CapabilityRegistry:
+    root = release_evidence_root()
     return CapabilityRegistry.from_json_text(
-        CONFIG_PATH.read_text(encoding="utf-8"),
-        root=ROOT,
+        (root / "config" / "capabilities.yaml").read_text(encoding="utf-8"),
+        root=root,
         now=now or datetime.now(timezone.utc),
         composed_ports=composed_runtime_ports(),
     )

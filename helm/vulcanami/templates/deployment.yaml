@@ -74,7 +74,7 @@ spec:
           - sh
           - -c
         args:
-          - uvicorn vulcan.runtime.app:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1
+          - python -m uvicorn vulcan.runtime.app:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1
         ports:
         - name: http
           containerPort: {{ .Values.service.targetPort }}

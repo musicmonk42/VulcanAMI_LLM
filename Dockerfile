@@ -1,334 +1,54 @@
-# =============================================================================
-# VulcanAMI Full Platform - Unified Secure Container Build
-# =============================================================================
-# This is the MAIN Dockerfile for deploying the complete VulcanAMI platform.
-# Used by Railway, and recommended for single-container deployments.
-#
-# WHAT THIS BUILDS:
-# - Complete VulcanAMI platform via src/full_platform.py
-# - VULCAN cognitive platform with /vulcan/v1/chat endpoint
-# - Graphix Registry API
-# - All 71+ integrated services behind a unified interface
-#
-# FOR MICROSERVICE DEPLOYMENTS:
-# Use the service-specific Dockerfiles in docker/ directory:
-# - docker/api/Dockerfile    - API Gateway microservice
-# - docker/dqs/Dockerfile    - Data Quality Service
-# - docker/pii/Dockerfile    - PII Detection Service
-#
-# SECURITY FEATURES:
-# - Multi-stage build (builder + runtime)
-# - Non-root execution (graphix user uid 1001)
-# - Mandatory acknowledgement of NOT embedding insecure JWT secret
-# - Runtime secret validation via entrypoint.sh (length, strength)
-# - Hash-verified dependency installation (--require-hashes)
-# - Optional SBOM generation (CycloneDX) for dependency transparency
-# - Locale, timezone, buffering, bytecode settings
-# - OS package updates & cleanup to reduce CVE footprint
-# - Healthcheck endpoint probing
-# - Reduced final attack surface (only necessary runtime artifacts copied)
-#
-# EXPECTED INPUTS AT RUNTIME (REQUIRED - NOT BAKED INTO IMAGE):
-#   - One of the following secure JWT secret env vars:
-#       GRAPHIX_JWT_SECRET   (Graphix API Server / src/api_server.py)
-#       JWT_SECRET_KEY       (Flask registry / app.py)
-#       JWT_SECRET           (Unified Platform / full_platform.py)
-#
-# RECOMMENDED: Provide a hashed requirements lock file named:
-#       requirements-hashed.txt
-# containing lines formatted as:
-#       package==version --hash=sha256:<hash> [--hash=sha256:<hash2> ...]
-#
-# If requirements-hashed.txt is absent, the build will FALL BACK to
-# standard 'pip install' (less secure). For production, ALWAYS supply
-# the hashed lock file and remove the insecure fallback logic.
-#
-# To acknowledge that you intentionally are not baking a JWT secret
-# into the image, pass:
-#   --build-arg REJECT_INSECURE_JWT=ack
-#
-# DEPENDENCY HASH ENFORCEMENT:
-# Pass --build-arg REQUIRE_HASHES=1 to enforce hash-verified installs.
-# If REQUIRE_HASHES=1 and hashed install fails, the build will fail.
-# Default is REQUIRE_HASHES=0 (fallback to unhashed install allowed).
-# Build output includes one of:
-#   HASHED_DEPS=ENFORCED        - Hashed install succeeded
-#   HASHED_DEPS=FALLBACK_UNHASHED - Fallback to unhashed install used
-#
-# =============================================================================
+# Canonical Linux serving artifact. Research, cloud, distributed, and development
+# extras are deliberately absent from both build resolution and runtime imports.
+FROM python:3.11.13-slim-bookworm AS builder
+WORKDIR /build
+COPY pyproject.toml setup.py README.md LICENSE ./
+COPY src/vulcan ./src/vulcan
+COPY requirements-runtime.lock ./
+RUN python -m pip install --no-cache-dir --require-hashes --target /install -r requirements-runtime.lock \
+ && python -m pip wheel --no-deps --no-build-isolation --no-cache-dir --wheel-dir /wheels . \
+ && python -m pip install --no-deps --no-index --target /install /wheels/*.whl
 
-# -----------------------------
-# Stage 1: Builder
-# -----------------------------
-FROM python:3.11-slim AS builder
-
-ARG REJECT_INSECURE_JWT="default-super-secret-key-change-me"
-ARG REQUIRE_HASHES=0
-
-# Fail build unless acknowledgement arg changed from default
-RUN test "$REJECT_INSECURE_JWT" != "default-super-secret-key-change-me" || \
-    (echo "Refusing to build: set --build-arg REJECT_INSECURE_JWT=ack (or any non-default value) to acknowledge no JWT secrets are embedded." >&2; exit 1)
-
-# Set build environment related variables
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    LANG=C.UTF-8 \
-    TZ=UTC
-
+FROM python:3.11.13-slim-bookworm AS runtime
+ARG SOURCE_COMMIT=unknown
+ARG DEPENDENCY_LOCK_DIGEST=unknown
+ARG ARCHITECTURE_STATUS_DIGEST=unknown
+ARG REJECT_INSECURE_JWT=ack
+ARG REQUIRE_HASHES=1
+LABEL org.opencontainers.image.revision=$SOURCE_COMMIT \
+      org.vulcan.dependency-lock-digest=$DEPENDENCY_LOCK_DIGEST \
+      org.vulcan.architecture-status-digest=$ARCHITECTURE_STATUS_DIGEST \
+      org.vulcan.qualification-gate="E"
+ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 VULCAN_ENV=production \
+    VULCAN_RUNTIME_DURABLE_ROOT=/var/lib/vulcan VULCAN_ENABLE_SELF_IMPROVEMENT=false \
+    VULCAN_RELEASE_EVIDENCE_ROOT=/app PORT=8000
 WORKDIR /app
-
-# System updates & minimal utilities (curl for healthcheck, ca-certificates)
-# NOTE: Remove packages you do not strictly need to minimize surface.
-# hadolint ignore=DL3008
-RUN apt-get update && \
-    apt-get upgrade -y && \
-    apt-get install -y --no-install-recommends \
-        curl \
-        ca-certificates \
-        build-essential \
-        git \
-        zstd \
-        liblz4-dev \
-        libzstd-dev && \
-    update-ca-certificates && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /var/cache/*
-
-# Upgrade pip and setuptools to latest versions
-# hadolint ignore=DL3013
-RUN pip install --no-cache-dir --root-user-action=ignore --upgrade pip setuptools wheel
-
-# Copy requirement files
-# requirements.txt is the human-friendly file
-# requirements-hashed.txt (optional) should contain --require-hashes enforced entries
-COPY requirements.txt ./requirements.txt
-
-# (Optional) If you include a requirements-hashed.txt in the build context, it will be copied.
-# Do NOT use shell redirection in COPY instruction; Dockerfile does not support it.
-COPY requirements-hashed.txt ./requirements-hashed.txt
-
-# Copy setup.py and source for local package installation
-COPY setup.py ./setup.py
-
-# Create virtual environment (optional; here we use system site-packages directly)
-# RUN python -m venv /opt/venv
-# ENV PATH="/opt/venv/bin:$PATH"
-
-# Install dependencies with hash verification if lock file present and non-empty
-# SECURITY: Uses --require-hashes for supply chain security
-# For production, always provide requirements-hashed.txt with pip-compile --generate-hashes
-# Check if the file exists, is non-empty, and contains actual package entries (not just comments)
-# 
-# NOTE: The requirements-hashed.txt was generated with Python 3.12. If hash mismatches occur
-# on different Python versions or platforms, the build will fall back to unhashed install.
-# For maximum security, regenerate hashes on the target platform.
-#
-# REQUIRE_HASHES build argument controls enforcement:
-#   REQUIRE_HASHES=1: Enforce --require-hashes and fail the build if it does not succeed
-#   REQUIRE_HASHES=0 (default): Attempt hashed install first, allow fallback to requirements.txt
-RUN if [ -f requirements-hashed.txt ] && grep -qE '^[^#]' requirements-hashed.txt; then \
-        echo "=== Attempting hashed dependency installation ==="; \
-        echo "File: requirements-hashed.txt ($(grep -cE '^[^#]' requirements-hashed.txt) non-comment lines)"; \
-        if pip install --no-cache-dir --root-user-action=ignore --require-hashes -r requirements-hashed.txt; then \
-            echo "HASHED_DEPS=ENFORCED"; \
-        elif [ "${REQUIRE_HASHES}" = "1" ]; then \
-            echo "ERROR: Hashed install failed and REQUIRE_HASHES=1 is set. Failing build." >&2; \
-            exit 1; \
-        else \
-            echo "=== WARNING: Hashed install failed, falling back to unhashed install ==="; \
-            echo "This may happen due to platform/architecture differences or hash mismatches."; \
-            echo "For full supply chain security, regenerate requirements-hashed.txt on target platform."; \
-            pip install --no-cache-dir --root-user-action=ignore -r requirements.txt; \
-            echo "HASHED_DEPS=FALLBACK_UNHASHED"; \
-        fi; \
-    elif [ "${REQUIRE_HASHES}" = "1" ]; then \
-        echo "ERROR: requirements-hashed.txt not found or empty, and REQUIRE_HASHES=1 is set. Failing build." >&2; \
-        exit 1; \
-    else \
-        echo "=== WARNING: requirements-hashed.txt not found or empty ==="; \
-        echo "Using unhashed install (NOT RECOMMENDED FOR PRODUCTION)"; \
-        echo "Generate with: pip-compile --generate-hashes requirements.txt"; \
-        pip install --no-cache-dir --root-user-action=ignore -r requirements.txt; \
-        echo "HASHED_DEPS=FALLBACK_UNHASHED"; \
-    fi && \
-    # Clean up pip cache and temporary files after dependencies installation
-    rm -rf /root/.cache/pip /tmp/* /var/tmp/*
-
-# Optional: Generate CycloneDX SBOM (can be skipped by removing lines)
-# This gives you an sbom.json artifact for compliance / scanning.
-# hadolint ignore=DL3013,SC2015
-RUN pip install --no-cache-dir --root-user-action=ignore cyclonedx-bom && \
-    cyclonedx-py requirements requirements.txt -o sbom.json || (echo "CycloneDX generation failed (continuing)"; touch sbom.json) && \
-    # Clean up pip cache after SBOM generation
-    rm -rf /root/.cache/pip /tmp/* /var/tmp/*
-
-# Copy application source (builder keeps full code to run compile step)
-COPY src/ ./src
-
-# Copy GraphixVulcanLLM (main LLM module at project root)
-COPY graphix_vulcan_llm.py ./graphix_vulcan_llm.py
-
-# Copy configuration files (required by application)
-COPY configs/ ./configs/
-
-# Copy Python config module (includes reasoning.yaml)
-COPY config/ ./config/
-
-# Copy demo files (e.g., sse_mind.html)
-COPY demos/ ./demos/
-
-# Copy static files (chat interface HTML/CSS/JS)
-COPY static/ ./static/
-
-# Install local package (graphix) if setup.py exists
-RUN if [ -f setup.py ]; then \
-        echo "Installing local package from setup.py"; \
-        pip install --no-cache-dir --root-user-action=ignore -e .; \
-    fi
-
-# Download spacy language model if spacy is installed
-# Using en_core_web_sm (smaller model ~40MB vs ~400MB for lg) to reduce disk usage
-# Switch to en_core_web_lg only if self-improvement features require better accuracy
-RUN python -m spacy download en_core_web_sm || echo "Spacy model download failed (non-critical)" && \
-    # Clean up pip cache after spacy download
-    rm -rf /root/.cache/pip /tmp/* /var/tmp/*
-
-# Pre-compile Python bytecode (optional performance / tamper evidence)
-RUN python -m compileall -q src && \
-    # Clean up Python cache files after compilation
-    find /app -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
-
-# -----------------------------
-# Stage 2: Runtime (slim)
-# -----------------------------
-FROM python:3.11-slim AS runtime
-
-# Runtime environment settings
-# THREAD THRASHING FIX (Forensic Audit Issue #2):
-# These variables MUST be set before Python imports numpy/torch/scipy
-# to prevent CPU oversubscription. Setting them in the Docker ENV ensures
-# they are available from the very start of any Python process.
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    LANG=C.UTF-8 \
-    TZ=UTC \
-    # Optionally run with Python optimization (-O) by setting below:
-    PYTHONOPTIMIZE=1 \
-    # Thread limits to prevent CPU oversubscription
-    OMP_NUM_THREADS=4 \
-    MKL_NUM_THREADS=4 \
-    TORCH_NUM_THREADS=4 \
-    OPENBLAS_NUM_THREADS=4 \
-    VECLIB_MAXIMUM_THREADS=4 \
-    NUMEXPR_NUM_THREADS=4 \
-    TOKENIZERS_PARALLELISM=false
-
-WORKDIR /app
-
-# OS hardening: minimal updates; remove apt caches immediately
-# Include compression libraries for Vulcan Memory System (zstd, lz4)
-# Note: libgl1-mesa-glx was replaced with libgl1 in Debian trixie
-# hadolint ignore=DL3008
-RUN apt-get update && \
-    apt-get upgrade -y && \
-    apt-get install -y --no-install-recommends \
-        curl \
-        ca-certificates \
-        libgl1 \
-        libglib2.0-0 \
-        zstd \
-        liblz4-1 \
-        libzstd1 && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /var/cache/*
-
-# Create non-root user (uid 1001) and group
-RUN useradd -r -u 1001 -d /app -s /usr/sbin/nologin graphix && \
-    mkdir -p /app && chown -R graphix:graphix /app
-
-# Copy only necessary Python site-packages and application code from builder
-# This reduces image size and avoids build tools presence.
-COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
-COPY --from=builder /app/src ./src
-COPY --from=builder /app/graphix_vulcan_llm.py ./graphix_vulcan_llm.py
-COPY --from=builder /app/configs ./configs
-# Copy Python config module (includes reasoning.yaml)
-COPY --from=builder /app/config ./config
-# Copy demo files (e.g., sse_mind.html)
-COPY --from=builder /app/demos ./demos
-# Copy static files (chat interface HTML/CSS/JS)
-COPY --from=builder /app/static ./static
-# Copy generated SBOM (optional)
-COPY --from=builder /app/sbom.json ./sbom.json
-
-# Source mutation and deployment capabilities belong to the separately built
-# offline operator artifact.  They are physically absent from the serving image,
-# rather than relying on configuration or filesystem permissions for denial.
-RUN rm -f \
-      /usr/local/bin/vulcan-improvement-operator \
-      /app/src/vulcan/improvement/offline.py \
-      /app/src/vulcan/endpoints/self_improvement.py \
-      /app/src/vulcan/world_model/self_improvement.py \
-      /app/src/vulcan/world_model/self_improvement_apply.py \
-      /app/src/vulcan/world_model/self_improvement_engine.py \
-      /app/src/vulcan/world_model/meta_reasoning/governed_transaction.py \
-      /app/src/vulcan/world_model/meta_reasoning/self_improvement_drive.py
-
-# Production runtime immutability: source, bundled policy/config, and model assets are read-only.
-# Only explicit state/cache directories are writable by the non-root runtime user.
-RUN mkdir -p /var/lib/vulcan/audit /var/lib/vulcan/alignment /var/lib/vulcan/domains /var/lib/vulcan/memory /var/lib/vulcan/learning/outbox /var/lib/vulcan/csiu /var/lib/vulcan/approval /var/lib/vulcan/improvement /app/data /app/data/backups /tmp/vulcan-cache /app/models && \
-    chown -R root:root /app/src /app/configs /app/config /app/models && \
-    chmod -R a-w /app/src /app/configs /app/config /app/models && \
-    chown -R graphix:graphix /var/lib/vulcan /app/data /tmp/vulcan-cache && \
-    chmod 0700 /var/lib/vulcan /var/lib/vulcan/audit /var/lib/vulcan/alignment /var/lib/vulcan/domains /var/lib/vulcan/memory /var/lib/vulcan/learning /var/lib/vulcan/learning/outbox /var/lib/vulcan/csiu /var/lib/vulcan/approval /var/lib/vulcan/improvement /tmp/vulcan-cache
-
-# Add hardened entrypoint script
-# This updated script enforces:
-# - JWT secret presence
-# - Minimum length >= 32 chars
-# - Rejects known weak patterns
-# - Ensures urlsafe compatibility (basic check)
+COPY --from=builder /install /usr/local/lib/python3.11/site-packages
+COPY config/capabilities.yaml config/architecture-status.json /app/config/
+COPY docs/architecture/ami-invariants.yaml docs/architecture/adr-006-local-language-interface.md /app/docs/architecture/
+COPY docs/governance/controls.yaml docs/governance/impact-assessment.yaml /app/docs/governance/
+COPY tests/security/test_language_contracts.py /app/tests/security/test_language_contracts.py
+RUN useradd -r -u 1001 -d /app -s /usr/sbin/nologin vulcan \
+ && install -d -o vulcan -g vulcan -m 0700 /var/lib/vulcan /tmp/vulcan-cache
+RUN rm -rf \
+      /usr/local/lib/python3.11/site-packages/vulcan/arena \
+      /usr/local/lib/python3.11/site-packages/vulcan/orchestrator \
+      /usr/local/lib/python3.11/site-packages/vulcan/deployment \
+      /usr/local/lib/python3.11/site-packages/vulcan/semantic_bridge \
+      /usr/local/lib/python3.11/site-packages/vulcan/reasoning \
+      /usr/local/lib/python3.11/site-packages/vulcan/curiosity_engine \
+      /usr/local/lib/python3.11/site-packages/vulcan/world_model \
+      /usr/local/lib/python3.11/site-packages/vulcan/runtime/semantic.py \
+      /usr/local/lib/python3.11/site-packages/vulcan/improvement/offline.py
 COPY entrypoint.sh /app/entrypoint.sh
-RUN chmod 0555 /app/entrypoint.sh
-
-# Application database location environment variable example (SQLite default)
-ENV SQLALCHEMY_DATABASE_URI="sqlite:///graphix_api.db"
-# Production imports one package identity only.  Do not add /app here: doing so
-# makes the same VULCAN source importable as both ``src.vulcan`` and ``vulcan``.
-ENV PYTHONPATH=/app/src
-ENV VULCAN_ENV=production
-ENV VULCAN_SAFETY_LEVEL=strict
-ENV VULCAN_ENABLE_SELF_IMPROVEMENT=false
-ENV VULCAN_RUNTIME_DURABLE_ROOT=/var/lib/vulcan
-ENV VULCAN_CACHE_ROOT=/tmp/vulcan-cache
+RUN chown root:root /app/entrypoint.sh /usr/local/lib/python3.11/site-packages \
+ && chmod 0555 /app/entrypoint.sh \
+ && chown -R root:root /app/config /app/docs /app/tests \
+ && chmod -R a-w /usr/local/lib/python3.11/site-packages /app/config /app/docs /app/tests
 VOLUME ["/var/lib/vulcan"]
-
-# Default port for containerized deployments (can be overridden via PORT env var)
-ENV PORT=8000
-
-# Expose application port (Flask / FastAPI / Graphix API Server)
 EXPOSE 8000
-
-# Switch to non-root user
-USER graphix
-
-# Healthcheck using curl (uses fast /health/live endpoint)
-# Uses PORT env var with default of 8000 if not set
-# CRITICAL: start-period must be long enough for ML model loading
-# The application loads BERT, spaCy en_core_web_lg (~300s worst case), and embedding models
-# start-period=600s allows up to 10 minutes for initial startup before health checks begin
-# interval=30s checks every 30 seconds after start-period
-# timeout=10s gives each check 10 seconds to respond
-# retries=3 allows 3 failures before marking unhealthy
-HEALTHCHECK --interval=30s --timeout=10s --start-period=600s --retries=3 \
-    CMD curl -fsS http://localhost:${PORT:-8000}/health/live || exit 1
-
-# Entrypoint ensures runtime secrets are provided securely
+USER vulcan
+HEALTHCHECK --interval=10s --timeout=3s --start-period=20s --retries=6 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready',timeout=2)" || exit 1
 ENTRYPOINT ["/app/entrypoint.sh"]
-
-# Default command - runs the single statically composed VULCAN runtime.
-# Note: The PORT environment variable is used for flexibility (default 8000)
-# PRODUCTION MODE: --workers 1 ensures singleton process (no split-brain)
-# DO NOT use --reload in production as it spawns a parent watcher + child worker
-CMD ["sh", "-c", "uvicorn vulcan.runtime.app:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"]
+CMD ["sh", "-c", "python -m uvicorn vulcan.runtime.app:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"]

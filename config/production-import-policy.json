@@ -1,0 +1,40 @@
+{
+  "schema": "vulcan-production-import-policy/v1",
+  "entrypoint": "vulcan.runtime.app",
+  "allowed_prefixes": [
+    "vulcan.constitution",
+    "vulcan.graphix",
+    "vulcan.improvement.proposal",
+    "vulcan.learning_owner",
+    "vulcan.memory.composition",
+    "vulcan.memory.governed",
+    "vulcan.microkernel",
+    "vulcan.platform",
+    "vulcan.runtime",
+    "vulcan.safety.response_adapter",
+    "vulcan.safety.safety_types",
+    "vulcan.state_authorities",
+    "vulcan.assurance.capabilities",
+    "vulcan.learning_bandit",
+    "vulcan.local_language",
+    "vulcan.memory.outbox",
+    "vulcan.persistence",
+    "vulcan.core",
+    "vulcan.assurance.evidence"
+  ],
+  "denied_prefixes": [
+    "src.vulcan",
+    "vulcan.arena",
+    "vulcan.orchestrator",
+    "vulcan.deployment",
+    "vulcan.semantic_bridge",
+    "vulcan.reasoning",
+    "vulcan.curiosity_engine",
+    "vulcan.npt",
+    "vulcan.research",
+    "vulcan.experimental",
+    "vulcan.cloud",
+    "vulcan.distributed",
+    "vulcan.runtime.semantic"
+  ]
+}

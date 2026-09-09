@@ -5,7 +5,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
-from .semantic import EpistemicStatus
+from vulcan.graphix.runtime import EpistemicStatus
 from vulcan.persistence.transactions import TransactionId
 
 SCHEMA_VERSION="vulcan-alignment/1"; POLICY_ID="canonical-evidence-bound"; MAX_HIST=16

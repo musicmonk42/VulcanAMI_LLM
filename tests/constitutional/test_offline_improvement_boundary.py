@@ -39,9 +39,9 @@ def test_serving_import_closure_has_no_install_or_process_capability() -> None:
         imports = {alias.name.split(".")[0] for node in ast.walk(tree) if isinstance(node, ast.Import) for alias in node.names}
         assert imports.isdisjoint({"subprocess", "shutil", "tempfile"})
     dockerfile = Path("Dockerfile").read_text()
-    for capability in ("improvement/offline.py", "governed_transaction.py", "self_improvement_drive.py"):
-        assert f"/app/src/vulcan/{capability}" in dockerfile or capability in dockerfile
-    assert "/usr/local/bin/vulcan-improvement-operator" in dockerfile
+    assert "/site-packages/vulcan/improvement/offline.py" in dockerfile
+    assert "/site-packages/vulcan/world_model" in dockerfile
+    assert "vulcan-improvement-operator" not in dockerfile
 
 
 def test_serving_proposal_store_is_immutable_and_rejects_escape(tmp_path: Path) -> None:
