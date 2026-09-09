@@ -33,7 +33,11 @@ The generated [architecture truth map](docs/generated/architecture-inventory.md#
 | Bounded deterministic arithmetic | `RuntimeContainer.CognitiveKernel` | **M3 — Canonical** | NFC-normalized bounded arithmetic only; no broad reasoning, neural-provider, or general tool authority |
 <!-- END GENERATED ARCHITECTURE CAPABILITIES -->
 
-No other capability is advertised as production-ready. Implemented or tested subsystems below M3 are visible in the generated truth map, but are not public runtime claims.
+This row is advertised only while the live `CapabilityManifestAuthority`
+attestation confirms the same owner, release, M3 route, active mode, state
+digest, readiness, and constitutional permission. No other capability is
+advertised as production-ready. Implemented or tested subsystems below M3 are
+visible in the generated truth map, but are not public runtime claims.
 
 ## Architecture
 

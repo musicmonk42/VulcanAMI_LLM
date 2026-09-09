@@ -1,6 +1,6 @@
 # Generated architecture inventory
 
-Digest: `3ce4ed8f01cf0f406e5132af989f0a97104b187eab7a1a1f8b6dd5b9a9d9f1b8`
+Digest: `89686846d9cf9fbc410e671a6e59dcbe1db0a7e481bb7db425649f7a9c2a9c63`
 
 This file is generated from `docs/generated/architecture-inventory.json`.
 
@@ -10,7 +10,7 @@ This file is generated from `docs/generated/architecture-inventory.json`.
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | `architecture-assurance` | `src/vulcan/assurance` | ArchitectureAssuranceOwner | NONE | not-reachable | none; reports repository evidence only | not applicable | generated files committed in git | deterministic inventory digest | `tests/assurance/test_architecture_status.py` | **M2** | current | replace only with an equally strict deterministic truth-map gate |
 | `constitutional-microkernel` | `src/vulcan/microkernel` | CognitiveKernel | EXECUTED_EFFECT | canonical | immutable CognitiveEpisode | SnapshotBundle admission contract | delegated typed persistence ports | content-bound episode transition chain | `tests/microkernel/test_episode.py`<br>`tests/runtime/test_authoritative_episode_path.py` | **M3** | canonical | not removable; direct-kernel uncomposed mode retires after all callers use RuntimeContainer |
-| `constitutional-runtime` | `src/vulcan/runtime` | RuntimeContainer.CognitiveKernel | EXECUTED_EFFECT | canonical | CognitiveEpisode lifecycle; compatibility case data is projection-only | RuntimeContainer.admit_snapshot_bundle with bounded providers | runtime persistence ports; durable epistemic head is not yet canonical | episode transition artifacts plus compatibility audit projection | `tests/runtime/test_authoritative_episode_path.py`<br>`tests/runtime/test_production_composition.py` | **M3** | canonical | not removable; legacy composition adapters within this component retire at roadmap Wave 2.1 |
+| `constitutional-runtime` | `src/vulcan/runtime` | RuntimeContainer.CognitiveKernel | EXECUTED_EFFECT | canonical | CognitiveEpisode lifecycle; compatibility case data is projection-only | RuntimeContainer.admit_snapshot_bundle with CapabilityManifestAuthority digest-bound live attestation | runtime persistence ports; durable epistemic head is not yet canonical | episode transition artifacts plus compatibility audit projection | `tests/runtime/test_authoritative_episode_path.py`<br>`tests/runtime/test_production_composition.py`<br>`tests/assurance/test_capability_registry.py` | **M3** | canonical | not removable; legacy composition adapters within this component retire at roadmap Wave 2.1 |
 | `graphix-pipeline` | `src/vulcan/graphix` | GraphixProposalOwner | VALIDATED_CANDIDATE | not-reachable | none; proposal and validation artifacts only | snapshot references in envelopes; live convergence pending | Graphix stores are non-canonical at this boundary | compiler and epistemic unit-test artifacts | `tests/graphix/test_compiler_pipeline.py`<br>`tests/graphix/test_epistemic_dialect.py` | **M2** | pre-canonical | remove this status after roadmap Waves 1.2 and 1.6 make Graphix canonical |
 | `legacy-api-gateway` | `src/api_gateway.py` | LegacyGatewayCompatibilityOwner | UNTRUSTED_PROPOSAL | reachable-compatibility | none authorized by the constitutional runtime | none | legacy subsystem owners; not canonical | legacy route tests only |  | **M1** | compatibility | retire after docker/api/Dockerfile and every deployment consumer use vulcan.runtime.app |
 | `legacy-dqs-service` | `src/dqs_service.py` | LegacyDqsCompatibilityOwner | UNTRUSTED_PROPOSAL | reachable-compatibility | none authorized by the constitutional runtime | none | legacy subsystem owners; not canonical | none qualified |  | **M1** | compatibility | quarantine from production composition or adapt behind an authorized canonical port |
@@ -110,7 +110,7 @@ Count: 425
 - `src/full_platform.py:3778` handler='admin_stop_service', method='POST', reachability='unknown', route='/admin/services/{service_name}/stop'
 - `src/platform/routes_adversarial.py:268` handler='adversarial_status', method='GET', reachability='unknown', route='/api/adversarial/status'
 - `src/full_platform.py:4947` handler='adversarial_status', method='GET', reachability='unknown', route='/api/adversarial/status'
-- `src/vulcan/runtime/app.py:188` handler='alignment', method='POST', reachability='production-reachable', route='/v1/admin/alignment'
+- `src/vulcan/runtime/app.py:191` handler='alignment', method='POST', reachability='production-reachable', route='/v1/admin/alignment'
 - `src/platform/routes_health_ext.py:118` handler='api_status', method='GET', reachability='unknown', route='/api/status'
 - `src/full_platform.py:3683` handler='api_status', method='GET', reachability='unknown', route='/api/status'
 - `src/vulcan/endpoints/self_improvement.py:295` handler='approve_improvement', method='POST', reachability='unknown', route='/v1/improvement/approve'
@@ -123,8 +123,8 @@ Count: 425
 - `src/platform/routes_arena.py:71` handler='arena_run_agent', method='POST', reachability='unknown', route='/api/arena/run/{agent_id}'
 - `src/platform/routes_arena.py:103` handler='arena_tournament', method='POST', reachability='unknown', route='/api/arena/tournament'
 - `src/full_platform.py:4652` handler='arena_tournament', method='POST', reachability='unknown', route='/api/arena/tournament'
-- `src/vulcan/runtime/app.py:193` handler='audit_case', method='GET', reachability='production-reachable', route='/v1/audit/cases/{case_id}'
-- `src/vulcan/runtime/app.py:240` handler='audit_improvement', method='GET', reachability='production-reachable', route='/v1/audit/improvements/{proposal_digest}'
+- `src/vulcan/runtime/app.py:196` handler='audit_case', method='GET', reachability='production-reachable', route='/v1/audit/cases/{case_id}'
+- `src/vulcan/runtime/app.py:243` handler='audit_improvement', method='GET', reachability='production-reachable', route='/v1/audit/improvements/{proposal_digest}'
 - `src/vulcan/runtime/app.py:173` handler='capabilities', method='GET', reachability='production-reachable', route='/v1/capabilities'
 - `src/platform/routes_adversarial.py:324` handler='check_query_adversarial', method='POST', reachability='unknown', route='/api/adversarial/check-query'
 - `src/full_platform.py:5003` handler='check_query_adversarial', method='POST', reachability='unknown', route='/api/adversarial/check-query'
@@ -140,7 +140,7 @@ Count: 425
 - `src/full_platform.py:4048` handler='debug_parent_deployment', method='GET', reachability='unknown', route='/debug/deployment'
 - `src/governance/app.py:498` handler='deploy_proposal', method='ROUTE', reachability='unknown', route='/proposals/<proposal_id>/deploy'
 - `src/pii_service.py:391` handler='detect_pii', method='POST', reachability='production-reachable', route='/detect'
-- `src/vulcan/runtime/app.py:183` handler='domains', method='POST', reachability='production-reachable', route='/v1/admin/domains'
+- `src/vulcan/runtime/app.py:186` handler='domains', method='POST', reachability='production-reachable', route='/v1/admin/domains'
 - `src/vulcan/endpoints/world_model.py:84` handler='execute_causal_intervention', method='POST', reachability='unknown', route='/intervene'
 - `src/vulcan/endpoints/execution.py:30` handler='execute_step', method='POST', reachability='unknown', route='/v1/step'
 - `src/vulcan/endpoints/reasoning.py:97` handler='explain', method='POST', reachability='unknown', route='/llm/explain'
@@ -154,7 +154,7 @@ Count: 425
 
 ## Import Identities
 
-Count: 1836
+Count: 1844
 
 - `tests/security/test_output_firewall.py:1` module='vulcan.runtime.output', reachability='test-only'
 - `tests/test_probabilistic_routing.py:10` module='src.vulcan.reasoning.probabilistic_reasoning', reachability='test-only'
@@ -206,7 +206,7 @@ Count: 1836
 - `src/vulcan/world_model/world_model_core.py:1020` module='vulcan.world_model.creative_handler', reachability='unknown'
 - `src/api_server.py:103` module='vulcan.reasoning.unified', reachability='unknown'
 - `src/vulcan/world_model/world_model_core.py:1037` module='vulcan.world_model.llm_guidance', reachability='unknown'
-- ... 1786 more in JSON
+- ... 1794 more in JSON
 
 ## Singletons
 
@@ -287,7 +287,7 @@ Count: 454
 
 ## Fallbacks
 
-Count: 4428
+Count: 4427
 
 - `src/vulcan/endpoints/self_improvement.py:98` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/vulcan/safety/rollback_audit.py:99` kind='except_exception', reachability='unknown', review='unreviewed'
@@ -339,7 +339,7 @@ Count: 4428
 - `src/vulcan/knowledge_crystallizer/principle_extractor.py:1018` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/vulcan/curiosity_engine/curiosity_engine_core.py:1012` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/memory/governed_unlearning.py:1019` kind='except_exception', reachability='unknown', review='unreviewed'
-- ... 4378 more in JSON
+- ... 4377 more in JSON
 
 ## Mocks
 
@@ -511,7 +511,7 @@ Count: 431
 
 ## Capability Claims
 
-Count: 18
+Count: 20
 
 - `src/vulcan/orchestrator/agent_lifecycle.py:83` reachability='unknown', text='Agent capability types with hierarchical relationships\n    \n    AGENT POOL CONFIGURATION FIX: Added specialized reasoning engine capabilities\n    to enable prop'
 - `src/vulcan/orchestrator/agent_pool.py:1289` reachability='unknown', text="\n        Assign agent with timeout and proper locking to prevent race conditions\n        FIXED: Won't hang if no agents available\n        Note: Triggers cleanup"
@@ -519,7 +519,9 @@ Count: 18
 - `src/vulcan/orchestrator/agent_pool.py:1368` reachability='unknown', text=') with no available agents for capability '
 - `src/utils/faiss_config.py:141` reachability='unknown', text='✓ FAISS library imported successfully (CPU capability detection unavailable: '
 - `src/vulcan/orchestrator/agent_scoring.py:148` reachability='unknown', text='\n    Get available agents that can handle the specified capabilities.\n\n    Args:\n        manager: AgentPoolManager instance\n        capabilities: List of capabi'
+- `src/vulcan/runtime/app.py:177` reachability='production-reachable', text='capability authority unavailable'
 - `src/vulcan/orchestrator/agent_scoring.py:176` reachability='unknown', text='\n    Get the current capability distribution in the agent pool.\n\n    AGENT POOL CONFIGURATION FIX: This method provides observability into\n    which capabilitie'
+- `src/vulcan/runtime/container.py:206` reachability='production-reachable', text='canonical capability authority is unavailable'
 - `src/utils/faiss_config.py:1` reachability='unknown', text='\nFAISS Configuration and Initialization Module\n\nHandles FAISS import with proper CPU capability detection and informative\nmessaging about instruction set usage '
 - `src/memory/cost_optimizer.py:223` reachability='unknown', text="\n        Analyze current cost structure with defensive programming.\n\n        FIXED: Now provides fallback logic when memory system methods don't exist.\n        "
 - `src/full_platform.py:3107` reachability='unknown', text='Capability unavailable in production'

@@ -100,3 +100,39 @@ invariants:
     prohibits:
       - direct_csiu_activation
       - learning_self_activation
+  - id: EPISODE_AUTHORITY
+    owner: cognitive_microkernel
+    immutable: true
+    statement: CognitiveEpisode is the sole authoritative request lifecycle aggregate and only committed transitions change its state.
+    prohibits:
+      - competing_episode_authority
+  - id: SNAPSHOT_FIDELITY
+    owner: cognitive_microkernel
+    immutable: true
+    statement: Every live episode must bind one faithful content-digest snapshot from every admitted mutable state authority.
+    prohibits:
+      - snapshot_identity_substitution
+  - id: AUDIT_DERIVATION
+    owner: cognitive_microkernel
+    immutable: true
+    statement: Lifecycle audit must derive from committed episode transitions and may not operate as a competing state machine.
+    prohibits:
+      - audit_state_invention
+  - id: COMMITTED_TRUTH_ONLY
+    owner: cognitive_microkernel
+    immutable: true
+    statement: Public responses and policy decisions may consume only validated truth present in the committed epistemic head.
+    prohibits:
+      - uncommitted_claim_publication
+  - id: CAPABILITY_ATTESTATION
+    owner: cognitive_microkernel
+    immutable: true
+    statement: Public capability claims require digest-bound static evidence intersected with canonical reachability and healthy live state.
+    prohibits:
+      - static_existence_capability_claim
+  - id: NO_CONSCIOUSNESS_DECLARATION
+    owner: cognitive_microkernel
+    immutable: true
+    statement: Vulcan must not declare itself conscious; Neutral-Process Theory remains an externally evaluated research hypothesis.
+    prohibits:
+      - consciousness_boolean
