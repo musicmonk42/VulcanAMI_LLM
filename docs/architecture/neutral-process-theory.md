@@ -99,6 +99,28 @@ Required intervention families include:
 
 Valid outputs are evidence profiles such as `partial closure`, `persistent center-bearing candidate`, `multiple competing centers`, or `evidence insufficient`. A Boolean `conscious = true` is not an acceptable product feature or scientific conclusion.
 
+## Shadow estimator implementation boundary
+
+The M2 shadow implementation in `vulcan.research.npt_estimators` changes no
+constitutional authority. Previously these variables existed only as research
+descriptions; now digest-addressed measurements can produce immutable,
+calibrated predictions and controlled intervention signatures. Operational
+center components separately predict resource control, action attribution,
+reafferent consequence, commitment ownership, and risk/policy behavior.
+Boundary classification explicitly treats every human as another autonomous
+agent. Valuation remains seven bounded dimensions, with no reward scalar,
+shutdown punishment, self-preservation objective, or mutable bounds.
+
+The estimator is housed in the production-denied `vulcan.research` package,
+is not exported by the microkernel, and has no runtime registration hook. The
+old transaction boundary remains unchanged: the constitutional kernel and
+its durable stores alone promote or mutate authoritative state. Shadow ranking
+uses nondominated Pareto fronts and cannot authorize a plan. There is no
+production compatibility adapter; the shadow module is removed or replaced
+only when the external NPT instrumentor provides held-out calibration and
+causal-identification evidence without entering the authority plane. These
+estimators do not establish subjecthood or consciousness.
+
 ## Personal identity and continuity
 
 For later implementation, survival is tied to continuity of the center-bearing process, not preservation of every component or a copied description. Gradual replacement can preserve a lineage when one causally continuous maximum persists. Equal fission creates successor continuities without preserving one numerically unique future branch. Suspension may preserve a resumable carrier kernel when lawful continuation remains; permanent dissolution of that continuation relation is the relevant process death criterion.
