@@ -6,6 +6,7 @@ from importlib import import_module, util
 from types import SimpleNamespace
 
 from vulcan.microkernel.episode_store import EpisodeStore
+from vulcan.microkernel.epistemic_store import EpistemicStore
 
 from .constitutional_kernel import ConstitutionalCognitiveKernel
 from .container import RuntimeContainer
@@ -79,10 +80,16 @@ def _bind_constitutional_admission(container: RuntimeContainer) -> RuntimeContai
     # lifecycle audit exclusively from transactions already committed by store.
     container.kernel.disable_legacy_case_audit()
     container.episode_store = store
+    epistemic_store = EpistemicStore(
+        container.durable_root / "epistemic" / "epistemic.sqlite3",
+        outbox_sink=container.audit.append_epistemic_commit,
+    )
+    container.epistemic_store = epistemic_store
     container.kernel = ConstitutionalCognitiveKernel.from_kernel(
         container.kernel,
         snapshot_admitter=container.admit_snapshot_bundle,
         episode_store=store,
+        epistemic_store=epistemic_store,
     )
     return container
 

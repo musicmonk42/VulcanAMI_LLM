@@ -12,6 +12,7 @@ from uuid import uuid4
 
 from vulcan.microkernel.episode import ActorBinding, CognitiveEpisode
 from vulcan.microkernel.episode_store import EpisodeStore
+from vulcan.microkernel.epistemic_store import EpistemicStore
 from vulcan.microkernel.snapshots import SnapshotBundle
 from vulcan.microkernel.state_machine import EpisodeState
 from vulcan.microkernel.principals import Principal, PrincipalKind
@@ -94,6 +95,7 @@ class ConstitutionalCognitiveKernel:
         *,
         snapshot_admitter: SnapshotAdmitter,
         episode_store: EpisodeStore | None = None,
+        epistemic_store: EpistemicStore | None = None,
     ) -> "ConstitutionalCognitiveKernel":
         if not callable(snapshot_admitter):
             raise TypeError("snapshot_admitter must be callable")
@@ -105,7 +107,12 @@ class ConstitutionalCognitiveKernel:
                 prefix="vulcan-episode-compat-", suffix=".sqlite3", delete=False
             ).name
             episode_store = EpisodeStore(path)
-        service = ConstitutionalTransactionService(episode_store)
+        if epistemic_store is None:
+            path = tempfile.NamedTemporaryFile(
+                prefix="vulcan-epistemic-compat-", suffix=".sqlite3", delete=False
+            ).name
+            epistemic_store = EpistemicStore(path)
+        service = ConstitutionalTransactionService(episode_store, epistemic_store)
         principal = Principal(
             PrincipalKind.SYSTEM_KERNEL,
             "constitutional-cognitive-kernel",

@@ -11,11 +11,13 @@ from enum import Enum
 from typing import Mapping, Sequence
 
 from vulcan.constitution.primitives import AuthorityLevel
+from vulcan.graphix.epistemic import EpistemicCommit, commit_to_dict
 
 from .authority import AuthorityError, AuthorityGrant, EvidenceRecord, Operation
 from .capability_tokens import CapabilityToken, CapabilityTokenIssuer
 from .episode import ArtifactRef, CognitiveEpisode, canonical_digest
 from .episode_store import EpisodeConflict, EpisodeStore
+from .epistemic_store import EpistemicStore
 from .principals import Principal, digest
 from .state_machine import EpisodeState
 
@@ -135,10 +137,116 @@ class TerminalOutcome(str, Enum):
 class ConstitutionalTransactionService:
     """Validate a command against the durable head and advance it by CAS."""
 
-    def __init__(self, store: EpisodeStore) -> None:
+    def __init__(
+        self, store: EpisodeStore, epistemic_store: EpistemicStore | None = None
+    ) -> None:
         if not isinstance(store, EpisodeStore):
             raise TypeError("a durable EpisodeStore is required")
         self._store = store
+        self._epistemic_store = epistemic_store
+
+    def epistemic_head(self, episode_id: str) -> EpistemicCommit | None:
+        if self._epistemic_store is None:
+            raise AuthorityError("durable epistemic authority is not bound")
+        return self._epistemic_store.head(episode_id)
+
+    def commit_epistemic_candidate(
+        self,
+        episode_id: str,
+        auth: CommandAuthority,
+        candidate: EpistemicCommit,
+    ) -> CognitiveEpisode:
+        """Commit Graphix Epistemic bytes before projecting them into the episode."""
+        if self._epistemic_store is None:
+            raise AuthorityError("durable epistemic authority is not bound")
+        if (
+            not auth.principal.is_kernel
+            or auth.grant.principal_digest != auth.principal.identity_digest
+            or not auth.grant.level.dominates(AuthorityLevel.COMMITTED_BELIEF)
+        ):
+            raise AuthorityError("only SYSTEM_KERNEL may commit epistemic candidates")
+        head = self._store.load(episode_id)
+        snapshot = "sha256:" + auth.snapshot_digest
+        if (
+            candidate.episode_id != episode_id
+            or candidate.case_id != episode_id
+            or candidate.snapshot_digest != snapshot
+            or candidate.authority_principal_id
+            != f"principal:{auth.principal.identity_digest[:32]}"
+            or candidate.authority_release_digest
+            != f"sha256:{auth.principal.release_digest}"
+            or candidate.validation_digest != f"sha256:{auth.validation_digest}"
+            or candidate.policy_digest != f"sha256:{auth.policy_digest}"
+            or candidate.authority_evidence_digest
+            != f"sha256:{auth.grant.evidence_digest}"
+            or head.snapshot_bundle is None
+            or head.snapshot_bundle.state_digest != auth.snapshot_digest
+            or head.digest != auth.expected_prior_episode_digest
+        ):
+            raise AuthorityError("epistemic candidate authority binding mismatch")
+        durable_head = self._epistemic_store.head(episode_id)
+        if durable_head is not None and self._same_epistemic_payload(
+            durable_head, candidate
+        ):
+            # Recovery for the DB-first crash window: epistemic persistence may
+            # have succeeded before its episode projection was acknowledged.
+            committed = durable_head
+        else:
+            committed = self._epistemic_store.append(
+                candidate, candidate.prior_commit_digest
+            )
+        claims = tuple(
+            ArtifactRef(
+                item.claim_id,
+                committed.commit_digest.removeprefix("sha256:"),
+                "graphix-epistemic-claim.v1",
+            )
+            for item in committed.claims
+        )
+        evidence = tuple(
+            ArtifactRef(
+                item.evidence_id,
+                item.content_digest.removeprefix("sha256:"),
+                "graphix-epistemic-evidence.v1",
+            )
+            for item in committed.evidence
+        )
+        derivations = tuple(
+            ArtifactRef(
+                item.derivation_id,
+                committed.commit_digest.removeprefix("sha256:"),
+                "graphix-epistemic-derivation.v1",
+            )
+            for item in committed.derivations
+        )
+        return self._advance(
+            episode_id,
+            auth,
+            EpisodeState.EPISTEMICALLY_COMMITTED,
+            reason="durable Graphix Epistemic head committed",
+            minimum=AuthorityLevel.COMMITTED_BELIEF,
+            claims=claims,
+            evidence=evidence,
+            derivations=derivations,
+        )
+
+    @staticmethod
+    def _same_epistemic_payload(
+        committed: EpistemicCommit, candidate: EpistemicCommit
+    ) -> bool:
+        def stable_document(value: EpistemicCommit) -> dict[str, object]:
+            document = commit_to_dict(value)
+            for field in (
+                "authority_evidence_digest",
+                "commit_digest",
+                "commit_id",
+                "committed_at",
+                "prior_commit_digest",
+            ):
+                document.pop(field)
+            return document
+
+        return stable_document(committed) == stable_document(candidate)
 
     def _advance(
         self,
@@ -250,6 +358,11 @@ class ConstitutionalTransactionService:
         evidence: Sequence[ArtifactRef],
         derivations: Sequence[ArtifactRef],
     ) -> CognitiveEpisode:
+        if self._epistemic_store is not None:
+            raise AuthorityError(
+                "compatibility artifact commitment is disabled when durable "
+                "epistemic authority is bound"
+            )
         return self._advance(
             episode_id,
             auth,
@@ -278,6 +391,14 @@ class ConstitutionalTransactionService:
             )
         if authorization.policy_digest != auth.policy_digest:
             raise AuthorityError("publication authorization policy mismatch")
+        if self._epistemic_store is not None:
+            epistemic_head = self.epistemic_head(episode_id)
+            if (
+                epistemic_head is None
+                or authorization.committed_epistemic_head
+                != epistemic_head.commit_digest.removeprefix("sha256:")
+            ):
+                raise AuthorityError("publication is not bound to the epistemic head")
         return self._advance(
             episode_id,
             auth,
@@ -406,6 +527,16 @@ class ConstitutionalTransactionService:
             or publication.policy_digest != auth.policy_digest
         ):
             raise AuthorityError("terminal publication authorization mismatch")
+        if publication is not None and self._epistemic_store is not None:
+            epistemic_head = self.epistemic_head(episode_id)
+            if (
+                epistemic_head is None
+                or publication.committed_epistemic_head
+                != epistemic_head.commit_digest.removeprefix("sha256:")
+            ):
+                raise AuthorityError(
+                    "terminal publication is not bound to the epistemic head"
+                )
         targets = {
             TerminalOutcome.ABSTENTION: EpisodeState.ABSTAINED,
             TerminalOutcome.BLOCK: EpisodeState.BLOCKED,
