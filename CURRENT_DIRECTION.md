@@ -52,6 +52,13 @@ resumes idempotent update and lineage ports from each durable boundary. This is
 not yet M3 because the composed request/effect path and cross-store atomic
 transaction are still pending.
 
+Causal autobiographical memory is now M2 as a bounded kernel-owned durable
+protocol. It records approved typed fact references and explicit causal edges,
+supports correction/supersession and tombstones without rewriting history, and
+retrieves only within tenant/person/purpose scope by causal bearing. It is not
+yet M3 because canonical effect/reafference composition and a shared atomic
+episode/lineage transaction remain pending.
+
 ## Governing equation
 
 ```text
