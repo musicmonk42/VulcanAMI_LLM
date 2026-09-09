@@ -42,6 +42,20 @@ Repository assurance is now **M2 — Tested locally**: the Python 3.11 constitut
 
 The preceding episode-foundation PR advances authoritative cognitive episodes and snapshot admission toward M3 for the bounded deterministic request path. It does not yet make the new Graphix compiler, Graphix Epistemic ledger, or independent nine-authority ports canonical.
 
+One Graphix path is **M3 — Canonical for bounded arithmetic and typed lookup**:
+the production cognitive kernel imports the canonical Graphix runtime rather
+than `runtime.semantic`; five code-owned dialects describe interpretation
+proposal, validated candidate, arithmetic/domain plan candidate, epistemic
+commit candidate, and response projection. Only the registered, non-dynamic
+`arithmetic` and `lookup` operations can compile. Graphix output remains a
+`VALIDATED_CANDIDATE`, and the constitutional transaction service remains the
+only commitment boundary. `runtime.semantic` is now a compatibility re-export
+for tests and research callers and is removed when those imports migrate.
+Every success and abstention validates a live interpretation envelope; supported
+operations also require a validated plan artifact before execution, and every
+durable claim records the producing Graphix artifact digest.
+Exact built-artifact restart qualification remains below M4.
+
 Atomic episode admission is **M3 — Canonical for the composed request path**: every supported production handler asks the composed kernel admission service to create a snapshot-bound genesis episode before the compatibility case becomes visible. Admission and cancellation release leases, direct unadmitted bypass fails closed, and compatibility ledger mutation rolls back when an episode transition fails. The legacy semantic ledger and migration-only post-genesis bind adapters keep overall episode authority below complete Wave 1 convergence, and exact artifact/restart qualification remains below M4.
 
 Durable episode authority is **M3 — Canonical for the composed request path**:
@@ -191,9 +205,15 @@ or mutation method. The retained
 removed when those callers migrate to typed inputs. Gate E remains incomplete
 until Wave 2.3 import closure and exact built-image restart qualification pass.
 
-### 2.2 One Graphix path
+### 2.2 One Graphix path — M3 (bounded production path; artifact qualification pending)
 
 Port deterministic arithmetic and typed lookup onto the registered Graphix pipeline; retire duplicate runtime semantic plans, claims, evidence, statuses, and response contracts.
+
+The bounded production kernel now uses `vulcan.graphix.runtime`, with a frozen
+code-owned operation allowlist and explicit provenance-link contracts. The old
+`vulcan.runtime.semantic` module is compatibility-only and owns no definitions
+or authority. Its removal condition is migration of remaining test, output,
+case-projection, alignment, and research imports to canonical Graphix types.
 
 ### 2.3 Production import closure
 

@@ -6,13 +6,13 @@ import pytest
 
 from vulcan.microkernel.episode import CognitiveEpisode
 from vulcan.microkernel.snapshots import construct_snapshot_bundle
-from vulcan.testing.snapshots import AttributeSnapshotProvider
 from vulcan.microkernel.state_machine import EpisodeState
 from vulcan.runtime.case import CognitiveCase, CognitiveCaseStatus
 from vulcan.runtime.constitutional_kernel import ConstitutionalCognitiveKernel
 from vulcan.runtime.finalization import FinalizationDecision, FinalizationResult
 from vulcan.runtime.kernel import CognitiveKernel, KernelRequest
 from vulcan.runtime.semantic import Utterance, canonical_digest
+from vulcan.testing.snapshots import AttributeSnapshotProvider
 
 
 class _Finalizer:
@@ -94,6 +94,12 @@ async def test_successful_request_binds_snapshot_and_consolidates_episode():
     assert case.episode.consolidation_refs
     assert case.snapshot_bundle is not None
     assert case.snapshot_bundle.released is True
+    epistemic_head = kernel.transaction_service.epistemic_head(case.case_id)
+    assert epistemic_head is not None
+    assert all(
+        claim.proposition.qualifiers["graphix_artifact_digest"].startswith("sha256:")
+        for claim in epistemic_head.claims
+    )
 
 
 @pytest.mark.asyncio
@@ -111,13 +117,21 @@ async def test_released_abstention_is_durably_communicated_and_consolidated():
     assert result.status is CognitiveCaseStatus.ABSTAINED
     assert case.episode is not None
     assert case.episode.state is EpisodeState.CONSOLIDATED
-    assert EpisodeState.COMMUNICATED in [item.to_state for item in case.episode.transitions]
+    assert EpisodeState.COMMUNICATED in [
+        item.to_state for item in case.episode.transitions
+    ]
     assert case.episode.snapshot_bundle is not None
     assert case.episode.claims
     assert case.episode.derivations
     assert case.episode.response is not None
     assert case.snapshot_bundle is not None
     assert case.snapshot_bundle.released is True
+    epistemic_head = kernel.transaction_service.epistemic_head(case.case_id)
+    assert epistemic_head is not None
+    assert all(
+        claim.proposition.qualifiers["graphix_artifact_digest"].startswith("sha256:")
+        for claim in epistemic_head.claims
+    )
 
 
 def test_case_identifier_and_episode_identifier_are_one_identity():

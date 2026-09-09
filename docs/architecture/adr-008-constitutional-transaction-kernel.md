@@ -81,6 +81,31 @@ The current `runtime.semantic` ledger and Graphix-like plan remain migration pro
 
 ## Consequences
 
+## Canonical Graphix runtime slice
+
+The old semantic boundary let the production kernel import plan, compiler,
+execution, claim, evidence, status, and response contracts from
+`vulcan.runtime.semantic`, while a separate Graphix compiler existed beside it.
+The new boundary makes `vulcan.graphix.runtime` the production contract owner.
+Its compiler admits only code-registered bounded arithmetic and typed lookup,
+and its five explicit dialect stages carry snapshot-bound source links. Compiler
+artifacts cannot exceed `VALIDATED_CANDIDATE`; durable epistemic commitment is
+still exclusively a constitutional transaction-service operation.
+
+The live kernel now constructs and validates the interpretation envelope before
+either success or abstention can commit. Supported requests additionally compile
+a source-linked plan envelope and refuse execution unless its validation digest,
+artifact digest, and admitted snapshot identity are present and match. The
+durable Graphix Epistemic proposition records that exact artifact digest, making
+the provenance check part of restart-verifiable committed content rather than a
+detached architecture helper.
+
+`vulcan.runtime.semantic` is retained as the named `runtime-semantic-import`
+compatibility adapter. It contains re-exports only and is removed after legacy
+tests, runtime projections, and research callers import canonical Graphix
+contracts. It cannot register operations, compile dynamic code, commit a belief,
+or authorize an effect.
+
 ## Typed production composition slice
 
 The old startup transaction wrapped `ProductionDeployment`, reflectively read
