@@ -1,31 +1,25 @@
 """Framework-independent typed semantic orchestration boundary."""
 
 from __future__ import annotations
+
 import asyncio
 import hashlib
 import inspect
 import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from vulcan.memory.governed import GovernedMemoryPort
-from .case import CognitiveCase, CognitiveCaseStatus
-from .epistemic_adapter import (
-    adapt_runtime_semantic_candidate,
-    verify_runtime_semantic_projection,
-)
-from .finalization import FinalizationDecision, ResponseFinalizerPort
-from vulcan.safety.safety_types import ResponseSafetyContext
+
 from vulcan.constitution.primitives import AuthorityLevel
 from vulcan.microkernel.authority import EvidenceRecord, promote_authority
 from vulcan.microkernel.episode import (
     ArtifactRef,
     SnapshotBundleRef,
-    canonical_digest as episode_digest,
 )
+from vulcan.microkernel.episode import canonical_digest as episode_digest
 from vulcan.microkernel.episode_store import EpisodeStore
 from vulcan.microkernel.epistemic_store import EpistemicStore
 from vulcan.microkernel.principals import Principal, PrincipalKind
@@ -35,11 +29,27 @@ from vulcan.microkernel.transactions import (
     PublicationAuthorization,
     TerminalOutcome,
 )
+from vulcan.safety.safety_types import ResponseSafetyContext
+
+from .case import CognitiveCase, CognitiveCaseStatus
+from .epistemic_adapter import (
+    adapt_runtime_semantic_candidate,
+    verify_runtime_semantic_projection,
+)
+from .finalization import FinalizationDecision, ResponseFinalizerPort
+from .output import (
+    DeterministicLanguageOutput,
+    LanguageOutputPort,
+    SemanticFirewall,
+    bind_publication,
+    project_committed,
+    render_projection,
+)
 from .semantic import (
+    RESPONSE_IR_VERSION,
     ClarificationRequest,
     DeterministicLanguageInput,
     LanguageInputPort,
-    RESPONSE_IR_VERSION,
     ResponseIR,
     ResponseMode,
     Utterance,
@@ -49,14 +59,7 @@ from .semantic import (
     compile_graphix_plan,
     execute,
     execute_graphix_plan,
-    render_strict,
     validate_proposal,
-)
-from .output import (
-    DeterministicLanguageOutput,
-    LanguageOutputPort,
-    SemanticFirewall,
-    project,
 )
 
 
@@ -72,13 +75,20 @@ class KernelResult:
     response_ir: ResponseIR
     status: CognitiveCaseStatus
     finalization: str
+    authorized_text_digest: str | None = None
+    publication_authorization_digest: str | None = None
 
     def transport(
         self, *, case_id: str, runtime_id: str, snapshot_id: str | None
     ) -> dict[str, object]:
-        released = self.finalization == FinalizationDecision.ALLOW.value
+        exact = hashlib.sha256(self.response.encode("utf-8")).hexdigest()
+        released = (
+            self.finalization == FinalizationDecision.ALLOW.value
+            and self.authorized_text_digest == exact
+            and self.publication_authorization_digest is not None
+        )
         return {
-            "response": self.response,
+            "response": self.response if released else None,
             "metadata": {
                 "case_id": case_id,
                 "runtime_id": runtime_id,
@@ -364,18 +374,22 @@ class CognitiveKernel:
                             ),
                         },
                     )
-                case.append_ledger(claim=claim, derivation=derivation)
+                proposed_claims = (claim,)
+                proposed_derivations = (derivation,)
+                proposed_evidence = ()
                 epistemic_auth = self._command(
                     case,
                     policy_digest,
                     canonical_digest(
                         {
-                            "claims": [canonical_digest(item) for item in case.claims],
+                            "claims": [
+                                canonical_digest(item) for item in proposed_claims
+                            ],
                             "derivations": [
-                                canonical_digest(item) for item in case.derivations
+                                canonical_digest(item) for item in proposed_derivations
                             ],
                             "evidence": [
-                                canonical_digest(item) for item in case.evidence
+                                canonical_digest(item) for item in proposed_evidence
                             ],
                         }
                     ),
@@ -386,9 +400,9 @@ class CognitiveKernel:
                     episode_id=case.case_id,
                     case_id=case.case_id,
                     snapshot_digest=case.state_snapshot_id or "",
-                    claims=case.claims,
-                    evidence=case.evidence,
-                    derivations=case.derivations,
+                    claims=proposed_claims,
+                    evidence=proposed_evidence,
+                    derivations=proposed_derivations,
                     authority=epistemic_auth,
                     prior_commit_digest=None if prior is None else prior.commit_digest,
                 )
@@ -400,11 +414,17 @@ class CognitiveKernel:
                         candidate,
                     ),
                 )
+                case.project_committed_ledger(
+                    episode=case.episode,
+                    claim=claim,
+                    derivation=derivation,
+                    evidence=proposed_evidence,
+                )
                 verify_runtime_semantic_projection(
                     self._transactions.epistemic_head(case.case_id),
-                    claims=case.claims,
-                    evidence=case.evidence,
-                    derivations=case.derivations,
+                    claims=proposed_claims,
+                    evidence=proposed_evidence,
+                    derivations=proposed_derivations,
                 )
                 if self._audit:
                     self._audit.append(
@@ -526,16 +546,18 @@ class CognitiveKernel:
                 finally:
                     if lease_cm is not None:
                         lease_cm.close()
-                case.append_ledger(
-                    claim=claim, derivation=derivation, evidence=evidence
-                )
+                proposed_claims = (claim,)
+                proposed_derivations = (derivation,)
+                proposed_evidence = evidence
                 ledger_digest = canonical_digest(
                     {
-                        "claims": [canonical_digest(item) for item in case.claims],
+                        "claims": [canonical_digest(item) for item in proposed_claims],
                         "derivations": [
-                            canonical_digest(item) for item in case.derivations
+                            canonical_digest(item) for item in proposed_derivations
                         ],
-                        "evidence": [canonical_digest(item) for item in case.evidence],
+                        "evidence": [
+                            canonical_digest(item) for item in proposed_evidence
+                        ],
                     }
                 )
                 epistemic_auth = self._command(
@@ -549,9 +571,9 @@ class CognitiveKernel:
                     episode_id=case.case_id,
                     case_id=case.case_id,
                     snapshot_digest=case.state_snapshot_id or "",
-                    claims=case.claims,
-                    evidence=case.evidence,
-                    derivations=case.derivations,
+                    claims=proposed_claims,
+                    evidence=proposed_evidence,
+                    derivations=proposed_derivations,
                     authority=epistemic_auth,
                     prior_commit_digest=None if prior is None else prior.commit_digest,
                 )
@@ -563,11 +585,17 @@ class CognitiveKernel:
                         candidate,
                     ),
                 )
+                case.project_committed_ledger(
+                    episode=case.episode,
+                    claim=claim,
+                    derivation=derivation,
+                    evidence=proposed_evidence,
+                )
                 verify_runtime_semantic_projection(
                     self._transactions.epistemic_head(case.case_id),
-                    claims=case.claims,
-                    evidence=case.evidence,
-                    derivations=case.derivations,
+                    claims=proposed_claims,
+                    evidence=proposed_evidence,
+                    derivations=proposed_derivations,
                 )
                 if self._audit:
                     self._audit.append(
@@ -650,7 +678,18 @@ class CognitiveKernel:
             )
             case.response_ir = response_ir
             # The adapter sees only the projection; firewall rejection is always strict fallback.
-            projection = project(response_ir, case.claims)
+            epistemic_head = self._transactions.epistemic_head(case.case_id)
+            if epistemic_head is None:
+                raise RuntimeError("durable epistemic head is unavailable")
+            durable_episode_head = self._transactions.episode_head(case.case_id)
+            if (
+                case.episode is None
+                or durable_episode_head.digest != case.episode.digest
+            ):
+                raise RuntimeError("case projection differs from durable episode head")
+            projection = project_committed(
+                response_ir, durable_episode_head, epistemic_head
+            )
             try:
                 draft = await self._language_output.render(projection)
                 if SemanticFirewall().validate(projection, draft).accepted:
@@ -662,9 +701,16 @@ class CognitiveKernel:
             except Exception:
                 # Provider/adapter failures are diagnostics only; strict rendering remains authoritative.
                 case.record("output_draft_unavailable")
-            artifact = render_strict(
-                response_ir, case.claims, case.derivations, case.evidence
-            )
+            current_epistemic_head = self._transactions.epistemic_head(case.case_id)
+            if (
+                current_epistemic_head is None
+                or current_epistemic_head.commit_digest
+                != projection.epistemic_head_digest
+                or self._transactions.episode_head(case.case_id).digest
+                != projection.episode_head_digest
+            ):
+                raise RuntimeError("durable head changed after response projection")
+            artifact = render_projection(projection)
             case.render_artifact = artifact
             case.record("strict_rendered")
             final_context = ResponseSafetyContext(
@@ -687,6 +733,15 @@ class CognitiveKernel:
                 finalization = await finalize(artifact)
             else:
                 finalization = await finalize(artifact, final_context)
+            if finalization.artifact != artifact:
+                raise RuntimeError("finalizer changed the committed render artifact")
+            if (
+                finalization.decision is FinalizationDecision.ALLOW
+                and finalization.public_text != artifact.text
+            ):
+                raise RuntimeError(
+                    "finalizer allowed text outside the committed render"
+                )
             case.record_finalization(finalization.decision.value)
             if finalization.decision is FinalizationDecision.BLOCK:
                 status = CognitiveCaseStatus.BLOCKED
@@ -696,12 +751,20 @@ class CognitiveKernel:
                 status = CognitiveCaseStatus.CANCELLED
             close_alignment_lease()
             terminal_commit_started = True
-            if status is CognitiveCaseStatus.SUCCESS:
+            publication_digest = None
+            if finalization.decision is FinalizationDecision.ALLOW and status in {
+                CognitiveCaseStatus.SUCCESS,
+                CognitiveCaseStatus.ABSTAINED,
+            }:
                 if case.episode is None:
                     raise RuntimeError("authoritative episode is unavailable")
-                response_ref = case._response_ref()
-                if response_ref is None:
-                    raise RuntimeError("response artifact is unavailable")
+                response_ref = ArtifactRef(
+                    response_ir.response_id,
+                    hashlib.sha256(
+                        finalization.public_text.encode("utf-8")
+                    ).hexdigest(),
+                    "published-response.v1",
+                )
                 bound_policy = (
                     policy_digest
                     if len(policy_digest) == 64
@@ -738,6 +801,10 @@ class CognitiveKernel:
                     self._kernel_principal.identity_digest,
                     self._kernel_principal.release_digest,
                 )
+                projection = bind_publication(
+                    projection, authorization, finalization.public_text
+                )
+                publication_digest = projection.publication_authorization_digest
                 self._apply(
                     case,
                     self._transactions.authorize_response_publication(
@@ -795,75 +862,20 @@ class CognitiveKernel:
                     CognitiveCaseStatus.CANCELLED: TerminalOutcome.CANCELLATION,
                     CognitiveCaseStatus.FAILED: TerminalOutcome.FAILURE,
                 }
-                terminal_kwargs = {}
-                if (
-                    status is CognitiveCaseStatus.ABSTAINED
-                    and finalization.decision is FinalizationDecision.ALLOW
-                    and case.episode is not None
-                ):
-                    response_ref = case._response_ref()
-                    if response_ref is None:
-                        raise RuntimeError(
-                            "abstention response artifact is unavailable"
-                        )
-                    bound_policy = (
-                        policy_digest
-                        if len(policy_digest) == 64
-                        else episode_digest({"policy": policy_digest or "default-deny"})
-                    )
-                    epistemic_head = self._transactions.epistemic_head(case.case_id)
-                    if epistemic_head is None:
-                        raise RuntimeError("durable epistemic head is unavailable")
-                    publication = PublicationAuthorization(
-                        epistemic_head.commit_digest.removeprefix("sha256:"),
-                        canonical_digest(
-                            {
-                                "accepted": decision.accepted,
-                                "reasons": list(decision.reason_codes),
-                                "policy_digest": decision.policy_digest,
-                                "policy_revision": decision.policy_revision,
-                            }
-                        ),
-                        bound_policy,
-                        int(decision.policy_revision),
-                        canonical_digest(
-                            {
-                                "decision": finalization.decision.value,
-                                "artifact": artifact.ir_digest,
-                            }
-                        ),
-                        hashlib.sha256(
-                            finalization.public_text.encode("utf-8")
-                        ).hexdigest(),
-                        canonical_digest({"privacy": case.privacy_classification}),
-                        canonical_digest(
-                            {"conversation_bound": case.conversation_id is not None}
-                        ),
-                        self._kernel_principal.identity_digest,
-                        self._kernel_principal.release_digest,
-                    )
-                    terminal_kwargs = {
-                        "response": response_ref,
-                        "publication": publication,
-                    }
-                    terminal_policy = bound_policy
-                else:
-                    terminal_policy = policy_digest
                 self._apply(
                     case,
                     self._transactions.terminalize(
                         case.case_id,
                         self._command(
                             case,
-                            terminal_policy,
+                            policy_digest,
                             canonical_digest({"terminal": status.value}),
                             AuthorityLevel.VALIDATED_CANDIDATE,
                         ),
                         outcomes[status],
-                        **terminal_kwargs,
                     ),
                 )
-            case.close(status)
+            case.mirror_terminal(status)
             if self._audit:
                 self._audit.append(
                     "case.finalized",
@@ -896,6 +908,12 @@ class CognitiveKernel:
                 response_ir,
                 status,
                 finalization.decision.value,
+                (
+                    hashlib.sha256(finalization.public_text.encode("utf-8")).hexdigest()
+                    if finalization.decision is FinalizationDecision.ALLOW
+                    else None
+                ),
+                publication_digest,
             )
         except asyncio.CancelledError:
             close_alignment_lease()
@@ -913,7 +931,7 @@ class CognitiveKernel:
                         TerminalOutcome.CANCELLATION,
                     ),
                 )
-                case.close(CognitiveCaseStatus.CANCELLED, "cancelled")
+                case.mirror_terminal(CognitiveCaseStatus.CANCELLED, "cancelled")
                 if self._audit:
                     self._audit.append(
                         "case.cancelled",
@@ -945,7 +963,7 @@ class CognitiveKernel:
                         TerminalOutcome.FAILURE,
                     ),
                 )
-                case.close(CognitiveCaseStatus.FAILED, type(exc).__name__)
+                case.mirror_terminal(CognitiveCaseStatus.FAILED, type(exc).__name__)
                 if self._audit:
                     self._audit.append(
                         "case.failed",

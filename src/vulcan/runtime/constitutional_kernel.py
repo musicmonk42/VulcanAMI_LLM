@@ -13,9 +13,9 @@ from uuid import uuid4
 from vulcan.microkernel.episode import ActorBinding, CognitiveEpisode
 from vulcan.microkernel.episode_store import EpisodeStore
 from vulcan.microkernel.epistemic_store import EpistemicStore
+from vulcan.microkernel.principals import Principal, PrincipalKind
 from vulcan.microkernel.snapshots import SnapshotBundle
 from vulcan.microkernel.state_machine import EpisodeState
-from vulcan.microkernel.principals import Principal, PrincipalKind
 from vulcan.microkernel.transactions import ConstitutionalTransactionService
 
 from .case import CognitiveCase
@@ -161,9 +161,23 @@ class ConstitutionalCognitiveKernel:
                     )
                 if result.status is not case.terminal_status:
                     raise RuntimeError("transport withheld: result status diverged")
+                if result.finalization == "allow":
+                    text_digest = sha256(result.response.encode("utf-8")).hexdigest()
+                    if (
+                        result.authorized_text_digest != text_digest
+                        or result.publication_authorization_digest is None
+                        or durable.response is None
+                        or durable.authorization is None
+                        or durable.response.digest != text_digest
+                        or durable.authorization.digest
+                        != result.publication_authorization_digest
+                    ):
+                        raise RuntimeError(
+                            "transport withheld: public text lacks exact publication evidence"
+                        )
                 required_by_status = {
                     "success": EpisodeState.CONSOLIDATED,
-                    "abstained": EpisodeState.ABSTAINED,
+                    "abstained": EpisodeState.CONSOLIDATED,
                     "blocked": EpisodeState.BLOCKED,
                     "finalization_error": EpisodeState.FAILED,
                     "failed": EpisodeState.FAILED,

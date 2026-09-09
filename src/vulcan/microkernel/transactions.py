@@ -150,6 +150,10 @@ class ConstitutionalTransactionService:
             raise AuthorityError("durable epistemic authority is not bound")
         return self._epistemic_store.head(episode_id)
 
+    def episode_head(self, episode_id: str) -> CognitiveEpisode:
+        """Return the verified durable episode head used by projection readers."""
+        return self._store.load(episode_id)
+
     def commit_epistemic_candidate(
         self,
         episode_id: str,
@@ -391,6 +395,10 @@ class ConstitutionalTransactionService:
             )
         if authorization.policy_digest != auth.policy_digest:
             raise AuthorityError("publication authorization policy mismatch")
+        if response.digest != authorization.rendered_text_digest:
+            raise AuthorityError(
+                "publication response is not the authorized exact text"
+            )
         if self._epistemic_store is not None:
             epistemic_head = self.epistemic_head(episode_id)
             if (
@@ -488,6 +496,9 @@ class ConstitutionalTransactionService:
         )
 
     def communicate(self, episode_id: str, auth: CommandAuthority) -> CognitiveEpisode:
+        head = self._store.load(episode_id)
+        if head.authorization is None or head.response is None:
+            raise AuthorityError("communication requires publication evidence")
         return self._advance(
             episode_id,
             auth,
@@ -527,6 +538,12 @@ class ConstitutionalTransactionService:
             or publication.policy_digest != auth.policy_digest
         ):
             raise AuthorityError("terminal publication authorization mismatch")
+        if (
+            publication is not None
+            and response is not None
+            and response.digest != publication.rendered_text_digest
+        ):
+            raise AuthorityError("terminal response is not the authorized exact text")
         if publication is not None and self._epistemic_store is not None:
             epistemic_head = self.epistemic_head(episode_id)
             if (

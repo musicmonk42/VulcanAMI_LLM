@@ -72,6 +72,17 @@ executed external effect. The compatibility case is projection-only and every
 composed live transition is submitted by the kernel to the service. This remains
 below M4 until the exact built artifact passes crash/restart qualification.
 
+Committed response projection is **M3 — Canonical for the composed request
+path**: rendering consumes matching durable episode and Graphix Epistemic heads,
+not mutable case collections. Publication and transport bind the exact final
+public-text digest, direct case-ledger mutation is rejected, and terminal case
+status is projection-only. Allowed abstentions also traverse `COMMUNICATED`,
+while unauthorized envelopes expose no response body. Head/snapshot drift,
+invented references, text swaps,
+cancellation, restart, and concurrent-writer behavior have local M2 evidence.
+The retained runtime-semantic object projection is removed with Wave 2.2; exact
+built-artifact crash/restart qualification remains below M4.
+
 Durable per-episode epistemic authority is **M3 — Canonical for the composed
 request path**: `EpistemicStore` now persists canonical Graphix Epistemic
 commits, one CAS head per episode, scoped claim/evidence indexes, and an audit

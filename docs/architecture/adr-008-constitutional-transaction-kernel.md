@@ -274,3 +274,36 @@ Rejected because naming a module `center`, `self`, or `consciousness` does not e
 ### Keep `CognitiveCase` and `CognitiveEpisode` as co-equal records
 
 Rejected because two lifecycle authorities cannot provide deterministic recovery, audit, or identity.
+
+## Committed response projection slice
+
+The old response boundary rendered `ResponseIR` from mutable `CognitiveCase`
+claim, evidence, and derivation lists. The finalizer authorized a text digest,
+but the episode's response reference identified only the ResponseIR digest. The
+new boundary constructs `ResponseProjection` from matching durable episode and
+Graphix Epistemic heads, the admitted snapshot, and accepted interpretation and
+plan references. The output adapter can return only ordered committed claim and
+citation references; the deterministic renderer realizes values carried by that
+typed projection. Both heads are checked again after the asynchronous adapter
+call.
+
+Publication now records the exact final public-text digest as the episode
+response artifact, and communication fails closed without both that artifact and
+publication authorization. Transport independently matches its bytes to the
+durable response evidence. `CognitiveCase` lists are the named
+`runtime.semantic` compatibility projection and are populated only after the
+durable commit; direct append is rejected. `mirror_terminal` similarly mirrors
+the durable terminal episode and replaces the former `close()` lifecycle seam.
+Remove these projections when the semantic runtime consumes Graphix Epistemic
+and `CognitiveEpisode` values directly. Successful episodes durably pass
+`COMMUNICATED` before optional durable consolidation; after a lost HTTP return,
+the committed communication remains authoritative and its exact response digest
+is recoverable without authorizing different text.
+
+An allowed abstention is public language and therefore follows the same
+`NORMATIVELY_AUTHORIZED -> COMMUNICATED -> CONSOLIDATED` lifecycle as an allowed
+strict answer; `ABSTAINED` remains its compatibility result classification, not
+a competing episode terminal state. Blocked, errored, and cancelled results do
+not carry response publication evidence and their transport projection contains
+no response body. A conforming finalizer must return the exact render artifact it
+evaluated and may allow only that artifact's text.

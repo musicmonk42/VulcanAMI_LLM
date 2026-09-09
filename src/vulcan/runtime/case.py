@@ -38,7 +38,9 @@ class CognitiveCaseStatus(str, Enum):
 
 _TERMINAL_EPISODE_STATE: dict[CognitiveCaseStatus, EpisodeState] = {
     CognitiveCaseStatus.SUCCESS: EpisodeState.CONSOLIDATED,
-    CognitiveCaseStatus.ABSTAINED: EpisodeState.ABSTAINED,
+    # A released abstention is still a communication transaction. Its semantic
+    # outcome remains ABSTAINED while its authoritative lifecycle consolidates.
+    CognitiveCaseStatus.ABSTAINED: EpisodeState.CONSOLIDATED,
     CognitiveCaseStatus.BLOCKED: EpisodeState.BLOCKED,
     CognitiveCaseStatus.FINALIZATION_ERROR: EpisodeState.FAILED,
     CognitiveCaseStatus.FAILED: EpisodeState.FAILED,
@@ -74,9 +76,9 @@ class CognitiveCase:
         default=None, repr=False
     )
     clarification: "ClarificationRequest | None" = field(default=None, repr=False)
-    _evidence: list["EvidenceArtifact"] = field(default_factory=list, repr=False)
-    _claims: list["Claim"] = field(default_factory=list, repr=False)
-    _derivations: list["Derivation"] = field(default_factory=list, repr=False)
+    _evidence: tuple["EvidenceArtifact", ...] = field(default=(), repr=False)
+    _claims: tuple["Claim", ...] = field(default=(), repr=False)
+    _derivations: tuple["Derivation", ...] = field(default=(), repr=False)
     response_ir: "ResponseIR | None" = field(default=None, repr=False)
     selected_components: tuple[str, ...] = ()
     terminal_status: CognitiveCaseStatus = CognitiveCaseStatus.OPEN
@@ -204,23 +206,46 @@ class CognitiveCase:
         derivation: "Derivation",
         evidence: tuple["EvidenceArtifact", ...] = (),
     ) -> None:
-        """Validate and update the request-local compatibility projection."""
+        """Retired authority seam; callers must project a durable commit."""
+        raise RuntimeError("direct case ledger mutation is prohibited")
+
+    def project_committed_ledger(
+        self,
+        *,
+        episode: CognitiveEpisode,
+        claim: "Claim",
+        derivation: "Derivation",
+        evidence: tuple["EvidenceArtifact", ...] = (),
+    ) -> None:
+        """Mirror objects only after their durable epistemic commit is in the episode.
+
+        This named compatibility projection is removed when runtime.semantic emits
+        Graphix Epistemic values directly.  It is deliberately replacement-only:
+        old callers cannot append a second mutable history.
+        """
         if self.terminal_status is not CognitiveCaseStatus.OPEN:
-            raise RuntimeError("cannot mutate a closed case ledger")
+            raise RuntimeError("cannot project into a terminal case")
+        if (
+            episode.episode_id != self.case_id
+            or episode.state is not EpisodeState.EPISTEMICALLY_COMMITTED
+        ):
+            raise RuntimeError("durable epistemic episode head is required")
         from .semantic import validate_ledger
 
-        proposed_evidence = (*self._evidence, *evidence)
-        proposed_derivations = (*self._derivations, derivation)
-        proposed_claims = (*self._claims, claim)
-        validate_ledger(
-            proposed_evidence,
-            proposed_derivations,
-            proposed_claims,
-            case_id=self.case_id,
-        )
-        self._evidence.extend(evidence)
-        self._derivations.append(derivation)
-        self._claims.append(claim)
+        validate_ledger(evidence, (derivation,), (claim,), case_id=self.case_id)
+        if {item.artifact_id for item in evidence} != {
+            item.artifact_id for item in episode.evidence
+        }:
+            raise RuntimeError("evidence projection differs from durable episode")
+        if {claim.claim_id} != {item.artifact_id for item in episode.claims}:
+            raise RuntimeError("claim projection differs from durable episode")
+        if {derivation.derivation_id} != {
+            item.artifact_id for item in episode.derivations
+        }:
+            raise RuntimeError("derivation projection differs from durable episode")
+        self._evidence = evidence
+        self._derivations = (derivation,)
+        self._claims = (claim,)
 
     def record_finalization(self, decision: str) -> None:
         if self.terminal_status is not CognitiveCaseStatus.OPEN:
@@ -230,15 +255,15 @@ class CognitiveCase:
         self.finalization_status = decision
         self.record("finalized", decision)
 
-    def close(
+    def mirror_terminal(
         self,
         status: CognitiveCaseStatus,
         failure_kind: str | None = None,
     ) -> None:
         if self.terminal_status is not CognitiveCaseStatus.OPEN:
-            raise RuntimeError("cognitive case closed more than once")
+            raise RuntimeError("terminal episode projected more than once")
         if self.episode is None or not self.episode.state.is_terminal:
-            raise RuntimeError("transaction service must terminalize the episode first")
+            raise RuntimeError("durable episode must terminalize first")
         expected = _TERMINAL_EPISODE_STATE[status]
         if self.episode.state is not expected:
             raise RuntimeError("case and episode terminal states disagree")

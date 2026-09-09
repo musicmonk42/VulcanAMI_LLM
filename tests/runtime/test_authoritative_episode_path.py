@@ -97,7 +97,7 @@ async def test_successful_request_binds_snapshot_and_consolidates_episode():
 
 
 @pytest.mark.asyncio
-async def test_abstention_is_an_authoritative_terminal_episode():
+async def test_released_abstention_is_durably_communicated_and_consolidated():
     utterance = Utterance.from_text("tell me a secret")
     kernel = _kernel()
     case = kernel.create_case(
@@ -110,7 +110,8 @@ async def test_abstention_is_an_authoritative_terminal_episode():
 
     assert result.status is CognitiveCaseStatus.ABSTAINED
     assert case.episode is not None
-    assert case.episode.state is EpisodeState.ABSTAINED
+    assert case.episode.state is EpisodeState.CONSOLIDATED
+    assert EpisodeState.COMMUNICATED in [item.to_state for item in case.episode.transitions]
     assert case.episode.snapshot_bundle is not None
     assert case.episode.claims
     assert case.episode.derivations
@@ -287,11 +288,14 @@ def test_compatibility_ledger_cannot_invoke_episode_transition(monkeypatch):
         raise RuntimeError("compatibility case attempted authority promotion")
 
     monkeypatch.setattr(CognitiveEpisode, "transition", deny_case_promotion)
-    case.append_ledger(claim=claim, derivation=derivation, evidence=evidence)
+    with pytest.raises(RuntimeError, match="direct case ledger mutation is prohibited"):
+        case.append_ledger(claim=claim, derivation=derivation, evidence=evidence)
     assert case.episode == before
-    assert case.claims == (claim,)
-    assert case.derivations == (derivation,)
-    assert case.evidence == evidence
+    assert case.claims == ()
+    assert case.derivations == ()
+    assert case.evidence == ()
+    with pytest.raises(AttributeError):
+        case._claims.append(claim)
 
 
 def test_cognitive_case_has_no_authority_promotion_or_persistence_logic():
