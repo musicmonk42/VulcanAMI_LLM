@@ -269,9 +269,20 @@ isolated single-file apply/gate behavior moves into the offline operator.
 
 Add lineage, branch, instance, monotonic tick, prior/current state digests, current snapshots, active commitments, episodes, and pending effects under one compare-and-swap head.
 
-### 3.2 Effect protocol
+### 3.2 Effect protocol — M2 (durable sandbox protocol; canonical wiring pending)
 
 Add authorized policy, durable effect intent, scoped capability, idempotent attempt, and execution receipt.
+
+Canonical contracts, a kernel-only transaction service, durable SQLite
+intent/attempt/receipt records, single-use replay-protected capabilities,
+transactional audit outbox, deterministic reversible sandbox, compensation,
+crash ambiguity, idempotent-target behavior, and operator reconciliation now
+have local adversarial and optimized-Python evidence. The
+`deterministic-effect-sandbox` adapter is removed when governed effect ports
+provide equivalent declarations and qualification. This remains below M3 until
+the composed request path authorizes an effect and atomically projects its
+intent and receipt into episode and lineage heads; exact-artifact restart
+qualification remains below M4.
 
 ### 3.3 Reafference and causal autobiography
 

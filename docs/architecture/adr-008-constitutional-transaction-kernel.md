@@ -81,6 +81,24 @@ The current `runtime.semantic` ledger and Graphix-like plan remain migration pro
 
 ## Consequences
 
+## Durable effect-protocol slice
+
+The old effect boundary stopped at an authorized-plan contract and had no safe
+production executor. The new bounded boundary is the kernel-only
+`EffectTransactionService`: it durably commits a content-bound intent and
+durably issues and atomically consumes a single-use capability before a
+code-owned reversible sandbox is invoked, then
+records an attempt and terminal or ambiguous receipt through a transactional
+outbox. Capability bindings cover principal/release, lineage/branch, episode,
+policy/expected effect, resource/operation, expiry, nonce, budget, and
+idempotency key. Restart never blindly retries a receipt-less attempt.
+
+`deterministic-effect-sandbox` is retained as the sole compatibility target and
+is removed when governed effect ports provide the same allowlist,
+idempotency/reconciliation, compensation, and qualification guarantees. This
+slice is M2, not canonical request-path wiring; see
+[`effect-protocol.md`](effect-protocol.md).
+
 ## Persistent causal-lineage slice
 
 The old continuity boundary ended at a bounded episode. The new boundary places
