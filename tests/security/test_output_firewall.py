@@ -24,4 +24,6 @@ def test_transport_never_releases_text_other_than_the_authorized_digest():
 
     ir = ResponseIR("3", "r", "case", None, "s", ResponseMode.STRICT, ("claim-a",))
     result = KernelResult("The computed result is 5.", ir, CognitiveCaseStatus.SUCCESS, "allow", sha256(b"The computed result is 4.").hexdigest())
-    assert result.transport(case_id="case", runtime_id="runtime", snapshot_id="s")["metadata"]["response_released"] is False
+    envelope = result.transport(case_id="case", runtime_id="runtime", snapshot_id="s")
+    assert envelope["response"] is None
+    assert envelope["metadata"]["response_released"] is False

@@ -165,16 +165,19 @@ class ConstitutionalCognitiveKernel:
                     text_digest = sha256(result.response.encode("utf-8")).hexdigest()
                     if (
                         result.authorized_text_digest != text_digest
+                        or result.publication_authorization_digest is None
                         or durable.response is None
                         or durable.authorization is None
                         or durable.response.digest != text_digest
+                        or durable.authorization.digest
+                        != result.publication_authorization_digest
                     ):
                         raise RuntimeError(
                             "transport withheld: public text lacks exact publication evidence"
                         )
                 required_by_status = {
                     "success": EpisodeState.CONSOLIDATED,
-                    "abstained": EpisodeState.ABSTAINED,
+                    "abstained": EpisodeState.CONSOLIDATED,
                     "blocked": EpisodeState.BLOCKED,
                     "finalization_error": EpisodeState.FAILED,
                     "failed": EpisodeState.FAILED,

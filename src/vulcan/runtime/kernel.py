@@ -41,6 +41,7 @@ from .output import (
     DeterministicLanguageOutput,
     LanguageOutputPort,
     SemanticFirewall,
+    bind_publication,
     project_committed,
     render_projection,
 )
@@ -75,6 +76,7 @@ class KernelResult:
     status: CognitiveCaseStatus
     finalization: str
     authorized_text_digest: str | None = None
+    publication_authorization_digest: str | None = None
 
     def transport(
         self, *, case_id: str, runtime_id: str, snapshot_id: str | None
@@ -83,9 +85,10 @@ class KernelResult:
         released = (
             self.finalization == FinalizationDecision.ALLOW.value
             and self.authorized_text_digest == exact
+            and self.publication_authorization_digest is not None
         )
         return {
-            "response": self.response,
+            "response": self.response if released else None,
             "metadata": {
                 "case_id": case_id,
                 "runtime_id": runtime_id,
@@ -678,7 +681,15 @@ class CognitiveKernel:
             epistemic_head = self._transactions.epistemic_head(case.case_id)
             if epistemic_head is None:
                 raise RuntimeError("durable epistemic head is unavailable")
-            projection = project_committed(response_ir, case.episode, epistemic_head)
+            durable_episode_head = self._transactions.episode_head(case.case_id)
+            if (
+                case.episode is None
+                or durable_episode_head.digest != case.episode.digest
+            ):
+                raise RuntimeError("case projection differs from durable episode head")
+            projection = project_committed(
+                response_ir, durable_episode_head, epistemic_head
+            )
             try:
                 draft = await self._language_output.render(projection)
                 if SemanticFirewall().validate(projection, draft).accepted:
@@ -695,8 +706,8 @@ class CognitiveKernel:
                 current_epistemic_head is None
                 or current_epistemic_head.commit_digest
                 != projection.epistemic_head_digest
-                or case.episode is None
-                or case.episode.digest != projection.episode_head_digest
+                or self._transactions.episode_head(case.case_id).digest
+                != projection.episode_head_digest
             ):
                 raise RuntimeError("durable head changed after response projection")
             artifact = render_projection(projection)
@@ -722,6 +733,15 @@ class CognitiveKernel:
                 finalization = await finalize(artifact)
             else:
                 finalization = await finalize(artifact, final_context)
+            if finalization.artifact != artifact:
+                raise RuntimeError("finalizer changed the committed render artifact")
+            if (
+                finalization.decision is FinalizationDecision.ALLOW
+                and finalization.public_text != artifact.text
+            ):
+                raise RuntimeError(
+                    "finalizer allowed text outside the committed render"
+                )
             case.record_finalization(finalization.decision.value)
             if finalization.decision is FinalizationDecision.BLOCK:
                 status = CognitiveCaseStatus.BLOCKED
@@ -731,7 +751,11 @@ class CognitiveKernel:
                 status = CognitiveCaseStatus.CANCELLED
             close_alignment_lease()
             terminal_commit_started = True
-            if status is CognitiveCaseStatus.SUCCESS:
+            publication_digest = None
+            if finalization.decision is FinalizationDecision.ALLOW and status in {
+                CognitiveCaseStatus.SUCCESS,
+                CognitiveCaseStatus.ABSTAINED,
+            }:
                 if case.episode is None:
                     raise RuntimeError("authoritative episode is unavailable")
                 response_ref = ArtifactRef(
@@ -777,6 +801,10 @@ class CognitiveKernel:
                     self._kernel_principal.identity_digest,
                     self._kernel_principal.release_digest,
                 )
+                projection = bind_publication(
+                    projection, authorization, finalization.public_text
+                )
+                publication_digest = projection.publication_authorization_digest
                 self._apply(
                     case,
                     self._transactions.authorize_response_publication(
@@ -834,74 +862,17 @@ class CognitiveKernel:
                     CognitiveCaseStatus.CANCELLED: TerminalOutcome.CANCELLATION,
                     CognitiveCaseStatus.FAILED: TerminalOutcome.FAILURE,
                 }
-                terminal_kwargs = {}
-                if (
-                    status is CognitiveCaseStatus.ABSTAINED
-                    and finalization.decision is FinalizationDecision.ALLOW
-                    and case.episode is not None
-                ):
-                    response_ref = ArtifactRef(
-                        response_ir.response_id,
-                        hashlib.sha256(
-                            finalization.public_text.encode("utf-8")
-                        ).hexdigest(),
-                        "published-response.v1",
-                    )
-                    bound_policy = (
-                        policy_digest
-                        if len(policy_digest) == 64
-                        else episode_digest({"policy": policy_digest or "default-deny"})
-                    )
-                    epistemic_head = self._transactions.epistemic_head(case.case_id)
-                    if epistemic_head is None:
-                        raise RuntimeError("durable epistemic head is unavailable")
-                    publication = PublicationAuthorization(
-                        epistemic_head.commit_digest.removeprefix("sha256:"),
-                        canonical_digest(
-                            {
-                                "accepted": decision.accepted,
-                                "reasons": list(decision.reason_codes),
-                                "policy_digest": decision.policy_digest,
-                                "policy_revision": decision.policy_revision,
-                            }
-                        ),
-                        bound_policy,
-                        int(decision.policy_revision),
-                        canonical_digest(
-                            {
-                                "decision": finalization.decision.value,
-                                "artifact": artifact.ir_digest,
-                            }
-                        ),
-                        hashlib.sha256(
-                            finalization.public_text.encode("utf-8")
-                        ).hexdigest(),
-                        canonical_digest({"privacy": case.privacy_classification}),
-                        canonical_digest(
-                            {"conversation_bound": case.conversation_id is not None}
-                        ),
-                        self._kernel_principal.identity_digest,
-                        self._kernel_principal.release_digest,
-                    )
-                    terminal_kwargs = {
-                        "response": response_ref,
-                        "publication": publication,
-                    }
-                    terminal_policy = bound_policy
-                else:
-                    terminal_policy = policy_digest
                 self._apply(
                     case,
                     self._transactions.terminalize(
                         case.case_id,
                         self._command(
                             case,
-                            terminal_policy,
+                            policy_digest,
                             canonical_digest({"terminal": status.value}),
                             AuthorityLevel.VALIDATED_CANDIDATE,
                         ),
                         outcomes[status],
-                        **terminal_kwargs,
                     ),
                 )
             case.mirror_terminal(status)
@@ -942,6 +913,7 @@ class CognitiveKernel:
                     if finalization.decision is FinalizationDecision.ALLOW
                     else None
                 ),
+                publication_digest,
             )
         except asyncio.CancelledError:
             close_alignment_lease()

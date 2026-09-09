@@ -38,7 +38,9 @@ class CognitiveCaseStatus(str, Enum):
 
 _TERMINAL_EPISODE_STATE: dict[CognitiveCaseStatus, EpisodeState] = {
     CognitiveCaseStatus.SUCCESS: EpisodeState.CONSOLIDATED,
-    CognitiveCaseStatus.ABSTAINED: EpisodeState.ABSTAINED,
+    # A released abstention is still a communication transaction. Its semantic
+    # outcome remains ABSTAINED while its authoritative lifecycle consolidates.
+    CognitiveCaseStatus.ABSTAINED: EpisodeState.CONSOLIDATED,
     CognitiveCaseStatus.BLOCKED: EpisodeState.BLOCKED,
     CognitiveCaseStatus.FINALIZATION_ERROR: EpisodeState.FAILED,
     CognitiveCaseStatus.FAILED: EpisodeState.FAILED,
@@ -74,9 +76,9 @@ class CognitiveCase:
         default=None, repr=False
     )
     clarification: "ClarificationRequest | None" = field(default=None, repr=False)
-    _evidence: list["EvidenceArtifact"] = field(default_factory=list, repr=False)
-    _claims: list["Claim"] = field(default_factory=list, repr=False)
-    _derivations: list["Derivation"] = field(default_factory=list, repr=False)
+    _evidence: tuple["EvidenceArtifact", ...] = field(default=(), repr=False)
+    _claims: tuple["Claim", ...] = field(default=(), repr=False)
+    _derivations: tuple["Derivation", ...] = field(default=(), repr=False)
     response_ir: "ResponseIR | None" = field(default=None, repr=False)
     selected_components: tuple[str, ...] = ()
     terminal_status: CognitiveCaseStatus = CognitiveCaseStatus.OPEN
@@ -241,9 +243,9 @@ class CognitiveCase:
             item.artifact_id for item in episode.derivations
         }:
             raise RuntimeError("derivation projection differs from durable episode")
-        self._evidence[:] = evidence
-        self._derivations[:] = (derivation,)
-        self._claims[:] = (claim,)
+        self._evidence = evidence
+        self._derivations = (derivation,)
+        self._claims = (claim,)
 
     def record_finalization(self, decision: str) -> None:
         if self.terminal_status is not CognitiveCaseStatus.OPEN:

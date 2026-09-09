@@ -76,7 +76,9 @@ Committed response projection is **M3 — Canonical for the composed request
 path**: rendering consumes matching durable episode and Graphix Epistemic heads,
 not mutable case collections. Publication and transport bind the exact final
 public-text digest, direct case-ledger mutation is rejected, and terminal case
-status is projection-only. Head/snapshot drift, invented references, text swaps,
+status is projection-only. Allowed abstentions also traverse `COMMUNICATED`,
+while unauthorized envelopes expose no response body. Head/snapshot drift,
+invented references, text swaps,
 cancellation, restart, and concurrent-writer behavior have local M2 evidence.
 The retained runtime-semantic object projection is removed with Wave 2.2; exact
 built-artifact crash/restart qualification remains below M4.

@@ -150,6 +150,10 @@ class ConstitutionalTransactionService:
             raise AuthorityError("durable epistemic authority is not bound")
         return self._epistemic_store.head(episode_id)
 
+    def episode_head(self, episode_id: str) -> CognitiveEpisode:
+        """Return the verified durable episode head used by projection readers."""
+        return self._store.load(episode_id)
+
     def commit_epistemic_candidate(
         self,
         episode_id: str,

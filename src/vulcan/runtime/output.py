@@ -7,12 +7,14 @@ model prose is deliberately not representable.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from hashlib import sha256
 from typing import Protocol
 
 from vulcan.graphix.epistemic import ClaimStatus, EpistemicCommit
 from vulcan.microkernel.episode import CognitiveEpisode
 from vulcan.microkernel.state_machine import EpisodeState
+from vulcan.microkernel.transactions import PublicationAuthorization
 
 from .semantic import (
     Claim,
@@ -50,6 +52,7 @@ class ResponseIRProjection:
     snapshot_digest: str = ""
     accepted_interpretation_id: str | None = None
     accepted_plan_ids: tuple[str, ...] = ()
+    publication_authorization_digest: str | None = None
 
 
 # Removal condition: delete this alias when output adapters have migrated from
@@ -250,6 +253,24 @@ def render_projection(projection: ResponseProjection) -> RenderArtifact:
         tuple(citations),
         projection.locale,
     )
+
+
+def bind_publication(
+    projection: ResponseProjection,
+    authorization: PublicationAuthorization,
+    public_text: str,
+) -> ResponseProjection:
+    """Complete a projection with exact publication evidence after finalization."""
+    if projection.publication_authorization_digest is not None:
+        raise ValueError("response projection already has publication evidence")
+    if (
+        authorization.committed_epistemic_head
+        != projection.epistemic_head_digest.removeprefix("sha256:")
+        or authorization.rendered_text_digest
+        != sha256(public_text.encode("utf-8")).hexdigest()
+    ):
+        raise ValueError("publication does not match the committed projection")
+    return replace(projection, publication_authorization_digest=authorization.digest)
 
 
 class DeterministicLanguageOutput:

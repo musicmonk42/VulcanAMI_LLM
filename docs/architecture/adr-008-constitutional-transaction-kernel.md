@@ -299,3 +299,11 @@ and `CognitiveEpisode` values directly. Successful episodes durably pass
 `COMMUNICATED` before optional durable consolidation; after a lost HTTP return,
 the committed communication remains authoritative and its exact response digest
 is recoverable without authorizing different text.
+
+An allowed abstention is public language and therefore follows the same
+`NORMATIVELY_AUTHORIZED -> COMMUNICATED -> CONSOLIDATED` lifecycle as an allowed
+strict answer; `ABSTAINED` remains its compatibility result classification, not
+a competing episode terminal state. Blocked, errored, and cancelled results do
+not carry response publication evidence and their transport projection contains
+no response body. A conforming finalizer must return the exact render artifact it
+evaluated and may allow only that artifact's text.

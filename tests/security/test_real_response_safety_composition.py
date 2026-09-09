@@ -165,7 +165,7 @@ def test_transport_exposes_terminal_and_release_semantics_without_second_authori
 
     envelope = result.transport(case_id="case-1", runtime_id="runtime-1", snapshot_id="snapshot-1")
 
-    assert envelope["response"] == "safe fallback"
+    assert envelope["response"] is None
     assert envelope["metadata"]["terminal_status"] == "blocked"
     assert envelope["metadata"]["response_released"] is False
     assert envelope["metadata"]["finalization_safety_decision"] == "block"
