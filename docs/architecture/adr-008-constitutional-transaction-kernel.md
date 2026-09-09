@@ -81,6 +81,19 @@ The current `runtime.semantic` ledger and Graphix-like plan remain migration pro
 
 ## Consequences
 
+## Observation/reafference slice
+
+The old causal boundary ended at a durable execution receipt. The new bounded
+boundary persists a receipt- and expected-effect-bound typed observation and a
+deterministic `VALIDATED_CANDIDATE` reafference assessment before the
+microkernel may commit proposed updates or advance lineage. A deterministic
+closed-loop/yoked-world adapter provides intervention evidence and
+observation-matched causal tests; it is removed when governed production
+environment ports provide equivalent typed observation and restart guarantees.
+This is M2 rather than canonical request-path wiring, and its callback commits
+are not yet one cross-store atomic transaction. See
+[`reafference-protocol.md`](reafference-protocol.md).
+
 ## Durable effect-protocol slice
 
 The old effect boundary stopped at an authorized-plan contract and had no safe

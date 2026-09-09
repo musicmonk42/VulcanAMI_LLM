@@ -20,7 +20,6 @@ from vulcan.constitution.primitives import Digest, canonical_json
 
 from .principals import Principal
 
-
 ZERO_DIGEST = "0" * 64
 ALLOWED_OPERATIONS = frozenset({"put", "delete"})
 
@@ -760,6 +759,55 @@ class EffectStore:
         if row is None:
             raise EffectError("unknown effect intent")
         return str(row["state"])
+
+    def validate_reafference_evidence(
+        self, receipt_digest: str, expected_effect_digest: str
+    ) -> None:
+        """Validate the exact successful receipt-to-expectation chain for observation."""
+        _check_digest(receipt_digest)
+        _check_digest(expected_effect_digest)
+        with self._connect() as db:
+            row = db.execute(
+                "SELECT r.document AS receipt_document,i.document AS intent_document,"
+                "a.expected_document AS expected_document "
+                "FROM effect_receipts r "
+                "JOIN effect_intents i ON i.digest=r.intent_digest "
+                "JOIN effect_capabilities c ON c.nonce=i.nonce "
+                "JOIN effect_authorizations a ON a.capability_digest=c.digest "
+                "WHERE r.digest=?",
+                (receipt_digest,),
+            ).fetchone()
+        if row is None:
+            raise EffectRejected("receipt evidence is missing")
+        receipt = _strict_document(row["receipt_document"])
+        intent = _strict_document(row["intent_document"])
+        expected = _strict_document(row["expected_document"])
+        receipt_claim = receipt.get("digest")
+        intent_claim = intent.get("digest")
+        expected_claim = expected.get("digest")
+        for document, claim in (
+            (receipt, receipt_claim),
+            (intent, intent_claim),
+            (expected, expected_claim),
+        ):
+            if not isinstance(claim, str):
+                raise EffectRejected("receipt evidence has an invalid digest")
+            unsigned = dict(document)
+            unsigned.pop("digest")
+            if _digest(unsigned) != claim:
+                raise EffectRejected("receipt evidence failed digest verification")
+        if (
+            receipt_claim != receipt_digest
+            or receipt.get("outcome") != EffectOutcome.SUCCEEDED.value
+            or receipt.get("intent_digest") != intent_claim
+            or intent.get("expected_effect_digest") != expected_effect_digest
+            or expected_claim != expected_effect_digest
+            or receipt.get("observed_digest") != expected.get("after_digest")
+            or receipt.get("observed_digest") == ZERO_DIGEST
+        ):
+            raise EffectRejected(
+                "receipt is not a successful observation-eligible effect chain"
+            )
 
     def verify(self) -> None:
         with self._connect() as db:
