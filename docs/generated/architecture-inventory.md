@@ -1,6 +1,6 @@
 # Generated architecture inventory
 
-Digest: `d7dbfefbc3e3a3b7d236a0b232ac9a3782574f9ad4e52e0637ba38cdce6a9952`
+Digest: `26987a0401cf145dbd58b046e9c9690eb7e8f8b429cd1ddb14a5eac9aeb0b8a4`
 
 This file is generated from `docs/generated/architecture-inventory.json`.
 
@@ -154,7 +154,7 @@ Count: 425
 
 ## Import Identities
 
-Count: 1826
+Count: 1834
 
 - `tests/security/test_output_firewall.py:1` module='vulcan.runtime.output', reachability='test-only'
 - `tests/test_probabilistic_routing.py:10` module='src.vulcan.reasoning.probabilistic_reasoning', reachability='test-only'
@@ -206,7 +206,7 @@ Count: 1826
 - `src/vulcan/world_model/world_model_core.py:1020` module='vulcan.world_model.creative_handler', reachability='unknown'
 - `src/api_server.py:103` module='vulcan.reasoning.unified', reachability='unknown'
 - `src/vulcan/world_model/world_model_core.py:1037` module='vulcan.world_model.llm_guidance', reachability='unknown'
-- ... 1776 more in JSON
+- ... 1784 more in JSON
 
 ## Singletons
 
@@ -309,6 +309,7 @@ Count: 4428
 - `src/vulcan/tests/test_collective.py:1003` kind='except_exception', reachability='test-only', review='unreviewed'
 - `src/vulcan/curiosity_engine/experiment_generator.py:1003` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/vulcan/world_model/system_observer.py:1004` kind='except_exception', reachability='unknown', review='unreviewed'
+- `src/vulcan/runtime/kernel.py:974` kind='except_exception', reachability='production-reachable', review='unreviewed'
 - `src/training/governed_trainer.py:1004` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/vulcan/world_model/world_model_core.py:1006` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/vulcan/reasoning/selection/warm_pool.py:1006` kind='except_exception', reachability='unknown', review='unreviewed'
@@ -338,7 +339,6 @@ Count: 4428
 - `src/generate_transparency_report.py:1014` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/vulcan/knowledge_crystallizer/principle_extractor.py:1018` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/vulcan/curiosity_engine/curiosity_engine_core.py:1012` kind='except_exception', reachability='unknown', review='unreviewed'
-- `src/memory/governed_unlearning.py:1019` kind='except_exception', reachability='unknown', review='unreviewed'
 - ... 4378 more in JSON
 
 ## Mocks

@@ -287,11 +287,12 @@ def test_compatibility_ledger_cannot_invoke_episode_transition(monkeypatch):
         raise RuntimeError("compatibility case attempted authority promotion")
 
     monkeypatch.setattr(CognitiveEpisode, "transition", deny_case_promotion)
-    case.append_ledger(claim=claim, derivation=derivation, evidence=evidence)
+    with pytest.raises(RuntimeError, match="direct case ledger mutation is prohibited"):
+        case.append_ledger(claim=claim, derivation=derivation, evidence=evidence)
     assert case.episode == before
-    assert case.claims == (claim,)
-    assert case.derivations == (derivation,)
-    assert case.evidence == evidence
+    assert case.claims == ()
+    assert case.derivations == ()
+    assert case.evidence == ()
 
 
 def test_cognitive_case_has_no_authority_promotion_or_persistence_logic():

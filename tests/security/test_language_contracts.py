@@ -36,7 +36,7 @@ async def test_failed_output_adapter_falls_back_to_strict_renderer():
     result = await CognitiveKernel(state_authority=object(), finalizer=_Finalizer(), language_output=_FailingOutput()).handle(KernelRequest(utterance, None), case)
     assert result.response == "The computed result is 4."
     assert [event.stage for event in case.events].count("output_draft_unavailable") == 1
-    assert case.render_artifact.renderer == "strict-template"
+    assert case.render_artifact.renderer == "committed-strict-template"
 
 import json
 from vulcan.local_language import SpanProposalError, VerifiedAdapterMetadata, VerifiedLocalSpanCompletion, parse_transformer_span_proposal

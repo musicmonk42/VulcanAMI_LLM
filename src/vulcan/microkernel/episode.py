@@ -7,9 +7,9 @@ serialized aggregate.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
-import re
 from types import MappingProxyType
 from typing import Mapping, Protocol, Sequence
 from uuid import uuid4
@@ -20,8 +20,8 @@ from vulcan.constitution.primitives import (
     EpisodeId,
     PrincipalId,
     SnapshotId,
-    canonical_json as _canonical_json,
 )
+from vulcan.constitution.primitives import canonical_json as _canonical_json
 
 from .state_machine import EpisodeState, EpisodeTransitionError, ensure_transition
 
@@ -301,7 +301,10 @@ class CognitiveEpisode:
             "response-authorization.compat.v1",
         }:
             raise ValueError("authorization artifact has the wrong kind")
-        if self.response is not None and self.response.kind != "response-ir.v3":
+        if self.response is not None and self.response.kind not in {
+            "published-response.v1",
+            "response-ir.v3",  # persisted pre-projection compatibility
+        }:
             raise ValueError("response artifact has the wrong kind")
         if any(
             ref.kind != "execution-receipt.v1"
