@@ -104,7 +104,10 @@ class KernelResult:
 
 class CognitiveKernel:
     CAPABILITY_OWNER = "RuntimeContainer.CognitiveKernel"
-    CAPABILITY_RELEASE_DIGEST = "e324762e004e2ac30d13758b6d9b5a80ccefb06c5d4a5f8d373a20d782bf426c"
+    CAPABILITY_RELEASE_DIGEST = (
+        "e324762e004e2ac30d13758b6d9b5a80ccefb06c5d4a5f8d373a20d782bf426c"
+    )
+
     def __init__(
         self,
         *,
@@ -115,6 +118,7 @@ class CognitiveKernel:
         memory: "GovernedMemoryPort | None" = None,
         audit: Any = None,
         alignment: Any = None,
+        domain_lookup: Any = None,
     ) -> None:
         # The kernel owns the only memory port exposed to the production path.
         # It deliberately does not turn retrieved text into executable semantics.
@@ -125,6 +129,7 @@ class CognitiveKernel:
         self._memory = memory
         self._audit = audit
         self._alignment = alignment
+        self._domain_lookup = domain_lookup
         self.calls = 0
         self._transactions: ConstitutionalTransactionService | None = None
         self._kernel_principal: Principal | None = None
@@ -475,7 +480,7 @@ class CognitiveKernel:
                 accepted_id = None
             else:
                 case.accepted_interpretation = selection
-                domain_port = getattr(self._state_authority, "domain", None)
+                domain_port = self._domain_lookup
                 lease_cm = (
                     domain_port.lease() if hasattr(domain_port, "lease") else None
                 )
