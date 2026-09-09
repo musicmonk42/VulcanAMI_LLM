@@ -1,6 +1,6 @@
 # Generated architecture inventory
 
-Digest: `daea30d2253fc82dd5448c2cceae0bee6e227b3d47a4ca6e5c12bad489c1e039`
+Digest: `4178dc64cc1783ff341858a66488735eb55239352b02ea2fbe087acea5ca2d89`
 
 This file is generated from `docs/generated/architecture-inventory.json`.
 
@@ -154,7 +154,7 @@ Count: 422
 
 ## Import Identities
 
-Count: 1847
+Count: 1855
 
 - `tests/security/test_output_firewall.py:1` module='vulcan.runtime.output', reachability='test-only'
 - `tests/test_probabilistic_routing.py:10` module='src.vulcan.reasoning.probabilistic_reasoning', reachability='test-only'
@@ -169,13 +169,12 @@ Count: 1847
 - `tests/test_world_model_research.py:10` module='vulcan.learning_owner', reachability='test-only'
 - `tests/security/test_local_language_governance.py:10` module='vulcan.local_language.tokenizer', reachability='test-only'
 - `src/vulcan/tests/test_consolidation.py:10` module='vulcan.memory.base', reachability='test-only'
-- `src/vulcan/runtime/composition.py:10` module='vulcan.microkernel.epistemic_store', reachability='production-reachable'
+- `src/vulcan/runtime/composition.py:10` module='vulcan.memory.composition', reachability='production-reachable'
 - `src/vulcan/runtime/state_authorities.py:10` module='vulcan.microkernel.snapshots', reachability='production-reachable'
 - `tests/persistence/test_episode_audit_projection.py:10` module='vulcan.microkernel.state_machine', reachability='test-only'
 - `tests/runtime/test_authoritative_episode_path.py:10` module='vulcan.microkernel.state_machine', reachability='test-only'
 - `src/vulcan/runtime/audit.py:10` module='vulcan.persistence.audit.reconcile', reachability='production-reachable'
 - `tests/test_learning_outbox.py:10` module='vulcan.runtime.audit', reachability='test-only'
-- `tests/runtime/test_production_composition.py:10` module='vulcan.runtime.composition', reachability='test-only'
 - `tests/security/test_persistent_audit_alignment.py:10` module='vulcan.runtime.finalization', reachability='test-only'
 - `tests/security/test_real_response_safety_composition.py:10` module='vulcan.runtime.kernel', reachability='test-only'
 - `tests/security/test_runtime_convergence.py:10` module='vulcan.runtime.kernel', reachability='test-only'
@@ -200,13 +199,14 @@ Count: 1847
 - `src/vulcan/tests/test_planning_endpoint.py:102` module='vulcan.endpoints.planning', reachability='test-only'
 - `tests/microkernel/test_episode.py:102` module='vulcan.microkernel.episode', reachability='test-only'
 - `tests/security/test_runtime_convergence.py:102` module='vulcan.runtime.app', reachability='test-only'
+- `src/vulcan/runtime/composition.py:102` module='vulcan.safety.safety_validator', reachability='production-reachable'
 - `src/vulcan/llm/__init__.py:89` module='vulcan.llm.openai_client', reachability='unknown'
 - `src/vulcan/tests/test_metrics_centralization.py:93` module='vulcan.metrics', reachability='test-only'
 - `src/vulcan/orchestrator/platform_status.py:99` module='vulcan.arena', reachability='unknown'
 - `src/vulcan/world_model/world_model_core.py:1020` module='vulcan.world_model.creative_handler', reachability='unknown'
 - `src/api_server.py:103` module='vulcan.reasoning.unified', reachability='unknown'
 - `src/vulcan/world_model/world_model_core.py:1037` module='vulcan.world_model.llm_guidance', reachability='unknown'
-- ... 1797 more in JSON
+- ... 1805 more in JSON
 
 ## Singletons
 
@@ -231,7 +231,7 @@ Count: 16
 
 ## Workers
 
-Count: 454
+Count: 455
 
 - `tests/runtime/test_state_authorities.py:203` call='Thread', reachability='test-only'
 - `src/vulcan/server/startup/manager.py:657` call='Thread', reachability='unknown'
@@ -283,11 +283,11 @@ Count: 454
 - `src/vulcan/safety/neural_safety.py:919` call='asyncio.create_task', reachability='unknown'
 - `tests/test_scheduler_node.py:92` call='asyncio.create_task', reachability='test-only'
 - `src/unified_runtime/execution_engine.py:920` call='asyncio.create_task', reachability='unknown'
-- ... 404 more in JSON
+- ... 405 more in JSON
 
 ## Fallbacks
 
-Count: 4429
+Count: 4431
 
 - `src/vulcan/endpoints/self_improvement.py:98` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/vulcan/safety/rollback_audit.py:99` kind='except_exception', reachability='unknown', review='unreviewed'
@@ -339,7 +339,7 @@ Count: 4429
 - `src/vulcan/knowledge_crystallizer/principle_extractor.py:1018` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/vulcan/curiosity_engine/curiosity_engine_core.py:1012` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/memory/governed_unlearning.py:1019` kind='except_exception', reachability='unknown', review='unreviewed'
-- ... 4379 more in JSON
+- ... 4381 more in JSON
 
 ## Mocks
 
@@ -521,9 +521,9 @@ Count: 20
 - `src/vulcan/orchestrator/agent_scoring.py:148` reachability='unknown', text='\n    Get available agents that can handle the specified capabilities.\n\n    Args:\n        manager: AgentPoolManager instance\n        capabilities: List of capabi'
 - `src/vulcan/runtime/app.py:177` reachability='production-reachable', text='capability authority unavailable'
 - `src/vulcan/orchestrator/agent_scoring.py:176` reachability='unknown', text='\n    Get the current capability distribution in the agent pool.\n\n    AGENT POOL CONFIGURATION FIX: This method provides observability into\n    which capabilitie'
-- `src/vulcan/runtime/container.py:204` reachability='production-reachable', text='canonical capability authority is unavailable'
 - `src/utils/faiss_config.py:1` reachability='unknown', text='\nFAISS Configuration and Initialization Module\n\nHandles FAISS import with proper CPU capability detection and informative\nmessaging about instruction set usage '
 - `src/memory/cost_optimizer.py:223` reachability='unknown', text="\n        Analyze current cost structure with defensive programming.\n\n        FIXED: Now provides fallback logic when memory system methods don't exist.\n        "
+- `src/vulcan/runtime/container.py:309` reachability='production-reachable', text='canonical capability authority is unavailable'
 - `src/full_platform.py:3107` reachability='unknown', text='Capability unavailable in production'
 - `src/vulcan/orchestrator/agent_scoring.py:20` reachability='unknown', text='\n    Assign an available agent with required capability.\n\n    Must be called with manager.lock held.\n\n    Args:\n        manager: AgentPoolManager instance\n     '
 - `src/vulcan/runtime/errors.py:43` reachability='production-reachable', text='capability_unavailable'

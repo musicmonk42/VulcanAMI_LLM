@@ -81,6 +81,27 @@ The current `runtime.semantic` ledger and Graphix-like plan remain migration pro
 
 ## Consequences
 
+## Typed production composition slice
+
+The old startup transaction wrapped `ProductionDeployment`, reflectively read
+its collective, and mutated the deployment and World Model with newly created
+owners. The new startup transaction is the typed `CompositionSpecification` /
+`RuntimeOwnerInputs` boundary: all constitutional stores, authorities, ports,
+and adapters are constructed once, checked for duplicate ownership, and only
+then published as one `RuntimeContainer`. Partial construction closes acquired
+resources, and shutdown follows the generated reverse ownership order while
+continuing after individual close failures.
+
+`RuntimeContainer.new(deployment=...)` is retained as the named
+`legacy-deployment-input` adapter for tests and research callers and is removed
+when those callers use typed owner inputs. `LegacyWorldReadOnlyAdapter` exposes
+only readiness and snapshot identity from the legacy World Model; it cannot
+invoke reasoning, mutate domain state, authorize policy, or publish effects.
+The completed graph, including CTS and durable stores, is assembled in locals
+and passed once to `RuntimeContainer`, rather than installed by post-construction
+field mutation. This is M3 composition evidence, not Gate E completion: serving import closure and
+exact built-image restart qualification remain required.
+
 ## Live capability authority slice
 
 The old capability boundary combined a static evidence registry used by the

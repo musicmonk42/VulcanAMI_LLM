@@ -7,7 +7,7 @@ import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from hashlib import sha256
-from typing import Protocol
+from typing import Callable, Protocol
 from uuid import uuid4
 
 from vulcan.microkernel.episode import ActorBinding, CognitiveEpisode
@@ -82,11 +82,22 @@ class ConstitutionalCognitiveKernel:
     adapter when the semantic compatibility kernel itself consumes episodes.
     """
 
-    def __init__(self, delegate: KernelDelegate, admission: EpisodeAdmissionService):
+    def __init__(
+        self,
+        delegate: KernelDelegate,
+        admission: EpisodeAdmissionService,
+        transaction_service: ConstitutionalTransactionService,
+    ):
         if not callable(getattr(delegate, "handle", None)):
             raise TypeError("constitutional wrapper requires a kernel delegate")
         self._delegate = delegate
         self.admission = admission
+        self._transaction_service = transaction_service
+
+    @property
+    def transaction_service(self) -> ConstitutionalTransactionService:
+        """The exact service bound to the delegate by composition."""
+        return self._transaction_service
 
     @classmethod
     def from_kernel(
@@ -96,6 +107,9 @@ class ConstitutionalCognitiveKernel:
         snapshot_admitter: SnapshotAdmitter,
         episode_store: EpisodeStore | None = None,
         epistemic_store: EpistemicStore | None = None,
+        transaction_service_factory: Callable[
+            ..., ConstitutionalTransactionService
+        ] = ConstitutionalTransactionService,
     ) -> "ConstitutionalCognitiveKernel":
         if not callable(snapshot_admitter):
             raise TypeError("snapshot_admitter must be callable")
@@ -112,7 +126,7 @@ class ConstitutionalCognitiveKernel:
                 prefix="vulcan-epistemic-compat-", suffix=".sqlite3", delete=False
             ).name
             epistemic_store = EpistemicStore(path)
-        service = ConstitutionalTransactionService(episode_store, epistemic_store)
+        service = transaction_service_factory(episode_store, epistemic_store)
         principal = Principal(
             PrincipalKind.SYSTEM_KERNEL,
             "constitutional-cognitive-kernel",
@@ -121,7 +135,11 @@ class ConstitutionalCognitiveKernel:
         binder = getattr(kernel, "bind_transaction_service", None)
         if callable(binder):
             binder(service, principal)
-        return cls(kernel, EpisodeAdmissionService(snapshot_admitter, episode_store))
+        return cls(
+            kernel,
+            EpisodeAdmissionService(snapshot_admitter, episode_store),
+            service,
+        )
 
     @property
     def calls(self) -> int:

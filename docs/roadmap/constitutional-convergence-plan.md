@@ -177,9 +177,19 @@ Exact built-artifact and restart qualification remain below M4.
 
 ## Wave 2 — Remove legacy authority seams
 
-### 2.1 Typed production composition
+### 2.1 Typed production composition — M3 (canonical source path; artifact qualification pending)
 
 Construct the canonical owners directly rather than wrapping `ProductionDeployment` and injecting owners with `setattr`.
+
+The canonical `compose_runtime()` path now uses one explicit composition
+specification and typed owner inputs. It constructs each owner once, rejects
+missing or duplicate ownership, records reverse close order, closes partial
+graphs without masking the startup failure, and never imports or instantiates
+`ProductionDeployment`. `LegacyWorldReadOnlyAdapter` exposes no legacy reasoning
+or mutation method. The retained
+`RuntimeContainer.new(deployment=...)` adapter serves tests/research only and is
+removed when those callers migrate to typed inputs. Gate E remains incomplete
+until Wave 2.3 import closure and exact built-image restart qualification pass.
 
 ### 2.2 One Graphix path
 

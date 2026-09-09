@@ -1,216 +1,284 @@
 from __future__ import annotations
 
-import sys
-import types
+import ast
+import asyncio
+from collections import Counter
+from dataclasses import fields, replace
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
-from vulcan.runtime.composition import DevelopmentStubDeployment, compose_runtime
+from vulcan.runtime.composition import (
+    CompositionSpecification,
+    LegacyWorldReadOnlyAdapter,
+    compose_runtime,
+)
 from vulcan.runtime.errors import StartupErrorCategory, StartupFailure
-from vulcan.runtime.settings import RuntimeSettings, VulcanEnvironment, durable_root_paths, OpaqueSecret, SecretSource
+from vulcan.runtime.settings import (
+    OpaqueSecret,
+    RuntimeSettings,
+    SecretSource,
+    VulcanEnvironment,
+    durable_root_paths,
+)
+from vulcan.safety.safety_types import ResponseSafetyDecision, ResponseSafetyStatus
 
 
-def settings(tmp_path: Path, *, env: VulcanEnvironment = VulcanEnvironment.production, stub: bool = False) -> RuntimeSettings:
+def settings(
+    tmp_path: Path, *, env=VulcanEnvironment.production, stub=False
+) -> RuntimeSettings:
     root = (tmp_path / "durable").resolve()
     root.mkdir()
     return RuntimeSettings(
         environment=env,
         jwt_issuer="vulcan",
         jwt_audience="vulcan-runtime",
-        jwt_secret=OpaqueSecret(SecretSource.direct, "A" * 40 + "1!bcdefgh", "VULCAN_JWT_SECRET"),
+        jwt_secret=OpaqueSecret(
+            SecretSource.direct, "A" * 40 + "1!bcdefgh", "VULCAN_JWT_SECRET"
+        ),
         durable_root=root,
         durable_paths=durable_root_paths(root),
-        approval_hmac_secret=OpaqueSecret(SecretSource.direct, "B" * 40 + "1!cdefghi", "VULCAN_APPROVAL_HMAC_SECRET"),
+        approval_hmac_secret=OpaqueSecret(
+            SecretSource.direct, "B" * 40 + "1!cdefghi", "VULCAN_APPROVAL_HMAC_SECRET"
+        ),
         memory_sqlite_path=root / "memory" / "memory.sqlite",
         development_stub_mode=stub,
     )
 
 
-class DummyOwner:
-    owner_id = "dummy-owner"
+class Owner:
+    owner_id = "owner"
     capability = SimpleNamespace(value="shadow")
-    def readiness(self): return True
-    def close(self): return None
-    def capabilities(self): return ()
-    def capability_matrix(self): return ()
-    def append_episode_transition(self, event_type, data): return None
-    def append_epistemic_commit(self, event_id, data): return None
     domain_snapshot_id = "d" * 64
+
+    def __init__(self, *args, **kwargs):
+        self.closed = False
+
+    def readiness(self):
+        return True
+
+    def close(self):
+        self.closed = True
+
+    def capabilities(self):
+        return ()
+
+    def append_episode_transition(self, *args):
+        return None
+
+    def append_epistemic_commit(self, *args):
+        return None
+
+    def append(self, *args):
+        return None
+
     def lease(self):
-        return SimpleNamespace(domain_snapshot_id=self.domain_snapshot_id, policy_digest="a" * 64,
-                               revision=1, close=lambda: None)
-    def active_metadata(self): return {"policy_digest": "a" * 64, "revision": 1}
-    def snapshot_state(self): return "0", {"enabled": True, "digest": "b" * 64}
+        return SimpleNamespace(
+            domain_snapshot_id=self.domain_snapshot_id,
+            policy_digest="a" * 64,
+            revision=1,
+            close=lambda: None,
+        )
+
+    def active_metadata(self):
+        return {"policy_digest": "a" * 64, "revision": 1}
+
+    def snapshot_state(self):
+        return "0", {"enabled": True, "digest": "b" * 64}
 
 
-def lightweight_container(monkeypatch: pytest.MonkeyPatch) -> None:
-    import vulcan.runtime.container as container
-    monkeypatch.setattr(container, "compose_governed_memory", lambda config, **kwargs: DummyOwner())
-    monkeypatch.setattr(container, "CanonicalAudit", lambda path: DummyOwner())
-    monkeypatch.setattr(container, "AlignmentRegistry", lambda path, audit=None: DummyOwner())
-    monkeypatch.setattr(container, "PersistentDomainRegistry", lambda path, audit=None: DummyOwner())
-    monkeypatch.setattr(container, "ShadowLinUCBToolBandit", lambda: DummyOwner())
-    monkeypatch.setattr(container, "LearningOwner", lambda **kwargs: DummyOwner())
-    monkeypatch.setattr(container, "EnhancedSafetyResponseAdapter", lambda safety: DummyOwner())
-    monkeypatch.setattr(container, "SafetyResponseFinalizer", lambda response_safety: DummyOwner())
+class World(Owner):
+    snapshot_id = "world-v1"
 
 
-class GoodWorld:
-    def readiness(self):
-        return True
+class Safety(Owner):
+    pass
 
 
-class GoodSafety:
-    def readiness(self):
-        return True
-
-    def validate(self, *args, **kwargs):
-        return True
+class SafetyPort(Owner):
+    async def evaluate_response(self, text, context):
+        return ResponseSafetyDecision(ResponseSafetyStatus.ALLOW, "test", 1.0, {})
 
 
-class Deployment:
-    def __init__(self, config=None, *, world=GoodWorld(), safety=GoodSafety()):
-        self.collective = SimpleNamespace(deps=SimpleNamespace(world_model=world, safety_validator=safety, continual=None))
-
-    def readiness(self):
-        return True
-
-
-def install_deployment(monkeypatch: pytest.MonkeyPatch, deployment_cls=Deployment) -> None:
-    config = types.ModuleType("vulcan.config")
-    config.get_config = lambda: {"authoritative": True}
-    deployment = types.ModuleType("vulcan.orchestrator.deployment")
-    deployment.ProductionDeployment = deployment_cls
-    monkeypatch.setitem(sys.modules, "vulcan.config", config)
-    monkeypatch.setitem(sys.modules, "vulcan.orchestrator.deployment", deployment)
+def test_legacy_world_adapter_exposes_readiness_and_identity_only():
+    legacy = World()
+    legacy.reason = lambda query: "untrusted"
+    legacy.domain = object()
+    adapter = LegacyWorldReadOnlyAdapter(legacy)
+    assert adapter.readiness()
+    assert adapter.snapshot_id == "world-v1"
+    assert not hasattr(adapter, "reason")
+    assert not hasattr(adapter, "domain")
+    adapter.close()
+    assert legacy.closed
 
 
-def test_serving_rejects_legacy_self_improvement_configuration(monkeypatch, tmp_path):
-    config = types.ModuleType("vulcan.config")
-    config.get_config = lambda: SimpleNamespace(enable_self_improvement=True)
-    deployment_module = types.ModuleType("vulcan.orchestrator.deployment")
-    deployment_module.ProductionDeployment = Deployment
-    monkeypatch.setitem(sys.modules, "vulcan.config", config)
-    monkeypatch.setitem(sys.modules, "vulcan.orchestrator.deployment", deployment_module)
-    with pytest.raises(StartupFailure) as failure:
-        compose_runtime(settings(tmp_path))
-    assert failure.value.category is StartupErrorCategory.DEPLOYMENT_CONSTRUCTION_FAILED
-    assert "retired self-improvement" in str(failure.value.__cause__)
+def spec(**changes):
+    values = dict(
+        world_proposal_factory=World,
+        safety_validator_factory=Safety,
+        audit_projector_factory=Owner,
+        governed_memory_factory=lambda config, **kwargs: Owner(),
+        alignment_factory=Owner,
+        domain_lookup_factory=Owner,
+        learning_factory=lambda **kwargs: Owner(),
+        safety_port_factory=lambda safety: SafetyPort(),
+    )
+    values.update(changes)
+    return CompositionSpecification(**values)
 
 
 @pytest.mark.asyncio
-async def test_real_composition_contains_no_fallback_types(monkeypatch, tmp_path):
-    install_deployment(monkeypatch)
-    lightweight_container(monkeypatch)
-    runtime = compose_runtime(settings(tmp_path))
+async def test_typed_composition_is_ready_and_has_close_graph(tmp_path):
+    runtime = compose_runtime(settings(tmp_path), spec())
+    assert runtime.deployment is None
+    assert runtime.transaction_service is not None
+    assert runtime.ownership_close_order[-2:] == ("safety", "world_proposal")
+    assert len(runtime.ownership_close_order) == len(set(runtime.ownership_close_order))
+    await runtime.readiness()
+    await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_every_declared_factory_is_invoked_exactly_once(tmp_path):
+    configured = spec()
+    calls: Counter[str] = Counter()
+    replacements = {}
+    for declared in fields(configured):
+        original = getattr(configured, declared.name)
+
+        def counted(*args, _name=declared.name, _factory=original, **kwargs):
+            calls[_name] += 1
+            return _factory(*args, **kwargs)
+
+        replacements[declared.name] = counted
+    runtime = compose_runtime(settings(tmp_path), replace(configured, **replacements))
     try:
-        assert "Fallback" not in type(runtime.deployment).__name__
-        assert "Fallback" not in type(runtime.world_state).__name__
-        assert "Fallback" not in type(runtime.safety).__name__
-        assert runtime.capabilities() == ("cap.bounded_arithmetic",)
-        bundle = runtime.admit_snapshot_bundle("case-capability-conformance")
-        try:
-            capability_ref = next(ref for ref in bundle.refs() if ref.kind == "capability")
-            assert capability_ref.owner == "CapabilityManifestAuthority"
-            assert capability_ref.digest == runtime.capability_authority.state_digest()
-        finally:
-            bundle.close()
-        await runtime.readiness()
+        assert calls == Counter({declared.name: 1 for declared in fields(configured)})
     finally:
         await runtime.close()
 
 
-def test_missing_world_fails_with_original_category(monkeypatch, tmp_path):
-    class MissingWorld(Deployment):
-        def __init__(self, config=None):
-            super().__init__(config, world=None)
-
-    install_deployment(monkeypatch, MissingWorld)
-    lightweight_container(monkeypatch)
-    with pytest.raises(StartupFailure) as excinfo:
-        compose_runtime(settings(tmp_path))
-    assert excinfo.value.category is StartupErrorCategory.WORLD_MISSING
-    assert excinfo.value.public_code == "world_missing"
-
-
-def test_startup_fails_closed_when_a_state_reader_is_unavailable(monkeypatch, tmp_path):
-    import vulcan.runtime.container as container
-    lightweight_container(monkeypatch)
-    class BrokenMemory(DummyOwner):
-        def snapshot_state(self):
-            raise RuntimeError("faithful memory snapshot unavailable")
-    monkeypatch.setattr(container, "compose_governed_memory", lambda *args, **kwargs: BrokenMemory())
-    with pytest.raises(RuntimeError, match="faithful memory snapshot unavailable"):
-        container.RuntimeContainer.new(deployment=Deployment(), settings=settings(tmp_path))
+@pytest.mark.asyncio
+async def test_typed_composition_restarts_from_the_same_durable_root(tmp_path):
+    configured = settings(tmp_path)
+    first = compose_runtime(configured, spec())
+    await first.close()
+    restarted = compose_runtime(configured, spec())
+    try:
+        await restarted.readiness()
+        assert restarted.episode_store is not first.episode_store
+        assert restarted.epistemic_store is not first.epistemic_store
+    finally:
+        await restarted.close()
 
 
-def test_missing_safety_fails_with_original_category(monkeypatch, tmp_path):
-    class MissingSafety(Deployment):
-        def __init__(self, config=None):
-            super().__init__(config, safety=None)
-
-    install_deployment(monkeypatch, MissingSafety)
-    lightweight_container(monkeypatch)
-    with pytest.raises(StartupFailure) as excinfo:
-        compose_runtime(settings(tmp_path))
-    assert excinfo.value.category is StartupErrorCategory.SAFETY_MISSING
+def test_missing_owner_fails_closed_with_category(tmp_path):
+    with pytest.raises(StartupFailure) as failure:
+        compose_runtime(settings(tmp_path), spec(world_proposal_factory=lambda: None))
+    assert failure.value.category is StartupErrorCategory.WORLD_MISSING
 
 
-def test_deployment_constructor_failure_preserves_cause(monkeypatch, tmp_path):
+def test_duplicate_ownership_is_rejected(tmp_path):
+    shared = Owner()
+    bad = spec(
+        audit_projector_factory=lambda *a, **k: shared,
+        governed_memory_factory=lambda *a, **k: shared,
+    )
+    with pytest.raises(StartupFailure, match="duplicate ownership"):
+        compose_runtime(settings(tmp_path), bad)
+
+
+def test_duplicate_edge_owner_is_rejected_before_authorities_construct(tmp_path):
+    shared = World()
+    with pytest.raises(StartupFailure, match="duplicate ownership"):
+        compose_runtime(
+            settings(tmp_path),
+            spec(
+                world_proposal_factory=lambda: shared,
+                safety_validator_factory=lambda: shared,
+            ),
+        )
+    assert shared.closed
+
+
+def test_partial_construction_closes_earlier_owner(tmp_path):
+    world = World()
+
+    def fail():
+        raise RuntimeError("safety construction failed")
+
+    with pytest.raises(StartupFailure):
+        compose_runtime(
+            settings(tmp_path),
+            spec(world_proposal_factory=lambda: world, safety_validator_factory=fail),
+        )
+    assert world.closed
+
+
+def test_startup_cancellation_is_not_reclassified_and_still_cleans_up(tmp_path):
+    world = World()
+
+    def cancel():
+        raise asyncio.CancelledError()
+
+    with pytest.raises(asyncio.CancelledError):
+        compose_runtime(
+            settings(tmp_path),
+            spec(world_proposal_factory=lambda: world, safety_validator_factory=cancel),
+        )
+    assert world.closed
+
+
+@pytest.mark.asyncio
+async def test_close_is_best_effort_and_preserves_first_failure(tmp_path):
+    runtime = compose_runtime(settings(tmp_path), spec())
+    called = []
+
     class Broken:
-        def __init__(self, config=None):
-            raise ValueError("malicious constructor escalation")
+        def close(self):
+            called.append("broken")
+            raise RuntimeError("close failed")
 
-    install_deployment(monkeypatch, Broken)
-    with pytest.raises(StartupFailure) as excinfo:
-        compose_runtime(settings(tmp_path))
-    assert excinfo.value.category is StartupErrorCategory.DEPLOYMENT_CONSTRUCTION_FAILED
-    assert isinstance(excinfo.value.cause, ValueError)
+    class Later:
+        def close(self):
+            called.append("later")
+
+    runtime.language_output = Broken()
+    runtime.language_input = Later()
+    with pytest.raises(RuntimeError, match="close failed"):
+        await runtime.close()
+    assert called == ["broken", "later"]
 
 
-def test_development_stub_is_explicit_and_not_production_ready(monkeypatch, tmp_path):
-    lightweight_container(monkeypatch)
-    runtime = compose_runtime(settings(tmp_path, env=VulcanEnvironment.development, stub=True))
-    assert isinstance(runtime.deployment, DevelopmentStubDeployment)
-    assert runtime.deployment.production_ready is False
-    with pytest.raises(RuntimeError):
-        import asyncio
-        asyncio.run(runtime.readiness())
+def test_no_legacy_deployment_import_or_setattr_in_canonical_root():
+    path = Path("src/vulcan/runtime/composition.py")
+    tree = ast.parse(path.read_text())
+    imports = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.Import, ast.ImportFrom))
+    ]
+    assert all("orchestrator.deployment" not in ast.unparse(node) for node in imports)
+    assert "ProductionDeployment" not in path.read_text()
+    assert "setattr(" not in Path("src/vulcan/runtime/container.py").read_text()
+    assert "runtime.kernel =" not in path.read_text()
+
+
+@pytest.mark.asyncio
+async def test_development_stub_composes_but_never_becomes_ready(tmp_path):
+    runtime = compose_runtime(
+        settings(tmp_path, env=VulcanEnvironment.development, stub=True), spec()
+    )
+    try:
+        with pytest.raises(RuntimeError, match="world_state is unhealthy"):
+            await runtime.readiness()
+    finally:
+        await runtime.close()
 
 
 def test_production_forbids_development_stub_setting(tmp_path):
-    from vulcan.runtime.settings import SettingsError, load_runtime_settings
-    root = (tmp_path / "prod-root").resolve()
-    env = {
-        "VULCAN_ENV": "production",
-        "VULCAN_RUNTIME_DURABLE_ROOT": str(root),
-        "VULCAN_JWT_SECRET": "Abcd1234!" * 5,
-        "VULCAN_APPROVAL_HMAC_SECRET": "Bcde1234!" * 5,
-        "VULCAN_DEVELOPMENT_STUB_MODE": "true",
-    }
-    with pytest.raises(SettingsError, match="development stub mode"):
-        load_runtime_settings(env)
-
-
-def test_server_dependency_absence_fails_import_without_fake_frameworks():
-    import os
-    import subprocess
-    import sys
-
-    env = os.environ.copy()
-    env["PYTHONPATH"] = "src"
-    result = subprocess.run(
-        [sys.executable, "-c", "import vulcan.runtime.app"],
-        cwd=Path(__file__).resolve().parents[2],
-        env=env,
-        text=True,
-        capture_output=True,
-        timeout=10,
-        check=False,
-    )
-    if result.returncode == 0:
-        pytest.skip("server dependencies are installed in this environment")
-    assert "ModuleNotFoundError" in result.stderr
-    assert "fastapi" in result.stderr or "pydantic" in result.stderr
+    with pytest.raises(StartupFailure) as failure:
+        compose_runtime(settings(tmp_path, stub=True), spec())
+    assert failure.value.category is StartupErrorCategory.SETTINGS_INVALID
