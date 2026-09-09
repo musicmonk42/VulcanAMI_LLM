@@ -319,9 +319,23 @@ from silently contradicting durable constitutional history.
 dispatcher. This remains below M3 until the canonical effect/reafference path
 commits autobiography and lineage under one transaction.
 
-### 3.4 Center, boundary, and valuation in shadow mode
+### 3.4 Center, boundary, and valuation in shadow mode — M2 (intervention-sensitive local evidence; canonical wiring pending)
 
 Estimate operational center, controllability boundary, ownership, temporal currentness, and bounded multidimensional valuation without granting those estimators authority.
+
+Production-denied immutable shadow estimators now operationalize five center variables, seven
+boundary categories, and seven independently bounded valuation dimensions.
+All outputs bind digest-only provenance and calibration/Brier error estimates;
+full-rank center interventions and boundary/valuation perturbations produce
+distinguishable downstream predictions. Humans fail closed to autonomous
+external-agent classification regardless of apparent control signals. Shadow
+plan ordering uses nondominated Pareto fronts and exposes neither an
+authorization operation nor a scalar reward.
+The implementation is M2 only: it is not composed into the canonical request
+path and has no authority, memory mutation, effect, or public subjecthood claim.
+The research module is removed or replaced when the external instrumentor
+provides held-out causal-identification and calibration evidence outside the
+authority plane.
 
 ### 3.5 External NPT instrumentor
 
