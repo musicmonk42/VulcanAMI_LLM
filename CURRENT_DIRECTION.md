@@ -60,6 +60,13 @@ testable. These estimates cannot authorize, commit, mutate memory, or act and
 are not evidence of subjecthood or consciousness. Canonical runtime wiring and
 held-out predictive qualification remain pending.
 
+The external NPT instrumentor is now M2 for synthetic qualification only. It
+recovers the corrected preregistered cyclic structure with perfect precision and
+recall and compares prior-state typed closure against five rivals on wholly
+held-out intervention families in closed-loop/yoked-replay trials. The frozen run
+records a negative incremental-prediction result. Gate G and M5 remain closed;
+because Gate F remains incomplete, Vulcan telemetry has not been analysed.
+
 Causal autobiographical memory is now M2 as a bounded kernel-owned durable
 protocol. It records approved typed fact references and explicit causal edges,
 supports correction/supersession and tombstones without rewriting history, and

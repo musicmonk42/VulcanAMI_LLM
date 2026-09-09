@@ -337,9 +337,27 @@ The research module is removed or replaced when the external instrumentor
 provides held-out causal-identification and calibration evidence outside the
 authority plane.
 
-### 3.5 External NPT instrumentor
+### 3.5 External NPT instrumentor — M2 (synthetic qualification; negative result)
 
 Measure typed closure outside the authority plane and compare held-out intervention predictions against rival models.
+
+The production-denied research package now preserves the seven-dimensional
+closure vector, provides ground-truth and blind instrumentors, qualifies
+multivariate lagged recovery on a known cyclic synthetic graph, and runs the
+corrected preregistered closed-loop/yoked-replay comparison against five named
+rivals. Dataset digest,
+seed, disjoint intervention-family split, prior-state model features, complexity
+penalties, limitations, corrective history, and exact per-outcome scores
+are reproducibly reported. `SyntheticCyclicWorld.v2` is removed when qualified
+Gate F telemetry provides equivalent matched-history intervention records.
+
+The corrected v2 design invalidates v1 because it permitted false-positive
+recovery and same-time leakage. V2 recovers the declared graph with perfect
+precision and recall, but its checked flagship result remains deliberately
+negative: NPT-specific variables did not add held-out predictive value beyond
+every rival. Gate G and M5 remain closed, and the theory must be revised before
+stronger claims. Gate F is still incomplete, so no Vulcan telemetry was
+analysed and this M2 slice does not override the prerequisite.
 
 **Wave exit gate:** a true closed-loop action and an observation-matched replay produce different, predicted causal and ownership updates, and NPT-specific variables add held-out predictive value.
 
