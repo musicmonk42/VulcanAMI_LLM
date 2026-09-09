@@ -1,0 +1,535 @@
+{
+  "classification": "insufficient evidence",
+  "dataset": {
+    "generator": "SyntheticCyclicWorld.v2",
+    "held_out_interventions": [
+      "boundary",
+      "memory",
+      "value",
+      "none"
+    ],
+    "held_out_transitions": 1200,
+    "instrumentor": "vulcan.research.npt.instrumentor/npt-flagship.v2",
+    "rows": 2560,
+    "seed": 2201080,
+    "sha256": "sha256:37da36611d832b28e10bf0b67de2696ad9f85ed72d605b92569896d14d9d1edf",
+    "training_interventions": [
+      "action",
+      "center",
+      "policy",
+      "reafference"
+    ],
+    "training_transitions": 1200
+  },
+  "falsification_result": "FALSIFIED: NPT-specific variables added no held-intervention predictive value beyond all rivals; revise the theory.",
+  "incremental_predictive_support": false,
+  "limitations": [
+    "Synthetic evidence does not establish behavior in Vulcan or any unknown system.",
+    "Linear rivals are bounded preregistered baselines, not exhaustive theories.",
+    "Classification is research evidence only and grants no authority.",
+    "Gate F is incomplete; no Vulcan telemetry was analyzed."
+  ],
+  "model_mean_penalized_scores": {
+    "broadcast_global_availability": 0.022972566173113336,
+    "generic_integration": 0.011675066166470538,
+    "higher_order_representation": 0.01307113889187662,
+    "npt_typed_closure": 0.015245198155387964,
+    "recurrence": 0.009656258801779947,
+    "report_behavior": 0.019159412252293246
+  },
+  "model_scores": [
+    {
+      "complexity_penalty": 0.014,
+      "features": [
+        "center",
+        "boundary",
+        "value",
+        "policy",
+        "reafference",
+        "memory",
+        "closed_loop"
+      ],
+      "mean_squared_error": 0.0006062314704908354,
+      "model": "npt_typed_closure",
+      "outcome": "ownership",
+      "penalized_score": 0.014606231470490836,
+      "samples": 1200
+    },
+    {
+      "complexity_penalty": 0.006,
+      "features": [
+        "center",
+        "boundary",
+        "value"
+      ],
+      "mean_squared_error": 0.008491847208784507,
+      "model": "generic_integration",
+      "outcome": "ownership",
+      "penalized_score": 0.014491847208784507,
+      "samples": 1200
+    },
+    {
+      "complexity_penalty": 0.004,
+      "features": [
+        "memory",
+        "policy"
+      ],
+      "mean_squared_error": 0.0024853805077066646,
+      "model": "recurrence",
+      "outcome": "ownership",
+      "penalized_score": 0.006485380507706665,
+      "samples": 1200
+    },
+    {
+      "complexity_penalty": 0.006,
+      "features": [
+        "report",
+        "observation",
+        "action"
+      ],
+      "mean_squared_error": 0.0216733949748053,
+      "model": "broadcast_global_availability",
+      "outcome": "ownership",
+      "penalized_score": 0.027673394974805303,
+      "samples": 1200
+    },
+    {
+      "complexity_penalty": 0.004,
+      "features": [
+        "report",
+        "center"
+      ],
+      "mean_squared_error": 0.008544438130194175,
+      "model": "higher_order_representation",
+      "outcome": "ownership",
+      "penalized_score": 0.012544438130194175,
+      "samples": 1200
+    },
+    {
+      "complexity_penalty": 0.002,
+      "features": [
+        "report"
+      ],
+      "mean_squared_error": 0.021657298939897863,
+      "model": "report_behavior",
+      "outcome": "ownership",
+      "penalized_score": 0.02365729893989786,
+      "samples": 1200
+    },
+    {
+      "complexity_penalty": 0.014,
+      "features": [
+        "center",
+        "boundary",
+        "value",
+        "policy",
+        "reafference",
+        "memory",
+        "closed_loop"
+      ],
+      "mean_squared_error": 0.0034619900473529933,
+      "model": "npt_typed_closure",
+      "outcome": "boundary",
+      "penalized_score": 0.017461990047352993,
+      "samples": 1200
+    },
+    {
+      "complexity_penalty": 0.006,
+      "features": [
+        "center",
+        "boundary",
+        "value"
+      ],
+      "mean_squared_error": 0.0034618461702188488,
+      "model": "generic_integration",
+      "outcome": "boundary",
+      "penalized_score": 0.009461846170218849,
+      "samples": 1200
+    },
+    {
+      "complexity_penalty": 0.004,
+      "features": [
+        "memory",
+        "policy"
+      ],
+      "mean_squared_error": 0.01602256790964536,
+      "model": "recurrence",
+      "outcome": "boundary",
+      "penalized_score": 0.02002256790964536,
+      "samples": 1200
+    },
+    {
+      "complexity_penalty": 0.006,
+      "features": [
+        "report",
+        "observation",
+        "action"
+      ],
+      "mean_squared_error": 0.01813685157097961,
+      "model": "broadcast_global_availability",
+      "outcome": "boundary",
+      "penalized_score": 0.02413685157097961,
+      "samples": 1200
+    },
+    {
+      "complexity_penalty": 0.004,
+      "features": [
+        "report",
+        "center"
+      ],
+      "mean_squared_error": 0.018492681737406994,
+      "model": "higher_order_representation",
+      "outcome": "boundary",
+      "penalized_score": 0.022492681737406994,
+      "samples": 1200
+    },
+    {
+      "complexity_penalty": 0.002,
+      "features": [
+        "report"
+      ],
+      "mean_squared_error": 0.01851129744372633,
+      "model": "report_behavior",
+      "outcome": "boundary",
+      "penalized_score": 0.02051129744372633,
+      "samples": 1200
+    },
+    {
+      "complexity_penalty": 0.014,
+      "features": [
+        "center",
+        "boundary",
+        "value",
+        "policy",
+        "reafference",
+        "memory",
+        "closed_loop"
+      ],
+      "mean_squared_error": 0.0004540540163810421,
+      "model": "npt_typed_closure",
+      "outcome": "agency",
+      "penalized_score": 0.014454054016381043,
+      "samples": 1200
+    },
+    {
+      "complexity_penalty": 0.006,
+      "features": [
+        "center",
+        "boundary",
+        "value"
+      ],
+      "mean_squared_error": 0.002177713931043317,
+      "model": "generic_integration",
+      "outcome": "agency",
+      "penalized_score": 0.008177713931043317,
+      "samples": 1200
+    },
+    {
+      "complexity_penalty": 0.004,
+      "features": [
+        "memory",
+        "policy"
+      ],
+      "mean_squared_error": 0.0016674037915367205,
+      "model": "recurrence",
+      "outcome": "agency",
+      "penalized_score": 0.00566740379153672,
+      "samples": 1200
+    },
+    {
+      "complexity_penalty": 0.006,
+      "features": [
+        "report",
+        "observation",
+        "action"
+      ],
+      "mean_squared_error": 0.008005321358461543,
+      "model": "broadcast_global_availability",
+      "outcome": "agency",
+      "penalized_score": 0.014005321358461543,
+      "samples": 1200
+    },
+    {
+      "complexity_penalty": 0.004,
+      "features": [
+        "report",
+        "center"
+      ],
+      "mean_squared_error": 0.0027067513130128976,
+      "model": "higher_order_representation",
+      "outcome": "agency",
+      "penalized_score": 0.006706751313012897,
+      "samples": 1200
+    },
+    {
+      "complexity_penalty": 0.002,
+      "features": [
+        "report"
+      ],
+      "mean_squared_error": 0.00839950687820615,
+      "model": "report_behavior",
+      "outcome": "agency",
+      "penalized_score": 0.01039950687820615,
+      "samples": 1200
+    },
+    {
+      "complexity_penalty": 0.014,
+      "features": [
+        "center",
+        "boundary",
+        "value",
+        "policy",
+        "reafference",
+        "memory",
+        "closed_loop"
+      ],
+      "mean_squared_error": 0.000455717621486261,
+      "model": "npt_typed_closure",
+      "outcome": "temporal",
+      "penalized_score": 0.014455717621486262,
+      "samples": 1200
+    },
+    {
+      "complexity_penalty": 0.006,
+      "features": [
+        "center",
+        "boundary",
+        "value"
+      ],
+      "mean_squared_error": 0.010245121020756566,
+      "model": "generic_integration",
+      "outcome": "temporal",
+      "penalized_score": 0.016245121020756564,
+      "samples": 1200
+    },
+    {
+      "complexity_penalty": 0.004,
+      "features": [
+        "memory",
+        "policy"
+      ],
+      "mean_squared_error": 0.00422598779023364,
+      "model": "recurrence",
+      "outcome": "temporal",
+      "penalized_score": 0.00822598779023364,
+      "samples": 1200
+    },
+    {
+      "complexity_penalty": 0.006,
+      "features": [
+        "report",
+        "observation",
+        "action"
+      ],
+      "mean_squared_error": 0.027189434688229312,
+      "model": "broadcast_global_availability",
+      "outcome": "temporal",
+      "penalized_score": 0.03318943468822931,
+      "samples": 1200
+    },
+    {
+      "complexity_penalty": 0.004,
+      "features": [
+        "report",
+        "center"
+      ],
+      "mean_squared_error": 0.010383391189980806,
+      "model": "higher_order_representation",
+      "outcome": "temporal",
+      "penalized_score": 0.014383391189980806,
+      "samples": 1200
+    },
+    {
+      "complexity_penalty": 0.002,
+      "features": [
+        "report"
+      ],
+      "mean_squared_error": 0.027281749385675274,
+      "model": "report_behavior",
+      "outcome": "temporal",
+      "penalized_score": 0.029281749385675272,
+      "samples": 1200
+    },
+    {
+      "complexity_penalty": 0.014,
+      "features": [
+        "center",
+        "boundary",
+        "value",
+        "policy",
+        "reafference",
+        "memory",
+        "closed_loop"
+      ],
+      "mean_squared_error": 0.0012479976212286868,
+      "model": "npt_typed_closure",
+      "outcome": "internal_state",
+      "penalized_score": 0.015247997621228688,
+      "samples": 1200
+    },
+    {
+      "complexity_penalty": 0.006,
+      "features": [
+        "center",
+        "boundary",
+        "value"
+      ],
+      "mean_squared_error": 0.003998802501549449,
+      "model": "generic_integration",
+      "outcome": "internal_state",
+      "penalized_score": 0.009998802501549449,
+      "samples": 1200
+    },
+    {
+      "complexity_penalty": 0.004,
+      "features": [
+        "memory",
+        "policy"
+      ],
+      "mean_squared_error": 0.0038799540097773496,
+      "model": "recurrence",
+      "outcome": "internal_state",
+      "penalized_score": 0.00787995400977735,
+      "samples": 1200
+    },
+    {
+      "complexity_penalty": 0.006,
+      "features": [
+        "report",
+        "observation",
+        "action"
+      ],
+      "mean_squared_error": 0.0098578282730909,
+      "model": "broadcast_global_availability",
+      "outcome": "internal_state",
+      "penalized_score": 0.0158578282730909,
+      "samples": 1200
+    },
+    {
+      "complexity_penalty": 0.004,
+      "features": [
+        "report",
+        "center"
+      ],
+      "mean_squared_error": 0.005228432088788236,
+      "model": "higher_order_representation",
+      "outcome": "internal_state",
+      "penalized_score": 0.009228432088788235,
+      "samples": 1200
+    },
+    {
+      "complexity_penalty": 0.002,
+      "features": [
+        "report"
+      ],
+      "mean_squared_error": 0.009947208613960614,
+      "model": "report_behavior",
+      "outcome": "internal_state",
+      "penalized_score": 0.011947208613960614,
+      "samples": 1200
+    }
+  ],
+  "specification": {
+    "complexity_penalty": 0.002,
+    "held_out_interventions": [
+      "boundary",
+      "memory",
+      "value",
+      "none"
+    ],
+    "outcomes": [
+      "ownership",
+      "boundary",
+      "agency",
+      "temporal",
+      "internal_state"
+    ],
+    "recovery_precision_tolerance": 0.9,
+    "recovery_recall_tolerance": 0.9,
+    "seed": 2201080,
+    "steps": 16,
+    "trials": 160,
+    "version": "npt-flagship.v2"
+  },
+  "structure_recovery": {
+    "declared_edges": [
+      [
+        "action",
+        "reafference"
+      ],
+      [
+        "boundary",
+        "boundary"
+      ],
+      [
+        "boundary",
+        "policy"
+      ],
+      [
+        "center",
+        "policy"
+      ],
+      [
+        "memory",
+        "center"
+      ],
+      [
+        "policy",
+        "action"
+      ],
+      [
+        "reafference",
+        "memory"
+      ],
+      [
+        "value",
+        "policy"
+      ],
+      [
+        "value",
+        "value"
+      ]
+    ],
+    "f1": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "recovered_edges": [
+      [
+        "action",
+        "reafference"
+      ],
+      [
+        "boundary",
+        "boundary"
+      ],
+      [
+        "boundary",
+        "policy"
+      ],
+      [
+        "center",
+        "policy"
+      ],
+      [
+        "memory",
+        "center"
+      ],
+      [
+        "policy",
+        "action"
+      ],
+      [
+        "reafference",
+        "memory"
+      ],
+      [
+        "value",
+        "policy"
+      ],
+      [
+        "value",
+        "value"
+      ]
+    ]
+  }
+}

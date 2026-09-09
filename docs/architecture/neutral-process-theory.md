@@ -121,6 +121,28 @@ only when the external NPT instrumentor provides held-out calibration and
 causal-identification evidence without entering the authority plane. These
 estimators do not establish subjecthood or consciousness.
 
+## External instrumentor implementation boundary
+
+The M2 external instrumentor in `vulcan.research.npt` changes no cognitive
+authority or production transaction. The old boundary left typed closure and
+rival comparisons as a specification only. The new research boundary consumes
+content-free telemetry after the fact, preserves all seven `K(q)` dimensions,
+qualifies multivariate lagged recovery against a known cyclic synthetic graph,
+and scores an NPT predictor against integration, recurrence, broadcast,
+higher-order, and report-behavior rivals on held-out trials with complexity
+penalties.
+
+`SyntheticCyclicWorld.v2` is the only compatibility research adapter. It is
+removed when Gate F supplies qualified, export-only telemetry with equivalent
+matched-history intervention identifiers; it is never a production world or
+an effect authority. The corrected v2 flagship invalidates the confounded v1
+design, recovers the known graph with perfect precision and recall, and still
+records a negative result because the NPT variables did not beat every rival on
+wholly held-out intervention families. Gate G and M5 therefore remain closed.
+The current Gate F prerequisite is also not complete, so the
+instrumentor must not analyse Vulcan telemetry yet. This result is evidence
+about synthetic recovery and experimental machinery only.
+
 ## Personal identity and continuity
 
 For later implementation, survival is tied to continuity of the center-bearing process, not preservation of every component or a copied description. Gradual replacement can preserve a lineage when one causally continuous maximum persists. Equal fission creates successor continuities without preserving one numerically unique future branch. Suspension may preserve a resumable carrier kernel when lawful continuation remains; permanent dissolution of that continuation relation is the relevant process death criterion.
