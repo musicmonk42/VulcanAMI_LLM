@@ -45,6 +45,13 @@ operator reconciliation for non-idempotent ambiguity. It is not yet M3: the
 composed request path does not authorize effects or project them into episode
 and lineage heads.
 
+Typed observation and reafference are now M2 in a deterministic causal test
+world. Receipt-bound observations and validated-candidate assessments persist
+prediction error, confounders, uncertainty, and calibration telemetry; restart
+resumes idempotent update and lineage ports from each durable boundary. This is
+not yet M3 because the composed request/effect path and cross-store atomic
+transaction are still pending.
+
 ## Governing equation
 
 ```text

@@ -24,7 +24,6 @@ from vulcan.microkernel.effects import (
 )
 from vulcan.microkernel.principals import Principal, PrincipalKind
 
-
 D = sha256(b"fixture").hexdigest()
 NOW = datetime(2030, 1, 1, tzinfo=timezone.utc)
 
@@ -216,6 +215,11 @@ def test_durable_order_and_audit_bindings(tmp_path):
     ]
     assert events[1][1]["episode_id"] == intent.episode_id
     assert events[1][1]["lineage_id"] == intent.lineage_id
+    store.validate_reafference_evidence(receipt.digest, values[2].digest)
+    with pytest.raises(EffectRejected, match="observation-eligible"):
+        store.validate_reafference_evidence(receipt.digest, D)
+    with pytest.raises(EffectRejected, match="missing"):
+        store.validate_reafference_evidence(D, values[2].digest)
 
 
 def test_capability_is_single_use_and_concurrency_safe(tmp_path):

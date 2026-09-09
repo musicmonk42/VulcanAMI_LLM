@@ -284,9 +284,26 @@ the composed request path authorizes an effect and atomically projects its
 intent and receipt into episode and lineage heads; exact-artifact restart
 qualification remains below M4.
 
-### 3.3 Reafference and causal autobiography
+### 3.3 Reafference and causal autobiography — M2 (causal loop tested; canonical wiring pending)
 
 Record expected effect, observation, prediction error, self-caused probability, violated assumptions, world/self updates, and autobiographical consolidation.
+
+Canonical `Observation` and `ReafferenceAssessment` contracts now bind typed
+environment changes to expected effects and receipts. A deterministic
+closed-loop/yoked adapter produces matched observations with different current
+causal control, and deterministic assessment records confounders, delays,
+external actors, violated predictions, uncertainty, ownership-related updates,
+and Brier calibration telemetry. Typed adapter and assessor validators prevent
+provider-authored artifacts from entering the chain, while the effect store
+verifies the exact successful receipt/intent/expectation evidence. The
+microkernel-only transaction service persists candidates before committing
+updates and advances lineage only after receipt validation, observation,
+assessment, and update commitment. Idempotent authority ports resume at every
+durable crash boundary; schema, calibration, tamper, replay, cancellation, and
+concurrency behavior has local evidence. This remains
+below M3 because it is not composed with the canonical request/effect path and
+its update, lineage, and reafference stores do not yet share one atomic commit;
+Gate F remains incomplete pending that wiring and exact-artifact qualification.
 
 ### 3.4 Center, boundary, and valuation in shadow mode
 
