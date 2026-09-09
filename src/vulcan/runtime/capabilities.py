@@ -278,7 +278,7 @@ class CapabilityManifestAuthority:
                 acquired_at,
                 acquired_at,
                 expires_at,
-                f"{self.owner}:{episode_id}:{digest}",
+                f"capability-lease:{digest[:32]}:{episode_id[-32:]}",
             ),
             None,
         )

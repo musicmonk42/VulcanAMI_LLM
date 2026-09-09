@@ -246,6 +246,7 @@ class CognitiveEpisode:
     schema_version: str = SCHEMA_VERSION
     conversation_id: str | None = None
     parent: EpisodeRef | None = None
+    lineage_head: ArtifactRef | None = None
     snapshot_bundle: SnapshotBundleRef | None = None
     interpretation: Mapping[str, str] = field(default_factory=dict)
     claims: tuple[ArtifactRef, ...] = ()
@@ -301,6 +302,11 @@ class CognitiveEpisode:
             "response-authorization.compat.v1",
         }:
             raise ValueError("authorization artifact has the wrong kind")
+        if (
+            self.lineage_head is not None
+            and self.lineage_head.kind != "lineage-head.v1"
+        ):
+            raise ValueError("lineage binding has the wrong kind")
         if self.response is not None and self.response.kind not in {
             "published-response.v1",
             "response-ir.v3",  # persisted pre-projection compatibility
@@ -379,6 +385,7 @@ class CognitiveEpisode:
         raw_request: bytes | str | None = None,
         conversation_id: str | None = None,
         parent: EpisodeRef | None = None,
+        lineage_head: ArtifactRef | None = None,
         snapshot_bundle: SnapshotBundleRef | None = None,
         projection_digest: str | None = None,
         episode_id: str | None = None,
@@ -400,6 +407,7 @@ class CognitiveEpisode:
             request=RequestBinding(request_id, input_digest, projection_digest),
             conversation_id=conversation_id,
             parent=parent,
+            lineage_head=lineage_head,
             snapshot_bundle=snapshot_bundle,
         )
         return episode._append_event(
@@ -558,6 +566,7 @@ class CognitiveEpisode:
             "episode_id": self.episode_id,
             "evidence": [x.to_json() for x in self.evidence],
             "interpretation": dict(self.interpretation),
+            "lineage_head": self.lineage_head.to_json() if self.lineage_head else None,
             "parent": self.parent.to_json() if self.parent else None,
             "request": self.request.to_json(),
             "response": self.response.to_json() if self.response else None,

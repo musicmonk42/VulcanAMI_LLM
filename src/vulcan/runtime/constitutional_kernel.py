@@ -10,9 +10,18 @@ from hashlib import sha256
 from typing import Callable, Protocol
 from uuid import uuid4
 
-from vulcan.microkernel.episode import ActorBinding, CognitiveEpisode
+from vulcan.microkernel.episode import (
+    ActorBinding,
+    ArtifactRef,
+    CognitiveEpisode,
+)
 from vulcan.microkernel.episode_store import EpisodeStore
 from vulcan.microkernel.epistemic_store import EpistemicStore
+from vulcan.microkernel.lineage import (
+    AuthoritySnapshotRef,
+    LineageConflict,
+    LineageTransactionService,
+)
 from vulcan.microkernel.principals import Principal, PrincipalKind
 from vulcan.microkernel.snapshots import SnapshotBundle
 from vulcan.microkernel.state_machine import EpisodeState
@@ -39,6 +48,8 @@ class EpisodeAdmissionService:
 
     snapshot_admitter: SnapshotAdmitter
     store: EpisodeStore
+    lineage: LineageTransactionService | None = None
+    branch_id: str | None = None
 
     def admit(
         self,
@@ -59,15 +70,58 @@ class EpisodeAdmissionService:
                 principal_digest=sha256(request_id.encode("utf-8")).hexdigest(),
                 authority="CognitiveKernel",
             )
-            episode = CognitiveEpisode.create(
-                actor=binding,
-                request_id=request_id,
-                input_digest=input_digest,
-                conversation_id=conversation_id,
-                episode_id=episode_id,
-                snapshot_bundle=bundle.bundle_ref(),
-            )
-            if self.store is not None:
+
+            def genesis(lineage_head: ArtifactRef | None) -> CognitiveEpisode:
+                return CognitiveEpisode.create(
+                    actor=binding,
+                    request_id=request_id,
+                    input_digest=input_digest,
+                    conversation_id=conversation_id,
+                    episode_id=episode_id,
+                    snapshot_bundle=bundle.bundle_ref(),
+                    lineage_head=lineage_head,
+                )
+
+            if self.lineage is not None:
+                if self.branch_id is None:
+                    raise RuntimeError("lineage branch identity is missing")
+                snapshots = tuple(
+                    AuthoritySnapshotRef(
+                        ref.kind,
+                        ref.digest,
+                        ref.revision,
+                        ref.schema_version,
+                        ref.owner,
+                        ref.release_id,
+                    )
+                    for ref in bundle.refs()
+                )
+                for _ in range(32):
+                    head = self.lineage.store.load(self.branch_id)
+                    episode = genesis(
+                        ArtifactRef(
+                            f"lineage-head:{head.branch_id}:{head.tick}",
+                            head.digest,
+                            "lineage-head.v1",
+                        )
+                    )
+                    try:
+                        self.lineage.admit_episode(
+                            self.branch_id,
+                            head.digest,
+                            episode,
+                            snapshots,
+                            self.store,
+                        )
+                        break
+                    except LineageConflict:
+                        continue
+                else:
+                    raise LineageConflict(
+                        "episode admission contention did not converge"
+                    )
+            else:
+                episode = genesis(None)
                 self.store.create(episode)
             return CognitiveCase.from_admitted_episode(episode=episode, bundle=bundle)
         except BaseException:
@@ -110,6 +164,8 @@ class ConstitutionalCognitiveKernel:
         transaction_service_factory: Callable[
             ..., ConstitutionalTransactionService
         ] = ConstitutionalTransactionService,
+        lineage: LineageTransactionService | None = None,
+        lineage_branch_id: str | None = None,
     ) -> "ConstitutionalCognitiveKernel":
         if not callable(snapshot_admitter):
             raise TypeError("snapshot_admitter must be callable")
@@ -137,7 +193,9 @@ class ConstitutionalCognitiveKernel:
             binder(service, principal)
         return cls(
             kernel,
-            EpisodeAdmissionService(snapshot_admitter, episode_store),
+            EpisodeAdmissionService(
+                snapshot_admitter, episode_store, lineage, lineage_branch_id
+            ),
             service,
         )
 
@@ -206,6 +264,28 @@ class ConstitutionalCognitiveKernel:
                     raise RuntimeError(
                         "transport withheld: durable terminal state missing"
                     )
+                self._complete_lineage(durable)
             return result
+        except asyncio.CancelledError:
+            # The delegate terminalizes cancellation before propagating it.
+            # Preserve that causal fact in lineage without converting cancellation
+            # into an ordinary response.
+            durable = self.admission.store.load(case.case_id)
+            if durable.state.is_terminal:
+                self._complete_lineage(durable)
+            raise
         finally:
             case.release_snapshot_bundle()
+
+    def _complete_lineage(self, durable: CognitiveEpisode) -> None:
+        if self.admission.lineage is None:
+            return
+        if self.admission.branch_id is None:
+            raise RuntimeError("lineage branch identity is missing")
+        branch = self.admission.lineage.store.load(self.admission.branch_id)
+        if any(
+            ref.episode_id == durable.episode_id for ref in branch.active_episode_refs
+        ):
+            self.admission.lineage.complete_episode(
+                self.admission.branch_id, durable, self.admission.store
+            )

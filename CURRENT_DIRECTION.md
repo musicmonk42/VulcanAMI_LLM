@@ -31,6 +31,13 @@ transactional outbox. `CanonicalAudit` projects committed
 `episode.transitioned` artifacts and retains `case.*` solely for historical
 reads; it is no longer a competing live lifecycle authority.
 
+Persistent causal lineage is now M3 on the composed request path: episode
+genesis binds the current branch head and terminal episodes enter that branch's
+history through kernel-only CAS transactions. This is neutral continuity
+metadata, not a personal-identity or consciousness claim. Episode genesis and
+lineage admission are one database transaction; exact-artifact restart
+qualification remains open.
+
 ## Governing equation
 
 ```text
