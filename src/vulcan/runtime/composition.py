@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from importlib import import_module, util
 from types import SimpleNamespace
+from collections.abc import Mapping
 
 from vulcan.microkernel.episode_store import EpisodeStore
 from vulcan.microkernel.epistemic_store import EpistemicStore
@@ -118,7 +119,15 @@ def compose_runtime(settings: RuntimeSettings) -> RuntimeContainer:
     try:
         config_module = import_module("vulcan.config")
         deployment_module = import_module("vulcan.orchestrator.deployment")
-        deployment = deployment_module.ProductionDeployment(config_module.get_config())
+        deployment_config = config_module.get_config()
+        legacy_improvement = (deployment_config.get("enable_self_improvement", False)
+                              if isinstance(deployment_config, Mapping)
+                              else getattr(deployment_config, "enable_self_improvement", False))
+        if bool(legacy_improvement):
+            raise RuntimeError(
+                "serving deployment requested retired self-improvement capability"
+            )
+        deployment = deployment_module.ProductionDeployment(deployment_config)
     except BaseException as exc:
         raise _startup_failure(
             StartupErrorCategory.DEPLOYMENT_CONSTRUCTION_FAILED,

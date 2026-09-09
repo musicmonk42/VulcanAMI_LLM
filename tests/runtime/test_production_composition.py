@@ -51,7 +51,6 @@ def lightweight_container(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(container, "CanonicalAudit", lambda path: DummyOwner())
     monkeypatch.setattr(container, "AlignmentRegistry", lambda path, audit=None: DummyOwner())
     monkeypatch.setattr(container, "PersistentDomainRegistry", lambda path, audit=None: DummyOwner())
-    monkeypatch.setattr(container, "compose_self_improvement_runtime", lambda **kwargs: SimpleNamespace(drive=DummyOwner(), capabilities=lambda: (), close=lambda: None))
     monkeypatch.setattr(container, "ShadowLinUCBToolBandit", lambda: DummyOwner())
     monkeypatch.setattr(container, "LearningOwner", lambda **kwargs: DummyOwner())
     monkeypatch.setattr(container, "EnhancedSafetyResponseAdapter", lambda safety: DummyOwner())
@@ -86,6 +85,19 @@ def install_deployment(monkeypatch: pytest.MonkeyPatch, deployment_cls=Deploymen
     deployment.ProductionDeployment = deployment_cls
     monkeypatch.setitem(sys.modules, "vulcan.config", config)
     monkeypatch.setitem(sys.modules, "vulcan.orchestrator.deployment", deployment)
+
+
+def test_serving_rejects_legacy_self_improvement_configuration(monkeypatch, tmp_path):
+    config = types.ModuleType("vulcan.config")
+    config.get_config = lambda: SimpleNamespace(enable_self_improvement=True)
+    deployment_module = types.ModuleType("vulcan.orchestrator.deployment")
+    deployment_module.ProductionDeployment = Deployment
+    monkeypatch.setitem(sys.modules, "vulcan.config", config)
+    monkeypatch.setitem(sys.modules, "vulcan.orchestrator.deployment", deployment_module)
+    with pytest.raises(StartupFailure) as failure:
+        compose_runtime(settings(tmp_path))
+    assert failure.value.category is StartupErrorCategory.DEPLOYMENT_CONSTRUCTION_FAILED
+    assert "retired self-improvement" in str(failure.value.__cause__)
 
 
 @pytest.mark.asyncio

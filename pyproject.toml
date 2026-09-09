@@ -112,6 +112,7 @@ Issues = "https://github.com/musicmonk42/VulcanAMI_LLM/issues"
 
 [project.scripts]
 vulcan-verify = "scripts.verify_installation:main"
+vulcan-improvement-operator = "vulcan.improvement.offline:main"
 
 # CRITICAL: Package configuration for 'import src' support
 # This enables importing modules with 'from src.vulcan.orchestrator import ...'

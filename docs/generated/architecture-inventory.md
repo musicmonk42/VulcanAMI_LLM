@@ -1,6 +1,6 @@
 # Generated architecture inventory
 
-Digest: `89686846d9cf9fbc410e671a6e59dcbe1db0a7e481bb7db425649f7a9c2a9c63`
+Digest: `daea30d2253fc82dd5448c2cceae0bee6e227b3d47a4ca6e5c12bad489c1e039`
 
 This file is generated from `docs/generated/architecture-inventory.json`.
 
@@ -98,7 +98,7 @@ Count: 406
 
 ## Routes
 
-Count: 425
+Count: 422
 
 - `src/platform/routes_admin.py:104` handler='admin_get_service', method='GET', reachability='unknown', route='/admin/services/{service_name}'
 - `src/full_platform.py:3742` handler='admin_get_service', method='GET', reachability='unknown', route='/admin/services/{service_name}'
@@ -124,7 +124,7 @@ Count: 425
 - `src/platform/routes_arena.py:103` handler='arena_tournament', method='POST', reachability='unknown', route='/api/arena/tournament'
 - `src/full_platform.py:4652` handler='arena_tournament', method='POST', reachability='unknown', route='/api/arena/tournament'
 - `src/vulcan/runtime/app.py:196` handler='audit_case', method='GET', reachability='production-reachable', route='/v1/audit/cases/{case_id}'
-- `src/vulcan/runtime/app.py:243` handler='audit_improvement', method='GET', reachability='production-reachable', route='/v1/audit/improvements/{proposal_digest}'
+- `src/vulcan/runtime/app.py:226` handler='audit_improvement', method='GET', reachability='production-reachable', route='/v1/audit/improvements/{proposal_digest}'
 - `src/vulcan/runtime/app.py:173` handler='capabilities', method='GET', reachability='production-reachable', route='/v1/capabilities'
 - `src/platform/routes_adversarial.py:324` handler='check_query_adversarial', method='POST', reachability='unknown', route='/api/adversarial/check-query'
 - `src/full_platform.py:5003` handler='check_query_adversarial', method='POST', reachability='unknown', route='/api/adversarial/check-query'
@@ -150,11 +150,11 @@ Count: 425
 - `src/governance/app.py:636` handler='get_agent', method='ROUTE', reachability='unknown', route='/agents/<agent_id>'
 - `src/vulcan/endpoints/agents.py:48` handler='get_agent_pool_status', method='GET', reachability='unknown', route='/status'
 - `src/governance/app.py:577` handler='get_audit_log', method='ROUTE', reachability='unknown', route='/audit/log'
-- ... 375 more in JSON
+- ... 372 more in JSON
 
 ## Import Identities
 
-Count: 1844
+Count: 1847
 
 - `tests/security/test_output_firewall.py:1` module='vulcan.runtime.output', reachability='test-only'
 - `tests/test_probabilistic_routing.py:10` module='src.vulcan.reasoning.probabilistic_reasoning', reachability='test-only'
@@ -169,6 +169,7 @@ Count: 1844
 - `tests/test_world_model_research.py:10` module='vulcan.learning_owner', reachability='test-only'
 - `tests/security/test_local_language_governance.py:10` module='vulcan.local_language.tokenizer', reachability='test-only'
 - `src/vulcan/tests/test_consolidation.py:10` module='vulcan.memory.base', reachability='test-only'
+- `src/vulcan/runtime/composition.py:10` module='vulcan.microkernel.epistemic_store', reachability='production-reachable'
 - `src/vulcan/runtime/state_authorities.py:10` module='vulcan.microkernel.snapshots', reachability='production-reachable'
 - `tests/persistence/test_episode_audit_projection.py:10` module='vulcan.microkernel.state_machine', reachability='test-only'
 - `tests/runtime/test_authoritative_episode_path.py:10` module='vulcan.microkernel.state_machine', reachability='test-only'
@@ -179,7 +180,6 @@ Count: 1844
 - `tests/security/test_real_response_safety_composition.py:10` module='vulcan.runtime.kernel', reachability='test-only'
 - `tests/security/test_runtime_convergence.py:10` module='vulcan.runtime.kernel', reachability='test-only'
 - `tests/security/test_language_contracts.py:10` module='vulcan.runtime.semantic', reachability='test-only'
-- `src/vulcan/runtime/self_improvement.py:10` module='vulcan.world_model.meta_reasoning.csiu_enforcement', reachability='production-reachable'
 - `tests/test_phase9g_runtime_ownership.py:10` module='vulcan.world_model.meta_reasoning.self_improvement_drive', reachability='test-only'
 - `src/vulcan/monitoring/__init__.py:3` module='vulcan.monitoring.memory_guard', reachability='unknown'
 - `src/vulcan/tests/test_meta_learning.py:5` module='vulcan.learning.meta_learning', reachability='test-only'
@@ -206,7 +206,7 @@ Count: 1844
 - `src/vulcan/world_model/world_model_core.py:1020` module='vulcan.world_model.creative_handler', reachability='unknown'
 - `src/api_server.py:103` module='vulcan.reasoning.unified', reachability='unknown'
 - `src/vulcan/world_model/world_model_core.py:1037` module='vulcan.world_model.llm_guidance', reachability='unknown'
-- ... 1794 more in JSON
+- ... 1797 more in JSON
 
 ## Singletons
 
@@ -287,7 +287,7 @@ Count: 454
 
 ## Fallbacks
 
-Count: 4427
+Count: 4429
 
 - `src/vulcan/endpoints/self_improvement.py:98` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/vulcan/safety/rollback_audit.py:99` kind='except_exception', reachability='unknown', review='unreviewed'
@@ -339,7 +339,7 @@ Count: 4427
 - `src/vulcan/knowledge_crystallizer/principle_extractor.py:1018` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/vulcan/curiosity_engine/curiosity_engine_core.py:1012` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/memory/governed_unlearning.py:1019` kind='except_exception', reachability='unknown', review='unreviewed'
-- ... 4377 more in JSON
+- ... 4379 more in JSON
 
 ## Mocks
 
@@ -399,13 +399,15 @@ Count: 400
 
 ## Persistence
 
-Count: 396
+Count: 398
 
+- `src/vulcan/improvement/offline.py:101` kind='call', reachability='unknown', value='fcntl.flock'
 - `tests/persistence/test_memory_outbox_v2.py:103` kind='call', reachability='test-only', value='SQLiteMemoryRepository'
 - `src/vulcan/runtime/alignment.py:107` kind='call', reachability='production-reachable', value='fcntl.flock'
 - `src/platform/background.py:108` kind='call', reachability='unknown', value='fcntl.flock'
 - `tests/persistence/test_memory_outbox_v2.py:108` kind='call', reachability='test-only', value='SQLiteMemoryRepository'
 - `src/adversarial_tester.py:1109` kind='call', reachability='unknown', value='sqlite3.connect'
+- `src/vulcan/improvement/offline.py:111` kind='call', reachability='unknown', value='fcntl.flock'
 - `src/vulcan/learning/outbox.py:111` kind='call', reachability='unknown', value='fcntl.flock'
 - `src/vulcan/safety/adversarial_integration.py:1166` kind='call', reachability='unknown', value='sqlite3.connect'
 - `tests/microkernel/test_epistemic_store.py:117` kind='call', reachability='test-only', value='sqlite3.connect'
@@ -449,9 +451,7 @@ Count: 396
 - `src/full_platform.py:279` kind='call', reachability='unknown', value='fcntl.flock'
 - `src/vulcan/world_model/meta_reasoning/governed_transaction.py:290` kind='call', reachability='unknown', value='fcntl.flock'
 - `src/vulcan/world_model/meta_reasoning/governed_transaction.py:302` kind='call', reachability='unknown', value='fcntl.flock'
-- `src/vulcan/microkernel/episode_store.py:310` kind='call', reachability='production-reachable', value='sqlite3.connect'
-- `src/vulcan/curiosity_engine/resolution_bridge.py:313` kind='call', reachability='unknown', value='sqlite3.connect'
-- ... 346 more in JSON
+- ... 348 more in JSON
 
 ## Environment Readers
 
@@ -521,7 +521,7 @@ Count: 20
 - `src/vulcan/orchestrator/agent_scoring.py:148` reachability='unknown', text='\n    Get available agents that can handle the specified capabilities.\n\n    Args:\n        manager: AgentPoolManager instance\n        capabilities: List of capabi'
 - `src/vulcan/runtime/app.py:177` reachability='production-reachable', text='capability authority unavailable'
 - `src/vulcan/orchestrator/agent_scoring.py:176` reachability='unknown', text='\n    Get the current capability distribution in the agent pool.\n\n    AGENT POOL CONFIGURATION FIX: This method provides observability into\n    which capabilitie'
-- `src/vulcan/runtime/container.py:206` reachability='production-reachable', text='canonical capability authority is unavailable'
+- `src/vulcan/runtime/container.py:204` reachability='production-reachable', text='canonical capability authority is unavailable'
 - `src/utils/faiss_config.py:1` reachability='unknown', text='\nFAISS Configuration and Initialization Module\n\nHandles FAISS import with proper CPU capability detection and informative\nmessaging about instruction set usage '
 - `src/memory/cost_optimizer.py:223` reachability='unknown', text="\n        Analyze current cost structure with defensive programming.\n\n        FIXED: Now provides fallback logic when memory system methods don't exist.\n        "
 - `src/full_platform.py:3107` reachability='unknown', text='Capability unavailable in production'
@@ -643,9 +643,9 @@ Count: 305
 - `docker-compose.prod.yml:627` image: nginx:1.27-alpine
 
 ### docker
-- `Dockerfile:312` CMD curl -fsS http://localhost:${PORT:-8000}/health/live || exit 1
-- `Dockerfile:315` ENTRYPOINT ["/app/entrypoint.sh"]
-- `Dockerfile:321` CMD ["sh", "-c", "uvicorn vulcan.runtime.app:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"]
+- `Dockerfile:325` CMD curl -fsS http://localhost:${PORT:-8000}/health/live || exit 1
+- `Dockerfile:328` ENTRYPOINT ["/app/entrypoint.sh"]
+- `Dockerfile:334` CMD ["sh", "-c", "uvicorn vulcan.runtime.app:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"]
 - `docker/api/Dockerfile:135` CMD curl -fsS http://localhost:8000/health/live || exit 1
 - `docker/api/Dockerfile:137` ENTRYPOINT ["/app/entrypoint.sh"]
 - `docker/api/Dockerfile:140` CMD ["python", "-m", "uvicorn", "src.api_gateway:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

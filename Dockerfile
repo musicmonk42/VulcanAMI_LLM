@@ -262,6 +262,19 @@ COPY --from=builder /app/static ./static
 # Copy generated SBOM (optional)
 COPY --from=builder /app/sbom.json ./sbom.json
 
+# Source mutation and deployment capabilities belong to the separately built
+# offline operator artifact.  They are physically absent from the serving image,
+# rather than relying on configuration or filesystem permissions for denial.
+RUN rm -f \
+      /usr/local/bin/vulcan-improvement-operator \
+      /app/src/vulcan/improvement/offline.py \
+      /app/src/vulcan/endpoints/self_improvement.py \
+      /app/src/vulcan/world_model/self_improvement.py \
+      /app/src/vulcan/world_model/self_improvement_apply.py \
+      /app/src/vulcan/world_model/self_improvement_engine.py \
+      /app/src/vulcan/world_model/meta_reasoning/governed_transaction.py \
+      /app/src/vulcan/world_model/meta_reasoning/self_improvement_drive.py
+
 # Production runtime immutability: source, bundled policy/config, and model assets are read-only.
 # Only explicit state/cache directories are writable by the non-root runtime user.
 RUN mkdir -p /var/lib/vulcan/audit /var/lib/vulcan/alignment /var/lib/vulcan/domains /var/lib/vulcan/memory /var/lib/vulcan/learning/outbox /var/lib/vulcan/csiu /var/lib/vulcan/approval /var/lib/vulcan/improvement /app/data /app/data/backups /tmp/vulcan-cache /app/models && \

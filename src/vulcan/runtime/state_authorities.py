@@ -96,6 +96,22 @@ def disabled_authority(kind: str, *, reason: str) -> ContentBoundStateAuthority:
     )
 
 
+class DisabledCSIUPolicyAuthority(ContentBoundStateAuthority):
+    """Explicit CSIU policy owner when no live CSIU policy is admitted.
+
+    This is intentionally not backed by a learning or improvement runtime.
+    """
+
+    def __init__(self, *, reason: str = "CSIU policy authority is disabled"):
+        super().__init__(
+            kind="csiu",
+            owner="constitutional:disabled-csiu-policy",
+            schema="vulcan-csiu-policy-disabled.v1",
+            release="constitutional-v1",
+            read=lambda: ("0", {"enabled": False, "mode": "proposal-only", "reason": reason}, None),
+        )
+
+
 @dataclass(frozen=True)
 class StateAuthoritySet:
     world: ContentBoundStateAuthority

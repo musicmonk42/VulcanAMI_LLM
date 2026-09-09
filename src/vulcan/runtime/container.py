@@ -21,11 +21,11 @@ from .finalization import SafetyResponseFinalizer
 from .kernel import CognitiveKernel
 from .output import DeterministicLanguageOutput, LanguageOutputPort
 from .semantic import DeterministicLanguageInput, LanguageInputPort
-from .self_improvement import SelfImprovementRuntime, compose_self_improvement_runtime
+from vulcan.improvement.proposal import ImprovementProposalStore
 from .settings import RuntimeSettings
 from .health import HealthFailureCategory, HealthStateMachine, ProcessState, bounded_disk_check, categorize_failure
 from vulcan.microkernel.snapshots import MAX_EPISODE_LIFETIME, SnapshotBundle, construct_snapshot_bundle
-from .state_authorities import ContentBoundStateAuthority, StateAuthoritySet, disabled_authority
+from .state_authorities import ContentBoundStateAuthority, DisabledCSIUPolicyAuthority, StateAuthoritySet, disabled_authority
 from .capabilities import CapabilityManifestAuthority, LiveOwnerFact, composed_runtime_ports, load_capability_registry
 from vulcan.constitution.primitives import Digest, canonical_json
 
@@ -64,7 +64,7 @@ class RuntimeContainer:
     alignment: AlignmentRegistry | None = None
     domain_registry: PersistentDomainRegistry | None = None
     durable_root: Path | None = None
-    self_improvement: SelfImprovementRuntime | None = None
+    improvement_proposals: ImprovementProposalStore | None = None
     learning_owner: LearningOwner | None = None
     settings: RuntimeSettings | None = None
     closed: bool = False
@@ -96,7 +96,6 @@ class RuntimeContainer:
             self.memory,
             self.alignment,
             self.audit,
-            self.self_improvement,
             self.learning_owner,
             self.domain_registry,
             self.episode_store,
@@ -134,7 +133,6 @@ class RuntimeContainer:
             "alignment": self.alignment,
             "domain_registry": self.domain_registry,
             "durable_root": self.durable_root,
-            "self_improvement": self.self_improvement,
             "learning_owner": self.learning_owner,
         }
 
@@ -228,14 +226,14 @@ class RuntimeContainer:
         language_output: LanguageOutputPort = DeterministicLanguageOutput()
         root = str(settings.durable_root)
         Path(root).mkdir(parents=True, exist_ok=True)
-        memory = audit = alignment = domain_registry = self_improvement = None
+        memory = audit = alignment = domain_registry = None
         try:
             audit = CanonicalAudit(f"{root}/audit/events.jsonl")
             memory = compose_governed_memory(MemoryRuntimeConfig(settings.memory_enabled, settings.memory_sqlite_path, settings.durable_root, settings.replicas, settings.memory_backend.value), audit=audit)
             memory.readiness()
             alignment = AlignmentRegistry(f"{root}/alignment/active.json", audit=audit)
             domain_registry = PersistentDomainRegistry(f"{root}/domains", audit=audit)
-            self_improvement = compose_self_improvement_runtime(durable_root=Path(root), audit=audit, alignment=alignment, world_model=world_state, approval_hmac_secret=settings.approval_hmac_secret.reveal() if settings.approval_hmac_secret else None)
+            improvement_proposals = ImprovementProposalStore(Path(root) / "improvement-proposals")
             shadow_bandit = ShadowLinUCBToolBandit()
             learning_owner = LearningOwner(
                 capability=LearningCapabilityStatus.SHADOW,
@@ -248,14 +246,12 @@ class RuntimeContainer:
             setattr(deployment, "learning_owner", learning_owner)
             setattr(deployment, "learning_system", learning_owner)
             setattr(world_state, "domain", domain_registry)
-            setattr(world_state, "self_improvement_runtime", self_improvement)
-            setattr(world_state, "self_improvement_drive", self_improvement.drive)
             response_safety = EnhancedSafetyResponseAdapter(safety)
             response_safety.readiness()
             kernel = CognitiveKernel(state_authority=world_state, finalizer=SafetyResponseFinalizer(response_safety),
                                      language_input=language_input, language_output=language_output, memory=memory, audit=audit, alignment=alignment)
             container = cls(str(uuid4()), deployment, world_state, kernel, safety, memory,
-                       language_input, language_output, config, audit, alignment, domain_registry, Path(root), self_improvement, learning_owner, settings, False, HealthStateMachine(), int(MAX_EPISODE_LIFETIME.total_seconds()))
+                       language_input, language_output, config, audit, alignment, domain_registry, Path(root), improvement_proposals, learning_owner, settings, False, HealthStateMachine(), int(MAX_EPISODE_LIFETIME.total_seconds()))
             def domain_state():
                 lease = domain_registry.lease()
                 return lease.domain_snapshot_id, {"snapshot_id": lease.domain_snapshot_id}, lease
@@ -297,7 +293,7 @@ class RuntimeContainer:
                 domain=ContentBoundStateAuthority(kind="domain", owner="domain-registry", schema="vulcan-domain-snapshot.v1", release="constitutional-v1", read=domain_state),
                 memory=ContentBoundStateAuthority(kind="memory", owner="governed-memory", schema="vulcan-memory-snapshot.v1", release="constitutional-v1", read=memory_state),
                 capability=capability_authority,
-                csiu=ContentBoundStateAuthority(kind="csiu", owner="csiu-policy", schema="vulcan-csiu-policy.v1", release="constitutional-v1", read=lambda: ("1", {"enabled": settings.csiu_enabled, "mode": "proposal-only"}, None)),
+                csiu=DisabledCSIUPolicyAuthority(reason="no serving-process CSIU policy owner is authorized"),
                 alignment=ContentBoundStateAuthority(kind="alignment", owner="alignment-registry", schema="vulcan-alignment-snapshot.v1", release="constitutional-v1", read=alignment_state),
             )
             container.state_authorities.validate()
@@ -307,7 +303,7 @@ class RuntimeContainer:
             container.health.admit()
             return container
         except Exception:
-            for r in (locals().get("learning_owner"), self_improvement, domain_registry, alignment, audit, memory, language_output, language_input):
+            for r in (locals().get("learning_owner"), domain_registry, alignment, audit, memory, language_output, language_input):
                 if r is not None:
                     close=getattr(r,"close",None)
                     if close: close()

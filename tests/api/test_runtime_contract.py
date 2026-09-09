@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -41,11 +42,7 @@ class Runtime:
     runtime_id = "rt-1"
     health = None
     audit = Audit()
-    self_improvement = SimpleNamespace(
-        journal=SimpleNamespace(owner_id="journal"),
-        drive=SimpleNamespace(state=SimpleNamespace(pending_approvals=[])),
-        status_port=SimpleNamespace(status=lambda: {}),
-    )
+    improvement_proposals = SimpleNamespace(root=Path("/nonexistent"))
     async def admission(self):
         return True
     async def shallow_readiness(self):
