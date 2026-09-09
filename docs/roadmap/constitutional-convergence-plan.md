@@ -215,9 +215,14 @@ code-owned operation allowlist and explicit provenance-link contracts. The old
 or authority. Its removal condition is migration of remaining test, output,
 case-projection, alignment, and research imports to canonical Graphix types.
 
-### 2.3 Production import closure
+### 2.3 Production import closure — M3 (qualification-ready; hosted artifact pending)
 
-Enforce an allowlist for serving imports and quarantine Arena, old orchestrators, broad experimental endpoints, and obsolete deployment surfaces behind research extras.
+The installed `vulcan` wheel is the sole canonical identity and setuptools uses the standard src layout. Runtime, server, constitutional-test, research, cloud, distributed, and development dependency sets are separated. A machine-enforced transitive allowlist/denylist proves canonical serving does not import legacy orchestration/deployment, retired semantic authority, Arena, cloud/distributed, experimental-memory, or NPT research packages. The exact non-root Linux image qualifies readiness, bounded arithmetic, durable episode/epistemic audit retrieval, same-volume restart, source immutability, and absence of legacy routes. CI publishes artifact and input digests. Gate E is qualification-ready for canonical Linux/Docker serving but remains pending until the committed workflow produces passing exact-image evidence; Windows serving is not claimed.
+
+The serving image also removes denied package trees and offline installation
+code physically, and bundles only the read-only evidence files needed for live
+capability verification. Import closure includes every parent package
+initializer, preventing package-level side effects from bypassing the graph.
 
 ### 2.4 Offline self-improvement — M3 serving boundary / M2 operator evidence
 

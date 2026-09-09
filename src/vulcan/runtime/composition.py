@@ -11,6 +11,7 @@ from vulcan.memory.composition import compose_governed_memory
 from vulcan.microkernel.episode_store import EpisodeStore
 from vulcan.microkernel.epistemic_store import EpistemicStore
 from vulcan.microkernel.transactions import ConstitutionalTransactionService
+from vulcan.platform import require_canonical_serving_platform
 from vulcan.safety.response_adapter import EnhancedSafetyResponseAdapter
 from vulcan.safety.safety_types import ResponseSafetyDecision, ResponseSafetyStatus
 
@@ -23,7 +24,7 @@ from .domain_registry import PersistentDomainRegistry
 from .errors import StartupErrorCategory, StartupFailure
 from .finalization import SafetyResponseFinalizer
 from .output import DeterministicLanguageOutput
-from .semantic import DeterministicLanguageInput
+from vulcan.graphix.runtime import DeterministicLanguageInput
 from .settings import RuntimeSettings, VulcanEnvironment
 from .state_authorities import StateAuthoritySet
 
@@ -92,16 +93,27 @@ class LegacyWorldReadOnlyAdapter:
             close()
 
 
-def _production_world() -> LegacyWorldReadOnlyAdapter:
-    from vulcan.world_model.world_model_core import WorldModel
+class CanonicalWorldProposalPort:
+    """Dependency-light world proposal port; owns no state or reasoning authority."""
 
-    return LegacyWorldReadOnlyAdapter(WorldModel())
+    production_ready = True
+    snapshot_id = "canonical-world-proposal:v1"
+
+    def readiness(self) -> bool:
+        return True
+
+    def close(self) -> None:
+        return None
+
+
+def _production_world() -> CanonicalWorldProposalPort:
+    return CanonicalWorldProposalPort()
 
 
 def _production_safety() -> Any:
-    from vulcan.safety.safety_validator import EnhancedSafetyValidator
+    from .response_safety import CanonicalResponseSafetyValidator
 
-    return EnhancedSafetyValidator(config=None)
+    return CanonicalResponseSafetyValidator()
 
 
 @dataclass(frozen=True)
@@ -134,6 +146,7 @@ def compose_runtime(
     settings: RuntimeSettings, specification: CompositionSpecification | None = None
 ) -> RuntimeContainer:
     """Construct and publish exactly one typed production owner graph."""
+    require_canonical_serving_platform()
     spec = specification or CompositionSpecification()
     if (
         settings.development_stub_mode

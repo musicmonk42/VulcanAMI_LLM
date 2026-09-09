@@ -12,7 +12,7 @@ from uuid import uuid4
 if TYPE_CHECKING:
     from vulcan.microkernel.snapshots import SnapshotBundle
 
-    from .semantic import (
+    from vulcan.graphix.runtime import (
         AcceptedInterpretation,
         Claim,
         ClarificationRequest,
@@ -230,7 +230,7 @@ class CognitiveCase:
             or episode.state is not EpisodeState.EPISTEMICALLY_COMMITTED
         ):
             raise RuntimeError("durable epistemic episode head is required")
-        from .semantic import validate_ledger
+        from vulcan.graphix.runtime import validate_ledger
 
         validate_ledger(evidence, (derivation,), (claim,), case_id=self.case_id)
         if {item.artifact_id for item in evidence} != {
@@ -289,7 +289,7 @@ class CognitiveCase:
 
     @staticmethod
     def _ledger_refs_for(claim_items, derivation_items, evidence_items):
-        from .semantic import canonical_digest
+        from vulcan.graphix.runtime import canonical_digest
 
         claims = tuple(
             ArtifactRef(claim.claim_id, canonical_digest(claim), "semantic-claim.v2")
@@ -314,7 +314,7 @@ class CognitiveCase:
         return claims, derivations, evidence
 
     def _response_ref(self) -> ArtifactRef | None:
-        from .semantic import canonical_digest
+        from vulcan.graphix.runtime import canonical_digest
 
         if self.response_ir is None or self.render_artifact is None:
             return None

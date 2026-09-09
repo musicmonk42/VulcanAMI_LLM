@@ -26,9 +26,23 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - run: python -m pip install --require-hashes -r requirements-constitutional.txt
+      - name: Verify minimal installed package identity
+        run: |
+          python -m venv /tmp/vulcan-minimal
+          /tmp/vulcan-minimal/bin/pip install --require-hashes -r requirements-runtime.lock
+          /tmp/vulcan-minimal/bin/pip install --no-build-isolation --no-deps .
+          cd /tmp
+          /tmp/vulcan-minimal/bin/python -c "import vulcan; from vulcan.constitution import primitives; assert vulcan.__name__ == 'vulcan'"
+          if /tmp/vulcan-minimal/bin/python -c "import src.vulcan"; then exit 1; fi
       - run: python -m pytest -q tests/e2e/runtime_image/
       - run: scripts/e2e/run_runtime_qualification.sh
       - run: PYTHON_BIN='python -O' scripts/e2e/run_runtime_qualification.sh
+      - if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: gate-e-qualification-evidence
+          path: evidence/runtime-e2e/gate-e.json
+          if-no-files-found: error
       - if: failure()
         run: |
           mkdir -p evidence/runtime-e2e

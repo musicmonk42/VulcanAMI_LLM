@@ -8,7 +8,7 @@ from typing import Protocol
 
 from vulcan.safety.safety_types import ResponseSafetyContext, ResponseSafetyPort, ResponseSafetyStatus
 
-from .semantic import RenderArtifact
+from vulcan.graphix.runtime import RenderArtifact
 
 
 class FinalizationDecision(str, Enum):

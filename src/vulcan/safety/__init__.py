@@ -1,83 +1,35 @@
-# src/vulcan/safety/__init__.py
-import importlib
-import logging
-from pathlib import Path
-import sys
+"""Dependency-light safety contracts.
 
-logger = logging.getLogger(__name__)
+Research validators are available from their explicit modules; importing this
+package never mutates ``sys.path`` or initializes optional integrations.
+"""
 
-# Ensure src is in the path for absolute imports
-src_path = Path(__file__).parent.parent.parent
-if str(src_path) not in sys.path:
-    sys.path.insert(0, str(src_path))
+from __future__ import annotations
+
+from .safety_types import GovernanceOrchestrator, SafetyValidator
+
+SAFETY_VALIDATOR_AVAILABLE = True
+GOVERNANCE_ORCHESTRATOR_AVAILABLE = True
+DQS_AVAILABLE = False
+DQSValidator = None
 
 
 class SafetyUnavailable:
-    """Fallback when full safety stack isn't available."""
+    """Fail-closed marker for compatibility callers lacking a validator."""
 
-    def validate(self, *a, **k):
-        return {"status": "unavailable", "safe": True}
+    def validate(self, *args, **kwargs):
+        return {"status": "unavailable", "safe": False}
 
-    def clamp(self, *a, **k):
-        return a[0] if a else None
+    def clamp(self, *args, **kwargs):
+        return None
 
     def get_status(self):
-        return {"available": False, "reason": "lazy import not resolved"}
-
-
-# Track availability
-SAFETY_VALIDATOR_AVAILABLE = False
-GOVERNANCE_ORCHESTRATOR_AVAILABLE = False
-DQS_AVAILABLE = False
-SafetyValidator = None
-GovernanceOrchestrator = None
-DQSValidator = None
-
-# Import SafetyValidator using relative import to avoid circular imports
-try:
-    from .safety_types import SafetyValidator as _SafetyValidator
-
-    SafetyValidator = _SafetyValidator
-    SAFETY_VALIDATOR_AVAILABLE = True
-except ImportError as e:
-    logger.warning(f"SafetyValidator not available: {e}")
-    SAFETY_VALIDATOR_AVAILABLE = False
-    SafetyValidator = None
-
-# Import GovernanceOrchestrator using relative import to avoid circular imports
-try:
-    from .safety_types import (
-        GovernanceOrchestrator as _GovernanceOrchestrator,
-    )
-
-    GovernanceOrchestrator = _GovernanceOrchestrator
-    GOVERNANCE_ORCHESTRATOR_AVAILABLE = True
-except ImportError as e:
-    logger.warning(f"GovernanceOrchestrator not available: {e}")
-    GOVERNANCE_ORCHESTRATOR_AVAILABLE = False
-    GovernanceOrchestrator = None
-
-# Import DQS integration using relative import
-try:
-    from .dqs_integration import DQSValidator as _DQSValidator, DQS_AVAILABLE as _DQS_AVAILABLE
-    
-    DQSValidator = _DQSValidator
-    DQS_AVAILABLE = _DQS_AVAILABLE
-except ImportError as e:
-    logger.warning(f"DQS integration not available: {e}")
-    DQS_AVAILABLE = False
-    DQSValidator = None
+        return {"available": False, "reason": "explicit validator required"}
 
 
 def get_safety_validator():
-    """Return EnhancedSafetyValidator if importable, else stub."""
-    try:
-        mod = importlib.import_module("vulcan.safety.safety_validator")
-        cls = getattr(mod, "EnhancedSafetyValidator", None)
-        return cls() if cls else SafetyUnavailable()
-    except Exception as e:
-        logger.warning("Safety validator unavailable (lazy): %s", e)
-        return SafetyUnavailable()
+    """Compatibility accessor; serving composition never uses this function."""
+    return SafetyUnavailable()
 
 
 __all__ = [

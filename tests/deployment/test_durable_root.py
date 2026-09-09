@@ -85,8 +85,7 @@ def test_dockerfile_declares_canonical_volume_uid_and_restrictive_permissions() 
     dockerfile = Path("Dockerfile").read_text(encoding="utf-8")
     assert "VULCAN_RUNTIME_DURABLE_ROOT=/var/lib/vulcan" in dockerfile
     assert "VOLUME [\"/var/lib/vulcan\"]" in dockerfile
-    assert "chown -R graphix:graphix /var/lib/vulcan" in dockerfile
-    assert "chmod 0700 /var/lib/vulcan" in dockerfile
+    assert "install -d -o vulcan -g vulcan -m 0700 /var/lib/vulcan" in dockerfile
 
 
 def test_compose_uses_single_canonical_durable_volume_and_ephemeral_cache() -> None:

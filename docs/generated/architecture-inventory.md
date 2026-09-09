@@ -1,6 +1,6 @@
 # Generated architecture inventory
 
-Digest: `0291517481b99b727afe440ea03880ec8b7233370b533ca75b9a9168cd35aafa`
+Digest: `d2e186cedb343db83ca523b4e7bd850af0d57c4d0095b84cad79a401af736131`
 
 This file is generated from `docs/generated/architecture-inventory.json`.
 
@@ -10,7 +10,7 @@ This file is generated from `docs/generated/architecture-inventory.json`.
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | `architecture-assurance` | `src/vulcan/assurance` | ArchitectureAssuranceOwner | NONE | not-reachable | none; reports repository evidence only | not applicable | generated files committed in git | deterministic inventory digest | `tests/assurance/test_architecture_status.py` | **M2** | current | replace only with an equally strict deterministic truth-map gate |
 | `constitutional-microkernel` | `src/vulcan/microkernel` | CognitiveKernel | EXECUTED_EFFECT | canonical | immutable CognitiveEpisode | SnapshotBundle admission contract | delegated typed persistence ports | content-bound episode transition chain | `tests/microkernel/test_episode.py`<br>`tests/runtime/test_authoritative_episode_path.py` | **M3** | canonical | not removable; direct-kernel uncomposed mode retires after all callers use RuntimeContainer |
-| `constitutional-runtime` | `src/vulcan/runtime` | RuntimeContainer.CognitiveKernel | EXECUTED_EFFECT | canonical | CognitiveEpisode lifecycle; compatibility case data is projection-only | RuntimeContainer.admit_snapshot_bundle with CapabilityManifestAuthority digest-bound live attestation | runtime persistence ports; durable epistemic head is not yet canonical | episode transition artifacts plus compatibility audit projection | `tests/runtime/test_authoritative_episode_path.py`<br>`tests/runtime/test_production_composition.py`<br>`tests/assurance/test_capability_registry.py` | **M3** | canonical | not removable; legacy composition adapters within this component retire at roadmap Wave 2.1 |
+| `constitutional-runtime` | `src/vulcan/runtime` | RuntimeContainer.CognitiveKernel | EXECUTED_EFFECT | canonical | CognitiveEpisode lifecycle; compatibility case data is projection-only | RuntimeContainer.admit_snapshot_bundle with CapabilityManifestAuthority digest-bound live attestation | EpisodeStore and EpistemicStore durable CAS heads with audit outboxes | episode transition artifacts plus compatibility audit projection | `tests/runtime/test_authoritative_episode_path.py`<br>`tests/runtime/test_production_composition.py`<br>`tests/assurance/test_capability_registry.py` | **M3** | canonical | LegacyWorldReadOnlyAdapter after direct research callers migrate; runtime-semantic-import after research imports migrate; setup.py after PEP 517-only tooling |
 | `graphix-pipeline` | `src/vulcan/graphix` | GraphixProposalOwner | VALIDATED_CANDIDATE | canonical | none; proposal and validation artifacts only | snapshot-bound canonical Graphix artifact links | EpistemicStore through ConstitutionalTransactionService | compiler, provenance, import-closure, and epistemic artifacts | `tests/graphix/test_compiler_pipeline.py`<br>`tests/graphix/test_epistemic_dialect.py`<br>`tests/architecture/test_one_graphix_path.py` | **M3** | canonical | not removable; runtime.semantic compatibility re-exports retire after downstream import migration |
 | `legacy-api-gateway` | `src/api_gateway.py` | LegacyGatewayCompatibilityOwner | UNTRUSTED_PROPOSAL | reachable-compatibility | none authorized by the constitutional runtime | none | legacy subsystem owners; not canonical | legacy route tests only |  | **M1** | compatibility | retire after docker/api/Dockerfile and every deployment consumer use vulcan.runtime.app |
 | `legacy-dqs-service` | `src/dqs_service.py` | LegacyDqsCompatibilityOwner | UNTRUSTED_PROPOSAL | reachable-compatibility | none authorized by the constitutional runtime | none | legacy subsystem owners; not canonical | none qualified |  | **M1** | compatibility | quarantine from production composition or adapt behind an authorized canonical port |
@@ -42,7 +42,7 @@ This file is generated from `docs/generated/architecture-inventory.json`.
 
 ## Entrypoints
 
-Count: 406
+Count: 407
 
 - `src/vulcan/tests/test_multimodal_reasoning.py:999` kind='python_main_guard', reachability='test-only'
 - `src/vulcan/tests/test_curiosity_engine_integration.py:1000` kind='python_main_guard', reachability='test-only'
@@ -94,7 +94,7 @@ Count: 406
 - `src/vulcan/tests/test_exploration_budget.py:1158` kind='python_main_guard', reachability='test-only'
 - `src/vulcan/tests/test_principle_learner.py:1163` kind='python_main_guard', reachability='test-only'
 - `src/vulcan/tests/test_dynamics_model.py:1169` kind='python_main_guard', reachability='test-only'
-- ... 356 more in JSON
+- ... 357 more in JSON
 
 ## Routes
 
@@ -110,7 +110,7 @@ Count: 422
 - `src/full_platform.py:3778` handler='admin_stop_service', method='POST', reachability='unknown', route='/admin/services/{service_name}/stop'
 - `src/platform/routes_adversarial.py:268` handler='adversarial_status', method='GET', reachability='unknown', route='/api/adversarial/status'
 - `src/full_platform.py:4947` handler='adversarial_status', method='GET', reachability='unknown', route='/api/adversarial/status'
-- `src/vulcan/runtime/app.py:191` handler='alignment', method='POST', reachability='production-reachable', route='/v1/admin/alignment'
+- `src/vulcan/runtime/app.py:190` handler='alignment', method='POST', reachability='production-reachable', route='/v1/admin/alignment'
 - `src/platform/routes_health_ext.py:118` handler='api_status', method='GET', reachability='unknown', route='/api/status'
 - `src/full_platform.py:3683` handler='api_status', method='GET', reachability='unknown', route='/api/status'
 - `src/vulcan/endpoints/self_improvement.py:295` handler='approve_improvement', method='POST', reachability='unknown', route='/v1/improvement/approve'
@@ -123,8 +123,8 @@ Count: 422
 - `src/platform/routes_arena.py:71` handler='arena_run_agent', method='POST', reachability='unknown', route='/api/arena/run/{agent_id}'
 - `src/platform/routes_arena.py:103` handler='arena_tournament', method='POST', reachability='unknown', route='/api/arena/tournament'
 - `src/full_platform.py:4652` handler='arena_tournament', method='POST', reachability='unknown', route='/api/arena/tournament'
-- `src/vulcan/runtime/app.py:196` handler='audit_case', method='GET', reachability='production-reachable', route='/v1/audit/cases/{case_id}'
-- `src/vulcan/runtime/app.py:226` handler='audit_improvement', method='GET', reachability='production-reachable', route='/v1/audit/improvements/{proposal_digest}'
+- `src/vulcan/runtime/app.py:195` handler='audit_case', method='GET', reachability='production-reachable', route='/v1/audit/cases/{case_id}'
+- `src/vulcan/runtime/app.py:225` handler='audit_improvement', method='GET', reachability='production-reachable', route='/v1/audit/improvements/{proposal_digest}'
 - `src/vulcan/runtime/app.py:173` handler='capabilities', method='GET', reachability='production-reachable', route='/v1/capabilities'
 - `src/platform/routes_adversarial.py:324` handler='check_query_adversarial', method='POST', reachability='unknown', route='/api/adversarial/check-query'
 - `src/full_platform.py:5003` handler='check_query_adversarial', method='POST', reachability='unknown', route='/api/adversarial/check-query'
@@ -140,7 +140,7 @@ Count: 422
 - `src/full_platform.py:4048` handler='debug_parent_deployment', method='GET', reachability='unknown', route='/debug/deployment'
 - `src/governance/app.py:498` handler='deploy_proposal', method='ROUTE', reachability='unknown', route='/proposals/<proposal_id>/deploy'
 - `src/pii_service.py:391` handler='detect_pii', method='POST', reachability='production-reachable', route='/detect'
-- `src/vulcan/runtime/app.py:186` handler='domains', method='POST', reachability='production-reachable', route='/v1/admin/domains'
+- `src/vulcan/runtime/app.py:185` handler='domains', method='POST', reachability='production-reachable', route='/v1/admin/domains'
 - `src/vulcan/endpoints/world_model.py:84` handler='execute_causal_intervention', method='POST', reachability='unknown', route='/intervene'
 - `src/vulcan/endpoints/execution.py:30` handler='execute_step', method='POST', reachability='unknown', route='/v1/step'
 - `src/vulcan/endpoints/reasoning.py:97` handler='explain', method='POST', reachability='unknown', route='/llm/explain'
@@ -154,7 +154,7 @@ Count: 422
 
 ## Import Identities
 
-Count: 1872
+Count: 1885
 
 - `tests/security/test_output_firewall.py:1` module='vulcan.runtime.output', reachability='test-only'
 - `tests/test_probabilistic_routing.py:10` module='src.vulcan.reasoning.probabilistic_reasoning', reachability='test-only'
@@ -199,14 +199,14 @@ Count: 1872
 - `src/vulcan/tests/test_planning_endpoint.py:102` module='vulcan.endpoints.planning', reachability='test-only'
 - `tests/microkernel/test_episode.py:102` module='vulcan.microkernel.episode', reachability='test-only'
 - `tests/security/test_runtime_convergence.py:102` module='vulcan.runtime.app', reachability='test-only'
-- `src/vulcan/runtime/composition.py:102` module='vulcan.safety.safety_validator', reachability='production-reachable'
 - `src/vulcan/llm/__init__.py:89` module='vulcan.llm.openai_client', reachability='unknown'
 - `src/vulcan/tests/test_metrics_centralization.py:93` module='vulcan.metrics', reachability='test-only'
 - `src/vulcan/orchestrator/platform_status.py:99` module='vulcan.arena', reachability='unknown'
 - `src/vulcan/world_model/world_model_core.py:1020` module='vulcan.world_model.creative_handler', reachability='unknown'
 - `src/api_server.py:103` module='vulcan.reasoning.unified', reachability='unknown'
 - `src/vulcan/world_model/world_model_core.py:1037` module='vulcan.world_model.llm_guidance', reachability='unknown'
-- ... 1822 more in JSON
+- `src/vulcan/server/startup/manager.py:1039` module='vulcan.utils_main.http_session', reachability='unknown'
+- ... 1835 more in JSON
 
 ## Singletons
 
@@ -287,7 +287,7 @@ Count: 455
 
 ## Fallbacks
 
-Count: 4431
+Count: 4429
 
 - `src/vulcan/endpoints/self_improvement.py:98` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/vulcan/safety/rollback_audit.py:99` kind='except_exception', reachability='unknown', review='unreviewed'
@@ -339,7 +339,7 @@ Count: 4431
 - `src/vulcan/knowledge_crystallizer/principle_extractor.py:1018` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/vulcan/curiosity_engine/curiosity_engine_core.py:1012` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/memory/governed_unlearning.py:1019` kind='except_exception', reachability='unknown', review='unreviewed'
-- ... 4381 more in JSON
+- ... 4379 more in JSON
 
 ## Mocks
 
@@ -455,7 +455,7 @@ Count: 398
 
 ## Environment Readers
 
-Count: 431
+Count: 432
 
 - `src/audit_log.py:416` call='os.environ.get', key='AGENT_ID', reachability='unknown'
 - `src/api_server.py:1058` call='os.environ.get', key='ALLOWED_ORIGIN', reachability='unknown'
@@ -507,7 +507,7 @@ Count: 431
 - `src/governance/app.py:50` call='os.environ.get', key='FORCE_HTTPS', reachability='unknown'
 - `src/api_gateway.py:90` call='os.environ.get', key='GATEWAY_MODE', reachability='production-reachable'
 - `src/vulcan/memory/hierarchical.py:1656` call='os.environ.get', key='GITHUB_ACTIONS', reachability='unknown'
-- ... 381 more in JSON
+- ... 382 more in JSON
 
 ## Capability Claims
 
@@ -536,7 +536,7 @@ Count: 20
 
 ## Ownership Graph
 
-Count: 306
+Count: 307
 
 - `src/vulcan/persistence/alignment.py:` owner_domain='alignment', reachability='unknown'
 - `src/vulcan/runtime/alignment.py:` owner_domain='alignment', reachability='production-reachable'
@@ -588,7 +588,7 @@ Count: 306
 - `src/vulcan/local_language/__init__.py:` owner_domain='language', reachability='unknown'
 - `src/vulcan/local_language/adapter.py:` owner_domain='language', reachability='unknown'
 - `src/vulcan/local_language/governance.py:` owner_domain='language', reachability='unknown'
-- ... 256 more in JSON
+- ... 257 more in JSON
 
 ## Text Entrypoints
 
@@ -643,9 +643,9 @@ Count: 306
 - `docker-compose.prod.yml:627` image: nginx:1.27-alpine
 
 ### docker
-- `Dockerfile:325` CMD curl -fsS http://localhost:${PORT:-8000}/health/live || exit 1
-- `Dockerfile:328` ENTRYPOINT ["/app/entrypoint.sh"]
-- `Dockerfile:334` CMD ["sh", "-c", "uvicorn vulcan.runtime.app:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"]
+- `Dockerfile:52` CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready',timeout=2)" || exit 1
+- `Dockerfile:53` ENTRYPOINT ["/app/entrypoint.sh"]
+- `Dockerfile:54` CMD ["sh", "-c", "python -m uvicorn vulcan.runtime.app:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"]
 - `docker/api/Dockerfile:135` CMD curl -fsS http://localhost:8000/health/live || exit 1
 - `docker/api/Dockerfile:137` ENTRYPOINT ["/app/entrypoint.sh"]
 - `docker/api/Dockerfile:140` CMD ["python", "-m", "uvicorn", "src.api_gateway:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

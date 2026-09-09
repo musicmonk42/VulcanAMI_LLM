@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio, json, math, threading
 from dataclasses import dataclass
 from typing import Any, Protocol
-from vulcan.runtime.semantic import InterpretationProposal, ProposedCandidate, SCHEMA_VERSION, SourceSpan, Utterance
+from vulcan.graphix.runtime import InterpretationProposal, ProposedCandidate, SCHEMA_VERSION, SourceSpan, Utterance
 
 PROPOSAL_SCHEMA="transformer-span-proposal/1"
 RUNTIME_ABI="vulcan-transformer-span/1"

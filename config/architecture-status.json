@@ -10,17 +10,30 @@
       "production_reachability": "canonical",
       "state_authority": "CognitiveEpisode lifecycle; compatibility case data is projection-only",
       "snapshot_implementation": "RuntimeContainer.admit_snapshot_bundle with CapabilityManifestAuthority digest-bound live attestation",
-      "persistence_owner": "runtime persistence ports; durable epistemic head is not yet canonical",
+      "persistence_owner": "EpisodeStore and EpistemicStore durable CAS heads with audit outboxes",
       "audit_evidence": "episode transition artifacts plus compatibility audit projection",
-      "tests": ["tests/runtime/test_authoritative_episode_path.py", "tests/runtime/test_production_composition.py", "tests/assurance/test_capability_registry.py"],
+      "tests": [
+        "tests/runtime/test_authoritative_episode_path.py",
+        "tests/runtime/test_production_composition.py",
+        "tests/assurance/test_capability_registry.py"
+      ],
       "maturity": "M3",
-      "maturity_evidence": ["tests/runtime/test_authoritative_episode_path.py", "tests/assurance/test_capability_registry.py", "docs/architecture/cognitive-episode.md"],
+      "maturity_evidence": [
+        "tests/runtime/test_authoritative_episode_path.py",
+        "tests/assurance/test_capability_registry.py",
+        "docs/architecture/cognitive-episode.md",
+        "scripts/e2e/run_runtime_qualification.sh",
+        "config/production-import-policy.json",
+        "requirements-runtime.lock"
+      ],
       "public_capability_claim": true,
       "public_name": "Bounded deterministic arithmetic",
       "public_limitations": "NFC-normalized bounded arithmetic only; no broad reasoning, neural-provider, or general tool authority",
-      "capability_ids": ["cap.bounded_arithmetic"],
+      "capability_ids": [
+        "cap.bounded_arithmetic"
+      ],
       "compatibility_status": "canonical",
-      "removal_condition": "not removable; legacy composition adapters within this component retire at roadmap Wave 2.1"
+      "removal_condition": "LegacyWorldReadOnlyAdapter after direct research callers migrate; runtime-semantic-import after research imports migrate; setup.py after PEP 517-only tooling"
     },
     {
       "component_id": "constitutional-microkernel",
@@ -32,9 +45,15 @@
       "snapshot_implementation": "SnapshotBundle admission contract",
       "persistence_owner": "delegated typed persistence ports",
       "audit_evidence": "content-bound episode transition chain",
-      "tests": ["tests/microkernel/test_episode.py", "tests/runtime/test_authoritative_episode_path.py"],
+      "tests": [
+        "tests/microkernel/test_episode.py",
+        "tests/runtime/test_authoritative_episode_path.py"
+      ],
       "maturity": "M3",
-      "maturity_evidence": ["tests/runtime/test_authoritative_episode_path.py", "docs/architecture/adr-008-constitutional-transaction-kernel.md"],
+      "maturity_evidence": [
+        "tests/runtime/test_authoritative_episode_path.py",
+        "docs/architecture/adr-008-constitutional-transaction-kernel.md"
+      ],
       "public_capability_claim": false,
       "capability_ids": [],
       "compatibility_status": "canonical",
@@ -50,9 +69,13 @@
       "snapshot_implementation": "not applicable",
       "persistence_owner": "generated files committed in git",
       "audit_evidence": "deterministic inventory digest",
-      "tests": ["tests/assurance/test_architecture_status.py"],
+      "tests": [
+        "tests/assurance/test_architecture_status.py"
+      ],
       "maturity": "M2",
-      "maturity_evidence": ["tests/assurance/test_architecture_status.py"],
+      "maturity_evidence": [
+        "tests/assurance/test_architecture_status.py"
+      ],
       "public_capability_claim": false,
       "capability_ids": [],
       "compatibility_status": "current",
@@ -68,9 +91,18 @@
       "snapshot_implementation": "snapshot-bound canonical Graphix artifact links",
       "persistence_owner": "EpistemicStore through ConstitutionalTransactionService",
       "audit_evidence": "compiler, provenance, import-closure, and epistemic artifacts",
-      "tests": ["tests/graphix/test_compiler_pipeline.py", "tests/graphix/test_epistemic_dialect.py", "tests/architecture/test_one_graphix_path.py"],
+      "tests": [
+        "tests/graphix/test_compiler_pipeline.py",
+        "tests/graphix/test_epistemic_dialect.py",
+        "tests/architecture/test_one_graphix_path.py"
+      ],
       "maturity": "M3",
-      "maturity_evidence": ["tests/graphix/test_compiler_pipeline.py", "tests/graphix/test_epistemic_dialect.py", "tests/architecture/test_one_graphix_path.py", "docs/architecture/adr-008-constitutional-transaction-kernel.md"],
+      "maturity_evidence": [
+        "tests/graphix/test_compiler_pipeline.py",
+        "tests/graphix/test_epistemic_dialect.py",
+        "tests/architecture/test_one_graphix_path.py",
+        "docs/architecture/adr-008-constitutional-transaction-kernel.md"
+      ],
       "public_capability_claim": false,
       "capability_ids": [],
       "compatibility_status": "canonical",
@@ -88,7 +120,10 @@
       "audit_evidence": "legacy route tests only",
       "tests": [],
       "maturity": "M1",
-      "maturity_evidence": ["src/api_gateway.py", "docker/api/Dockerfile"],
+      "maturity_evidence": [
+        "src/api_gateway.py",
+        "docker/api/Dockerfile"
+      ],
       "public_capability_claim": false,
       "capability_ids": [],
       "compatibility_status": "compatibility",
@@ -106,7 +141,10 @@
       "audit_evidence": "none qualified",
       "tests": [],
       "maturity": "M1",
-      "maturity_evidence": ["src/dqs_service.py", "docker/dqs/Dockerfile"],
+      "maturity_evidence": [
+        "src/dqs_service.py",
+        "docker/dqs/Dockerfile"
+      ],
       "public_capability_claim": false,
       "capability_ids": [],
       "compatibility_status": "compatibility",
@@ -122,9 +160,14 @@
       "snapshot_implementation": "none",
       "persistence_owner": "legacy subsystem owners; not canonical",
       "audit_evidence": "fail-safe unit tests only",
-      "tests": ["tests/test_pii_service_failsafe.py"],
+      "tests": [
+        "tests/test_pii_service_failsafe.py"
+      ],
       "maturity": "M2",
-      "maturity_evidence": ["tests/test_pii_service_failsafe.py", "docker/pii/Dockerfile"],
+      "maturity_evidence": [
+        "tests/test_pii_service_failsafe.py",
+        "docker/pii/Dockerfile"
+      ],
       "public_capability_claim": false,
       "capability_ids": [],
       "compatibility_status": "compatibility",
@@ -140,9 +183,13 @@
       "snapshot_implementation": "none",
       "persistence_owner": "none authorized",
       "audit_evidence": "historical tests only",
-      "tests": ["tests/test_platform_shell.py"],
+      "tests": [
+        "tests/test_platform_shell.py"
+      ],
       "maturity": "M1",
-      "maturity_evidence": ["src/full_platform.py"],
+      "maturity_evidence": [
+        "src/full_platform.py"
+      ],
       "public_capability_claim": false,
       "capability_ids": [],
       "compatibility_status": "historical",

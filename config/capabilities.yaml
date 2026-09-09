@@ -20,9 +20,7 @@
       "implementation_digest": "2e78fe032235056b513a80fc175cb1c84d5efed1225003657a70c63164fa3100",
       "release_digest": "e324762e004e2ac30d13758b6d9b5a80ccefb06c5d4a5f8d373a20d782bf426c",
       "route_reachability": [
-        "POST /v1/chat",
-        "POST /v1/chat/orchestrated",
-        "POST /vulcan/v1/chat"
+        "POST /v1/chat"
       ],
       "port_reachability": [
         "POST /v1/chat"
@@ -30,7 +28,7 @@
       "evaluation_artifact": {
         "evidence_type": "test_result",
         "artifact_uri": "file://tests/security/test_language_contracts.py",
-        "artifact_sha256": "1dabfa74c5f1a4b67ebaee6f14c5393e02b6dcdab1232e882a11c20ec3e3cba3",
+        "artifact_sha256": "db6ccdb32d6372cd79486909aa17bcd097198adc3f39ae8246794f8f35bad018",
         "schema": "ami-assurance-evidence/v1"
       },
       "safety_artifacts": [
@@ -73,7 +71,7 @@
       "evaluation_artifact": {
         "evidence_type": "test_result",
         "artifact_uri": "file://tests/security/test_language_contracts.py",
-        "artifact_sha256": "1dabfa74c5f1a4b67ebaee6f14c5393e02b6dcdab1232e882a11c20ec3e3cba3",
+        "artifact_sha256": "db6ccdb32d6372cd79486909aa17bcd097198adc3f39ae8246794f8f35bad018",
         "schema": "ami-assurance-evidence/v1"
       },
       "safety_artifacts": [
@@ -113,7 +111,7 @@
       "evaluation_artifact": {
         "evidence_type": "source_digest",
         "artifact_uri": "file://config/architecture-status.json",
-        "artifact_sha256": "5f001d22712f1ff789fd55c4c46f6c8da78fec6fb62a0209fdc7cae9220f82ac",
+        "artifact_sha256": "34365721b43caf145fa5483ffc8b8021c4b8120daa033892d921b756010c792f",
         "schema": "ami-assurance-evidence/v1"
       },
       "safety_artifacts": [
