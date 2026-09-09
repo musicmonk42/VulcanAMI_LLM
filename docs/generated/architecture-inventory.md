@@ -1,6 +1,6 @@
 # Generated architecture inventory
 
-Digest: `4178dc64cc1783ff341858a66488735eb55239352b02ea2fbe087acea5ca2d89`
+Digest: `0291517481b99b727afe440ea03880ec8b7233370b533ca75b9a9168cd35aafa`
 
 This file is generated from `docs/generated/architecture-inventory.json`.
 
@@ -11,7 +11,7 @@ This file is generated from `docs/generated/architecture-inventory.json`.
 | `architecture-assurance` | `src/vulcan/assurance` | ArchitectureAssuranceOwner | NONE | not-reachable | none; reports repository evidence only | not applicable | generated files committed in git | deterministic inventory digest | `tests/assurance/test_architecture_status.py` | **M2** | current | replace only with an equally strict deterministic truth-map gate |
 | `constitutional-microkernel` | `src/vulcan/microkernel` | CognitiveKernel | EXECUTED_EFFECT | canonical | immutable CognitiveEpisode | SnapshotBundle admission contract | delegated typed persistence ports | content-bound episode transition chain | `tests/microkernel/test_episode.py`<br>`tests/runtime/test_authoritative_episode_path.py` | **M3** | canonical | not removable; direct-kernel uncomposed mode retires after all callers use RuntimeContainer |
 | `constitutional-runtime` | `src/vulcan/runtime` | RuntimeContainer.CognitiveKernel | EXECUTED_EFFECT | canonical | CognitiveEpisode lifecycle; compatibility case data is projection-only | RuntimeContainer.admit_snapshot_bundle with CapabilityManifestAuthority digest-bound live attestation | runtime persistence ports; durable epistemic head is not yet canonical | episode transition artifacts plus compatibility audit projection | `tests/runtime/test_authoritative_episode_path.py`<br>`tests/runtime/test_production_composition.py`<br>`tests/assurance/test_capability_registry.py` | **M3** | canonical | not removable; legacy composition adapters within this component retire at roadmap Wave 2.1 |
-| `graphix-pipeline` | `src/vulcan/graphix` | GraphixProposalOwner | VALIDATED_CANDIDATE | not-reachable | none; proposal and validation artifacts only | snapshot references in envelopes; live convergence pending | Graphix stores are non-canonical at this boundary | compiler and epistemic unit-test artifacts | `tests/graphix/test_compiler_pipeline.py`<br>`tests/graphix/test_epistemic_dialect.py` | **M2** | pre-canonical | remove this status after roadmap Waves 1.2 and 1.6 make Graphix canonical |
+| `graphix-pipeline` | `src/vulcan/graphix` | GraphixProposalOwner | VALIDATED_CANDIDATE | canonical | none; proposal and validation artifacts only | snapshot-bound canonical Graphix artifact links | EpistemicStore through ConstitutionalTransactionService | compiler, provenance, import-closure, and epistemic artifacts | `tests/graphix/test_compiler_pipeline.py`<br>`tests/graphix/test_epistemic_dialect.py`<br>`tests/architecture/test_one_graphix_path.py` | **M3** | canonical | not removable; runtime.semantic compatibility re-exports retire after downstream import migration |
 | `legacy-api-gateway` | `src/api_gateway.py` | LegacyGatewayCompatibilityOwner | UNTRUSTED_PROPOSAL | reachable-compatibility | none authorized by the constitutional runtime | none | legacy subsystem owners; not canonical | legacy route tests only |  | **M1** | compatibility | retire after docker/api/Dockerfile and every deployment consumer use vulcan.runtime.app |
 | `legacy-dqs-service` | `src/dqs_service.py` | LegacyDqsCompatibilityOwner | UNTRUSTED_PROPOSAL | reachable-compatibility | none authorized by the constitutional runtime | none | legacy subsystem owners; not canonical | none qualified |  | **M1** | compatibility | quarantine from production composition or adapt behind an authorized canonical port |
 | `legacy-pii-service` | `src/pii_service.py` | LegacyPiiCompatibilityOwner | VALIDATED_CANDIDATE | reachable-compatibility | none authorized by the constitutional runtime | none | legacy subsystem owners; not canonical | fail-safe unit tests only | `tests/test_pii_service_failsafe.py` | **M2** | compatibility | quarantine from production composition or adapt behind an authorized canonical port |
@@ -154,7 +154,7 @@ Count: 422
 
 ## Import Identities
 
-Count: 1855
+Count: 1872
 
 - `tests/security/test_output_firewall.py:1` module='vulcan.runtime.output', reachability='test-only'
 - `tests/test_probabilistic_routing.py:10` module='src.vulcan.reasoning.probabilistic_reasoning', reachability='test-only'
@@ -163,7 +163,7 @@ Count: 1855
 - `src/vulcan/microkernel/snapshots.py:10` module='vulcan.constitution.primitives', reachability='production-reachable'
 - `tests/core/test_core_primitives.py:10` module='vulcan.core.decisions', reachability='test-only'
 - `src/vulcan/endpoints/__init__.py:10` module='vulcan.endpoints.distillation', reachability='unknown'
-- `src/vulcan/graphix/validation/pipeline.py:10` module='vulcan.graphix.codec', reachability='unknown'
+- `src/vulcan/graphix/validation/pipeline.py:10` module='vulcan.graphix.codec', reachability='production-reachable'
 - `tests/graphix/test_epistemic_dialect.py:10` module='vulcan.graphix.epistemic', reachability='test-only'
 - `tests/test_progressive_research.py:10` module='vulcan.learning_owner', reachability='test-only'
 - `tests/test_world_model_research.py:10` module='vulcan.learning_owner', reachability='test-only'
@@ -172,13 +172,13 @@ Count: 1855
 - `src/vulcan/runtime/composition.py:10` module='vulcan.memory.composition', reachability='production-reachable'
 - `src/vulcan/runtime/state_authorities.py:10` module='vulcan.microkernel.snapshots', reachability='production-reachable'
 - `tests/persistence/test_episode_audit_projection.py:10` module='vulcan.microkernel.state_machine', reachability='test-only'
-- `tests/runtime/test_authoritative_episode_path.py:10` module='vulcan.microkernel.state_machine', reachability='test-only'
 - `src/vulcan/runtime/audit.py:10` module='vulcan.persistence.audit.reconcile', reachability='production-reachable'
 - `tests/test_learning_outbox.py:10` module='vulcan.runtime.audit', reachability='test-only'
+- `tests/runtime/test_authoritative_episode_path.py:10` module='vulcan.runtime.case', reachability='test-only'
 - `tests/security/test_persistent_audit_alignment.py:10` module='vulcan.runtime.finalization', reachability='test-only'
+- `tests/security/test_language_contracts.py:10` module='vulcan.runtime.kernel', reachability='test-only'
 - `tests/security/test_real_response_safety_composition.py:10` module='vulcan.runtime.kernel', reachability='test-only'
 - `tests/security/test_runtime_convergence.py:10` module='vulcan.runtime.kernel', reachability='test-only'
-- `tests/security/test_language_contracts.py:10` module='vulcan.runtime.semantic', reachability='test-only'
 - `tests/test_phase9g_runtime_ownership.py:10` module='vulcan.world_model.meta_reasoning.self_improvement_drive', reachability='test-only'
 - `src/vulcan/monitoring/__init__.py:3` module='vulcan.monitoring.memory_guard', reachability='unknown'
 - `src/vulcan/tests/test_meta_learning.py:5` module='vulcan.learning.meta_learning', reachability='test-only'
@@ -206,7 +206,7 @@ Count: 1855
 - `src/vulcan/world_model/world_model_core.py:1020` module='vulcan.world_model.creative_handler', reachability='unknown'
 - `src/api_server.py:103` module='vulcan.reasoning.unified', reachability='unknown'
 - `src/vulcan/world_model/world_model_core.py:1037` module='vulcan.world_model.llm_guidance', reachability='unknown'
-- ... 1805 more in JSON
+- ... 1822 more in JSON
 
 ## Singletons
 
@@ -536,7 +536,7 @@ Count: 20
 
 ## Ownership Graph
 
-Count: 305
+Count: 306
 
 - `src/vulcan/persistence/alignment.py:` owner_domain='alignment', reachability='unknown'
 - `src/vulcan/runtime/alignment.py:` owner_domain='alignment', reachability='production-reachable'
@@ -584,11 +584,11 @@ Count: 305
 - `tests/persistence/test_domain_registry_v2.py:` owner_domain='domain', reachability='test-only'
 - `tests/security/test_persistent_domain_registry.py:` owner_domain='domain', reachability='test-only'
 - `tests/test_domain_specific_formatting.py:` owner_domain='domain', reachability='test-only'
-- `src/vulcan/graphix/language.py:` owner_domain='language', reachability='unknown'
+- `src/vulcan/graphix/language.py:` owner_domain='language', reachability='production-reachable'
 - `src/vulcan/local_language/__init__.py:` owner_domain='language', reachability='unknown'
 - `src/vulcan/local_language/adapter.py:` owner_domain='language', reachability='unknown'
 - `src/vulcan/local_language/governance.py:` owner_domain='language', reachability='unknown'
-- ... 255 more in JSON
+- ... 256 more in JSON
 
 ## Text Entrypoints
 

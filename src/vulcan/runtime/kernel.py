@@ -14,6 +14,23 @@ if TYPE_CHECKING:
     from vulcan.memory.governed import GovernedMemoryPort
 
 from vulcan.constitution.primitives import AuthorityLevel
+from vulcan.graphix.runtime import (
+    RESPONSE_IR_VERSION,
+    ClarificationRequest,
+    DeterministicLanguageInput,
+    LanguageInputPort,
+    ResponseIR,
+    ResponseMode,
+    Utterance,
+    accept,
+    build_graphix_plan,
+    canonical_digest,
+    compile_graphix_plan,
+    execute,
+    execute_graphix_plan,
+    validate_interpretation_artifact,
+    validate_proposal,
+)
 from vulcan.microkernel.authority import EvidenceRecord, promote_authority
 from vulcan.microkernel.episode import (
     ArtifactRef,
@@ -44,22 +61,6 @@ from .output import (
     bind_publication,
     project_committed,
     render_projection,
-)
-from .semantic import (
-    RESPONSE_IR_VERSION,
-    ClarificationRequest,
-    DeterministicLanguageInput,
-    LanguageInputPort,
-    ResponseIR,
-    ResponseMode,
-    Utterance,
-    accept,
-    build_graphix_plan,
-    canonical_digest,
-    compile_graphix_plan,
-    execute,
-    execute_graphix_plan,
-    validate_proposal,
 )
 
 
@@ -291,6 +292,11 @@ class CognitiveKernel:
             selection = accept(bundle)
             policy_digest = getattr(policy, "policy_digest", "")
             validation_digest = canonical_digest(bundle)
+            interpretation_artifact_digest = validate_interpretation_artifact(
+                request_digest=request.utterance.digest,
+                state_snapshot_id=case.state_snapshot_id or "",
+                episode_id=case.case_id,
+            )
             self._apply(
                 case,
                 self._transactions.record_interpretation(
@@ -412,6 +418,7 @@ class CognitiveKernel:
                     derivations=proposed_derivations,
                     authority=epistemic_auth,
                     prior_commit_digest=None if prior is None else prior.commit_digest,
+                    graphix_artifact_digest=interpretation_artifact_digest,
                 )
                 self._apply(
                     case,
@@ -500,6 +507,7 @@ class CognitiveKernel:
                         request_digest=request.utterance.digest,
                         state_snapshot_id=case.state_snapshot_id or "",
                         domain_snapshot_id=domain_snapshot_id,
+                        episode_id=case.case_id,
                     )
                     self._apply(
                         case,
@@ -549,6 +557,7 @@ class CognitiveKernel:
                         domain_snapshot_id=domain_snapshot_id,
                         case_id=case.case_id,
                         domain=leased_domain,
+                        require_canonical_artifact=True,
                     )
                 finally:
                     if lease_cm is not None:
@@ -583,6 +592,8 @@ class CognitiveKernel:
                     derivations=proposed_derivations,
                     authority=epistemic_auth,
                     prior_commit_digest=None if prior is None else prior.commit_digest,
+                    graphix_artifact_digest=compiled.plan_artifact_digest
+                    or interpretation_artifact_digest,
                 )
                 self._apply(
                     case,

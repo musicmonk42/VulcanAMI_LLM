@@ -10,19 +10,18 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from vulcan.constitution.primitives import Digest
+from vulcan.graphix import runtime as semantic
 from vulcan.graphix.epistemic import (
+    Citation,
     Claim,
     ClaimStatus,
-    Citation,
+    Derivation,
     EpistemicCommit,
     EvidenceArtifact,
     EvidenceKind,
     Proposition,
-    Derivation,
 )
 from vulcan.microkernel.transactions import CommandAuthority
-
-from . import semantic
 
 
 def _digest(value: str) -> str:
@@ -96,6 +95,7 @@ def adapt_runtime_semantic_candidate(
     derivations: tuple[semantic.Derivation, ...],
     authority: CommandAuthority,
     prior_commit_digest: str | None,
+    graphix_artifact_digest: str,
 ) -> EpistemicCommit:
     """Translate a validated request ledger without granting it authority."""
     semantic.validate_ledger(evidence, derivations, claims, case_id=case_id)
@@ -146,6 +146,7 @@ def adapt_runtime_semantic_candidate(
                 item.proposition.object,
                 {
                     "semantic_claim_digest": _digest(semantic.canonical_digest(item)),
+                    "graphix_artifact_digest": _digest(graphix_artifact_digest),
                     "expression_digest": (
                         None
                         if item.proposition.expression is None
@@ -172,6 +173,7 @@ def adapt_runtime_semantic_candidate(
         "derivations": [semantic.canonical_digest(item) for item in derivations],
         "evidence": [semantic.canonical_digest(item) for item in evidence],
         "prior": prior_commit_digest,
+        "graphix_artifact_digest": _digest(graphix_artifact_digest),
     }
     return EpistemicCommit(
         commit_id=f"commit:{Digest.of_json(content).hex[:48]}",
