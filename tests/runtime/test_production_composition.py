@@ -97,6 +97,14 @@ async def test_real_composition_contains_no_fallback_types(monkeypatch, tmp_path
         assert "Fallback" not in type(runtime.deployment).__name__
         assert "Fallback" not in type(runtime.world_state).__name__
         assert "Fallback" not in type(runtime.safety).__name__
+        assert runtime.capabilities() == ("cap.bounded_arithmetic",)
+        bundle = runtime.admit_snapshot_bundle("case-capability-conformance")
+        try:
+            capability_ref = next(ref for ref in bundle.refs() if ref.kind == "capability")
+            assert capability_ref.owner == "CapabilityManifestAuthority"
+            assert capability_ref.digest == runtime.capability_authority.state_digest()
+        finally:
+            bundle.close()
         await runtime.readiness()
     finally:
         await runtime.close()

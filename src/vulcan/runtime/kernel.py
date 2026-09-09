@@ -103,6 +103,8 @@ class KernelResult:
 
 
 class CognitiveKernel:
+    CAPABILITY_OWNER = "RuntimeContainer.CognitiveKernel"
+    CAPABILITY_RELEASE_DIGEST = "e324762e004e2ac30d13758b6d9b5a80ccefb06c5d4a5f8d373a20d782bf426c"
     def __init__(
         self,
         *,

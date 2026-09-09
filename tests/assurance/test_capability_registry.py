@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from vulcan.assurance.capabilities import CapabilityRecord, CapabilityRegistry, CapabilityStatus, EvidenceArtifactRef
-from vulcan.runtime.capabilities import composed_runtime_ports, public_capability_response
+from vulcan.runtime.capabilities import CapabilityManifestAuthority, LiveCapabilityStatus, LiveOwnerFact, composed_runtime_ports, public_capability_response
 
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG = ROOT / "config" / "capabilities.yaml"
@@ -59,13 +59,62 @@ def test_registry_loads_current_config_and_public_projection_is_evidence_backed(
     assert loaded.records["cap.bounded_arithmetic"].port_reachability == ("POST /v1/chat",)
 
 
-def test_runtime_public_capabilities_match_registry_active_projection() -> None:
-    expected = {item["capability_id"] for item in registry().public_capabilities()}
-    actual = {item["capability_id"] for item in public_capability_response(NOW)["capabilities"]}
-    assert actual == expected
+def authority(*, ready: bool = True, release: str | None = None, state: str = "a" * 64) -> CapabilityManifestAuthority:
+    reg = registry()
+    record = reg.records["cap.bounded_arithmetic"]
+    return CapabilityManifestAuthority(registry=reg, live_facts=lambda: {
+        record.capability_id: LiveOwnerFact(record.owner, release or record.release_digest, True, "deterministic_only", state, ready, True)
+    })
+
+
+def test_runtime_public_capabilities_match_live_attestation() -> None:
+    actual = {item["capability_id"] for item in public_capability_response(authority())["capabilities"]}
+    assert actual == {"cap.bounded_arithmetic"}
     assert "cap.broad_reasoning" not in actual
     assert "cap.internal_llm" not in actual
     assert "cap.learning" not in actual
+
+
+def test_absent_unhealthy_and_different_release_owner_cannot_be_advertised() -> None:
+    assert authority(ready=False).public_capabilities() == ()
+    assert authority(release="f" * 64).public_capabilities() == ()
+    assert {item.status for item in authority(ready=False).attestations()} >= {LiveCapabilityStatus.UNAVAILABLE.value}
+
+
+def test_capability_snapshot_identity_changes_with_live_truth_and_replays_stably() -> None:
+    first = authority(state="a" * 64)
+    replay = authority(state="a" * 64)
+    changed = authority(state="b" * 64)
+    assert first.state_digest() == replay.state_digest()
+    assert first.state_digest() != changed.state_digest()
+
+
+def test_public_response_uses_one_atomic_live_observation() -> None:
+    reg = registry(); record = reg.records["cap.bounded_arithmetic"]; calls = 0
+    def facts():
+        nonlocal calls
+        calls += 1
+        return {record.capability_id: LiveOwnerFact(record.owner, record.release_digest, True, "deterministic_only", f"{calls:064x}", True, True)}
+    response = public_capability_response(CapabilityManifestAuthority(registry=reg, live_facts=facts))
+    assert calls == 1
+    assert len(response["capabilities"]) == 1
+
+
+@pytest.mark.parametrize(("reachable", "mode", "permitted"), [(False, "deterministic_only", True), (True, "disabled", True), (True, "deterministic_only", False)])
+def test_inactive_or_unpermitted_live_fact_is_not_public(reachable: bool, mode: str, permitted: bool) -> None:
+    reg = registry(); record = reg.records["cap.bounded_arithmetic"]
+    subject = CapabilityManifestAuthority(registry=reg, live_facts=lambda: {record.capability_id: LiveOwnerFact(record.owner, record.release_digest, reachable, mode, "a" * 64, True, permitted)})
+    assert subject.public_capabilities() == ()
+
+
+def test_malformed_or_unknown_live_facts_fail_closed() -> None:
+    reg = registry(); record = reg.records["cap.bounded_arithmetic"]
+    malformed = CapabilityManifestAuthority(registry=reg, live_facts=lambda: {record.capability_id: LiveOwnerFact(record.owner, record.release_digest, True, "deterministic_only", "not-a-digest", True, True)})
+    with pytest.raises(ValueError, match="state_digest"):
+        malformed.snapshot()
+    unknown = CapabilityManifestAuthority(registry=reg, live_facts=lambda: {"cap.invented": LiveOwnerFact(record.owner, record.release_digest, True, "deterministic_only", "a" * 64, True, True)})
+    with pytest.raises(ValueError, match="unknown live capability"):
+        unknown.snapshot()
 
 
 def test_status_enum_rejects_unknown_statuses() -> None:

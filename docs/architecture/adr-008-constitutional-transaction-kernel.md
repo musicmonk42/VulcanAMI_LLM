@@ -81,6 +81,26 @@ The current `runtime.semantic` ledger and Graphix-like plan remain migration pro
 
 ## Consequences
 
+## Live capability authority slice
+
+The old capability boundary combined a static evidence registry used by the
+public endpoint with an unrelated kernel/learning string list used as the
+capability snapshot. Either view could change without changing the other. The
+new sole transaction boundary is `CapabilityManifestAuthority`: it intersects
+verified artifact evidence with M3 production reachability, an exact live owner
+and release, active configuration, a content-bound state digest, readiness, and
+constitutional permission. The public endpoint and episode snapshot port now
+consume the same digest-bound attestation and fail closed when the runtime or
+owner is unavailable.
+
+`CapabilityRegistry` is retained as the named static-evidence input adapter and
+is removed when governed release attestations store that evidence directly.
+`RuntimeContainer.capabilities()` is retained as a projection of canonical
+public capability identifiers and is removed when all internal callers consume
+typed attestations. Neither adapter owns or promotes capability truth. This
+slice is M3 on the canonical runtime path but remains below M4 pending exact
+built-artifact and restart qualification.
+
 Positive consequences:
 
 - successful public responses can no longer coexist with an episode left at `PERCEIVED`;

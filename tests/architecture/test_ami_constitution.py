@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, get_type_hints
 
 import pytest
 ROOT = Path(__file__).resolve().parents[2]
@@ -24,6 +24,12 @@ REQUIRED_IDS = {
     "CONSTITUTIONAL_NON_SELF_MODIFICATION",
     "LANGUAGE_INTERFACE_ONLY",
     "CSIU_PROPOSAL_ONLY",
+    "EPISODE_AUTHORITY",
+    "SNAPSHOT_FIDELITY",
+    "AUDIT_DERIVATION",
+    "COMMITTED_TRUTH_ONLY",
+    "CAPABILITY_ATTESTATION",
+    "NO_CONSCIOUSNESS_DECLARATION",
 }
 
 REQUIRED_LATTICE = [
@@ -187,3 +193,19 @@ def test_architecture_documents_define_one_authority_and_boundaries() -> None:
     ]
     for phrase in required_phrases:
         assert phrase in combined
+
+
+def test_constitutional_claims_have_runtime_owners_and_conformance_facts() -> None:
+    """Architecture evidence must inspect executable composition, not prose alone."""
+    from vulcan.microkernel.episode import CognitiveEpisode
+    from vulcan.microkernel.episode_store import EpisodeStore
+    from vulcan.microkernel.epistemic_store import EpistemicStore
+    from vulcan.runtime.capabilities import CapabilityManifestAuthority
+    from vulcan.runtime.container import RuntimeContainer
+
+    assert get_type_hints(RuntimeContainer)["capability_authority"] == CapabilityManifestAuthority | None
+    assert callable(CapabilityManifestAuthority.lease_snapshot)
+    assert callable(RuntimeContainer.admit_snapshot_bundle)
+    assert callable(EpisodeStore.advance)
+    assert callable(EpistemicStore.append)
+    assert hasattr(CognitiveEpisode, "transition")

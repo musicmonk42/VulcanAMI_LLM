@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import inspect
 from dataclasses import dataclass
 from typing import Any, Literal
@@ -25,6 +26,8 @@ from .settings import RuntimeSettings
 from .health import HealthFailureCategory, HealthStateMachine, ProcessState, bounded_disk_check, categorize_failure
 from vulcan.microkernel.snapshots import MAX_EPISODE_LIFETIME, SnapshotBundle, construct_snapshot_bundle
 from .state_authorities import ContentBoundStateAuthority, StateAuthoritySet, disabled_authority
+from .capabilities import CapabilityManifestAuthority, LiveOwnerFact, composed_runtime_ports, load_capability_registry
+from vulcan.constitution.primitives import Digest, canonical_json
 
 
 LanguageMode = Literal["disabled", "deterministic_only", "transformer_proposal"]
@@ -70,6 +73,7 @@ class RuntimeContainer:
     episode_store: Any = None
     epistemic_store: Any = None
     state_authorities: StateAuthoritySet | None = None
+    capability_authority: CapabilityManifestAuthority | None = None
 
     async def close(self) -> None:
         """Release every owned resource once, preserving the first failure.
@@ -197,27 +201,10 @@ class RuntimeContainer:
         return construct_snapshot_bundle(episode_id=episode_id, providers=self.state_authorities.providers(), lifetime=timedelta(seconds=self.max_episode_lifetime_seconds))
 
     def capabilities(self) -> tuple[str, ...]:
-        """Return only capabilities supplied by the composed kernel object."""
-        advertised = getattr(self.kernel, "capabilities", None)
-        if not callable(advertised):
-            raise RuntimeError("canonical kernel does not expose its capabilities")
-        result = advertised()
-        if self.language_config.mode == "transformer_proposal":
-            try:
-                meta = self.language_input.readiness()
-                abi = meta["runtime_abi"]
-                result = tuple(dict.fromkeys((*result, "verified-transformer-span", f"language-abi:{abi}")))
-            except Exception as exc:
-                raise RuntimeError("language interface readiness failed") from exc
-        if self.self_improvement is not None:
-            result = tuple(dict.fromkeys((*result, *self.self_improvement.capabilities())))
-        if self.learning_owner is None:
-            raise RuntimeError("canonical learning owner is unavailable")
-        learning_status = self.learning_owner.capability.value
-        result = tuple(dict.fromkeys((*result, f"learning:{learning_status}")))
-        if not isinstance(result, tuple) or not all(isinstance(value, str) for value in result):
-            raise RuntimeError("canonical kernel returned an invalid capability list")
-        return result
+        """Compatibility projection of canonical public attestation IDs."""
+        if self.capability_authority is None:
+            raise RuntimeError("canonical capability authority is unavailable")
+        return tuple(item.capability_id for item in self.capability_authority.public_capabilities())
 
     @classmethod
     def new(cls, *, deployment: Any, settings: RuntimeSettings, language_config: LanguageRuntimeConfig | None = None) -> "RuntimeContainer":
@@ -278,6 +265,30 @@ class RuntimeContainer:
             def memory_state():
                 revision, state = memory.snapshot_state()
                 return revision, state, None
+            capability_registry = load_capability_registry()
+            arithmetic = capability_registry.records["cap.bounded_arithmetic"]
+            def live_capability_facts():
+                kernel_caps = tuple(kernel.capabilities())
+                ready = isinstance(kernel, CognitiveKernel) and "bounded-arithmetic" in kernel_caps
+                policy_digest = hashlib.sha256(
+                    (Path(__file__).resolve().parents[3] / "docs" / "architecture" / "ami-invariants.yaml").read_bytes()
+                ).hexdigest()
+                ports = composed_runtime_ports()
+                return {"cap.bounded_arithmetic": LiveOwnerFact(
+                    owner=kernel.CAPABILITY_OWNER,
+                    release_digest=kernel.CAPABILITY_RELEASE_DIGEST,
+                    canonical_reachable=all(port in ports for port in arithmetic.port_reachability),
+                    mode=config.mode,
+                    state_digest=Digest.of_bytes(canonical_json({
+                        "kernel_type": f"{type(kernel).__module__}.{type(kernel).__qualname__}",
+                        "kernel_capabilities": kernel_caps,
+                        "language_mode": config.mode,
+                    })).hex,
+                    ready=ready,
+                    constitutionally_permitted=policy_digest == arithmetic.active_policy_digest,
+                )}
+            capability_authority = CapabilityManifestAuthority(registry=capability_registry, live_facts=live_capability_facts)
+            container.capability_authority = capability_authority
             container.state_authorities = StateAuthoritySet(
                 world=disabled_authority("world", reason="legacy world model has no faithful constitutional state export"),
                 self_state=disabled_authority("self", reason="canonical self-state authority is not implemented"),
@@ -285,7 +296,7 @@ class RuntimeContainer:
                 normative=disabled_authority("normative", reason="normative decisions are owned by alignment, not legacy world state"),
                 domain=ContentBoundStateAuthority(kind="domain", owner="domain-registry", schema="vulcan-domain-snapshot.v1", release="constitutional-v1", read=domain_state),
                 memory=ContentBoundStateAuthority(kind="memory", owner="governed-memory", schema="vulcan-memory-snapshot.v1", release="constitutional-v1", read=memory_state),
-                capability=ContentBoundStateAuthority(kind="capability", owner="cognitive-kernel", schema="vulcan-capability-manifest.v1", release="constitutional-v1", read=lambda: ("1", {"capabilities": sorted(kernel.capabilities())}, None)),
+                capability=capability_authority,
                 csiu=ContentBoundStateAuthority(kind="csiu", owner="csiu-policy", schema="vulcan-csiu-policy.v1", release="constitutional-v1", read=lambda: ("1", {"enabled": settings.csiu_enabled, "mode": "proposal-only"}, None)),
                 alignment=ContentBoundStateAuthority(kind="alignment", owner="alignment-registry", schema="vulcan-alignment-snapshot.v1", release="constitutional-v1", read=alignment_state),
             )

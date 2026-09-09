@@ -160,9 +160,18 @@ Replace the mutable request ledger and in-memory authoritative ledger with a dur
 
 **Exit gate:** only claims in the committed head may be rendered or used for policy.
 
-### 1.7 Live capability attestation
+### 1.7 Live capability attestation — M3 (canonical runtime path; artifact qualification pending)
 
 Intersect static evidence with live owner identity, release, settings, state digest, and readiness.
+
+`CapabilityManifestAuthority` now owns the public projection and the explicit
+capability snapshot port. Its digest-bound attestations fail closed unless
+static artifacts, M3 reachability, matching live owner/release, active mode,
+current state digest, readiness, and constitutional permission intersect. The
+former learning-owner list substitution is retained nowhere. Static
+`CapabilityRegistry` is an evidence-input compatibility adapter and may be
+removed after evidence is stored directly in governed release attestations.
+Exact built-artifact and restart qualification remain below M4.
 
 **Exit gate:** the public endpoint cannot advertise an absent, unhealthy, disabled, or differently released capability.
 

@@ -170,9 +170,12 @@ def create_app()->FastAPI:
         except (HTTPException, ApiContractError):
             return JSONResponse(status_code=503, content={'status':'failed','code':'runtime_integrity_failed'})
     @app.get('/v1/capabilities')
-    async def capabilities():
+    async def capabilities(request: Request):
         from vulcan.runtime.capabilities import public_capability_response
-        return public_capability_response()
+        rt = await _ready_runtime(request)
+        if rt.capability_authority is None:
+            raise ApiContractError(503, ApiErrorCategory.RUNTIME_NOT_READY, 'capability authority unavailable')
+        return public_capability_response(rt.capability_authority)
     async def chat(request:Request):
         _principal(request,'reason:write'); rt=await _runtime(request); data=await _body(request); body=ReasonRequest.model_validate(data)
         utterance=Utterance.from_text(body.message); case=rt.kernel.create_case(request_id=_request_id(request), conversation_id=body.conversation_id, input_digest=utterance.digest)
