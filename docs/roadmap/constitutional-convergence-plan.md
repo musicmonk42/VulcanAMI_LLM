@@ -284,7 +284,7 @@ the composed request path authorizes an effect and atomically projects its
 intent and receipt into episode and lineage heads; exact-artifact restart
 qualification remains below M4.
 
-### 3.3 Reafference and causal autobiography — M2 (causal loop tested; canonical wiring pending)
+### 3.3 Reafference and causal autobiography — M2 (durable bounded protocols; canonical wiring pending)
 
 Record expected effect, observation, prediction error, self-caused probability, violated assumptions, world/self updates, and autobiographical consolidation.
 
@@ -304,6 +304,20 @@ concurrency behavior has local evidence. This remains
 below M3 because it is not composed with the canonical request/effect path and
 its update, lineage, and reafference stores do not yet share one atomic commit;
 Gate F remains incomplete pending that wiring and exact-artifact qualification.
+
+The bounded autobiographical-memory protocol now appends content-addressed
+causal episodes under a kernel-only DB-first transaction with an idempotent
+audit outbox. Observation, inference, prediction, and outcome remain distinct;
+correction and tombstone revisions preserve history; and causal retrieval is
+explicitly tenant/person/purpose scoped and uses policy, model, and causal edges
+rather than textual similarity. Replay, poisoning, correction, restart,
+authorized document erasure, retention, cancellation/crash windows,
+isolation, chain-authority drift, outbox recovery, and concurrent-writer tests
+provide local M2 evidence. A mandatory chain-authority port prevents memory
+from silently contradicting durable constitutional history.
+`autobiography-outbox-callback` remains until canonical audit supplies a typed
+dispatcher. This remains below M3 until the canonical effect/reafference path
+commits autobiography and lineage under one transaction.
 
 ### 3.4 Center, boundary, and valuation in shadow mode
 

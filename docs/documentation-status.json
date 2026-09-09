@@ -10,6 +10,7 @@
     {"path": "docs/architecture/persistent-agent-lineage.md", "status": "current", "purpose": "implemented neutral causal-lineage boundary"},
     {"path": "docs/architecture/effect-protocol.md", "status": "current", "purpose": "tested durable sandbox effect boundary pending canonical wiring"},
     {"path": "docs/architecture/reafference-protocol.md", "status": "current", "purpose": "tested observation and causal reafference boundary pending canonical wiring"},
+    {"path": "docs/architecture/causal-autobiographical-memory.md", "status": "current", "purpose": "tested causal autobiography boundary pending canonical wiring"},
     {"path": "docs/architecture/neutral-process-theory.md", "status": "research-only", "purpose": "falsifiable research hypothesis outside the authority path"},
     {"path": "docs/architecture/ami-invariants.yaml", "status": "normative", "purpose": "machine-readable constitutional invariants"},
     {"path": "docs/architecture/adr-003-canonical-runtime.md", "status": "current", "purpose": "canonical runtime composition decision"},

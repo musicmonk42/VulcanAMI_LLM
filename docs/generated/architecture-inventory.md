@@ -1,6 +1,6 @@
 # Generated architecture inventory
 
-Digest: `c9eca8ac8707e70e701dd44d2f6e121db71bedb2aa6299de38c5b4e1798d6e47`
+Digest: `bfc2f86c553568c198a1260c826e5633364e83256b2aa8382542dd17085c8df3`
 
 This file is generated from `docs/generated/architecture-inventory.json`.
 
@@ -35,6 +35,7 @@ This file is generated from `docs/generated/architecture-inventory.json`.
 | [`docs/architecture/adr-008-constitutional-transaction-kernel.md`](../architecture/adr-008-constitutional-transaction-kernel.md) | **normative** | target transaction architecture |
 | [`docs/architecture/ami-invariants.yaml`](../architecture/ami-invariants.yaml) | **normative** | machine-readable constitutional invariants |
 | [`docs/architecture/audit-v2.md`](../architecture/audit-v2.md) | **current** | current audit implementation contract pending episode derivation |
+| [`docs/architecture/causal-autobiographical-memory.md`](../architecture/causal-autobiographical-memory.md) | **current** | tested causal autobiography boundary pending canonical wiring |
 | [`docs/architecture/cognitive-episode.md`](../architecture/cognitive-episode.md) | **current** | implemented episode boundary |
 | [`docs/architecture/effect-protocol.md`](../architecture/effect-protocol.md) | **current** | tested durable sandbox effect boundary pending canonical wiring |
 | [`docs/architecture/neutral-process-theory.md`](../architecture/neutral-process-theory.md) | **research-only** | falsifiable research hypothesis outside the authority path |
@@ -157,13 +158,14 @@ Count: 422
 
 ## Import Identities
 
-Count: 1904
+Count: 1908
 
 - `tests/security/test_output_firewall.py:1` module='vulcan.runtime.output', reachability='test-only'
 - `tests/test_probabilistic_routing.py:10` module='src.vulcan.reasoning.probabilistic_reasoning', reachability='test-only'
 - `tests/test_wm_request_handling.py:10` module='src.vulcan.world_model.request_handling', reachability='test-only'
 - `tests/assurance/test_capability_registry.py:10` module='vulcan.assurance.capabilities', reachability='test-only'
 - `src/vulcan/microkernel/snapshots.py:10` module='vulcan.constitution.primitives', reachability='production-reachable'
+- `tests/microkernel/test_autobiography.py:10` module='vulcan.constitution.primitives', reachability='test-only'
 - `tests/core/test_core_primitives.py:10` module='vulcan.core.decisions', reachability='test-only'
 - `src/vulcan/endpoints/__init__.py:10` module='vulcan.endpoints.distillation', reachability='unknown'
 - `src/vulcan/graphix/validation/pipeline.py:10` module='vulcan.graphix.codec', reachability='production-reachable'
@@ -208,8 +210,7 @@ Count: 1904
 - `src/vulcan/orchestrator/platform_status.py:99` module='vulcan.arena', reachability='unknown'
 - `src/vulcan/world_model/world_model_core.py:1020` module='vulcan.world_model.creative_handler', reachability='unknown'
 - `src/api_server.py:103` module='vulcan.reasoning.unified', reachability='unknown'
-- `src/vulcan/world_model/world_model_core.py:1037` module='vulcan.world_model.llm_guidance', reachability='unknown'
-- ... 1854 more in JSON
+- ... 1858 more in JSON
 
 ## Singletons
 
@@ -402,7 +403,7 @@ Count: 400
 
 ## Persistence
 
-Count: 449
+Count: 459
 
 - `src/vulcan/improvement/offline.py:101` kind='call', reachability='unknown', value='fcntl.flock'
 - `tests/persistence/test_memory_outbox_v2.py:103` kind='call', reachability='test-only', value='SQLiteMemoryRepository'
@@ -454,7 +455,7 @@ Count: 449
 - `src/vulcan/world_model/meta_reasoning/governed_transaction.py:244` kind='call', reachability='unknown', value='fcntl.flock'
 - `src/vulcan/safety/governance_alignment.py:248` kind='call', reachability='unknown', value='sqlite3.connect'
 - `tests/microkernel/test_lineage.py:256` kind='call', reachability='test-only', value='sqlite3.connect'
-- ... 399 more in JSON
+- ... 409 more in JSON
 
 ## Environment Readers
 
