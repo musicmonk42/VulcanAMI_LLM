@@ -135,7 +135,7 @@ def test_only_authentication_adapter_constructs_authenticated_binding() -> None:
     for path in Path("src").rglob("*.py"):
         if "_from_verified_identity" in path.read_text(encoding="utf-8"):
             references.append(path.as_posix())
-    assert references == [
+    assert sorted(references) == [
         "src/vulcan/microkernel/episode.py",
         "src/vulcan/runtime/auth.py",
     ]

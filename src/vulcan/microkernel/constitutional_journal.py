@@ -28,7 +28,7 @@ from vulcan.microkernel.state_machine import (
 
 SCHEMA_VERSION = "vulcan-constitutional-journal/1"
 EXPECTED_SCHEMA_FINGERPRINT = (
-    "9f777b533e5557be8fbb16b9182f485fce36f53df8929fdd388987f0acc073ca"
+    "076db4b35cd7b3cbc003f52b59ff599d43e69ac34dad9c0c4d7264496764c9a3"
 )
 _HEX = re.compile(r"^[0-9a-f]{64}$")
 _ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$")
@@ -38,8 +38,10 @@ _TRANSACTION_SQL = re.compile(
 )
 _READ_SQL = re.compile(r"^\s*(?:SELECT|WITH)\b", re.IGNORECASE)
 _CREDENTIAL_FIELD = re.compile(
-    r"(?:authorization|bearer|raw.?token|secret|signing.?key)", re.IGNORECASE
+    r"(?:^|[_-])(?:authorization|bearer|raw[_-]?token|secret|signing[_-]?key)(?:$|[_-])",
+    re.IGNORECASE,
 )
+_CREDENTIAL_VALUE = re.compile(r"^\s*bearer\s+\S+", re.IGNORECASE)
 _LIFECYCLE_ACTIONS = frozenset(
     action
     for action in (
@@ -133,7 +135,9 @@ def _utc(value: datetime) -> str:
 def _validate_nonsecret_payload(value: object) -> None:
     if isinstance(value, Mapping):
         for key, item in value.items():
-            if not isinstance(key, str) or _CREDENTIAL_FIELD.search(key):
+            if not isinstance(key, str) or (
+                _CREDENTIAL_FIELD.search(key) and not key.lower().endswith("_digest")
+            ):
                 raise ValueError(
                     "credential material is prohibited from journal payloads"
                 )
@@ -141,6 +145,8 @@ def _validate_nonsecret_payload(value: object) -> None:
     elif isinstance(value, (list, tuple)):
         for item in value:
             _validate_nonsecret_payload(item)
+    elif isinstance(value, str) and _CREDENTIAL_VALUE.search(value):
+        raise ValueError("credential material is prohibited from journal payloads")
     canonical_json(value)
 
 
@@ -182,12 +188,34 @@ def _strict_json(text: str) -> object:
 
 def verify_integrity(connection: sqlite3.Connection) -> None:
     """Verify authoritative chains and derived heads before the owner is usable."""
+    metadata = connection.execute(
+        "SELECT value FROM journal_metadata WHERE key='schema_version'"
+    ).fetchone()
+    if metadata is None or metadata[0] != SCHEMA_VERSION:
+        raise JournalError("constitutional journal schema version mismatch")
     if connection.execute("PRAGMA foreign_key_check").fetchone() is not None:
         raise JournalError("constitutional journal has dangling references")
     actors = connection.execute("SELECT actor_digest,document FROM actors").fetchall()
     for actor_digest, document in actors:
         if _digest(_strict_json(document)) != actor_digest:
             raise JournalError("actor document digest mismatch")
+    commands = connection.execute(
+        "SELECT command_id,actor_digest,credential_provenance_digest,request_id,"
+        "request_digest,operation,idempotency_key,command_digest FROM commands"
+    ).fetchall()
+    for row in commands:
+        facts = {
+            "actor_digest": row["actor_digest"],
+            "command_id": row["command_id"],
+            "credential_provenance_digest": row["credential_provenance_digest"],
+            "idempotency_key": row["idempotency_key"],
+            "operation": row["operation"],
+            "request_digest": row["request_digest"],
+            "request_id": row["request_id"],
+            "schema_version": SCHEMA_VERSION,
+        }
+        if _digest(facts) != row["command_digest"]:
+            raise JournalError("command fact digest mismatch")
     artifacts = connection.execute(
         "SELECT artifact_digest,content FROM artifacts"
     ).fetchall()
@@ -518,6 +546,7 @@ class ConstitutionalDatabase:
               request_digest TEXT NOT NULL CHECK(length(request_digest)=64 AND request_digest NOT GLOB '*[^0-9a-f]*'),
               operation TEXT NOT NULL CHECK(length(operation) BETWEEN 1 AND 128),
               idempotency_key TEXT NOT NULL CHECK(length(idempotency_key) BETWEEN 1 AND 128),
+              command_digest TEXT NOT NULL UNIQUE CHECK(length(command_digest)=64 AND command_digest NOT GLOB '*[^0-9a-f]*'),
               commit_seq INTEGER NOT NULL REFERENCES journal_commits(commit_seq),
               UNIQUE(actor_digest,operation,idempotency_key)
             ) STRICT;
@@ -646,6 +675,7 @@ class ConstitutionalDatabase:
     def _exit(
         self, connection: sqlite3.Connection, uow: UnitOfWork, success: bool
     ) -> None:
+        committed = False
         try:
             if success and uow._event_count == 0:
                 connection.execute("ROLLBACK")
@@ -653,9 +683,14 @@ class ConstitutionalDatabase:
             if success:
                 self.__failpoint("before_commit")
                 connection.execute("COMMIT")
+                committed = True
                 self.__failpoint("after_commit")
             else:
                 connection.execute("ROLLBACK")
+        except BaseException:
+            if not committed and connection.in_transaction:
+                connection.execute("ROLLBACK")
+            raise
         finally:
             uow._finish()
             connection.close()
@@ -756,8 +791,8 @@ class ConstitutionalJournal:
         credential_provenance_digest: str,
         request_id: str,
         request_digest: str,
+        operation: str,
         idempotency_key: str,
-        operation: str = "execute",
     ) -> str:
         for value, name in (
             (command_id, "command id"),
@@ -769,12 +804,38 @@ class ConstitutionalJournal:
         _hex(actor_digest, "actor digest")
         _hex(credential_provenance_digest, "credential provenance digest")
         _hex(request_digest, "request digest")
+        facts = {
+            "actor_digest": actor_digest,
+            "command_id": command_id,
+            "credential_provenance_digest": credential_provenance_digest,
+            "idempotency_key": idempotency_key,
+            "operation": operation,
+            "request_digest": request_digest,
+            "request_id": request_id,
+            "schema_version": SCHEMA_VERSION,
+        }
+        command_digest = _digest(facts)
         existing = uow._execute(
-            "SELECT command_id,request_id,request_digest,credential_provenance_digest "
+            "SELECT command_id,request_id,request_digest,credential_provenance_digest,"
+            "command_digest "
             "FROM commands WHERE actor_digest=? AND operation=? AND idempotency_key=?",
             (actor_digest, operation, idempotency_key),
         ).fetchone()
         if existing is not None:
+            persisted_facts = {
+                "actor_digest": actor_digest,
+                "command_id": existing["command_id"],
+                "credential_provenance_digest": existing[
+                    "credential_provenance_digest"
+                ],
+                "idempotency_key": idempotency_key,
+                "operation": operation,
+                "request_digest": existing["request_digest"],
+                "request_id": existing["request_id"],
+                "schema_version": SCHEMA_VERSION,
+            }
+            if _digest(persisted_facts) != existing["command_digest"]:
+                raise JournalError("persisted command fact digest mismatch")
             if existing["request_digest"] != request_digest:
                 raise IdempotencyConflict(
                     "idempotency key is bound to different command facts"
@@ -783,7 +844,7 @@ class ConstitutionalJournal:
             # stable replay identity. Return the canonical persisted command.
             return f"replay:{existing['command_id']}"
         uow._execute(
-            "INSERT INTO commands VALUES (?,?,?,?,?,?,?,?)",
+            "INSERT INTO commands VALUES (?,?,?,?,?,?,?,?,?)",
             (
                 command_id,
                 actor_digest,
@@ -792,6 +853,7 @@ class ConstitutionalJournal:
                 request_digest,
                 operation,
                 idempotency_key,
+                command_digest,
                 uow.commit_seq,
             ),
         )

@@ -260,6 +260,9 @@ transitions, artifacts, epistemic heads, lineage membership, admitted contexts,
 terminal results, a transactional outbox, serialized commit sequences, ordinals,
 and receipt chaining. It deliberately contains no Phase-C memory, effect,
 reafference, or autobiography tables and performs no production dual writes.
+Persisted command facts are independently content-bound, operation-scoped replay
+returns the original command identity across request IDs and credential rotation,
+and deterministic transaction failpoints prove prior-or-complete restart state.
 The stable schema fingerprint is emitted in
 `config/constitutional-journal-schema.json`. Production migration remains blocked
 until A06 defines atomic cutover and restart/replay evidence.

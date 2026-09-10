@@ -1,8 +1,9 @@
 {
   "schema": "vulcan-constitutional-journal/1",
-  "schema_fingerprint": "9f777b533e5557be8fbb16b9182f485fce36f53df8929fdd388987f0acc073ca",
+  "schema_fingerprint": "076db4b35cd7b3cbc003f52b59ff599d43e69ac34dad9c0c4d7264496764c9a3",
   "ordering_authority": ["commit_seq", "event_ordinal"],
   "receipt_chain": ["previous_receipt_digest", "receipt_digest"],
+  "command_integrity": "sha256-jcs over complete persisted command facts",
   "required_pragmas": {
     "journal_mode": "WAL",
     "synchronous": "FULL",

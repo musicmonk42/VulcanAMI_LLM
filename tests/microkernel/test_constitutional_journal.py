@@ -48,6 +48,7 @@ def genesis(journal: ConstitutionalJournal, uow, suffix: str = "1"):
             request_id=f"request-{suffix}",
             request_digest=(suffix[-1] if suffix[-1] in "0123456789abcdef" else "a")
             * 64,
+            operation="execute",
             idempotency_key=f"idem-{suffix}",
         )
         == "created"
@@ -202,6 +203,15 @@ def test_nested_hidden_commit_empty_commit_and_dangling_reference_fail(tmp_path)
 def test_credential_material_is_rejected_at_persistence_boundaries(tmp_path):
     with pytest.raises(ValueError, match="credential material"):
         JournalEvent("journal.commit", D, C, {"authorization": "Bearer raw"}, NOW)
+    with pytest.raises(ValueError, match="credential material"):
+        JournalEvent("journal.commit", D, C, {"value": "Bearer raw"}, NOW)
+    JournalEvent(
+        "journal.commit",
+        D,
+        C,
+        {"publication_authorization_digest": "a" * 64},
+        NOW,
+    )
     db = ConstitutionalDatabase(tmp_path / "constitutional.sqlite3")
     journal = ConstitutionalJournal()
     with db.transaction() as uow:
@@ -249,6 +259,7 @@ def test_successor_idempotency_and_lineage_constraints(tmp_path):
                 credential_provenance_digest=C,
                 request_id="request-replay",
                 request_digest="1" * 64,
+                operation="execute",
                 idempotency_key="idem-1",
             )
             == "replay:command-1"
@@ -261,6 +272,7 @@ def test_successor_idempotency_and_lineage_constraints(tmp_path):
                 credential_provenance_digest=D,
                 request_id="request-conflict",
                 request_digest="9" * 64,
+                operation="execute",
                 idempotency_key="idem-1",
             )
         uow.emit(event(actor, "replay"))
@@ -450,6 +462,25 @@ def test_restart_rejects_receipt_chain_tampering(tmp_path):
     connection.commit()
     connection.close()
     with pytest.raises(JournalError, match="receipt chain"):
+        ConstitutionalDatabase(db.path)
+
+
+def test_restart_rejects_command_fact_tampering(tmp_path):
+    db = ConstitutionalDatabase(tmp_path / "constitutional.sqlite3")
+    journal = ConstitutionalJournal()
+    with db.transaction() as uow:
+        actor = genesis(journal, uow)
+        uow.emit(event(actor))
+    db.close()
+
+    connection = sqlite3.connect(db.path)
+    connection.execute(
+        "UPDATE commands SET request_digest=? WHERE command_id='command-1'",
+        ("f" * 64,),
+    )
+    connection.commit()
+    connection.close()
+    with pytest.raises(JournalError, match="command fact digest"):
         ConstitutionalDatabase(db.path)
 
 
