@@ -42,6 +42,8 @@ def test_live_permit_is_process_local_unserializable_and_single_use():
         permit._episode_id = "episode-other"
     receipt = port.consume(permit, edge=TransitionEdge.VALIDATION, **facts)
     assert receipt["edge"] == "validation"
+    with pytest.raises(PermissionError, match="live transition permit"):
+        port.consume(receipt, edge=TransitionEdge.VALIDATION, **facts)
     with pytest.raises(PermissionError, match="consumed"):
         port.consume(permit, edge=TransitionEdge.VALIDATION, **facts)
 

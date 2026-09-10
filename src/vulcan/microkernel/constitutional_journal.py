@@ -254,11 +254,125 @@ def verify_integrity(connection: sqlite3.Connection) -> None:
         if (
             set(receipt) != required
             or receipt["schema_version"] != "vulcan-transition-receipt/1"
+            or receipt["operation"]
+            not in {"admission", "validation", "epistemic_commit", "publication"}
+            or not isinstance(receipt["commit_seq"], int)
+            or not isinstance(receipt["artifact_digests"], list)
         ):
             raise JournalError("transition receipt schema is invalid")
         committed = datetime.fromisoformat(receipt["committed_at"]).timestamp()
         if not receipt["issued_at_epoch"] <= committed <= receipt["expires_at_epoch"]:
             raise JournalError("transition receipt permit was expired at commit")
+        for name in (
+            "actor_digest",
+            "constitution_digest",
+            "credential_provenance_digest",
+            "nonce_digest",
+            "policy_digest",
+            "predecessor_digest",
+            "qualified_release_digest",
+            "resulting_head_digest",
+            "snapshot_digest",
+            "trust_root_digest",
+            "validation_digest",
+            "verifier_digest",
+        ):
+            try:
+                _hex(receipt[name], name.replace("_", " "))
+            except (TypeError, ValueError) as exc:
+                raise JournalError(
+                    "transition receipt digest binding is invalid"
+                ) from exc
+        command = connection.execute(
+            "SELECT actor_digest,credential_provenance_digest,commit_seq "
+            "FROM commands WHERE command_id=?",
+            (receipt["command_id"],),
+        ).fetchone()
+        if (
+            command is None
+            or command["actor_digest"] != receipt["actor_digest"]
+            or command["credential_provenance_digest"]
+            != receipt["credential_provenance_digest"]
+        ):
+            raise JournalError("transition receipt command binding is invalid")
+        episode = connection.execute(
+            "SELECT command_id,actor_digest FROM episodes WHERE episode_id=?",
+            (receipt["episode_id"],),
+        ).fetchone()
+        if (
+            episode is None
+            or episode["command_id"] != receipt["command_id"]
+            or episode["actor_digest"] != receipt["actor_digest"]
+        ):
+            raise JournalError("transition receipt episode binding is invalid")
+        if receipt["operation"] == "admission":
+            if int(command["commit_seq"]) != int(receipt["commit_seq"]):
+                raise JournalError("admission receipt commit binding is invalid")
+            admission = connection.execute(
+                "SELECT 1 FROM transactional_outbox "
+                "WHERE commit_seq=? AND event_type='episode.admitted' "
+                "AND json_extract(payload,'$.episode_id')=? "
+                "AND json_extract(payload,'$.episode_digest')=?",
+                (
+                    receipt["commit_seq"],
+                    receipt["episode_id"],
+                    receipt["resulting_head_digest"],
+                ),
+            ).fetchone()
+            if admission is None or receipt["predecessor_digest"] != "0" * 64:
+                raise JournalError("admission receipt genesis binding is invalid")
+        else:
+            transition = connection.execute(
+                "SELECT actor_digest,credential_provenance_digest,commit_seq,to_state,"
+                "transition_ordinal "
+                "FROM episode_transitions WHERE episode_id=? AND transition_digest=?",
+                (receipt["episode_id"], receipt["resulting_head_digest"]),
+            ).fetchone()
+            if (
+                transition is None
+                or transition["actor_digest"] != receipt["actor_digest"]
+                or transition["credential_provenance_digest"]
+                != receipt["credential_provenance_digest"]
+                or int(transition["commit_seq"]) != int(receipt["commit_seq"])
+            ):
+                raise JournalError("transition receipt successor binding is invalid")
+            expected_operation = (
+                "epistemic_commit"
+                if transition["to_state"] == "epistemically_committed"
+                else (
+                    "publication"
+                    if transition["to_state"]
+                    in {"normatively_authorized", "communicated", "consolidated"}
+                    else "validation"
+                )
+            )
+            if receipt["operation"] != expected_operation:
+                raise JournalError("transition receipt edge binding is invalid")
+            ordinal = int(transition["transition_ordinal"])
+            if ordinal == 0:
+                predecessor = connection.execute(
+                    "SELECT json_extract(a.content,'$.resulting_head_digest') "
+                    "FROM artifacts a WHERE a.kind='transition-receipt.v1' "
+                    "AND json_extract(a.content,'$.episode_id')=? "
+                    "AND json_extract(a.content,'$.operation')='admission'",
+                    (receipt["episode_id"],),
+                ).fetchone()
+            else:
+                predecessor = connection.execute(
+                    "SELECT transition_digest FROM episode_transitions "
+                    "WHERE episode_id=? AND transition_ordinal=?",
+                    (receipt["episode_id"], ordinal - 1),
+                ).fetchone()
+            if predecessor is None or predecessor[0] != receipt["predecessor_digest"]:
+                raise JournalError("transition receipt predecessor binding is invalid")
+        for member_digest in receipt["artifact_digests"]:
+            if (
+                connection.execute(
+                    "SELECT 1 FROM artifacts WHERE artifact_digest=?", (member_digest,)
+                ).fetchone()
+                is None
+            ):
+                raise JournalError("transition receipt artifact binding is dangling")
         reference = connection.execute(
             "SELECT 1 FROM transactional_outbox WHERE event_type='transition.receipt.recorded' "
             "AND json_extract(payload,'$.receipt_artifact_digest')=?",
@@ -552,6 +666,7 @@ class ConstitutionalDatabase:
         *,
         busy_timeout_ms: int = 5_000,
         failpoint: Failpoint | None = None,
+        require_transition_receipts: bool = False,
     ):
         if not 1 <= busy_timeout_ms <= 30_000:
             raise ValueError("busy timeout must be bounded")
@@ -564,6 +679,7 @@ class ConstitutionalDatabase:
             raise ValueError("constitutional database path must be a regular file")
         self.__busy_timeout_ms = busy_timeout_ms
         self.__failpoint = failpoint or (lambda _name: None)
+        self.__require_transition_receipts = require_transition_receipts
         self.__lock = threading.RLock()
         self.__local = threading.local()
         self.__active = 0
@@ -578,6 +694,7 @@ class ConstitutionalDatabase:
                     f"constitutional schema fingerprint mismatch: {actual}"
                 )
             verify_integrity(connection)
+            self.__verify_receipt_completeness(connection)
         finally:
             connection.close()
 
@@ -613,6 +730,19 @@ class ConstitutionalDatabase:
             connection.close()
             raise JournalError("required SQLite safety pragmas are unavailable")
         return connection
+
+    def __verify_receipt_completeness(self, connection: sqlite3.Connection) -> None:
+        if not self.__require_transition_receipts:
+            return
+        expected = connection.execute(
+            "SELECT (SELECT count(*) FROM episodes) + "
+            "(SELECT count(*) FROM episode_transitions)"
+        ).fetchone()[0]
+        actual = connection.execute(
+            "SELECT count(*) FROM artifacts WHERE kind='transition-receipt.v1'"
+        ).fetchone()[0]
+        if actual != expected:
+            raise JournalError("every episode mutation requires a transition receipt")
 
     @staticmethod
     def __create_schema(connection: sqlite3.Connection) -> None:
@@ -886,6 +1016,7 @@ class ConstitutionalDatabase:
         connection = self.__connect()
         try:
             verify_integrity(connection)
+            self.__verify_receipt_completeness(connection)
         finally:
             connection.close()
 

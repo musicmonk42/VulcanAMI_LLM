@@ -110,10 +110,10 @@
       "sha256": "9b6576ec5da0da5b48091f966e42635ef7da326c58c6e65eb0313630252dbe3c"
     },
     {
-      "loc": 161,
+      "loc": 188,
       "module": "vulcan.microkernel._transition_permits",
       "path": "src/vulcan/microkernel/_transition_permits.py",
-      "sha256": "7fdc3517ac92671bc75c53403ff441e7c1224c6d83845d7e5269e8a7ff646372"
+      "sha256": "b4a190ae8dcaf9d8132034db06013b4d08cf8fbe0266fa1cf753e38a07b89a4a"
     },
     {
       "loc": 116,
@@ -134,10 +134,10 @@
       "sha256": "125d2c3ffe5ce78ee8d6fca20602fb961867ee894ad86e362b69997583032e18"
     },
     {
-      "loc": 1205,
+      "loc": 1336,
       "module": "vulcan.microkernel.constitutional_journal",
       "path": "src/vulcan/microkernel/constitutional_journal.py",
-      "sha256": "ee2be09a48c9c9e9bb6afdde24ef0d645257236eb084eabb4c5682ef04b9ff80"
+      "sha256": "0fffec2998d4dbcacfc8c9ec11dd60ebabd8547b67142683a77722e8a052dfd8"
     },
     {
       "loc": 1128,
@@ -170,10 +170,10 @@
       "sha256": "4f236c513e4d0f1f18f1e45f6ae11bd12af6136ce46ffe59aa9407c069c14e13"
     },
     {
-      "loc": 659,
+      "loc": 648,
       "module": "vulcan.microkernel.journal_transactions",
       "path": "src/vulcan/microkernel/journal_transactions.py",
-      "sha256": "df33f7b833a3980fc70cf470d3dc0b422c94a0d84320749cc917dc7791012a43"
+      "sha256": "6c03238e78f0da68f254719ef74d4dfd108407e816653a9793332a0c3fb4e9f7"
     },
     {
       "loc": 670,
@@ -296,10 +296,10 @@
       "sha256": "dab7c8cf27b4aa98838b591b7f996686a13d72c4742b32a844a5bbee196d4cc5"
     },
     {
-      "loc": 1031,
+      "loc": 1023,
       "module": "vulcan.runtime.kernel",
       "path": "src/vulcan/runtime/kernel.py",
-      "sha256": "7f06813bcc2b68b47cfc0be37a8ae2b5042a4a95f11f1f8819049c334f1fe491"
+      "sha256": "1c1755ab9c767b3097bf1ce4c4afe964a7388907b2130e9b5322b523106eb874"
     },
     {
       "loc": 321,
@@ -308,10 +308,10 @@
       "sha256": "fe9b4328bb281bc84ce8e302cf2afea32e3fd1ba0b8959555f5cfde1004428bd"
     },
     {
-      "loc": 198,
+      "loc": 219,
       "module": "vulcan.runtime.phase_a_composition",
       "path": "src/vulcan/runtime/phase_a_composition.py",
-      "sha256": "c848f098b9d59b7c5bdfbffce2b9e1da8e7ed6fe277fa160727c142feea5d6ad"
+      "sha256": "7b3ed7f4ea1e5ec9ca203dfc4722611822fc6ace559a96c758db39f8dda467de"
     },
     {
       "loc": 23,
@@ -356,7 +356,7 @@
       "sha256": "0acc6f0572bce53b836bbce1640f741d9f517c3e8a250ce500ecac654c7e0e94"
     }
   ],
-  "manifest_digest": "72881110b46671fb8ea2d04d9aa02dea6ed0c13c91f31d4d70ce0971ea47b7c0",
+  "manifest_digest": "7d7b95d3b3ae86102e346f47faecd083421d07025683c0f29ac15f64f4b74945",
   "resources": [
     {
       "path": "config/actor-binding-schema.json",

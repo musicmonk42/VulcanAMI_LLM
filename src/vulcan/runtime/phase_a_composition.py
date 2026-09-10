@@ -85,7 +85,8 @@ def compose_phase_a_runtime(settings: RuntimeSettings) -> PhaseARuntime:
     with ExitStack() as cleanup:
         root = Path(settings.durable_root)
         constitutional_database = ConstitutionalDatabase(
-            root / "constitutional" / "constitutional.sqlite3"
+            root / "constitutional" / "constitutional.sqlite3",
+            require_transition_receipts=True,
         )
         cleanup.callback(constitutional_database.close)
         audit = JournalAuditProjector(
@@ -157,8 +158,28 @@ def compose_phase_a_runtime(settings: RuntimeSettings) -> PhaseARuntime:
             )
 
         branch_id = "branch-primary"
+        verifier_digest = hashlib.sha256(
+            canonical_json(
+                {
+                    "display_name": "",
+                    "kind": "system_kernel",
+                    "metadata": {},
+                    "principal_id": "constitutional-cognitive-kernel",
+                    "release_digest": hashlib.sha256(
+                        b"vulcan-constitutional-kernel-v1"
+                    ).hexdigest(),
+                }
+            )
+        ).hexdigest()
         service_factory = lambda *_stores: JournalConstitutionalTransactionService(
-            episode_store, epistemic_store, lineage_store, branch_id=branch_id
+            episode_store,
+            epistemic_store,
+            lineage_store,
+            branch_id=branch_id,
+            qualified_release_digest=hashlib.sha256(
+                b"vulcan-constitutional-kernel-v1"
+            ).hexdigest(),
+            verifier_digest=verifier_digest,
         )
         kernel = ConstitutionalCognitiveKernel.from_kernel(
             delegate,

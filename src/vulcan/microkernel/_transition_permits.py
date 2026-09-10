@@ -6,10 +6,21 @@ models, tools, and plugins must execute out of process.
 
 from __future__ import annotations
 
+import hashlib
 import secrets
 import time
 from enum import Enum
 from types import SimpleNamespace
+
+
+def _digest(value: object, name: str) -> str:
+    if (
+        not isinstance(value, str)
+        or len(value) != 64
+        or any(character not in "0123456789abcdef" for character in value)
+    ):
+        raise ValueError(f"{name} must be a lowercase sha256 digest")
+    return value
 
 
 class TransitionEdge(str, Enum):
@@ -94,15 +105,13 @@ class LiveTransitionPermit:
     def grant(self):
         return SimpleNamespace(
             principal_digest=self._verifier_digest,
-            evidence_digest=__import__("hashlib")
-            .sha256(
+            evidence_digest=hashlib.sha256(
                 (
                     self._validation_digest
                     + self._policy_digest
                     + self._snapshot_digest
                 ).encode()
-            )
-            .hexdigest(),
+            ).hexdigest(),
         )
 
 
@@ -116,15 +125,35 @@ class MutationPort:
     ) -> None:
         self._instance = object()
         self._spent: set[str] = set()
-        self.release_digest = release_digest
+        self.release_digest = _digest(release_digest, "qualified release digest")
         self.constitution_digest = (
-            constitution_digest
-            or __import__("hashlib").sha256(b"vulcan-constitution-v1").hexdigest()
+            _digest(constitution_digest, "constitution digest")
+            if constitution_digest is not None
+            else hashlib.sha256(b"vulcan-constitution-v1").hexdigest()
         )
 
     def issue(self, *, edge: TransitionEdge, lifetime_seconds: float = 30, **facts):
+        if not isinstance(edge, TransitionEdge):
+            raise TypeError("a typed transition edge is required")
         if lifetime_seconds <= 0 or lifetime_seconds > 300:
             raise ValueError("permit lifetime is outside the supported bound")
+        required = {
+            "actor_digest",
+            "episode_id",
+            "expected_prior_episode_digest",
+            "policy_digest",
+            "snapshot_digest",
+            "validation_digest",
+            "verifier_digest",
+        }
+        if (
+            set(facts) != required
+            or not isinstance(facts["episode_id"], str)
+            or not 1 <= len(facts["episode_id"]) <= 128
+        ):
+            raise ValueError("permit facts are incomplete")
+        for name in required - {"episode_id"}:
+            _digest(facts[name], name.replace("_", " "))
         return LiveTransitionPermit(
             self._instance,
             edge=edge,
@@ -150,9 +179,7 @@ class MutationPort:
             "constitution_digest": permit._constitution_digest,
             "expires_at_epoch": permit._expires_wall,
             "issued_at_epoch": permit._issued_at,
-            "nonce_digest": __import__("hashlib")
-            .sha256(permit._nonce.encode())
-            .hexdigest(),
+            "nonce_digest": hashlib.sha256(permit._nonce.encode()).hexdigest(),
             "policy_digest": permit._policy_digest,
             "qualified_release_digest": permit._release_digest,
             "snapshot_digest": permit._snapshot_digest,

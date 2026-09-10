@@ -139,16 +139,8 @@ class CognitiveKernel:
     ) -> None:
         if self._transactions is not None and self._transactions is not service:
             raise RuntimeError("transaction service already bound")
-        if not principal.is_kernel:
-            raise TypeError("transaction authority must be SYSTEM_KERNEL")
         self._transactions = service
         self._kernel_principal = principal
-        configure = getattr(service, "_configure_mutation_port", None)
-        if configure is not None:
-            configure(
-                qualified_release_digest=principal.release_digest,
-                verifier_digest=principal.identity_digest,
-            )
 
     def disable_legacy_case_audit(self) -> None:
         """Retire mutable ``case.*`` lifecycle writes on the composed path.
@@ -163,7 +155,7 @@ class CognitiveKernel:
         case: CognitiveCase,
         policy_digest: str,
         validation_digest: str,
-        level: AuthorityLevel,
+        edge: TransitionEdge,
     ):
         if (
             self._transactions is None
@@ -179,10 +171,6 @@ class CognitiveKernel:
         )
         issue = getattr(self._transactions, "_issue_transition_permit", None)
         if issue is not None:
-            edge = {
-                AuthorityLevel.COMMITTED_BELIEF: TransitionEdge.EPISTEMIC_COMMIT,
-                AuthorityLevel.AUTHORIZED_PLAN: TransitionEdge.PUBLICATION,
-            }.get(level, TransitionEdge.VALIDATION)
             return issue(
                 episode_id=case.episode.episode_id,
                 edge=edge,
@@ -191,10 +179,10 @@ class CognitiveKernel:
                 snapshot_digest=case.episode.snapshot_bundle.state_digest,
                 expected_prior_episode_digest=case.episode.digest,
             )
-        return self._legacy_command_authority(case, policy, validation_digest, level)
+        return self._legacy_command_authority(case, policy, validation_digest, edge)
 
     def _legacy_command_authority(
-        self, case, policy, validation_digest, level
+        self, case, policy, validation_digest, edge
     ) -> CommandAuthority:
         """Removal-bound adapter for non-journal compatibility tests only."""
         evidence = EvidenceRecord(
@@ -203,6 +191,10 @@ class CognitiveKernel:
             policy,
             datetime.now(timezone.utc),
         )
+        level = {
+            TransitionEdge.EPISTEMIC_COMMIT: AuthorityLevel.COMMITTED_BELIEF,
+            TransitionEdge.PUBLICATION: AuthorityLevel.AUTHORIZED_PLAN,
+        }.get(edge, AuthorityLevel.VALIDATED_CANDIDATE)
         grant = promote_authority(
             current=AuthorityLevel.UNTRUSTED_PROPOSAL,
             target=level,
@@ -329,7 +321,7 @@ class CognitiveKernel:
                         case,
                         policy_digest,
                         validation_digest,
-                        AuthorityLevel.VALIDATED_CANDIDATE,
+                        TransitionEdge.VALIDATION,
                     ),
                     {
                         "parser_identity": bundle.parser_identity,
@@ -346,7 +338,7 @@ class CognitiveKernel:
                         case,
                         policy_digest,
                         validation_digest,
-                        AuthorityLevel.VALIDATED_CANDIDATE,
+                        TransitionEdge.VALIDATION,
                     ),
                 ),
             )
@@ -384,7 +376,7 @@ class CognitiveKernel:
                             case,
                             policy_digest,
                             validation_digest,
-                            AuthorityLevel.VALIDATED_CANDIDATE,
+                            TransitionEdge.VALIDATION,
                         ),
                         (
                             ArtifactRef(
@@ -430,7 +422,7 @@ class CognitiveKernel:
                             ],
                         }
                     ),
-                    AuthorityLevel.COMMITTED_BELIEF,
+                    TransitionEdge.EPISTEMIC_COMMIT,
                 )
                 prior = self._transactions.epistemic_head(case.case_id)
                 candidate = adapt_runtime_semantic_candidate(
@@ -541,7 +533,7 @@ class CognitiveKernel:
                                 case,
                                 policy_digest,
                                 validation_digest,
-                                AuthorityLevel.VALIDATED_CANDIDATE,
+                                TransitionEdge.VALIDATION,
                             ),
                             (
                                 ArtifactRef(
@@ -604,7 +596,7 @@ class CognitiveKernel:
                     case,
                     policy_digest,
                     ledger_digest,
-                    AuthorityLevel.COMMITTED_BELIEF,
+                    TransitionEdge.EPISTEMIC_COMMIT,
                 )
                 prior = self._transactions.epistemic_head(case.case_id)
                 candidate = adapt_runtime_semantic_candidate(
@@ -855,7 +847,7 @@ class CognitiveKernel:
                             case,
                             bound_policy,
                             authorization.finalizer_decision_digest,
-                            AuthorityLevel.AUTHORIZED_PLAN,
+                            TransitionEdge.PUBLICATION,
                         ),
                         authorization=authorization,
                         response=response_ref,
@@ -871,7 +863,7 @@ class CognitiveKernel:
                             case,
                             bound_policy,
                             authorization.rendered_text_digest,
-                            AuthorityLevel.AUTHORIZED_PLAN,
+                            TransitionEdge.PUBLICATION,
                         ),
                     ),
                 )
@@ -893,7 +885,7 @@ class CognitiveKernel:
                             case,
                             bound_policy,
                             consolidation.digest,
-                            AuthorityLevel.AUTHORIZED_PLAN,
+                            TransitionEdge.PUBLICATION,
                         ),
                         consolidation,
                     ),
@@ -914,7 +906,7 @@ class CognitiveKernel:
                             case,
                             policy_digest,
                             canonical_digest({"terminal": status.value}),
-                            AuthorityLevel.VALIDATED_CANDIDATE,
+                            TransitionEdge.VALIDATION,
                         ),
                         outcomes[status],
                     ),
@@ -970,7 +962,7 @@ class CognitiveKernel:
                             case,
                             policy_digest,
                             canonical_digest({"terminal": "cancelled"}),
-                            AuthorityLevel.VALIDATED_CANDIDATE,
+                            TransitionEdge.VALIDATION,
                         ),
                         TerminalOutcome.CANCELLATION,
                     ),
@@ -1002,7 +994,7 @@ class CognitiveKernel:
                             canonical_digest(
                                 {"terminal": "failed", "category": type(exc).__name__}
                             ),
-                            AuthorityLevel.VALIDATED_CANDIDATE,
+                            TransitionEdge.VALIDATION,
                         ),
                         TerminalOutcome.FAILURE,
                     ),

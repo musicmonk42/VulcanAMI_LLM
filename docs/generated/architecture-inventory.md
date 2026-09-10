@@ -1,6 +1,6 @@
 # Generated architecture inventory
 
-Digest: `f56c0b228adfa2b51692d8181ed3d0d0cf2ca7fb49eb7923fee6c391fbd6cf53`
+Digest: `cf55d3243779bdf9775041e262381739e1b1e0c6a54cd399e817a7ae85367e90`
 
 This file is generated from `docs/generated/architecture-inventory.json`.
 
@@ -334,6 +334,7 @@ Count: 4428
 - `src/generate_transparency_report.py:1011` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/vulcan/semantic_bridge/semantic_bridge_core.py:1011` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/governance_loop.py:1012` kind='except_exception', reachability='unknown', review='unreviewed'
+- `src/vulcan/runtime/kernel.py:982` kind='except_exception', reachability='production-reachable', review='unreviewed'
 - `src/integration/graphix_vulcan_bridge.py:1013` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/vulcan/curiosity_engine/exploration_budget.py:1015` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/vulcan/reasoning/selection/memory_prior.py:1015` kind='except_exception', reachability='unknown', review='unreviewed'
@@ -345,7 +346,6 @@ Count: 4428
 - `src/generate_transparency_report.py:1014` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/vulcan/knowledge_crystallizer/principle_extractor.py:1018` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/vulcan/curiosity_engine/curiosity_engine_core.py:1012` kind='except_exception', reachability='unknown', review='unreviewed'
-- `src/vulcan/runtime/kernel.py:990` kind='except_exception', reachability='production-reachable', review='unreviewed'
 - ... 4378 more in JSON
 
 ## Mocks

@@ -38,6 +38,8 @@ class JournalConstitutionalTransactionService(ConstitutionalTransactionService):
         lineage: JournalLineageStore,
         *,
         branch_id: str,
+        qualified_release_digest: str,
+        verifier_digest: str,
     ) -> None:
         if not (
             episodes.database is epistemic.database
@@ -50,8 +52,8 @@ class JournalConstitutionalTransactionService(ConstitutionalTransactionService):
         self._database = episodes.database
         self._journal = ConstitutionalJournal()
         self._branch_id = branch_id
-        self._mutation_port: MutationPort | None = None
-        self._verifier_digest: str | None = None
+        self._mutation_port = MutationPort(qualified_release_digest)
+        self._verifier_digest = verifier_digest
         self._pending_publication: dict[
             str,
             tuple[
@@ -60,15 +62,6 @@ class JournalConstitutionalTransactionService(ConstitutionalTransactionService):
                 str,
             ],
         ] = {}
-
-    def _configure_mutation_port(
-        self, *, qualified_release_digest: str, verifier_digest: str
-    ) -> None:
-        """Bind the private serving capability once during trusted composition."""
-        if self._mutation_port is not None:
-            raise RuntimeError("mutation port is already configured")
-        self._mutation_port = MutationPort(qualified_release_digest)
-        self._verifier_digest = verifier_digest
 
     def _issue_transition_permit(
         self,
@@ -80,8 +73,6 @@ class JournalConstitutionalTransactionService(ConstitutionalTransactionService):
         snapshot_digest: str,
         expected_prior_episode_digest: str,
     ) -> LiveTransitionPermit:
-        if self._mutation_port is None or self._verifier_digest is None:
-            raise AuthorityError("live mutation port is not configured")
         rows = self._database.read(
             "SELECT actor_digest FROM episodes WHERE episode_id=?", (episode_id,)
         )
@@ -99,8 +90,6 @@ class JournalConstitutionalTransactionService(ConstitutionalTransactionService):
         )
 
     def _consume_permit(self, permit, *, edge, head):
-        if self._mutation_port is None or self._verifier_digest is None:
-            raise AuthorityError("live mutation port is not configured")
         rows = self._database.read(
             "SELECT actor_digest FROM episodes WHERE episode_id=?", (head.episode_id,)
         )
@@ -182,8 +171,6 @@ class JournalConstitutionalTransactionService(ConstitutionalTransactionService):
         idempotency_key: str,
         context_bytes: bytes,
     ) -> CognitiveEpisode:
-        if self._mutation_port is None or self._verifier_digest is None:
-            raise AuthorityError("live mutation port is not configured")
         with self._database.transaction() as uow:
             actor_digest = self._journal.bind_actor(uow, actor)
             admission = self._mutation_port.issue(
@@ -425,6 +412,7 @@ class JournalConstitutionalTransactionService(ConstitutionalTransactionService):
                 actor_digest,
                 credential,
                 permit_facts=permit_facts,
+                extra_artifact_digests=(artifact,),
             )
         return successor
 
@@ -484,6 +472,7 @@ class JournalConstitutionalTransactionService(ConstitutionalTransactionService):
         *,
         terminal_content: bytes | None = None,
         permit_facts: dict[str, object] | None = None,
+        extra_artifact_digests: tuple[str, ...] = (),
     ):
         transition = successor.transitions[-1]
         self._journal.append_transition(
@@ -503,6 +492,14 @@ class JournalConstitutionalTransactionService(ConstitutionalTransactionService):
         ).rowcount
         if lineage_changed != 1:
             raise SuccessorError("lineage and episode head compare-and-swap diverged")
+        persisted_artifacts = [
+            self._journal.put_artifact(
+                uow,
+                kind="episode-transition-document.v1",
+                content=successor.canonical_json().encode("utf-8"),
+            ),
+            *extra_artifact_digests,
+        ]
         if successor.state.is_terminal:
             result = self._journal.put_artifact(
                 uow,
@@ -530,6 +527,7 @@ class JournalConstitutionalTransactionService(ConstitutionalTransactionService):
                 credential_provenance_digest=credential,
                 terminal_state=successor.state.value,
             )
+            persisted_artifacts.append(result)
             uow._execute(
                 "UPDATE lineage_membership SET status='past' "
                 "WHERE branch_id=? AND episode_id=? AND status='active'",
@@ -549,16 +547,7 @@ class JournalConstitutionalTransactionService(ConstitutionalTransactionService):
             )[0]["command_id"]
             receipt = {
                 "actor_digest": actor_digest,
-                "artifact_digests": sorted(
-                    ref.digest
-                    for ref in (
-                        *successor.claims,
-                        *successor.evidence,
-                        *successor.derivations,
-                        *successor.candidate_plans,
-                        *successor.consolidation_refs,
-                    )
-                ),
+                "artifact_digests": sorted(persisted_artifacts),
                 "command_id": command,
                 "committed_at": successor.transitions[-1].at.isoformat(),
                 "commit_seq": uow.commit_seq,
