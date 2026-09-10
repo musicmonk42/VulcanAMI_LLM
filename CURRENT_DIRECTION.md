@@ -35,6 +35,7 @@ chain; deleting or failing to deliver JSONL cannot affect readiness or cognition
 The offline exclusive migrator preserves validated legacy sources as read-only
 rollback evidence and imports their records with `LEGACY_UNVERIFIED` attribution.
 The serving mutation port now requires edge-specific, process-local, single-use live permits and persists distinct replay-only transition receipts. Python object capabilities protect only the supported import-isolated TCB; arbitrary malicious code in the same interpreter cannot be contained and all future untrusted components must run out of process.
+A09 qualification tooling now refuses mutable image tags, dirty or switched subjects, incomplete critical catalogs, and self-authored PASS records. Exact image qualification remains NOT_EXECUTED in this environment because no container engine or registry access is available; no immutable qualified image digest or Phase-B admission bundle exists yet.
 
 Persistent causal lineage is now M3 on the composed request path: episode
 genesis binds the current branch head and terminal episodes enter that branch's

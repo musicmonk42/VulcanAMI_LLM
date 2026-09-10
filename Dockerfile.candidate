@@ -1,0 +1,24 @@
+# A09 image construction consumes one pre-verified wheel; it never rebuilds source.
+ARG PYTHON_BASE
+FROM ${PYTHON_BASE}
+ARG WHEEL_SHA256
+WORKDIR /app
+COPY candidate.whl /tmp/candidate.whl
+COPY requirements-runtime.lock /tmp/requirements-runtime.lock
+COPY wheelhouse /tmp/wheelhouse
+RUN test "$(sha256sum /tmp/candidate.whl | cut -d' ' -f1)" = "$WHEEL_SHA256" \
+ && python -m pip install --no-cache-dir --no-index --require-hashes --find-links=/tmp/wheelhouse -r /tmp/requirements-runtime.lock \
+ && python -m pip install --no-cache-dir --no-index --no-deps /tmp/candidate.whl \
+ && python -m pip check \
+ && rm -rf /tmp/candidate.whl /tmp/requirements-runtime.lock /tmp/wheelhouse /root/.cache
+ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 VULCAN_ENV=production \
+    VULCAN_RUNTIME_DURABLE_ROOT=/var/lib/vulcan VULCAN_ENABLE_SELF_IMPROVEMENT=false \
+    VULCAN_MEMORY_ENABLED=false VULCAN_CSIU_ENABLED=false VULCAN_LEARNING_ENABLED=false \
+    PORT=8000
+RUN useradd -r -u 1001 -d /app -s /usr/sbin/nologin vulcan \
+ && install -d -o vulcan -g vulcan -m 0700 /var/lib/vulcan /tmp/vulcan-cache \
+ && chmod -R a-w /usr/local/lib/python3.11/site-packages
+VOLUME ["/var/lib/vulcan"]
+USER 1001:1001
+EXPOSE 8000
+ENTRYPOINT ["python", "-m", "uvicorn", "vulcan.runtime.app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

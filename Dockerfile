@@ -1,6 +1,8 @@
-# Canonical Linux serving artifact. Research, cloud, distributed, and development
+# Canonical Linux serving artifact. PYTHON_BASE must be an immutable
+# repository@sha256 digest supplied by the qualification controller.
 # extras are deliberately absent from both build resolution and runtime imports.
-FROM python:3.11.13-slim-bookworm AS builder
+ARG PYTHON_BASE
+FROM ${PYTHON_BASE} AS builder
 WORKDIR /build
 COPY pyproject.toml setup.py README.md LICENSE requirements-build.lock requirements-build.in ./
 COPY scripts/ci/check_production_imports.py scripts/ci/generate_wheel_manifest.py scripts/ci/verify_wheel.py ./scripts/ci/
@@ -17,7 +19,7 @@ RUN python -m pip install --no-cache-dir --require-hashes -r requirements-build.
  && python scripts/ci/verify_wheel.py /wheels/*.whl \
  && python -m pip install --no-deps --no-index --target /install /wheels/*.whl
 
-FROM python:3.11.13-slim-bookworm AS runtime
+FROM ${PYTHON_BASE} AS runtime
 ARG SOURCE_COMMIT=unknown
 ARG DEPENDENCY_LOCK_DIGEST=unknown
 ARG ARCHITECTURE_STATUS_DIGEST=unknown

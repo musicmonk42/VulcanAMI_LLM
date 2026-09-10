@@ -72,6 +72,7 @@ CHECKS: dict[str, tuple[tuple[str, ...], ...]] = {
             "tests/persistence/test_journal_audit_projector.py",
             "tests/persistence/test_legacy_constitutional_migration.py",
             "tests/qualification/test_journal_recovery_harness.py",
+            "tests/qualification/test_phase_a_artifact_runner.py",
             "tests/architecture/test_ami_constitution.py",
             "tests/ci/test_workflow_gates.py",
         ),
@@ -93,6 +94,7 @@ CHECKS: dict[str, tuple[tuple[str, ...], ...]] = {
             "tests/persistence/test_journal_audit_projector.py",
             "tests/persistence/test_legacy_constitutional_migration.py",
             "tests/qualification/test_journal_recovery_harness.py",
+            "tests/qualification/test_phase_a_artifact_runner.py",
             "tests/architecture/test_ami_constitution.py",
         ),
         (
@@ -112,6 +114,7 @@ CHECKS: dict[str, tuple[tuple[str, ...], ...]] = {
             "tests/persistence/test_journal_audit_projector.py",
             "tests/persistence/test_legacy_constitutional_migration.py",
             "tests/qualification/test_journal_recovery_harness.py",
+            "tests/qualification/test_phase_a_artifact_runner.py",
             "tests/architecture/test_ami_constitution.py",
         ),
     ),

@@ -1,6 +1,6 @@
 # Generated architecture inventory
 
-Digest: `cf55d3243779bdf9775041e262381739e1b1e0c6a54cd399e817a7ae85367e90`
+Digest: `caed61d443d5b03816ef65b5f37f4dd9a27cb1124a7b13420df536396e56efcd`
 
 This file is generated from `docs/generated/architecture-inventory.json`.
 
@@ -42,6 +42,7 @@ This file is generated from `docs/generated/architecture-inventory.json`.
 | [`docs/architecture/live-transition-permits.md`](../architecture/live-transition-permits.md) | **current** | A08 process-local mutation permits and durable replay receipt boundary |
 | [`docs/architecture/neutral-process-theory.md`](../architecture/neutral-process-theory.md) | **research-only** | falsifiable research hypothesis outside the authority path |
 | [`docs/architecture/persistent-agent-lineage.md`](../architecture/persistent-agent-lineage.md) | **current** | implemented neutral causal-lineage boundary |
+| [`docs/architecture/phase-a-artifact-qualification.md`](../architecture/phase-a-artifact-qualification.md) | **current** | A09 immutable wheel/image qualification procedure and fail-closed evidence boundary |
 | [`docs/architecture/phase-a-serving-tcb.md`](../architecture/phase-a-serving-tcb.md) | **current** | Phase-A serving graph scope and TCB threshold justification |
 | [`docs/architecture/reafference-protocol.md`](../architecture/reafference-protocol.md) | **current** | tested observation and causal reafference boundary pending canonical wiring |
 | [`docs/architecture/sequence-6-baseline-audit.md`](../architecture/sequence-6-baseline-audit.md) | **historical** | point-in-time baseline audit |
@@ -49,7 +50,7 @@ This file is generated from `docs/generated/architecture-inventory.json`.
 
 ## Entrypoints
 
-Count: 412
+Count: 414
 
 - `src/vulcan/tests/test_multimodal_reasoning.py:999` kind='python_main_guard', reachability='test-only'
 - `src/vulcan/tests/test_curiosity_engine_integration.py:1000` kind='python_main_guard', reachability='test-only'
@@ -92,6 +93,7 @@ Count: 412
 - `src/vulcan/tests/test_vulcan_cost_model.py:1108` kind='python_main_guard', reachability='test-only'
 - `src/vulcan/tests/test_domain_validators.py:1119` kind='python_main_guard', reachability='test-only'
 - `src/vulcan/tests/test_hierarchical.py:1122` kind='python_main_guard', reachability='test-only'
+- `scripts/qualification/build_candidate_images.py:108` kind='python_main_guard', reachability='research-only'
 - `tests/test_os_import_unified_chat.py:69` kind='python_main_guard', reachability='test-only'
 - `src/audit_log.py:1074` kind='python_main_guard', reachability='unknown'
 - `tests/test_ontology_validation.py:1132` kind='python_main_guard', reachability='test-only'
@@ -100,8 +102,7 @@ Count: 412
 - `scripts/ci/verify_dependency_inputs.py:114` kind='python_main_guard', reachability='research-only'
 - `src/vulcan/tests/test_contraindication_tracker.py:1157` kind='python_main_guard', reachability='test-only'
 - `src/vulcan/tests/test_exploration_budget.py:1158` kind='python_main_guard', reachability='test-only'
-- `src/vulcan/tests/test_principle_learner.py:1163` kind='python_main_guard', reachability='test-only'
-- ... 362 more in JSON
+- ... 364 more in JSON
 
 ## Routes
 
@@ -294,7 +295,7 @@ Count: 455
 
 ## Fallbacks
 
-Count: 4428
+Count: 4430
 
 - `src/vulcan/endpoints/self_improvement.py:98` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/vulcan/safety/rollback_audit.py:99` kind='except_exception', reachability='unknown', review='unreviewed'
@@ -346,7 +347,7 @@ Count: 4428
 - `src/generate_transparency_report.py:1014` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/vulcan/knowledge_crystallizer/principle_extractor.py:1018` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/vulcan/curiosity_engine/curiosity_engine_core.py:1012` kind='except_exception', reachability='unknown', review='unreviewed'
-- ... 4378 more in JSON
+- ... 4380 more in JSON
 
 ## Mocks
 
@@ -649,9 +650,9 @@ Count: 317
 - `docker-compose.prod.yml:627` image: nginx:1.27-alpine
 
 ### docker
-- `Dockerfile:51` CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready',timeout=2)" || exit 1
-- `Dockerfile:52` ENTRYPOINT ["/app/entrypoint.sh"]
-- `Dockerfile:53` CMD ["sh", "-c", "python -m uvicorn vulcan.runtime.app:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"]
+- `Dockerfile:53` CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready',timeout=2)" || exit 1
+- `Dockerfile:54` ENTRYPOINT ["/app/entrypoint.sh"]
+- `Dockerfile:55` CMD ["sh", "-c", "python -m uvicorn vulcan.runtime.app:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"]
 - `docker/api/Dockerfile:135` CMD curl -fsS http://localhost:8000/health/live || exit 1
 - `docker/api/Dockerfile:137` ENTRYPOINT ["/app/entrypoint.sh"]
 - `docker/api/Dockerfile:140` CMD ["python", "-m", "uvicorn", "src.api_gateway:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

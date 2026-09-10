@@ -279,6 +279,7 @@ not gate readiness, and repeated rebuilds are byte-identical. A parent/child har
 proves named SQL, artifact, head, terminal, outbox, and commit crash boundaries under
 normal and optimized Python; an unreached failpoint is `NOT_EXECUTED`. This is M3
 source qualification, not installed-artifact M4 evidence. The A08 serving path now separates unpicklable process-local edge permits from receipt-chain-bound durable transition receipts. Principal kinds and compatibility grants are descriptive only on that path; process isolation remains mandatory for untrusted code. Stable external cryptographic signing is not claimed: receipts use an unsigned content digest plus the constitutional journal hash chain.
+A09 has a fail-closed immutable-subject runner and exact-wheel image recipe, but remains NOT_EXECUTED locally because the qualification environment has no container engine and denies registry access. Phase A therefore remains below M4; no Phase-B admission bundle or qualified image digest is claimed.
 
 ### 2.4 Offline self-improvement — M3 serving boundary / M2 operator evidence
 
