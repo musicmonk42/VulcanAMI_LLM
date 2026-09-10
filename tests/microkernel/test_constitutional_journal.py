@@ -148,8 +148,12 @@ def test_nested_hidden_commit_empty_commit_and_dangling_reference_fail(tmp_path)
         ):
             with pytest.raises(JournalError, match="cannot control"):
                 uow._execute(statement)
+        with pytest.raises(JournalError, match="unauthorized SQL"):
+            uow._execute("/* bypass */ COMMIT")
         with pytest.raises(JournalError, match="read-only"):
             uow.query("DELETE FROM actors")
+        with pytest.raises(JournalError, match="read-only"):
+            uow.query("WITH selected AS (SELECT 1) DELETE FROM actors")
         with pytest.raises(sqlite3.IntegrityError):
             uow._execute(
                 "INSERT INTO journal_commits VALUES (?,?)",
@@ -431,6 +435,21 @@ def test_database_rejects_symlink_path(tmp_path):
     link.symlink_to(target)
     with pytest.raises(ValueError, match="symlink"):
         ConstitutionalDatabase(link)
+
+
+def test_restart_rejects_receipt_chain_tampering(tmp_path):
+    db = ConstitutionalDatabase(tmp_path / "constitutional.sqlite3")
+    journal = ConstitutionalJournal()
+    with db.transaction() as uow:
+        actor = genesis(journal, uow)
+        uow.emit(event(actor))
+    db.close()
+    connection = sqlite3.connect(db.path)
+    connection.execute("UPDATE transactional_outbox SET receipt_digest=?", ("a" * 64,))
+    connection.commit()
+    connection.close()
+    with pytest.raises(JournalError, match="receipt chain"):
+        ConstitutionalDatabase(db.path)
 
 
 def test_journal_owner_is_not_production_composed_or_dual_written() -> None:

@@ -1,6 +1,6 @@
 # Generated architecture inventory
 
-Digest: `1278d0b99605f232d1faae74342689bd9a136ff2d43d8774512b62e073285540`
+Digest: `a76dad19d1c1d60e5221e394cf573773cf84b4bfa452c18198f94b02a30d94e9`
 
 This file is generated from `docs/generated/architecture-inventory.json`.
 
@@ -404,7 +404,7 @@ Count: 400
 
 ## Persistence
 
-Count: 481
+Count: 510
 
 - `src/vulcan/improvement/offline.py:101` kind='call', reachability='unknown', value='fcntl.flock'
 - `tests/persistence/test_memory_outbox_v2.py:103` kind='call', reachability='test-only', value='SQLiteMemoryRepository'
@@ -456,7 +456,7 @@ Count: 481
 - `src/vulcan/world_model/meta_reasoning/governed_transaction.py:244` kind='call', reachability='unknown', value='fcntl.flock'
 - `src/vulcan/safety/governance_alignment.py:248` kind='call', reachability='unknown', value='sqlite3.connect'
 - `tests/microkernel/test_lineage.py:256` kind='call', reachability='test-only', value='sqlite3.connect'
-- ... 431 more in JSON
+- ... 460 more in JSON
 
 ## Environment Readers
 

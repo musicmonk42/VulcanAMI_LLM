@@ -7,6 +7,7 @@ transaction owner and repository API without dual-writing existing authorities.
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import re
 import sqlite3
@@ -27,7 +28,7 @@ from vulcan.microkernel.state_machine import (
 
 SCHEMA_VERSION = "vulcan-constitutional-journal/1"
 EXPECTED_SCHEMA_FINGERPRINT = (
-    "9d18a2c748305017e03879a3f39724e281ef584ca8a549250a3a6952142776fd"
+    "ebebe671bcf4c4ffc81329a9c66f67c4e01929c175080d19adfa92ba6143ea2c"
 )
 _HEX = re.compile(r"^[0-9a-f]{64}$")
 _ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$")
@@ -38,6 +39,45 @@ _TRANSACTION_SQL = re.compile(
 _READ_SQL = re.compile(r"^\s*(?:SELECT|WITH)\b", re.IGNORECASE)
 _CREDENTIAL_FIELD = re.compile(
     r"(?:authorization|bearer|raw.?token|secret|signing.?key)", re.IGNORECASE
+)
+_LIFECYCLE_ACTIONS = frozenset(
+    action
+    for action in (
+        getattr(sqlite3, "SQLITE_TRANSACTION", None),
+        getattr(sqlite3, "SQLITE_SAVEPOINT", None),
+        getattr(sqlite3, "SQLITE_PRAGMA", None),
+        getattr(sqlite3, "SQLITE_ATTACH", None),
+        getattr(sqlite3, "SQLITE_DETACH", None),
+    )
+    if action is not None
+)
+_WRITE_ACTIONS = frozenset(
+    action
+    for name in (
+        "SQLITE_INSERT",
+        "SQLITE_UPDATE",
+        "SQLITE_DELETE",
+        "SQLITE_CREATE_INDEX",
+        "SQLITE_CREATE_TABLE",
+        "SQLITE_CREATE_TEMP_INDEX",
+        "SQLITE_CREATE_TEMP_TABLE",
+        "SQLITE_CREATE_TEMP_TRIGGER",
+        "SQLITE_CREATE_TEMP_VIEW",
+        "SQLITE_CREATE_TRIGGER",
+        "SQLITE_CREATE_VIEW",
+        "SQLITE_DROP_INDEX",
+        "SQLITE_DROP_TABLE",
+        "SQLITE_DROP_TEMP_INDEX",
+        "SQLITE_DROP_TEMP_TABLE",
+        "SQLITE_DROP_TEMP_TRIGGER",
+        "SQLITE_DROP_TEMP_VIEW",
+        "SQLITE_DROP_TRIGGER",
+        "SQLITE_DROP_VIEW",
+        "SQLITE_ALTER_TABLE",
+        "SQLITE_REINDEX",
+        "SQLITE_ANALYZE",
+    )
+    if (action := getattr(sqlite3, name, None)) is not None
 )
 
 
@@ -102,10 +142,137 @@ def schema_fingerprint(connection: sqlite3.Connection) -> str:
         "SELECT type,name,tbl_name,sql FROM sqlite_schema "
         "WHERE name NOT LIKE 'sqlite_%' ORDER BY type,name"
     ).fetchall()
-    normalized = [
-        [row[0], row[1], row[2], " ".join((row[3] or "").split())] for row in rows
+    digest = hashlib.sha256()
+    for row in rows:
+        for field in row:
+            raw = (field or "").encode("utf-8")
+            digest.update(len(raw).to_bytes(8, "big"))
+            digest.update(raw)
+    return digest.hexdigest()
+
+
+def _strict_json(text: str) -> object:
+    def pairs(items):
+        result = {}
+        for key, value in items:
+            if key in result:
+                raise JournalError("duplicate key in canonical journal JSON")
+            result[key] = value
+        return result
+
+    try:
+        value = json.loads(text, object_pairs_hook=pairs)
+    except (TypeError, json.JSONDecodeError) as exc:
+        raise JournalError("invalid journal JSON") from exc
+    try:
+        canonical = canonical_json(value).decode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise JournalError("invalid canonical journal JSON") from exc
+    if canonical != text:
+        raise JournalError("noncanonical journal JSON")
+    return value
+
+
+def verify_integrity(connection: sqlite3.Connection) -> None:
+    """Verify authoritative chains and derived heads before the owner is usable."""
+    if connection.execute("PRAGMA foreign_key_check").fetchone() is not None:
+        raise JournalError("constitutional journal has dangling references")
+    actors = connection.execute("SELECT actor_digest,document FROM actors").fetchall()
+    for actor_digest, document in actors:
+        if _digest(_strict_json(document)) != actor_digest:
+            raise JournalError("actor document digest mismatch")
+    artifacts = connection.execute(
+        "SELECT artifact_digest,content FROM artifacts"
+    ).fetchall()
+    for artifact_digest, content in artifacts:
+        if hashlib.sha256(bytes(content)).hexdigest() != artifact_digest:
+            raise JournalError("artifact content digest mismatch")
+    commits = [
+        int(row[0])
+        for row in connection.execute(
+            "SELECT commit_seq FROM journal_commits ORDER BY commit_seq"
+        )
     ]
-    return _digest(normalized)
+    if commits != list(range(1, len(commits) + 1)):
+        raise JournalError("commit sequence is not contiguous and monotonic")
+    next_value = connection.execute(
+        "SELECT next_value FROM journal_sequence WHERE singleton=1"
+    ).fetchone()
+    if next_value is None or int(next_value[0]) != len(commits) + 1:
+        raise JournalError("commit sequence allocator diverged")
+    rows = connection.execute(
+        "SELECT * FROM transactional_outbox ORDER BY commit_seq,event_ordinal"
+    ).fetchall()
+    previous = "0" * 64
+    by_commit: dict[int, int] = {}
+    for row in rows:
+        sequence = int(row["commit_seq"])
+        ordinal = int(row["event_ordinal"])
+        if ordinal != by_commit.get(sequence, 0):
+            raise JournalError("event ordinal chain is invalid")
+        by_commit[sequence] = ordinal + 1
+        payload = _strict_json(row["payload"])
+        _validate_nonsecret_payload(payload)
+        body = {
+            "actor_digest": row["actor_digest"],
+            "commit_seq": sequence,
+            "credential_provenance_digest": row["credential_provenance_digest"],
+            "event_ordinal": ordinal,
+            "event_type": row["event_type"],
+            "occurred_at": row["occurred_at"],
+            "payload": payload,
+            "previous_receipt_digest": previous,
+            "schema_version": SCHEMA_VERSION,
+        }
+        if row["previous_receipt_digest"] != previous or row[
+            "receipt_digest"
+        ] != _digest(body):
+            raise JournalError("transactional receipt chain is invalid")
+        previous = row["receipt_digest"]
+    if set(by_commit) != set(commits):
+        raise JournalError("every constitutional commit requires outbox evidence")
+    episodes = connection.execute(
+        "SELECT episode_id,state,head_transition_ordinal,actor_digest FROM episodes"
+    ).fetchall()
+    for episode_id, state, head_ordinal, actor_digest in episodes:
+        transitions = connection.execute(
+            "SELECT transition_ordinal,from_state,to_state,actor_digest "
+            "FROM episode_transitions WHERE episode_id=? ORDER BY transition_ordinal",
+            (episode_id,),
+        ).fetchall()
+        prior = EpisodeState.PERCEIVED
+        for expected_ordinal, row in enumerate(transitions):
+            ordinal, from_state, to_state, transition_actor = row
+            if (
+                int(ordinal) != expected_ordinal
+                or from_state != prior.value
+                or transition_actor != actor_digest
+            ):
+                raise JournalError("episode transition chain is invalid")
+            try:
+                target = EpisodeState(to_state)
+                ensure_transition(prior, target)
+            except (ValueError, EpisodeTransitionError) as exc:
+                raise JournalError("episode transition chain is invalid") from exc
+            prior = target
+        expected = (
+            (-1, EpisodeState.PERCEIVED.value)
+            if not transitions
+            else (int(transitions[-1][0]), transitions[-1][2])
+        )
+        if (int(head_ordinal), state) != expected:
+            raise JournalError("episode head diverged from transition chain")
+    branches = connection.execute(
+        "SELECT branch_id,head_episode_id FROM lineage_branches"
+    ).fetchall()
+    for branch_id, head_episode_id in branches:
+        active = connection.execute(
+            "SELECT episode_id FROM lineage_membership "
+            "WHERE branch_id=? AND status='active'",
+            (branch_id,),
+        ).fetchall()
+        if len(active) != 1 or active[0][0] != head_episode_id:
+            raise JournalError("lineage head diverged from active membership")
 
 
 @dataclass(frozen=True, slots=True)
@@ -171,7 +338,24 @@ class UnitOfWork:
         self._require_active()
         if not isinstance(sql, str) or _TRANSACTION_SQL.match(sql):
             raise JournalError("unit of work cannot control its transaction")
-        return self.__connection.execute(sql, parameters)
+        return self.__authorized_execute(sql, parameters, readonly=False)
+
+    def __authorized_execute(
+        self, sql: str, parameters: tuple[object, ...], *, readonly: bool
+    ) -> sqlite3.Cursor:
+        def authorize(action, arg1, arg2, database, trigger):
+            denied = _LIFECYCLE_ACTIONS | (_WRITE_ACTIONS if readonly else frozenset())
+            return sqlite3.SQLITE_DENY if action in denied else sqlite3.SQLITE_OK
+
+        self.__connection.set_authorizer(authorize)
+        try:
+            return self.__connection.execute(sql, parameters)
+        except sqlite3.DatabaseError as exc:
+            if "not authorized" in str(exc).lower():
+                raise JournalError("unit of work rejected unauthorized SQL") from exc
+            raise
+        finally:
+            self.__connection.set_authorizer(None)
 
     def query(
         self, sql: str, parameters: tuple[object, ...] = ()
@@ -180,7 +364,11 @@ class UnitOfWork:
         self._require_active()
         if not isinstance(sql, str) or _READ_SQL.match(sql) is None:
             raise JournalError("unit of work query must be read-only")
-        return tuple(self.__connection.execute(sql, parameters).fetchall())
+        try:
+            cursor = self.__authorized_execute(sql, parameters, readonly=True)
+        except JournalError as exc:
+            raise JournalError("unit of work query must be read-only") from exc
+        return tuple(cursor.fetchall())
 
     def emit(self, event: JournalEvent) -> str:
         self._require_active()
@@ -250,6 +438,7 @@ class ConstitutionalDatabase:
                 raise JournalError(
                     f"constitutional schema fingerprint mismatch: {actual}"
                 )
+            verify_integrity(connection)
         finally:
             connection.close()
 
@@ -490,21 +679,35 @@ class ConstitutionalDatabase:
         finally:
             connection.close()
 
+    def verify(self) -> None:
+        with self.__lock:
+            if self.__closed:
+                raise JournalClosedError("constitutional database is closed")
+            if self.__active:
+                raise JournalError("cannot verify during an active unit of work")
+        connection = self.__connect()
+        try:
+            verify_integrity(connection)
+        finally:
+            connection.close()
+
 
 class _TransactionContext:
+    __slots__ = ("__database", "__connection", "__uow")
+
     def __init__(self, database: ConstitutionalDatabase):
-        self.database = database
-        self.connection: sqlite3.Connection | None = None
-        self.uow: UnitOfWork | None = None
+        self.__database = database
+        self.__connection: sqlite3.Connection | None = None
+        self.__uow: UnitOfWork | None = None
 
     def __enter__(self) -> UnitOfWork:
-        self.connection, self.uow = self.database._enter()
-        return self.uow
+        self.__connection, self.__uow = self.__database._enter()
+        return self.__uow
 
     def __exit__(self, exc_type, exc, traceback) -> None:
-        if self.connection is None or self.uow is None:
+        if self.__connection is None or self.__uow is None:
             raise JournalError("unit of work was not entered")
-        self.database._exit(self.connection, self.uow, exc_type is None)
+        self.__database._exit(self.__connection, self.__uow, exc_type is None)
 
 
 class ConstitutionalJournal:
