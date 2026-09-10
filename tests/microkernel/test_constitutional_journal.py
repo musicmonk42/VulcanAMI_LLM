@@ -492,6 +492,9 @@ def test_journal_owner_is_production_composed_without_legacy_dual_write() -> Non
         "vulcan.microkernel.journal_stores",
         "vulcan.microkernel.journal_transactions",
     } <= modules
+    assert "vulcan.persistence.journal_audit" in modules
+    assert "vulcan.persistence.audit.store" not in modules
+    assert "vulcan.runtime.audit" not in modules
     composition = Path("src/vulcan/runtime/phase_a_composition.py").read_text(
         encoding="utf-8"
     )

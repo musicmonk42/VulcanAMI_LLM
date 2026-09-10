@@ -337,7 +337,7 @@ async def test_reduced_graph_executes_arithmetic_without_forbidden_packages(
 def test_reduced_composition_closes_durable_owners_after_startup_failure(
     tmp_path, monkeypatch
 ) -> None:
-    from vulcan.persistence.audit import CanonicalAudit
+    from vulcan.microkernel.constitutional_journal import ConstitutionalDatabase
     from vulcan.runtime import phase_a_composition
 
     root = tmp_path / "failed-start"
@@ -367,5 +367,7 @@ def test_reduced_composition_closes_durable_owners_after_startup_failure(
     with pytest.raises(RuntimeError, match="capability failure"):
         phase_a_composition.compose_phase_a_runtime(settings)
 
-    reopened = CanonicalAudit(root / "audit" / "events.jsonl")
+    reopened = ConstitutionalDatabase(
+        root / "constitutional" / "constitutional.sqlite3"
+    )
     reopened.close()

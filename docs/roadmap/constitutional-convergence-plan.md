@@ -240,7 +240,7 @@ initializer, preventing package-level side effects from bypassing the graph.
 
 The Phase-A application façade is **M2 — Tested locally**: its immutable envelopes expose only command/query dispatch, the ASGI surface is reduced to six routes with documentation disabled, and the reduced composition admits only deterministic arithmetic plus constitutional episode, epistemic, lineage, capability, safety, and audit owners. Exact wheel/image restart qualification remains required for M4.
 
-The minimal Phase-A wheel is **M2 — reproducibly built and locally verified**: a reviewed positive inclusion manifest admits the 63-module serving closure and ten content-bound release inputs; two clean builds produce identical wheel bytes; full RECORD, member digest, excluded-import, undeclared-import, mutation, and outside-checkout controls pass. Installed lifespan qualification remains below M4 until the locked runtime dependencies are available in the qualification environment.
+The minimal Phase-A wheel is **M2 — reproducibly built and locally verified**: a reviewed positive inclusion manifest admits the 58-module serving closure and ten content-bound release inputs; two clean builds produce identical wheel bytes; full RECORD, member digest, excluded-import, undeclared-import, mutation, and outside-checkout controls pass. Installed lifespan qualification remains below M4 until the locked runtime dependencies are available in the qualification environment.
 
 Authenticated actor binding is **M3 — canonical for the Phase-A request path**:
 the versioned `vulcan.actor-binding/1` identity binds only tenant, issuer, and
@@ -270,8 +270,15 @@ Admission, epistemic commitment, and terminal publication/lineage completion use
 the three indivisible boundaries required by A06. The legacy store implementations
 remain compatibility-only for non-Phase-A callers and are removed when those callers
 migrate; they are neither opened nor dual-written by the canonical serving graph.
-Offline legacy migration and kill/reopen qualification remain A07 work, so this is
-not installed-artifact M4 evidence.
+The A07 offline migrator validates and exclusively locks legacy episode, epistemic,
+and lineage sources, stops with a reconciliation report on disagreement, imports
+deterministically through caller-owned journal transactions, verifies and fsyncs a
+temporary database, atomically installs it, and preserves sources read-only. Audit
+is now an idempotent journal-receipt projector: JSONL deletion/delivery failure does
+not gate readiness, and repeated rebuilds are byte-identical. A parent/child harness
+proves named SQL, artifact, head, terminal, outbox, and commit crash boundaries under
+normal and optimized Python; an unreached failpoint is `NOT_EXECUTED`. This is M3
+source qualification, not installed-artifact M4 evidence.
 
 ### 2.4 Offline self-improvement — M3 serving boundary / M2 operator evidence
 

@@ -23,5 +23,7 @@
     "memory",
     "reafference"
   ],
-  "production_wiring": "phase-a-canonical-single-write"
+  "production_wiring": "phase-a-canonical-single-write",
+  "audit_projection": "disposable-jsonl-from-ordered-receipt-chain",
+  "legacy_migration": "offline-exclusive-temporary-verify-fsync-atomic-install"
 }

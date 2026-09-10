@@ -21,9 +21,9 @@ from vulcan.microkernel.journal_transactions import (
     JournalConstitutionalTransactionService,
 )
 from vulcan.microkernel.snapshots import MAX_EPISODE_LIFETIME, construct_snapshot_bundle
+from vulcan.persistence.journal_audit import JournalAuditProjector
 from vulcan.safety.response_adapter import EnhancedSafetyResponseAdapter
 
-from .audit import CanonicalAudit
 from .capabilities import (
     CapabilityManifestAuthority,
     LiveOwnerFact,
@@ -48,7 +48,7 @@ from .state_authorities import (
 class PhaseARuntime:
     runtime_id: str
     kernel: ConstitutionalCognitiveKernel
-    audit: CanonicalAudit
+    audit: JournalAuditProjector
     capability_authority: CapabilityManifestAuthority
     episode_store: JournalEpisodeStore
     epistemic_store: JournalEpistemicStore
@@ -76,20 +76,22 @@ class PhaseARuntime:
         if self.closed:
             return
         self.closed = True
-        self.constitutional_database.close()
         self.audit.close()
+        self.constitutional_database.close()
 
 
 def compose_phase_a_runtime(settings: RuntimeSettings) -> PhaseARuntime:
     reject_forbidden_settings(settings)
     with ExitStack() as cleanup:
         root = Path(settings.durable_root)
-        audit = CanonicalAudit(root / "audit" / "events.jsonl")
-        cleanup.callback(audit.close)
         constitutional_database = ConstitutionalDatabase(
             root / "constitutional" / "constitutional.sqlite3"
         )
         cleanup.callback(constitutional_database.close)
+        audit = JournalAuditProjector(
+            constitutional_database, root / "audit" / "events.jsonl"
+        )
+        cleanup.callback(audit.close)
         episode_store = JournalEpisodeStore(constitutional_database)
         epistemic_store = JournalEpistemicStore(constitutional_database)
         lineage_store = JournalLineageStore(constitutional_database)

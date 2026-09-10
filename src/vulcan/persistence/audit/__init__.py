@@ -1,4 +1,5 @@
 """Canonical segmented audit public package."""
+
 from .contracts import AuditDurabilityProfile, AuditError, AuditEvent, Failpoint
 from .store import CanonicalAudit
 

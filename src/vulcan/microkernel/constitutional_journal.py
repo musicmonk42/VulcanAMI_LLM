@@ -1,7 +1,7 @@
 """Caller-owned constitutional SQLite unit of work.
 
-This module is intentionally not composed into Phase A yet.  It defines the A05
-transaction owner and repository API without dual-writing existing authorities.
+This module owns the Phase-A constitutional database. Lower repositories receive
+its unit of work and cannot open, commit, or close hidden transactions.
 """
 
 from __future__ import annotations

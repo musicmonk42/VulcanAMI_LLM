@@ -131,7 +131,7 @@
       "loc": 1161,
       "module": "vulcan.microkernel.constitutional_journal",
       "path": "src/vulcan/microkernel/constitutional_journal.py",
-      "sha256": "5e7ce6c05486e590aedaae9279add549b7476637ad3b17c2c0104cff44953335"
+      "sha256": "e378f25b1cf9aa39cd5bd7d9671843e5995f6b9b345b5ea658a6991e78c4d2c3"
     },
     {
       "loc": 1128,
@@ -212,40 +212,16 @@
       "sha256": "02bad1e869322e6b55258838dfd7e40c143b6db3940bb6e359390e6f0e4f8bce"
     },
     {
-      "loc": 11,
-      "module": "vulcan.persistence.audit",
-      "path": "src/vulcan/persistence/audit/__init__.py",
-      "sha256": "fdbca0e5369c08ec4e6c1eb3d6cbcd3c20f02acdc329d38406baefb189860bf5"
+      "loc": 34,
+      "module": "vulcan.persistence.audit_contracts",
+      "path": "src/vulcan/persistence/audit_contracts.py",
+      "sha256": "e96b6320bace68a5ff3ad6873b07527fa10d905493bcf911b348bfd70904f5b3"
     },
     {
-      "loc": 33,
-      "module": "vulcan.persistence.audit.contracts",
-      "path": "src/vulcan/persistence/audit/contracts.py",
-      "sha256": "e084471704a1a63b7bfa95852df2fa32001c3ef4ff2dfaec9af92655e506b9fd"
-    },
-    {
-      "loc": 148,
-      "module": "vulcan.persistence.audit.events",
-      "path": "src/vulcan/persistence/audit/events.py",
-      "sha256": "5b28cdf2220d8c7afefbcd12dc3171f8abb4f03b46de3d3e6e8bd31f03b4894f"
-    },
-    {
-      "loc": 63,
-      "module": "vulcan.persistence.audit.index",
-      "path": "src/vulcan/persistence/audit/index.py",
-      "sha256": "7b230e53b9bb625486a246c2e61c0bf39e5fc661cb2be2651af3c56b6129f58f"
-    },
-    {
-      "loc": 33,
-      "module": "vulcan.persistence.audit.reconcile",
-      "path": "src/vulcan/persistence/audit/reconcile.py",
-      "sha256": "e58c9454c9c9ae51ef0640020a2f007795b424a0d37c516428e36b394a6f6264"
-    },
-    {
-      "loc": 401,
-      "module": "vulcan.persistence.audit.store",
-      "path": "src/vulcan/persistence/audit/store.py",
-      "sha256": "1a1b4427e4d0cae01250338d3900848851202bbdb91a92ccdca9088073312d6d"
+      "loc": 115,
+      "module": "vulcan.persistence.journal_audit",
+      "path": "src/vulcan/persistence/journal_audit.py",
+      "sha256": "2d4be0348b27773f4e68970c57307f2f692483543ea8e9fd973edf9fd2b40198"
     },
     {
       "loc": 8,
@@ -270,12 +246,6 @@
       "module": "vulcan.runtime.app",
       "path": "src/vulcan/runtime/app.py",
       "sha256": "7a6a962a06b1c63e77291ae43c5fed94f9491c738509d7dee788f4402fcdce02"
-    },
-    {
-      "loc": 22,
-      "module": "vulcan.runtime.audit",
-      "path": "src/vulcan/runtime/audit.py",
-      "sha256": "8dcd59b92b3287fbeb19342b5e413486fc8d39721f34d2ab00a3941b4dd52486"
     },
     {
       "loc": 385,
@@ -332,10 +302,10 @@
       "sha256": "fe9b4328bb281bc84ce8e302cf2afea32e3fd1ba0b8959555f5cfde1004428bd"
     },
     {
-      "loc": 196,
+      "loc": 198,
       "module": "vulcan.runtime.phase_a_composition",
       "path": "src/vulcan/runtime/phase_a_composition.py",
-      "sha256": "ad53f95f0f0a7676f6622b262e5bb217125a926ba22015b407cf791b15114010"
+      "sha256": "c848f098b9d59b7c5bdfbffce2b9e1da8e7ed6fe277fa160727c142feea5d6ad"
     },
     {
       "loc": 23,
@@ -380,7 +350,7 @@
       "sha256": "0acc6f0572bce53b836bbce1640f741d9f517c3e8a250ce500ecac654c7e0e94"
     }
   ],
-  "manifest_digest": "3114b3e7889b63744830689d52f00d5f15cf9355d670fc71d14fb70b89cda208",
+  "manifest_digest": "e9ad26cb5a99591b635961c29afe01538f6f419cc24f387fc6c98bc27aa26b37",
   "resources": [
     {
       "path": "config/actor-binding-schema.json",
@@ -394,7 +364,7 @@
     },
     {
       "path": "config/constitutional-journal-schema.json",
-      "sha256": "ff38e8e7c208073eb634e7350e3b9cf36d49d5ddab59dfa605a77b6d5094157c",
+      "sha256": "f4c34df35e65396ca363f25581f49d6c9f5a0bcf4c76f638be74c4f7069f3448",
       "wheel_path": "vulcan/_release_evidence/config/constitutional-journal-schema.json"
     },
     {

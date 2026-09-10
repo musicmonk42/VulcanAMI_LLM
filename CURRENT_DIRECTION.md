@@ -30,8 +30,11 @@ The Phase-A canonical path now commits episode, epistemic, lineage, terminal,
 and outbox facts to one constitutional journal through caller-owned units of
 work. Legacy EpisodeStore/EpistemicStore/LineageStore implementations remain
 compatibility-only and are not opened or dual-written by Phase-A composition.
-`CanonicalAudit` remains a disposable projection boundary; deterministic
-journal-outbox rebuilding and migration qualification are the next ordered work.
+Audit reads now use a deterministic, disposable projection of the journal receipt
+chain; deleting or failing to deliver JSONL cannot affect readiness or cognition.
+The offline exclusive migrator preserves validated legacy sources as read-only
+rollback evidence and imports their records with `LEGACY_UNVERIFIED` attribution.
+Live transition-permit separation is the next ordered work.
 
 Persistent causal lineage is now M3 on the composed request path: episode
 genesis binds the current branch head and terminal episodes enter that branch's

@@ -12,7 +12,7 @@ research, and transformer providers are not composed.
 
 ## Threshold disposition
 
-The reviewed wheel manifest currently contains 63 Python files and 17,715
+The reviewed wheel manifest currently contains 58 Python files and 17,155
 non-test lines of code, exceeding both the 45-file and 15,000-LOC review
 thresholds. This is accepted as a review exception, not as proof
 of safety, because the constitutional arithmetic transaction still requires the
@@ -25,7 +25,7 @@ No file-count result is treated as a security oracle.
 
 Behavioral gates independently require an exact six-route table, disabled
 OpenAPI/docs endpoints, immutable authenticated envelopes, deterministic
-arithmetic, restart-safe audit retrieval, and absence of forbidden subsystem
+arithmetic, journal-derived restart-safe audit retrieval, and absence of forbidden subsystem
 modules after startup and a request.
 
 ## Compatibility removal conditions
@@ -34,3 +34,9 @@ modules after startup and a request.
 compatibility projections. They are removed when the microkernel consumes the
 request envelope and response projection directly and all audit callers import
 the persistence-owned interface.
+
+The Phase-A audit owner is `JournalAuditProjector`. Its JSONL is disposable and
+never participates in readiness; journal schema, foreign keys, digests, successor
+chains, receipt order, heads, and recoverable outbox rows are the readiness facts.
+`CanonicalAudit` remains only for legacy callers until A07 migration consumers are
+retired.
