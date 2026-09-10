@@ -1,6 +1,6 @@
 # Generated architecture inventory
 
-Digest: `b4e816d5c5f340911f7f3c5d25a8f1a1e389956e6ee2db62b8f06e3b01d5fd5e`
+Digest: `7046497a813a7c246047c43517c6b88d25efb3a42ad4dcb4fcc1d90e31767e4f`
 
 This file is generated from `docs/generated/architecture-inventory.json`.
 
@@ -47,7 +47,7 @@ This file is generated from `docs/generated/architecture-inventory.json`.
 
 ## Entrypoints
 
-Count: 407
+Count: 410
 
 - `src/vulcan/tests/test_multimodal_reasoning.py:999` kind='python_main_guard', reachability='test-only'
 - `src/vulcan/tests/test_curiosity_engine_integration.py:1000` kind='python_main_guard', reachability='test-only'
@@ -62,7 +62,6 @@ Count: 407
 - `src/governance_loop.py:938` kind='python_main_guard', reachability='unknown'
 - `src/generate_transparency_report.py:1023` kind='python_main_guard', reachability='unknown'
 - `src/vulcan/tests/test_extracted_modules.py:1035` kind='python_main_guard', reachability='test-only'
-- `scripts/ci/verify_dependency_inputs.py:103` kind='python_main_guard', reachability='research-only'
 - `src/vulcan/tests/test_symbolic_core.py:1040` kind='python_main_guard', reachability='test-only'
 - `src/vulcan/tests/test_knowledge_crystallizer_core.py:1045` kind='python_main_guard', reachability='test-only'
 - `src/run_validation_test.py:999` kind='python_main_guard', reachability='unknown'
@@ -95,11 +94,12 @@ Count: 407
 - `src/audit_log.py:1074` kind='python_main_guard', reachability='unknown'
 - `tests/test_ontology_validation.py:1132` kind='python_main_guard', reachability='test-only'
 - `tests/test_demo_graphix.py:1145` kind='python_main_guard', reachability='test-only'
+- `scripts/ci/verify_dependency_inputs.py:114` kind='python_main_guard', reachability='research-only'
 - `src/vulcan/tests/test_contraindication_tracker.py:1157` kind='python_main_guard', reachability='test-only'
 - `src/vulcan/tests/test_exploration_budget.py:1158` kind='python_main_guard', reachability='test-only'
 - `src/vulcan/tests/test_principle_learner.py:1163` kind='python_main_guard', reachability='test-only'
 - `src/vulcan/tests/test_dynamics_model.py:1169` kind='python_main_guard', reachability='test-only'
-- ... 357 more in JSON
+- ... 360 more in JSON
 
 ## Routes
 
@@ -197,7 +197,6 @@ Count: 1921
 - `src/vulcan/api_gateway.py:101` module='src.vulcan.learning', reachability='unknown'
 - `src/vulcan/endpoints/planning.py:101` module='vulcan.reasoning.singletons', reachability='unknown'
 - `tests/test_conclusion_loss_fixes.py:101` module='vulcan.reasoning.unified.strategies', reachability='test-only'
-- `src/vulcan/runtime/capabilities.py:98` module='vulcan.runtime.route_manifest', reachability='production-reachable'
 - `src/vulcan/tests/test_vulcan_cost_model.py:1010` module='vulcan.reasoning.selection.cost_model', reachability='test-only'
 - `src/vulcan/learning/__init__.py:1012` module='vulcan.reasoning.selection.semantic_tool_matcher', reachability='unknown'
 - `src/vulcan/tests/test_extracted_modules.py:1014` module='vulcan.utils_main.timing', reachability='test-only'
@@ -211,6 +210,7 @@ Count: 1921
 - `src/vulcan/orchestrator/platform_status.py:99` module='vulcan.arena', reachability='unknown'
 - `src/vulcan/world_model/world_model_core.py:1020` module='vulcan.world_model.creative_handler', reachability='unknown'
 - `src/api_server.py:103` module='vulcan.reasoning.unified', reachability='unknown'
+- `src/vulcan/world_model/world_model_core.py:1037` module='vulcan.world_model.llm_guidance', reachability='unknown'
 - ... 1871 more in JSON
 
 ## Singletons
@@ -647,9 +647,9 @@ Count: 313
 - `docker-compose.prod.yml:627` image: nginx:1.27-alpine
 
 ### docker
-- `Dockerfile:53` CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready',timeout=2)" || exit 1
-- `Dockerfile:54` ENTRYPOINT ["/app/entrypoint.sh"]
-- `Dockerfile:55` CMD ["sh", "-c", "python -m uvicorn vulcan.runtime.app:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"]
+- `Dockerfile:51` CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready',timeout=2)" || exit 1
+- `Dockerfile:52` ENTRYPOINT ["/app/entrypoint.sh"]
+- `Dockerfile:53` CMD ["sh", "-c", "python -m uvicorn vulcan.runtime.app:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"]
 - `docker/api/Dockerfile:135` CMD curl -fsS http://localhost:8000/health/live || exit 1
 - `docker/api/Dockerfile:137` ENTRYPOINT ["/app/entrypoint.sh"]
 - `docker/api/Dockerfile:140` CMD ["python", "-m", "uvicorn", "src.api_gateway:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

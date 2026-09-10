@@ -27,8 +27,8 @@
       ],
       "evaluation_artifact": {
         "evidence_type": "test_result",
-        "artifact_uri": "file://tests/security/test_language_contracts.py",
-        "artifact_sha256": "db6ccdb32d6372cd79486909aa17bcd097198adc3f39ae8246794f8f35bad018",
+        "artifact_uri": "file://evidence/qualification/language-contracts.json",
+        "artifact_sha256": "f412d01af475d28da680993d6f5a48eeea05a86939991ac7f4050ded17c0b49e",
         "schema": "ami-assurance-evidence/v1"
       },
       "safety_artifacts": [
@@ -70,8 +70,8 @@
       "port_reachability": [],
       "evaluation_artifact": {
         "evidence_type": "test_result",
-        "artifact_uri": "file://tests/security/test_language_contracts.py",
-        "artifact_sha256": "db6ccdb32d6372cd79486909aa17bcd097198adc3f39ae8246794f8f35bad018",
+        "artifact_uri": "file://evidence/qualification/language-contracts.json",
+        "artifact_sha256": "f412d01af475d28da680993d6f5a48eeea05a86939991ac7f4050ded17c0b49e",
         "schema": "ami-assurance-evidence/v1"
       },
       "safety_artifacts": [

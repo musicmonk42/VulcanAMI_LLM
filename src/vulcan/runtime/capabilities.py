@@ -18,6 +18,7 @@ from vulcan.constitution.primitives import Digest, canonical_json
 from vulcan.microkernel.snapshots import SnapshotRef
 
 _SOURCE_ROOT = Path(__file__).resolve().parents[3]
+_PACKAGED_EVIDENCE_ROOT = Path(__file__).resolve().parents[1] / "_release_evidence"
 
 
 def release_evidence_root() -> Path:
@@ -28,6 +29,8 @@ def release_evidence_root() -> Path:
         if not root.is_absolute() or root.is_symlink():
             raise ValueError("invalid release evidence root")
         return root.resolve(strict=True)
+    if _PACKAGED_EVIDENCE_ROOT.is_dir():
+        return _PACKAGED_EVIDENCE_ROOT
     return _SOURCE_ROOT
 
 

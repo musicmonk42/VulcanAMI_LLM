@@ -15,6 +15,7 @@ CHECKS: dict[str, tuple[tuple[str, ...], ...]] = {
     "workflow": (
         (PYTHON, "scripts/architecture_inventory.py", "--check"),
         (PYTHON, "scripts/ci/check_production_imports.py"),
+        (PYTHON, "scripts/ci/generate_wheel_manifest.py", "--check"),
         (PYTHON, "scripts/ci/workflow_lint.py"),
         (PYTHON, "scripts/ci/verify_dependency_inputs.py"),
     ),

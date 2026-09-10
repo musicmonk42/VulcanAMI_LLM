@@ -11,8 +11,9 @@ research, and transformer providers are not composed.
 
 ## Threshold disposition
 
-The transitive production import checker currently reports more than the
-45-file review threshold. This is accepted as a review exception, not as proof
+The reviewed wheel manifest currently contains 60 Python files and 15,389
+non-test lines of code, exceeding both the 45-file and 15,000-LOC review
+thresholds. This is accepted as a review exception, not as proof
 of safety, because the constitutional arithmetic transaction still requires the
 typed Graphix compiler, immutable episode and snapshot contracts, publication
 finalization, capability evidence verification, and four durable projections.

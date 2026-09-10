@@ -240,6 +240,8 @@ initializer, preventing package-level side effects from bypassing the graph.
 
 The Phase-A application façade is **M2 — Tested locally**: its immutable envelopes expose only command/query dispatch, the ASGI surface is reduced to six routes with documentation disabled, and the reduced composition admits only deterministic arithmetic plus constitutional episode, epistemic, lineage, capability, safety, and audit owners. Exact wheel/image restart qualification remains required for M4.
 
+The minimal Phase-A wheel is **M2 — reproducibly built and locally verified**: a reviewed positive inclusion manifest admits the 60-module serving closure and seven content-bound release inputs; two clean builds produce identical wheel bytes; full RECORD, member digest, excluded-import, undeclared-import, mutation, and outside-checkout controls pass. Installed lifespan qualification remains below M4 until the locked runtime dependencies are available in the qualification environment.
+
 ### 2.4 Offline self-improvement — M3 serving boundary / M2 operator evidence
 
 Keep proposal generation and governed review, but move source installation out of the serving process. Use one approval issuer/verifier/store contract.

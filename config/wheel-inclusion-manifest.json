@@ -1,0 +1,404 @@
+{
+  "entrypoint": "vulcan.runtime.app",
+  "files": [
+    {
+      "loc": 59,
+      "module": "vulcan",
+      "path": "src/vulcan/__init__.py",
+      "sha256": "50167157574da85cf20d62f298f5c7bf63508a08081ce58c48958e5893a9a6e1"
+    },
+    {
+      "loc": 5,
+      "module": "vulcan.assurance",
+      "path": "src/vulcan/assurance/__init__.py",
+      "sha256": "9b3549af1bb4435c81a63dadb73d2754a85d93ac2b30c5ecc0e1b87bfe69b2cc"
+    },
+    {
+      "loc": 206,
+      "module": "vulcan.assurance.capabilities",
+      "path": "src/vulcan/assurance/capabilities.py",
+      "sha256": "5a41fb61324f1a30aa4c22d05e7e3083092428835d7ea08da60dee8ce32e6cf6"
+    },
+    {
+      "loc": 143,
+      "module": "vulcan.assurance.evidence",
+      "path": "src/vulcan/assurance/evidence.py",
+      "sha256": "d680d942b8403cc6ff4f931d0279a799166bede00501d9e62c377f32b6b686e6"
+    },
+    {
+      "loc": 35,
+      "module": "vulcan.constitution",
+      "path": "src/vulcan/constitution/__init__.py",
+      "sha256": "7ef69886bbea0ff9163e448227e67998a872cf54dd6cc248d8b08562ab3cb20b"
+    },
+    {
+      "loc": 209,
+      "module": "vulcan.constitution.primitives",
+      "path": "src/vulcan/constitution/primitives.py",
+      "sha256": "275d0630862dd14236a5d848e5c64dd2e9cea5fb78bdb423e114f06c4af88a91"
+    },
+    {
+      "loc": 2,
+      "module": "vulcan.graphix",
+      "path": "src/vulcan/graphix/__init__.py",
+      "sha256": "3ef6c5b1eb5f643da47c174fb0bf2e494028573691d2374cac2f7127a16e0209"
+    },
+    {
+      "loc": 132,
+      "module": "vulcan.graphix.codec",
+      "path": "src/vulcan/graphix/codec.py",
+      "sha256": "417f32ee04b289d00a3e1ac790cff46c07d90d00ff359e02015e335fe440e8fb"
+    },
+    {
+      "loc": 2,
+      "module": "vulcan.graphix.compilers",
+      "path": "src/vulcan/graphix/compilers/__init__.py",
+      "sha256": "7d3d10f98853f139f431ae8444e892983bae1d46ea2fc06402b7dedee51f8a61"
+    },
+    {
+      "loc": 119,
+      "module": "vulcan.graphix.compilers.pipeline",
+      "path": "src/vulcan/graphix/compilers/pipeline.py",
+      "sha256": "327c98c63d1392724111e58ac0e0bee5ac194aa3b124baf33c2638d770808d3d"
+    },
+    {
+      "loc": 151,
+      "module": "vulcan.graphix.core",
+      "path": "src/vulcan/graphix/core.py",
+      "sha256": "7f51fd26424d23b9b1a720f5d6b21dac9891e0c8fbc8448d8e6b874eeddf1ee5"
+    },
+    {
+      "loc": 19,
+      "module": "vulcan.graphix.dialects",
+      "path": "src/vulcan/graphix/dialects.py",
+      "sha256": "98b710356913e758c25dc866fa8ee69256b94d864cd54fe16c208eac0e5831f6"
+    },
+    {
+      "loc": 898,
+      "module": "vulcan.graphix.epistemic",
+      "path": "src/vulcan/graphix/epistemic.py",
+      "sha256": "13cb79cc37a6961ce5a58b9ef40a161e40f00602f486f99406f55912890f27b4"
+    },
+    {
+      "loc": 61,
+      "module": "vulcan.graphix.operations",
+      "path": "src/vulcan/graphix/operations.py",
+      "sha256": "ee99babf290daf0b8ca382c22cea35532794375c115c5ebe54f20267bb87fe16"
+    },
+    {
+      "loc": 1099,
+      "module": "vulcan.graphix.runtime",
+      "path": "src/vulcan/graphix/runtime.py",
+      "sha256": "8e03e11b4299989553b5d749ce1931cc473eb522967662637c7abe514e6b53aa"
+    },
+    {
+      "loc": 2,
+      "module": "vulcan.graphix.validation",
+      "path": "src/vulcan/graphix/validation/__init__.py",
+      "sha256": "3beb54916ba6a2135a790579e51b88a5623d34e9ee4e3cb7538bfe760131ad6c"
+    },
+    {
+      "loc": 100,
+      "module": "vulcan.graphix.validation.pipeline",
+      "path": "src/vulcan/graphix/validation/pipeline.py",
+      "sha256": "454545abc356081892811c385718dcfe2f34c19478b0f7e15cd068a9d77991e9"
+    },
+    {
+      "loc": 10,
+      "module": "vulcan.microkernel",
+      "path": "src/vulcan/microkernel/__init__.py",
+      "sha256": "9b6576ec5da0da5b48091f966e42635ef7da326c58c6e65eb0313630252dbe3c"
+    },
+    {
+      "loc": 116,
+      "module": "vulcan.microkernel.authority",
+      "path": "src/vulcan/microkernel/authority.py",
+      "sha256": "b560a72c09563d31b26841359350c30beae59d2c1f722821d15bf74a3310a1e5"
+    },
+    {
+      "loc": 906,
+      "module": "vulcan.microkernel.autobiography",
+      "path": "src/vulcan/microkernel/autobiography.py",
+      "sha256": "d057889cc7cbe5fb215d152720f64b180d413ed964fbee9eac8dc208b41ff9e1"
+    },
+    {
+      "loc": 67,
+      "module": "vulcan.microkernel.capability_tokens",
+      "path": "src/vulcan/microkernel/capability_tokens.py",
+      "sha256": "125d2c3ffe5ce78ee8d6fca20602fb961867ee894ad86e362b69997583032e18"
+    },
+    {
+      "loc": 1128,
+      "module": "vulcan.microkernel.effects",
+      "path": "src/vulcan/microkernel/effects.py",
+      "sha256": "a1f5ebef6eb0c2ce84001246d02bcd2da97aba17bc5e34969604fb7b22b16128"
+    },
+    {
+      "loc": 585,
+      "module": "vulcan.microkernel.episode",
+      "path": "src/vulcan/microkernel/episode.py",
+      "sha256": "f335d8a25ecfd3a07d2886c9ccf5fdbc146956cce91a87682cc649693a5faacf"
+    },
+    {
+      "loc": 619,
+      "module": "vulcan.microkernel.episode_store",
+      "path": "src/vulcan/microkernel/episode_store.py",
+      "sha256": "bff42afcae46a1be9a7083fadbc1ea56c6fd20358ce42298b61c5f5194b2bb7f"
+    },
+    {
+      "loc": 419,
+      "module": "vulcan.microkernel.epistemic_store",
+      "path": "src/vulcan/microkernel/epistemic_store.py",
+      "sha256": "75567fbee91e3582d27993102bf68fda3e4b7244741ec678692cbb5d50711d5e"
+    },
+    {
+      "loc": 670,
+      "module": "vulcan.microkernel.lineage",
+      "path": "src/vulcan/microkernel/lineage.py",
+      "sha256": "803e7b82f3afd3cc8026bf11f44c25e5a63dbae1a829d13a61f946fb9f33eb29"
+    },
+    {
+      "loc": 71,
+      "module": "vulcan.microkernel.principals",
+      "path": "src/vulcan/microkernel/principals.py",
+      "sha256": "d03e08339a8b497cd4d84996e6a7ceefcb9afac4c016a7f0c9a74a0d0aa9d2a4"
+    },
+    {
+      "loc": 900,
+      "module": "vulcan.microkernel.reafference",
+      "path": "src/vulcan/microkernel/reafference.py",
+      "sha256": "a0ab6c037d97fd0ee93cccabb0b78f949b28dd04730c94307da86a71c4f25cbc"
+    },
+    {
+      "loc": 176,
+      "module": "vulcan.microkernel.snapshots",
+      "path": "src/vulcan/microkernel/snapshots.py",
+      "sha256": "93b93392a0319a4db8e6f04db60bd16ade264d9404784ffa611b19bf463b250f"
+    },
+    {
+      "loc": 128,
+      "module": "vulcan.microkernel.state_machine",
+      "path": "src/vulcan/microkernel/state_machine.py",
+      "sha256": "430a6cbf571c8388485564aa595e7f6658b0a45b55f8bd9b0da9b62f9947b442"
+    },
+    {
+      "loc": 573,
+      "module": "vulcan.microkernel.transactions",
+      "path": "src/vulcan/microkernel/transactions.py",
+      "sha256": "9e8b94104899565236c3f037e04e776a9fd1240df5de5a33c3110069f880feff"
+    },
+    {
+      "loc": 1,
+      "module": "vulcan.persistence",
+      "path": "src/vulcan/persistence/__init__.py",
+      "sha256": "02bad1e869322e6b55258838dfd7e40c143b6db3940bb6e359390e6f0e4f8bce"
+    },
+    {
+      "loc": 11,
+      "module": "vulcan.persistence.audit",
+      "path": "src/vulcan/persistence/audit/__init__.py",
+      "sha256": "fdbca0e5369c08ec4e6c1eb3d6cbcd3c20f02acdc329d38406baefb189860bf5"
+    },
+    {
+      "loc": 33,
+      "module": "vulcan.persistence.audit.contracts",
+      "path": "src/vulcan/persistence/audit/contracts.py",
+      "sha256": "e084471704a1a63b7bfa95852df2fa32001c3ef4ff2dfaec9af92655e506b9fd"
+    },
+    {
+      "loc": 148,
+      "module": "vulcan.persistence.audit.events",
+      "path": "src/vulcan/persistence/audit/events.py",
+      "sha256": "5b28cdf2220d8c7afefbcd12dc3171f8abb4f03b46de3d3e6e8bd31f03b4894f"
+    },
+    {
+      "loc": 63,
+      "module": "vulcan.persistence.audit.index",
+      "path": "src/vulcan/persistence/audit/index.py",
+      "sha256": "7b230e53b9bb625486a246c2e61c0bf39e5fc661cb2be2651af3c56b6129f58f"
+    },
+    {
+      "loc": 33,
+      "module": "vulcan.persistence.audit.reconcile",
+      "path": "src/vulcan/persistence/audit/reconcile.py",
+      "sha256": "e58c9454c9c9ae51ef0640020a2f007795b424a0d37c516428e36b394a6f6264"
+    },
+    {
+      "loc": 401,
+      "module": "vulcan.persistence.audit.store",
+      "path": "src/vulcan/persistence/audit/store.py",
+      "sha256": "1a1b4427e4d0cae01250338d3900848851202bbdb91a92ccdca9088073312d6d"
+    },
+    {
+      "loc": 8,
+      "module": "vulcan.runtime",
+      "path": "src/vulcan/runtime/__init__.py",
+      "sha256": "275b7c08568993cb166ffaa8b7219cc6933cdc3c002382d2840f2f969332f91d"
+    },
+    {
+      "loc": 305,
+      "module": "vulcan.runtime.api",
+      "path": "src/vulcan/runtime/api.py",
+      "sha256": "65044ceed719ea120b304c1308b639a0ef4859298cf681e2c3ff5834ae1ec242"
+    },
+    {
+      "loc": 35,
+      "module": "vulcan.runtime.api_models",
+      "path": "src/vulcan/runtime/api_models.py",
+      "sha256": "6fe9ef9c3a9691d5a9c6f7f7314e8dd3758705cc176f383e788fa1d12856262a"
+    },
+    {
+      "loc": 236,
+      "module": "vulcan.runtime.app",
+      "path": "src/vulcan/runtime/app.py",
+      "sha256": "d5eb76beddfc1c0d9bd1f4b787c549bcbcd7eaaef1f24e7f109cd814d01c64dd"
+    },
+    {
+      "loc": 22,
+      "module": "vulcan.runtime.audit",
+      "path": "src/vulcan/runtime/audit.py",
+      "sha256": "8dcd59b92b3287fbeb19342b5e413486fc8d39721f34d2ab00a3941b4dd52486"
+    },
+    {
+      "loc": 117,
+      "module": "vulcan.runtime.auth",
+      "path": "src/vulcan/runtime/auth.py",
+      "sha256": "15f1810b04c6d8398c0f608bc94e4a068d307e2b5691c8d69d4c1aaec67b47aa"
+    },
+    {
+      "loc": 305,
+      "module": "vulcan.runtime.capabilities",
+      "path": "src/vulcan/runtime/capabilities.py",
+      "sha256": "17d3938623b144cca0c491f61ccbff304d552da89fa90fefed32c5cd50070515"
+    },
+    {
+      "loc": 348,
+      "module": "vulcan.runtime.case",
+      "path": "src/vulcan/runtime/case.py",
+      "sha256": "ce649f8542dc17cb4d06af67ad0996b5aaf11f81f8b303157811a99699fc3521"
+    },
+    {
+      "loc": 291,
+      "module": "vulcan.runtime.constitutional_kernel",
+      "path": "src/vulcan/runtime/constitutional_kernel.py",
+      "sha256": "0d2c36e42d21e5c4695b25187d95466fb0910572aca4dbf0646bda6ca10d5fd1"
+    },
+    {
+      "loc": 193,
+      "module": "vulcan.runtime.epistemic_adapter",
+      "path": "src/vulcan/runtime/epistemic_adapter.py",
+      "sha256": "ca6ee585c1022c3e451a8e960a90f1c41a8c284050a59a67f358b0cc77d29f3d"
+    },
+    {
+      "loc": 57,
+      "module": "vulcan.runtime.errors",
+      "path": "src/vulcan/runtime/errors.py",
+      "sha256": "59456dcc87ee84757a604ded12e2a2c7367154162227db9c204611ff97137087"
+    },
+    {
+      "loc": 63,
+      "module": "vulcan.runtime.finalization",
+      "path": "src/vulcan/runtime/finalization.py",
+      "sha256": "dab7c8cf27b4aa98838b591b7f996686a13d72c4742b32a844a5bbee196d4cc5"
+    },
+    {
+      "loc": 1002,
+      "module": "vulcan.runtime.kernel",
+      "path": "src/vulcan/runtime/kernel.py",
+      "sha256": "4bf47852b317cdfe3d3b9a466250c0b6711d06d64eba2fda730cc01158d78963"
+    },
+    {
+      "loc": 321,
+      "module": "vulcan.runtime.output",
+      "path": "src/vulcan/runtime/output.py",
+      "sha256": "fe9b4328bb281bc84ce8e302cf2afea32e3fd1ba0b8959555f5cfde1004428bd"
+    },
+    {
+      "loc": 205,
+      "module": "vulcan.runtime.phase_a_composition",
+      "path": "src/vulcan/runtime/phase_a_composition.py",
+      "sha256": "9f1c9ca8e13771645136fdc1f369273afcf1a60f3085ba159e6b2baa4a8180d6"
+    },
+    {
+      "loc": 23,
+      "module": "vulcan.runtime.response_safety",
+      "path": "src/vulcan/runtime/response_safety.py",
+      "sha256": "f0dca2e855b8025b21d8da7e98ccd43d884f06858152111b42d954c1b355fda9"
+    },
+    {
+      "loc": 96,
+      "module": "vulcan.runtime.route_manifest",
+      "path": "src/vulcan/runtime/route_manifest.py",
+      "sha256": "9193a26d8fa2de6f7b8c25ff65496eedb0cdf03b74fdbc4f7dba001ec85217bb"
+    },
+    {
+      "loc": 258,
+      "module": "vulcan.runtime.settings",
+      "path": "src/vulcan/runtime/settings.py",
+      "sha256": "5fd3960ff3e0c3b2c56afadb8eaa07e23f26a51a777ab1b1e38e748353d6f030"
+    },
+    {
+      "loc": 152,
+      "module": "vulcan.runtime.state_authorities",
+      "path": "src/vulcan/runtime/state_authorities.py",
+      "sha256": "278d0255c83a84d0140a25db8eeb83f3abb7775632bd37cbaed31467b0b9f572"
+    },
+    {
+      "loc": 44,
+      "module": "vulcan.safety",
+      "path": "src/vulcan/safety/__init__.py",
+      "sha256": "84041eed3867cfa7ad1df855382abc6e2dd45ce85f8a516bd5092d41ba463748"
+    },
+    {
+      "loc": 85,
+      "module": "vulcan.safety.response_adapter",
+      "path": "src/vulcan/safety/response_adapter.py",
+      "sha256": "37cbbb1c14060f3a9e7e71b48980a985379cd8038dcc31ae00bbec55f7a46b6a"
+    },
+    {
+      "loc": 923,
+      "module": "vulcan.safety.safety_types",
+      "path": "src/vulcan/safety/safety_types.py",
+      "sha256": "0acc6f0572bce53b836bbce1640f741d9f517c3e8a250ce500ecac654c7e0e94"
+    }
+  ],
+  "manifest_digest": "0a5661e1c66973abd3953d980653fed03e24dc2f2b812a06202f834310588f22",
+  "resources": [
+    {
+      "path": "config/capabilities.yaml",
+      "sha256": "642ee28d85da27063d050bc3d0a758960420d02bac3812bd9760b5173ee1a102",
+      "wheel_path": "vulcan/_release_evidence/config/capabilities.yaml"
+    },
+    {
+      "path": "config/architecture-status.json",
+      "sha256": "34365721b43caf145fa5483ffc8b8021c4b8120daa033892d921b756010c792f",
+      "wheel_path": "vulcan/_release_evidence/config/architecture-status.json"
+    },
+    {
+      "path": "docs/architecture/ami-invariants.yaml",
+      "sha256": "7eb15cff61064533acaf0894714c1a9f7fac0302b49208660386b2ee8ef636cf",
+      "wheel_path": "vulcan/_release_evidence/docs/architecture/ami-invariants.yaml"
+    },
+    {
+      "path": "docs/architecture/adr-006-local-language-interface.md",
+      "sha256": "e324762e004e2ac30d13758b6d9b5a80ccefb06c5d4a5f8d373a20d782bf426c",
+      "wheel_path": "vulcan/_release_evidence/docs/architecture/adr-006-local-language-interface.md"
+    },
+    {
+      "path": "docs/governance/controls.yaml",
+      "sha256": "37c2d9d7582453b0cdeedb7a264effb3e71fe5a3141a0643f771e3b8db9ed447",
+      "wheel_path": "vulcan/_release_evidence/docs/governance/controls.yaml"
+    },
+    {
+      "path": "docs/governance/impact-assessment.yaml",
+      "sha256": "005b0b4b413a00fbb0787b082bc5967f5860542bbf0cd2280f76a5fe9e322acc",
+      "wheel_path": "vulcan/_release_evidence/docs/governance/impact-assessment.yaml"
+    },
+    {
+      "path": "evidence/qualification/language-contracts.json",
+      "sha256": "f412d01af475d28da680993d6f5a48eeea05a86939991ac7f4050ded17c0b49e",
+      "wheel_path": "vulcan/_release_evidence/evidence/qualification/language-contracts.json"
+    }
+  ],
+  "schema": "vulcan-wheel-inclusion/v1"
+}
