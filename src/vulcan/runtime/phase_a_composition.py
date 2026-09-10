@@ -11,14 +11,15 @@ from uuid import uuid4
 
 from vulcan.constitution.primitives import Digest, canonical_json
 from vulcan.graphix.runtime import DeterministicLanguageInput
-from vulcan.microkernel.episode_store import EpisodeStore
-from vulcan.microkernel.epistemic_store import EpistemicStore
-from vulcan.microkernel.lineage import (
-    LineageError,
-    LineageStore,
-    LineageTransactionService,
+from vulcan.microkernel.constitutional_journal import ConstitutionalDatabase
+from vulcan.microkernel.journal_stores import (
+    JournalEpisodeStore,
+    JournalEpistemicStore,
+    JournalLineageStore,
 )
-from vulcan.microkernel.principals import Principal, PrincipalKind
+from vulcan.microkernel.journal_transactions import (
+    JournalConstitutionalTransactionService,
+)
 from vulcan.microkernel.snapshots import MAX_EPISODE_LIFETIME, construct_snapshot_bundle
 from vulcan.safety.response_adapter import EnhancedSafetyResponseAdapter
 
@@ -49,9 +50,10 @@ class PhaseARuntime:
     kernel: ConstitutionalCognitiveKernel
     audit: CanonicalAudit
     capability_authority: CapabilityManifestAuthority
-    episode_store: EpisodeStore
-    epistemic_store: EpistemicStore
-    lineage_store: LineageStore
+    episode_store: JournalEpisodeStore
+    epistemic_store: JournalEpistemicStore
+    lineage_store: JournalLineageStore
+    constitutional_database: ConstitutionalDatabase
     closed: bool = False
 
     async def admission(self) -> None:
@@ -68,13 +70,14 @@ class PhaseARuntime:
         self.episode_store.verify_all()
         self.epistemic_store.reconcile()
         self.lineage_store.verify_all()
+        self.constitutional_database.verify()
 
     async def close(self) -> None:
         if self.closed:
             return
         self.closed = True
-        for owner in (self.epistemic_store, self.episode_store, self.audit):
-            owner.close()
+        self.constitutional_database.close()
+        self.audit.close()
 
 
 def compose_phase_a_runtime(settings: RuntimeSettings) -> PhaseARuntime:
@@ -83,17 +86,13 @@ def compose_phase_a_runtime(settings: RuntimeSettings) -> PhaseARuntime:
         root = Path(settings.durable_root)
         audit = CanonicalAudit(root / "audit" / "events.jsonl")
         cleanup.callback(audit.close)
-        episode_store = EpisodeStore(
-            root / "episodes" / "episodes.sqlite3",
-            outbox_sink=audit.append_episode_transition,
+        constitutional_database = ConstitutionalDatabase(
+            root / "constitutional" / "constitutional.sqlite3"
         )
-        cleanup.callback(episode_store.close)
-        epistemic_store = EpistemicStore(
-            root / "epistemic" / "epistemic.sqlite3",
-            outbox_sink=audit.append_epistemic_commit,
-        )
-        cleanup.callback(epistemic_store.close)
-        lineage_store = LineageStore(root / "episodes" / "episodes.sqlite3")
+        cleanup.callback(constitutional_database.close)
+        episode_store = JournalEpisodeStore(constitutional_database)
+        epistemic_store = JournalEpistemicStore(constitutional_database)
+        lineage_store = JournalLineageStore(constitutional_database)
 
         validator = CanonicalResponseSafetyValidator()
         response_safety = EnhancedSafetyResponseAdapter(validator)
@@ -155,25 +154,16 @@ def compose_phase_a_runtime(settings: RuntimeSettings) -> PhaseARuntime:
                 lifetime=timedelta(seconds=int(MAX_EPISODE_LIFETIME.total_seconds())),
             )
 
-        principal = Principal(
-            PrincipalKind.SYSTEM_KERNEL,
-            "constitutional-cognitive-kernel",
-            hashlib.sha256(b"vulcan-constitutional-kernel-v1").hexdigest(),
-        )
-        lineage = LineageTransactionService(lineage_store, principal)
         branch_id = "branch-primary"
-        try:
-            head = lineage_store.load(branch_id)
-        except LineageError:
-            lineage.genesis("lineage-primary", branch_id, f"instance-{uuid4().hex}")
-        else:
-            lineage.restart(branch_id, head.digest, f"instance-{uuid4().hex}")
+        service_factory = lambda *_stores: JournalConstitutionalTransactionService(
+            episode_store, epistemic_store, lineage_store, branch_id=branch_id
+        )
         kernel = ConstitutionalCognitiveKernel.from_kernel(
             delegate,
             snapshot_admitter=admit_snapshot,
             episode_store=episode_store,
             epistemic_store=epistemic_store,
-            lineage=lineage,
+            transaction_service_factory=service_factory,
             lineage_branch_id=branch_id,
         )
         cleanup.pop_all()
@@ -185,6 +175,7 @@ def compose_phase_a_runtime(settings: RuntimeSettings) -> PhaseARuntime:
             episode_store,
             epistemic_store,
             lineage_store,
+            constitutional_database,
         )
 
 

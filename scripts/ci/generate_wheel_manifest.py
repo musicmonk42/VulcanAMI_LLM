@@ -14,6 +14,7 @@ MANIFEST = ROOT / "config/wheel-inclusion-manifest.json"
 RESOURCES = (
     "config/actor-binding-schema.json",
     "config/actor-binding-schema.sha256",
+    "config/constitutional-journal-schema.json",
     "config/capabilities.yaml",
     "config/architecture-status.json",
     "docs/architecture/ami-invariants.yaml",

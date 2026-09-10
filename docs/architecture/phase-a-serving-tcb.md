@@ -4,19 +4,22 @@
 
 The Phase-A application graph is the ASGI adapter, immutable API envelopes and
 `RuntimeAPI`, deterministic Graphix arithmetic, the cognitive microkernel,
-response finalization, capability attestation, and the durable episode,
-epistemic, lineage, and audit stores. Memory, domain mutation, live alignment
+response finalization, capability attestation, one constitutional database with
+journal-backed episode/epistemic/lineage views, and the disposable audit
+projection. Memory, domain mutation, live alignment
 mutation, learning, improvement, effects, reafference, autobiography, CSIU,
 research, and transformer providers are not composed.
 
 ## Threshold disposition
 
-The reviewed wheel manifest currently contains 60 Python files and 15,389
+The reviewed wheel manifest currently contains 63 Python files and 17,715
 non-test lines of code, exceeding both the 45-file and 15,000-LOC review
 thresholds. This is accepted as a review exception, not as proof
 of safety, because the constitutional arithmetic transaction still requires the
 typed Graphix compiler, immutable episode and snapshot contracts, publication
-finalization, capability evidence verification, and four durable projections.
+finalization, capability evidence verification, and one receipt-chained durable
+authority. Admission, epistemic promotion, and terminal publication are each
+single journal transactions; lower repositories cannot commit independently.
 The exception must be revisited when compatibility case projection is removed.
 No file-count result is treated as a security oracle.
 

@@ -128,6 +128,12 @@
       "sha256": "125d2c3ffe5ce78ee8d6fca20602fb961867ee894ad86e362b69997583032e18"
     },
     {
+      "loc": 1161,
+      "module": "vulcan.microkernel.constitutional_journal",
+      "path": "src/vulcan/microkernel/constitutional_journal.py",
+      "sha256": "5e7ce6c05486e590aedaae9279add549b7476637ad3b17c2c0104cff44953335"
+    },
+    {
       "loc": 1128,
       "module": "vulcan.microkernel.effects",
       "path": "src/vulcan/microkernel/effects.py",
@@ -137,7 +143,7 @@
       "loc": 689,
       "module": "vulcan.microkernel.episode",
       "path": "src/vulcan/microkernel/episode.py",
-      "sha256": "c26952eb372e8bfe94d812786b3b4fa2d63d22e7766ef64dbe7b5608adf9d060"
+      "sha256": "6cab80bb3d7dfa7d1b9851309457bf2c6575b3775794f3582a23c80291398599"
     },
     {
       "loc": 619,
@@ -150,6 +156,18 @@
       "module": "vulcan.microkernel.epistemic_store",
       "path": "src/vulcan/microkernel/epistemic_store.py",
       "sha256": "75567fbee91e3582d27993102bf68fda3e4b7244741ec678692cbb5d50711d5e"
+    },
+    {
+      "loc": 180,
+      "module": "vulcan.microkernel.journal_stores",
+      "path": "src/vulcan/microkernel/journal_stores.py",
+      "sha256": "4f236c513e4d0f1f18f1e45f6ae11bd12af6136ce46ffe59aa9407c069c14e13"
+    },
+    {
+      "loc": 453,
+      "module": "vulcan.microkernel.journal_transactions",
+      "path": "src/vulcan/microkernel/journal_transactions.py",
+      "sha256": "31ee31f06c82fd36d80aa0c29d7e0c00551caef486c6d45ff512183b803440a4"
     },
     {
       "loc": 670,
@@ -182,10 +200,10 @@
       "sha256": "430a6cbf571c8388485564aa595e7f6658b0a45b55f8bd9b0da9b62f9947b442"
     },
     {
-      "loc": 562,
+      "loc": 564,
       "module": "vulcan.microkernel.transactions",
       "path": "src/vulcan/microkernel/transactions.py",
-      "sha256": "8c2329bb51c582b34c70e9be0c9e9b789905f58725db78174faa41eaeaace7a7"
+      "sha256": "db27b204ae597a091f031cee6fc2d342b46aa3e32c7fe7931498a90291ab47f7"
     },
     {
       "loc": 1,
@@ -236,10 +254,10 @@
       "sha256": "275b7c08568993cb166ffaa8b7219cc6933cdc3c002382d2840f2f969332f91d"
     },
     {
-      "loc": 357,
+      "loc": 408,
       "module": "vulcan.runtime.api",
       "path": "src/vulcan/runtime/api.py",
-      "sha256": "e232ab7a300eb58d9a73001002f4a2510d060e1245a1664ff45ef82889e9a130"
+      "sha256": "02110ba3e13f212cc16097d31ffcb2285cbfa061f94007dd0f74f9c370887a0d"
     },
     {
       "loc": 35,
@@ -278,10 +296,10 @@
       "sha256": "01a099eaa29d6b6b8cb3a472006624e755ad387fe722374c2f358ce58836c15d"
     },
     {
-      "loc": 292,
+      "loc": 342,
       "module": "vulcan.runtime.constitutional_kernel",
       "path": "src/vulcan/runtime/constitutional_kernel.py",
-      "sha256": "7c203ffbfc6cb2fc332c4800e428eb60b5ab62e648a49d66ba3b23b6a957b12f"
+      "sha256": "2cf57702a1a45e68b68bf39df43f6723c543b3ffebb2bf46f8d1f0ff3705905f"
     },
     {
       "loc": 193,
@@ -302,10 +320,10 @@
       "sha256": "dab7c8cf27b4aa98838b591b7f996686a13d72c4742b32a844a5bbee196d4cc5"
     },
     {
-      "loc": 1002,
+      "loc": 1004,
       "module": "vulcan.runtime.kernel",
       "path": "src/vulcan/runtime/kernel.py",
-      "sha256": "4bf47852b317cdfe3d3b9a466250c0b6711d06d64eba2fda730cc01158d78963"
+      "sha256": "326353db70a2b554ae0ea8accb095400f1c0150e73229d8ff358307cf5a0e951"
     },
     {
       "loc": 321,
@@ -314,10 +332,10 @@
       "sha256": "fe9b4328bb281bc84ce8e302cf2afea32e3fd1ba0b8959555f5cfde1004428bd"
     },
     {
-      "loc": 205,
+      "loc": 196,
       "module": "vulcan.runtime.phase_a_composition",
       "path": "src/vulcan/runtime/phase_a_composition.py",
-      "sha256": "9f1c9ca8e13771645136fdc1f369273afcf1a60f3085ba159e6b2baa4a8180d6"
+      "sha256": "ad53f95f0f0a7676f6622b262e5bb217125a926ba22015b407cf791b15114010"
     },
     {
       "loc": 23,
@@ -362,7 +380,7 @@
       "sha256": "0acc6f0572bce53b836bbce1640f741d9f517c3e8a250ce500ecac654c7e0e94"
     }
   ],
-  "manifest_digest": "9775761da83da64aee8e4e538989ec4822303fc43690e43402193ac4b9edea1b",
+  "manifest_digest": "3114b3e7889b63744830689d52f00d5f15cf9355d670fc71d14fb70b89cda208",
   "resources": [
     {
       "path": "config/actor-binding-schema.json",
@@ -373,6 +391,11 @@
       "path": "config/actor-binding-schema.sha256",
       "sha256": "f1a077f00c910c567625898b174b7e3d889b8796a1ee0221fb4ee67911b63a2d",
       "wheel_path": "vulcan/_release_evidence/config/actor-binding-schema.sha256"
+    },
+    {
+      "path": "config/constitutional-journal-schema.json",
+      "sha256": "ff38e8e7c208073eb634e7350e3b9cf36d49d5ddab59dfa605a77b6d5094157c",
+      "wheel_path": "vulcan/_release_evidence/config/constitutional-journal-schema.json"
     },
     {
       "path": "config/capabilities.yaml",

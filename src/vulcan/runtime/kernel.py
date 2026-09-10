@@ -832,6 +832,8 @@ class CognitiveKernel:
                         ),
                         authorization=authorization,
                         response=response_ref,
+                        response_text=finalization.public_text,
+                        response_status=status.value,
                     ),
                 )
                 self._apply(

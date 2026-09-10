@@ -1,6 +1,6 @@
 # Generated architecture inventory
 
-Digest: `c42a264f3dd1757af10c56180e433f4ab6d0ddcbdd3d519286fda09bad866a6b`
+Digest: `c76275dd2f6a729cbab4ef15d71de01b1bb109d10371f1404a5ccfd6c8e3dadd`
 
 This file is generated from `docs/generated/architecture-inventory.json`.
 
@@ -159,7 +159,7 @@ Count: 413
 
 ## Import Identities
 
-Count: 1933
+Count: 1937
 
 - `tests/security/test_output_firewall.py:1` module='vulcan.runtime.output', reachability='test-only'
 - `tests/test_probabilistic_routing.py:10` module='src.vulcan.reasoning.probabilistic_reasoning', reachability='test-only'
@@ -211,7 +211,7 @@ Count: 1933
 - `src/vulcan/world_model/world_model_core.py:1020` module='vulcan.world_model.creative_handler', reachability='unknown'
 - `src/api_server.py:103` module='vulcan.reasoning.unified', reachability='unknown'
 - `src/vulcan/world_model/world_model_core.py:1037` module='vulcan.world_model.llm_guidance', reachability='unknown'
-- ... 1883 more in JSON
+- ... 1887 more in JSON
 
 ## Singletons
 
@@ -404,7 +404,7 @@ Count: 400
 
 ## Persistence
 
-Count: 514
+Count: 521
 
 - `src/vulcan/improvement/offline.py:101` kind='call', reachability='unknown', value='fcntl.flock'
 - `tests/persistence/test_memory_outbox_v2.py:103` kind='call', reachability='test-only', value='SQLiteMemoryRepository'
@@ -453,10 +453,10 @@ Count: 514
 - `tests/microkernel/test_epistemic_store.py:232` kind='call', reachability='test-only', value='sqlite3.connect'
 - `src/security_audit_engine.py:233` kind='call', reachability='unknown', value='sqlite3.connect'
 - `src/ai_providers.py:239` kind='call', reachability='unknown', value='sqlite3.connect'
+- `tests/runtime/test_phase_a_api.py:243` kind='call', reachability='test-only', value='sqlite3.connect'
 - `src/vulcan/world_model/meta_reasoning/governed_transaction.py:244` kind='call', reachability='unknown', value='fcntl.flock'
 - `src/vulcan/safety/governance_alignment.py:248` kind='call', reachability='unknown', value='sqlite3.connect'
-- `tests/microkernel/test_lineage.py:256` kind='call', reachability='test-only', value='sqlite3.connect'
-- ... 464 more in JSON
+- ... 471 more in JSON
 
 ## Environment Readers
 

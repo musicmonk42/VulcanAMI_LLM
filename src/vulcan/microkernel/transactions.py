@@ -374,6 +374,8 @@ class ConstitutionalTransactionService:
         *,
         authorization: PublicationAuthorization,
         response: ArtifactRef,
+        response_text: str | None = None,
+        response_status: str | None = None,
     ) -> CognitiveEpisode:
         if (
             authorization.principal_digest != auth.principal.identity_digest

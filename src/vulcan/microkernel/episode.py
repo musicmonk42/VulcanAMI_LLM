@@ -517,7 +517,7 @@ class CognitiveEpisode:
         return episode._append_event(
             EpisodeState.PERCEIVED,
             reason="created",
-            authority=actor.authority,
+            authority=actor.principal_digest,
             clock=clock,
             snapshot_ids=(
                 (snapshot_bundle.bundle_id, snapshot_bundle.state_digest)

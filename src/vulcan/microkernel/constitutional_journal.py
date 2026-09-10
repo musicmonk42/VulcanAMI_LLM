@@ -28,7 +28,7 @@ from vulcan.microkernel.state_machine import (
 
 SCHEMA_VERSION = "vulcan-constitutional-journal/1"
 EXPECTED_SCHEMA_FINGERPRINT = (
-    "076db4b35cd7b3cbc003f52b59ff599d43e69ac34dad9c0c4d7264496764c9a3"
+    "aa7f197387599d7d6ecf56cea44f3779d44e4208b3744174fc8431b251c24c89"
 )
 _HEX = re.compile(r"^[0-9a-f]{64}$")
 _ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$")
@@ -222,6 +222,41 @@ def verify_integrity(connection: sqlite3.Connection) -> None:
     for artifact_digest, content in artifacts:
         if hashlib.sha256(bytes(content)).hexdigest() != artifact_digest:
             raise JournalError("artifact content digest mismatch")
+    terminal_rows = connection.execute(
+        "SELECT t.terminal_state,a.content,ed.document FROM terminal_results t "
+        "JOIN artifacts a ON a.artifact_digest=t.result_digest "
+        "LEFT JOIN episode_documents ed ON ed.episode_id=t.episode_id "
+        "WHERE a.kind='terminal-result.v2'"
+    ).fetchall()
+    for terminal_state, content, episode_document in terminal_rows:
+        try:
+            result = _strict_json(bytes(content).decode("utf-8"))
+            status = result["status"]
+            response = result["response"]
+        except (KeyError, TypeError, UnicodeDecodeError) as exc:
+            raise JournalError("terminal result document is invalid") from exc
+        allowed = {
+            "consolidated": {"success", "abstained"},
+            "blocked": {"blocked"},
+            "failed": {"failed", "finalization_error"},
+            "cancelled": {"cancelled"},
+        }
+        if not isinstance(status, str) or status not in allowed.get(
+            terminal_state, set()
+        ):
+            raise JournalError("terminal result status diverged")
+        if response is not None:
+            if not isinstance(response, str) or episode_document is None:
+                raise JournalError("terminal response document is invalid")
+            from .episode_store import episode_from_document
+
+            episode = episode_from_document(episode_document)
+            if (
+                episode.response is None
+                or hashlib.sha256(response.encode("utf-8")).hexdigest()
+                != episode.response.digest
+            ):
+                raise JournalError("terminal response bytes diverged")
     commits = [
         int(row[0])
         for row in connection.execute(
@@ -306,7 +341,18 @@ def verify_integrity(connection: sqlite3.Connection) -> None:
             "WHERE branch_id=? AND status='active'",
             (branch_id,),
         ).fetchall()
-        if len(active) != 1 or active[0][0] != head_episode_id:
+        membership = connection.execute(
+            "SELECT status FROM lineage_membership WHERE branch_id=? AND episode_id=?",
+            (branch_id, head_episode_id),
+        ).fetchone()
+        if (
+            membership is None
+            or (
+                membership[0] == "active"
+                and (len(active) != 1 or active[0][0] != head_episode_id)
+            )
+            or (membership[0] == "past" and active)
+        ):
             raise JournalError("lineage head diverged from active membership")
 
 
@@ -336,10 +382,12 @@ class UnitOfWork:
         "__commit_seq",
         "__event_ordinal",
         "__previous_receipt",
+        "__failpoint",
     )
 
-    def __init__(self, connection: sqlite3.Connection):
+    def __init__(self, connection: sqlite3.Connection, failpoint: Failpoint):
         self.__connection = connection
+        self.__failpoint = failpoint
         self.__active = True
         row = connection.execute(
             "UPDATE journal_sequence SET next_value=next_value+1 WHERE singleton=1 "
@@ -373,7 +421,10 @@ class UnitOfWork:
         self._require_active()
         if not isinstance(sql, str) or _TRANSACTION_SQL.match(sql):
             raise JournalError("unit of work cannot control its transaction")
-        return self.__authorized_execute(sql, parameters, readonly=False)
+        self.__failpoint("before_sql")
+        cursor = self.__authorized_execute(sql, parameters, readonly=False)
+        self.__failpoint("after_sql")
+        return cursor
 
     def __authorized_execute(
         self, sql: str, parameters: tuple[object, ...], *, readonly: bool
@@ -420,6 +471,7 @@ class UnitOfWork:
             "schema_version": SCHEMA_VERSION,
         }
         receipt = _digest(body)
+        self.__failpoint("before_outbox_insert")
         self.__connection.execute(
             "INSERT INTO transactional_outbox VALUES (?,?,?,?,?,?,?,?,?)",
             (
@@ -434,6 +486,7 @@ class UnitOfWork:
                 receipt,
             ),
         )
+        self.__failpoint("after_outbox_insert")
         self.__event_ordinal += 1
         self.__previous_receipt = receipt
         return receipt
@@ -567,6 +620,11 @@ class ConstitutionalDatabase:
               state TEXT NOT NULL CHECK(state IN ('perceived','interpreted','grounded','deliberating','epistemically_committed','normatively_authorized','executed','observed','communicated','consolidated','abstained','blocked','failed','cancelled')),
               head_transition_ordinal INTEGER NOT NULL DEFAULT -1 CHECK(head_transition_ordinal>=-1)
             ) STRICT;
+            CREATE TABLE IF NOT EXISTS episode_documents(
+              episode_id TEXT PRIMARY KEY REFERENCES episodes(episode_id),
+              head_digest TEXT NOT NULL UNIQUE CHECK(length(head_digest)=64 AND head_digest NOT GLOB '*[^0-9a-f]*'),
+              document TEXT NOT NULL CHECK(json_valid(document))
+            ) STRICT;
             CREATE TABLE IF NOT EXISTS episode_transitions(
               episode_id TEXT NOT NULL REFERENCES episodes(episode_id),
               transition_ordinal INTEGER NOT NULL CHECK(transition_ordinal>=0),
@@ -604,6 +662,10 @@ class ConstitutionalDatabase:
             CREATE TABLE IF NOT EXISTS epistemic_heads(
               episode_id TEXT PRIMARY KEY REFERENCES episodes(episode_id),
               epistemic_digest TEXT NOT NULL UNIQUE REFERENCES epistemic_commits(epistemic_digest)
+            ) STRICT;
+            CREATE TABLE IF NOT EXISTS epistemic_documents(
+              epistemic_digest TEXT PRIMARY KEY REFERENCES epistemic_commits(epistemic_digest),
+              document BLOB NOT NULL
             ) STRICT;
             CREATE TABLE IF NOT EXISTS lineage_branches(
               branch_id TEXT PRIMARY KEY,
@@ -645,6 +707,41 @@ class ConstitutionalDatabase:
     def transaction(self) -> "_TransactionContext":
         return _TransactionContext(self)
 
+    def read(
+        self, sql: str, parameters: tuple[object, ...] = ()
+    ) -> tuple[sqlite3.Row, ...]:
+        """Execute a read through an owner-managed, write-denied connection."""
+        if not isinstance(sql, str) or _READ_SQL.match(sql) is None:
+            raise JournalError("constitutional database read must be read-only")
+        with self.__lock:
+            if self.__closed:
+                raise JournalClosedError("constitutional database is closed")
+            self.__active += 1
+        connection: sqlite3.Connection | None = None
+        try:
+            connection = self.__connect()
+
+            def authorize(action, arg1, arg2, database, trigger):
+                denied = _LIFECYCLE_ACTIONS | _WRITE_ACTIONS
+                return sqlite3.SQLITE_DENY if action in denied else sqlite3.SQLITE_OK
+
+            connection.set_authorizer(authorize)
+            try:
+                return tuple(connection.execute(sql, parameters).fetchall())
+            finally:
+                connection.set_authorizer(None)
+        except sqlite3.DatabaseError as exc:
+            if "not authorized" in str(exc).lower():
+                raise JournalError(
+                    "constitutional database read must be read-only"
+                ) from exc
+            raise
+        finally:
+            if connection is not None:
+                connection.close()
+            with self.__lock:
+                self.__active -= 1
+
     def _enter(self) -> tuple[sqlite3.Connection, UnitOfWork]:
         with self.__lock:
             if self.__closed:
@@ -659,7 +756,7 @@ class ConstitutionalDatabase:
             self.__failpoint("before_begin")
             connection.execute("BEGIN IMMEDIATE")
             self.__failpoint("after_begin")
-            return connection, UnitOfWork(connection)
+            return connection, UnitOfWork(connection, self.__failpoint)
         except BaseException:
             if connection is not None:
                 try:

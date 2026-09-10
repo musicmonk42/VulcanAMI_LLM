@@ -14,6 +14,7 @@ from typing import Mapping
 
 from vulcan.graphix.runtime import Utterance
 from vulcan.microkernel.episode import ActorBinding
+from vulcan.microkernel.episode import canonical_digest as canonical_episode_digest
 
 from .auth import AuthenticatedPrincipal, CredentialProvenance
 from .kernel import KernelRequest
@@ -87,6 +88,23 @@ class VerifiedAuthenticationContext:
 
     def _actor_binding(self) -> ActorBinding:
         return self.__actor
+
+    def _credential_provenance_digest(self) -> str:
+        if self.__credential is None:
+            raise TypeError("mutating commands require credential provenance")
+        value = self.__credential
+        return canonical_episode_digest(
+            {
+                "adapter_release": value.adapter_release,
+                "authenticated_at": value.authenticated_at.isoformat().replace(
+                    "+00:00", "Z"
+                ),
+                "key_id": value.key_id,
+                "method": value.method,
+                "scopes": sorted(value.scopes),
+                "token_id": value.token_id,
+            }
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -266,11 +284,44 @@ class RuntimeAPI:
         utterance = Utterance.from_text(message)
         runtime = self.__runtime
         await runtime.admission()
+        replay = getattr(runtime.kernel.transaction_service, "replay", None)
+        if callable(replay):
+            prior = replay(
+                actor=envelope.authentication._actor_binding(),
+                request_digest=envelope.request_digest,
+                idempotency_key=envelope.idempotency_key,
+            )
+            if prior is not None:
+                episode, response, status = prior
+                return _bounded_output(
+                    {
+                        "response": response,
+                        "metadata": {
+                            "case_id": episode.episode_id,
+                            "runtime_id": runtime.runtime_id,
+                            "state_snapshot_id": (
+                                None
+                                if episode.snapshot_bundle is None
+                                else episode.snapshot_bundle.state_digest
+                            ),
+                            "semantic_schema_version": "response-ir/3",
+                            "terminal_status": status,
+                            "response_released": response is not None,
+                            "finalized": True,
+                            "finalization_safety_decision": "allow",
+                        },
+                        "status": status,
+                    },
+                    envelope.budget,
+                )
         case = runtime.kernel.create_case(
             request_id=envelope.request_id,
             conversation_id=conversation_id,
             input_digest=utterance.digest,
             actor=envelope.authentication._actor_binding(),
+            credential_provenance_digest=envelope.authentication._credential_provenance_digest(),
+            request_digest=envelope.request_digest,
+            idempotency_key=envelope.idempotency_key,
         )
         async with asyncio.timeout(_remaining(envelope.deadline)):
             result = await runtime.kernel.handle(

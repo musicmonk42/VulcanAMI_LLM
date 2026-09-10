@@ -26,14 +26,16 @@ The repository contains strong components, but several generations of architectu
 6. remove the legacy deployment and mutable-case authority seams;
 7. only then add persistent lineage, action/reafference, causal autobiography, and NPT instrumentation.
 
-The canonical path now also derives lifecycle audit from the EpisodeStore
-transactional outbox. `CanonicalAudit` projects committed
-`episode.transitioned` artifacts and retains `case.*` solely for historical
-reads; it is no longer a competing live lifecycle authority.
+The Phase-A canonical path now commits episode, epistemic, lineage, terminal,
+and outbox facts to one constitutional journal through caller-owned units of
+work. Legacy EpisodeStore/EpistemicStore/LineageStore implementations remain
+compatibility-only and are not opened or dual-written by Phase-A composition.
+`CanonicalAudit` remains a disposable projection boundary; deterministic
+journal-outbox rebuilding and migration qualification are the next ordered work.
 
 Persistent causal lineage is now M3 on the composed request path: episode
 genesis binds the current branch head and terminal episodes enter that branch's
-history through kernel-only CAS transactions. This is neutral continuity
+history in the same journal transaction as terminal publication. This is neutral continuity
 metadata, not a personal-identity or consciousness claim. Episode genesis and
 lineage admission are one database transaction; exact-artifact restart
 qualification remains open.

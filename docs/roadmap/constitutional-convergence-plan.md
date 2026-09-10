@@ -240,7 +240,7 @@ initializer, preventing package-level side effects from bypassing the graph.
 
 The Phase-A application façade is **M2 — Tested locally**: its immutable envelopes expose only command/query dispatch, the ASGI surface is reduced to six routes with documentation disabled, and the reduced composition admits only deterministic arithmetic plus constitutional episode, epistemic, lineage, capability, safety, and audit owners. Exact wheel/image restart qualification remains required for M4.
 
-The minimal Phase-A wheel is **M2 — reproducibly built and locally verified**: a reviewed positive inclusion manifest admits the 60-module serving closure and nine content-bound release inputs; two clean builds produce identical wheel bytes; full RECORD, member digest, excluded-import, undeclared-import, mutation, and outside-checkout controls pass. Installed lifespan qualification remains below M4 until the locked runtime dependencies are available in the qualification environment.
+The minimal Phase-A wheel is **M2 — reproducibly built and locally verified**: a reviewed positive inclusion manifest admits the 63-module serving closure and ten content-bound release inputs; two clean builds produce identical wheel bytes; full RECORD, member digest, excluded-import, undeclared-import, mutation, and outside-checkout controls pass. Installed lifespan qualification remains below M4 until the locked runtime dependencies are available in the qualification environment.
 
 Authenticated actor binding is **M3 — canonical for the Phase-A request path**:
 the versioned `vulcan.actor-binding/1` identity binds only tenant, issuer, and
@@ -253,7 +253,7 @@ serialization and classification rules are emitted in
 `config/actor-binding-schema.json`. Exact installed-artifact and key-rotation
 qualification remain required for M4.
 
-The constitutional journal is **M2 — implemented and locally tested, not composed**:
+The constitutional journal is **M3 — canonical on the Phase-A serving path**:
 `ConstitutionalDatabase` owns one SQLite file, connection lifecycle, and caller-owned
 units of work. Its schema covers actor-bound commands/idempotency, episodes,
 transitions, artifacts, epistemic heads, lineage membership, admitted contexts,
@@ -264,8 +264,14 @@ Persisted command facts are independently content-bound, operation-scoped replay
 returns the original command identity across request IDs and credential rotation,
 and deterministic transaction failpoints prove prior-or-complete restart state.
 The stable schema fingerprint is emitted in
-`config/constitutional-journal-schema.json`. Production migration remains blocked
-until A06 defines atomic cutover and restart/replay evidence.
+`config/constitutional-journal-schema.json`. Phase-A now composes journal-backed
+episode, epistemic, and lineage repositories over the caller-owned unit of work.
+Admission, epistemic commitment, and terminal publication/lineage completion use
+the three indivisible boundaries required by A06. The legacy store implementations
+remain compatibility-only for non-Phase-A callers and are removed when those callers
+migrate; they are neither opened nor dual-written by the canonical serving graph.
+Offline legacy migration and kill/reopen qualification remain A07 work, so this is
+not installed-artifact M4 evidence.
 
 ### 2.4 Offline self-improvement — M3 serving boundary / M2 operator evidence
 

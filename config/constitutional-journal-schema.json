@@ -1,9 +1,14 @@
 {
   "schema": "vulcan-constitutional-journal/1",
-  "schema_fingerprint": "076db4b35cd7b3cbc003f52b59ff599d43e69ac34dad9c0c4d7264496764c9a3",
+  "schema_fingerprint": "aa7f197387599d7d6ecf56cea44f3779d44e4208b3744174fc8431b251c24c89",
   "ordering_authority": ["commit_seq", "event_ordinal"],
   "receipt_chain": ["previous_receipt_digest", "receipt_digest"],
   "command_integrity": "sha256-jcs over complete persisted command facts",
+  "phase_a_atomic_groups": [
+    "command+context+episode-genesis+active-lineage+outbox",
+    "epistemic-document+head+episode-transition+outbox",
+    "publication+exact-terminal-result+past-lineage+outbox"
+  ],
   "required_pragmas": {
     "journal_mode": "WAL",
     "synchronous": "FULL",
@@ -18,5 +23,5 @@
     "memory",
     "reafference"
   ],
-  "production_wiring": "not-composed-no-dual-write"
+  "production_wiring": "phase-a-canonical-single-write"
 }

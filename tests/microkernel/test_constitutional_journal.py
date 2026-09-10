@@ -406,7 +406,7 @@ def test_pragmas_and_schema_fingerprint_are_stable(tmp_path):
         Path("config/constitutional-journal-schema.json").read_text()
     )
     assert schema_evidence["schema_fingerprint"] == first
-    assert schema_evidence["production_wiring"] == "not-composed-no-dual-write"
+    assert schema_evidence["production_wiring"] == "phase-a-canonical-single-write"
     assert os.stat(db.path).st_mode & 0o777 == 0o600
     assert dict(db.sqlite_settings) == {
         "journal_mode": "wal",
@@ -484,16 +484,20 @@ def test_restart_rejects_command_fact_tampering(tmp_path):
         ConstitutionalDatabase(db.path)
 
 
-def test_journal_owner_is_not_production_composed_or_dual_written() -> None:
+def test_journal_owner_is_production_composed_without_legacy_dual_write() -> None:
     manifest = json.loads(Path("config/wheel-inclusion-manifest.json").read_text())
-    assert "vulcan.microkernel.constitutional_journal" not in {
-        row["module"] for row in manifest["files"]
-    }
-    for path in (
-        Path("src/vulcan/runtime/api.py"),
-        Path("src/vulcan/runtime/phase_a_composition.py"),
-    ):
-        assert "constitutional_journal" not in path.read_text(encoding="utf-8")
+    modules = {row["module"] for row in manifest["files"]}
+    assert {
+        "vulcan.microkernel.constitutional_journal",
+        "vulcan.microkernel.journal_stores",
+        "vulcan.microkernel.journal_transactions",
+    } <= modules
+    composition = Path("src/vulcan/runtime/phase_a_composition.py").read_text(
+        encoding="utf-8"
+    )
+    assert "ConstitutionalDatabase" in composition
+    assert "episodes.sqlite3" not in composition
+    assert "epistemic.sqlite3" not in composition
     implementation = Path("src/vulcan/microkernel/constitutional_journal.py").read_text(
         encoding="utf-8"
     )
@@ -501,6 +505,12 @@ def test_journal_owner_is_not_production_composed_or_dual_written() -> None:
     assert "sqlite3.connect" not in repositories
     assert '.execute("COMMIT"' not in repositories
     assert '.execute("ROLLBACK"' not in repositories
+    serving_repositories = Path("src/vulcan/microkernel/journal_stores.py").read_text(
+        encoding="utf-8"
+    )
+    assert "sqlite3.connect" not in serving_repositories
+    assert '"BEGIN' not in serving_repositories
+    assert '"COMMIT' not in serving_repositories
 
 
 @pytest.mark.parametrize(
@@ -508,6 +518,10 @@ def test_journal_owner_is_not_production_composed_or_dual_written() -> None:
     (
         ("before_begin", False),
         ("after_begin", False),
+        ("before_sql", False),
+        ("after_sql", False),
+        ("before_outbox_insert", False),
+        ("after_outbox_insert", False),
         ("before_commit", False),
         ("after_commit", True),
     ),

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import inspect
+import sqlite3
 import sys
 from dataclasses import FrozenInstanceError
 from datetime import datetime, timedelta, timezone
@@ -220,13 +221,72 @@ async def test_reduced_graph_executes_arithmetic_without_forbidden_packages(
         assert result["response"] == "The computed result is 4."
         assert result["status"] == "success"
         episode = runtime.episode_store.load(result["metadata"]["case_id"])
+        lineage = runtime.lineage_store.load("branch-primary")
         assert episode.state.is_terminal
+        assert lineage.head_digest == episode.digest
+        assert lineage.active_episode_ids == ()
+        assert lineage.past_episode_ids == (episode.episode_id,)
         assert episode.request.request_id == "request-transport-1"
         assert episode.actor == command().authentication._actor_binding()
         assert episode.actor.classification == "AUTHENTICATED"
+        assert all(
+            transition.authority == episode.actor.principal_digest
+            for transition in episode.transitions
+        )
         serialized = episode.canonical_json()
         assert "0123456789abcdef" not in serialized
         assert "key_version" not in serialized
+        journal_path = root / "constitutional" / "constitutional.sqlite3"
+        assert journal_path.is_file()
+        assert not (root / "episodes" / "episodes.sqlite3").exists()
+        assert not (root / "epistemic" / "epistemic.sqlite3").exists()
+        connection = sqlite3.connect(journal_path)
+        try:
+            terminal = connection.execute(
+                "SELECT t.commit_seq,m.status FROM terminal_results t "
+                "JOIN lineage_membership m ON m.episode_id=t.episode_id "
+                "WHERE t.episode_id=?",
+                (episode.episode_id,),
+            ).fetchone()
+            assert terminal is not None and terminal[1] == "past"
+            admission = connection.execute(
+                "SELECT c.commit_seq,m.admitted_commit_seq FROM commands c "
+                "JOIN episodes e ON e.command_id=c.command_id "
+                "JOIN lineage_membership m ON m.episode_id=e.episode_id "
+                "WHERE e.episode_id=?",
+                (episode.episode_id,),
+            ).fetchone()
+            assert admission is not None and admission[0] == admission[1]
+            assert (
+                connection.execute(
+                    "SELECT count(*) FROM transactional_outbox WHERE commit_seq=?",
+                    (admission[0],),
+                ).fetchone()[0]
+                >= 1
+            )
+            epistemic = connection.execute(
+                "SELECT ec.commit_seq,et.commit_seq FROM epistemic_commits ec "
+                "JOIN episode_transitions et ON et.episode_id=ec.episode_id "
+                "AND et.to_state='epistemically_committed' "
+                "WHERE ec.episode_id=?",
+                (episode.episode_id,),
+            ).fetchone()
+            assert epistemic is not None and epistemic[0] == epistemic[1]
+            terminal_transitions = connection.execute(
+                "SELECT count(*) FROM episode_transitions "
+                "WHERE episode_id=? AND commit_seq=?",
+                (episode.episode_id, terminal[0]),
+            ).fetchone()[0]
+            assert terminal_transitions == 3
+            assert (
+                connection.execute(
+                    "SELECT count(*) FROM transactional_outbox WHERE commit_seq=?",
+                    (terminal[0],),
+                ).fetchone()[0]
+                == 3
+            )
+        finally:
+            connection.close()
         audit_payload = {"episode_id": episode.episode_id}
         cross_tenant = QueryEnvelope(
             QueryKind.EPISODE_AUDIT,
@@ -255,8 +315,23 @@ async def test_reduced_graph_executes_arithmetic_without_forbidden_packages(
         )
         with pytest.raises(RuntimeError, match="output budget"):
             await api.execute(command(budget=ExecutionBudget(64, 1)))
+        await runtime.deep_integrity()
     finally:
         await runtime.close()
+    restarted = compose_phase_a_runtime(settings)
+    try:
+        replayed = await RuntimeAPI(restarted).execute(command())
+        assert replayed["response"] == "The computed result is 4."
+        assert replayed["metadata"]["case_id"] == result["metadata"]["case_id"]
+        connection = sqlite3.connect(root / "constitutional" / "constitutional.sqlite3")
+        try:
+            assert (
+                connection.execute("SELECT count(*) FROM commands").fetchone()[0] == 1
+            )
+        finally:
+            connection.close()
+    finally:
+        await restarted.close()
 
 
 def test_reduced_composition_closes_durable_owners_after_startup_failure(

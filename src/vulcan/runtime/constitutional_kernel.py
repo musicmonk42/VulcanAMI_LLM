@@ -10,6 +10,7 @@ from hashlib import sha256
 from typing import Callable, Protocol
 from uuid import uuid4
 
+from vulcan.constitution.primitives import canonical_json
 from vulcan.microkernel.episode import (
     ActorBinding,
     ArtifactRef,
@@ -50,6 +51,7 @@ class EpisodeAdmissionService:
     store: EpisodeStore
     lineage: LineageTransactionService | None = None
     branch_id: str | None = None
+    transaction_service: ConstitutionalTransactionService | None = None
 
     def admit(
         self,
@@ -58,6 +60,9 @@ class EpisodeAdmissionService:
         conversation_id: str | None,
         input_digest: str,
         actor: ActorBinding,
+        credential_provenance_digest: str | None = None,
+        request_digest: str | None = None,
+        idempotency_key: str | None = None,
     ) -> CognitiveCase:
         episode_id = f"case-{uuid4().hex}"
         bundle = self.snapshot_admitter(episode_id)
@@ -77,7 +82,40 @@ class EpisodeAdmissionService:
                     lineage_head=lineage_head,
                 )
 
-            if self.lineage is not None:
+            journal_admit = getattr(self.transaction_service, "admit_episode", None)
+            if callable(journal_admit):
+                if (
+                    credential_provenance_digest is None
+                    or request_digest is None
+                    or idempotency_key is None
+                    or self.branch_id is None
+                ):
+                    raise RuntimeError(
+                        "journal admission requires complete command facts"
+                    )
+                lineage_digest = self.transaction_service.lineage_head_digest()
+                episode = genesis(
+                    ArtifactRef(
+                        f"lineage-head:{self.branch_id}",
+                        lineage_digest,
+                        "lineage-head.v1",
+                    )
+                )
+                journal_admit(
+                    episode=episode,
+                    actor=actor,
+                    credential_provenance_digest=credential_provenance_digest,
+                    request_digest=request_digest,
+                    request_id=request_id,
+                    idempotency_key=idempotency_key,
+                    context_bytes=canonical_json(
+                        {
+                            "bundle": bundle.bundle_ref().to_json(),
+                            "refs": [ref.to_json() for ref in bundle.refs()],
+                        }
+                    ),
+                )
+            elif self.lineage is not None:
                 if self.branch_id is None:
                     raise RuntimeError("lineage branch identity is missing")
                 snapshots = tuple(
@@ -189,7 +227,11 @@ class ConstitutionalCognitiveKernel:
         return cls(
             kernel,
             EpisodeAdmissionService(
-                snapshot_admitter, episode_store, lineage, lineage_branch_id
+                snapshot_admitter,
+                episode_store,
+                lineage,
+                lineage_branch_id,
+                service,
             ),
             service,
         )
@@ -208,12 +250,18 @@ class ConstitutionalCognitiveKernel:
         conversation_id: str | None,
         input_digest: str,
         actor: ActorBinding,
+        credential_provenance_digest: str | None = None,
+        request_digest: str | None = None,
+        idempotency_key: str | None = None,
     ) -> CognitiveCase:
         return self.admission.admit(
             request_id=request_id,
             conversation_id=conversation_id,
             input_digest=input_digest,
             actor=actor,
+            credential_provenance_digest=credential_provenance_digest,
+            request_digest=request_digest,
+            idempotency_key=idempotency_key,
         )
 
     async def handle(self, request: KernelRequest, case: CognitiveCase) -> KernelResult:
@@ -265,7 +313,8 @@ class ConstitutionalCognitiveKernel:
                     raise RuntimeError(
                         "transport withheld: durable terminal state missing"
                     )
-                self._complete_lineage(durable)
+                if not hasattr(self._transaction_service, "admit_episode"):
+                    self._complete_lineage(durable)
             return result
         except asyncio.CancelledError:
             # The delegate terminalizes cancellation before propagating it.
@@ -273,7 +322,8 @@ class ConstitutionalCognitiveKernel:
             # into an ordinary response.
             durable = self.admission.store.load(case.case_id)
             if durable.state.is_terminal:
-                self._complete_lineage(durable)
+                if not hasattr(self._transaction_service, "admit_episode"):
+                    self._complete_lineage(durable)
             raise
         finally:
             case.release_snapshot_bundle()
