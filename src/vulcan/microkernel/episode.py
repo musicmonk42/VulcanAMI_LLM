@@ -105,14 +105,36 @@ class ActorBinding:
                     raise ValueError("authenticated actor identity is invalid")
             if canonical_digest(identity) != self.principal_digest:
                 raise ValueError("authenticated actor identity digest mismatch")
+            if self.actor_id != f"actor:{self.principal_digest}":
+                raise ValueError("authenticated actor identifier mismatch")
+            if self.authority != "VerifiedAuthentication":
+                raise ValueError("invalid authenticated actor authority")
         elif self.classification == "INTERNAL_SYSTEM_QUERY":
+            identity = {
+                "issuer": "vulcan",
+                "subject": "health-query",
+                "tenant": "internal",
+            }
+            expected = canonical_digest(identity)
             if (
                 self.schema_version != ACTOR_BINDING_SCHEMA
                 or self.authority != "SystemQuery"
+                or self.issuer != identity["issuer"]
+                or self.subject != identity["subject"]
+                or self.tenant != identity["tenant"]
+                or self.principal_digest != expected
+                or self.actor_id != f"actor:{expected}"
             ):
                 raise ValueError("invalid internal query actor")
         elif self.classification != "LEGACY_UNVERIFIED":
             raise ValueError("invalid actor classification")
+        elif (
+            self.schema_version != "legacy.actor-binding/0"
+            or self.tenant is not None
+            or self.issuer is not None
+            or self.subject is not None
+        ):
+            raise ValueError("legacy actor cannot claim verified provenance")
 
     @classmethod
     def _from_verified_identity(

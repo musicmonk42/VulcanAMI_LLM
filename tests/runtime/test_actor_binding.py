@@ -94,9 +94,22 @@ def test_actor_is_immutable_and_legacy_never_upgrades() -> None:
     legacy = ActorBinding("legacy", "a" * 64, "LegacySource")
     assert legacy.classification == "LEGACY_UNVERIFIED"
     assert set(legacy.to_json()) == {"actor_id", "authority", "principal_digest"}
+    with pytest.raises(ValueError, match="cannot claim"):
+        ActorBinding(
+            "legacy",
+            "a" * 64,
+            "LegacySource",
+            tenant="invented-tenant",
+        )
+    with pytest.raises(ValueError, match="identifier mismatch"):
+        replace(actor, actor_id="actor:" + "b" * 64)
 
 
 def test_context_requires_verified_principal_and_hides_credential_material() -> None:
+    with pytest.raises(TypeError, match="adapter-created"):
+        VerifiedAuthenticationContext(
+            principal().actor, None, frozenset({"reason:write"})
+        )
     with pytest.raises(TypeError, match="only by an adapter"):
         AuthenticatedPrincipal(
             "alice",

@@ -40,6 +40,7 @@ from vulcan.runtime.settings import (
 def authentication(
     *scopes: str, tenant: str = "tenant", issuer: str = "issuer"
 ) -> VerifiedAuthenticationContext:
+    scopes = scopes or ("public:read",)
     principal = AuthenticatedPrincipal._from_verified_adapter(
         "subject",
         tenant,

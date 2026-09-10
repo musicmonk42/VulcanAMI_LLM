@@ -1,6 +1,6 @@
 # Generated architecture inventory
 
-Digest: `e748b97bbc1b592702f51693bcff51dcd05b1529ec6c0b79c6b8ad4de89ec659`
+Digest: `9e19563021bbf3748a26505f95e1102634af0993783efbdc5903a0c6fa62f5fe`
 
 This file is generated from `docs/generated/architecture-inventory.json`.
 

@@ -110,6 +110,30 @@ class AuthenticatedPrincipal:
     ) -> None:
         if _adapter_token is not _VERIFIED_ADAPTER_TOKEN:
             raise TypeError("authenticated principals are created only by an adapter")
+        subject = _text(subject, 128, "subject")
+        tenant = _text(tenant, 128, "tenant")
+        issuer = _text(issuer, MAX_TEXT, "issuer")
+        if (
+            not isinstance(audience, tuple)
+            or not 1 <= len(audience) <= MAX_LIST
+            or len(set(audience)) != len(audience)
+        ):
+            raise AuthError("invalid audience")
+        audience = tuple(_text(item, MAX_TEXT, "audience") for item in audience)
+        if not isinstance(scopes, frozenset) or not 1 <= len(scopes) <= MAX_LIST:
+            raise AuthError("invalid scopes")
+        scopes = frozenset(_text(item, 64, "scope") for item in scopes)
+        if not _JTI.fullmatch(_text(jti, 128, "jti")):
+            raise AuthError("invalid jti")
+        key_version = _kid(key_version)
+        if (
+            not isinstance(authenticated_at, datetime)
+            or authenticated_at.tzinfo is None
+            or authenticated_at.utcoffset() != timezone.utc.utcoffset(authenticated_at)
+        ):
+            raise AuthError("authentication time must be UTC")
+        method = _text(method, 64, "authentication method")
+        adapter_release = _text(adapter_release, 128, "authentication adapter release")
         for name, value in {
             "subject": subject,
             "tenant": tenant,

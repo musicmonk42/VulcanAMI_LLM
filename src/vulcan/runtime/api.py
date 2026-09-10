@@ -19,6 +19,8 @@ from .auth import AuthenticatedPrincipal, CredentialProvenance
 from .kernel import KernelRequest
 from .settings import RuntimeSettings
 
+_AUTHENTICATION_CONTEXT_TOKEN = object()
+
 
 class CommandKind(str, Enum):
     CHAT = "chat"
@@ -31,13 +33,29 @@ class QueryKind(str, Enum):
     EPISODE_AUDIT = "episode_audit"
 
 
-@dataclass(frozen=True, slots=True, repr=False)
+@dataclass(frozen=True, slots=True, repr=False, init=False)
 class VerifiedAuthenticationContext:
     """Opaque verified actor plus nonpersistent credential provenance."""
 
     __actor: ActorBinding
     __credential: CredentialProvenance | None
     __scopes: frozenset[str]
+
+    def __init__(
+        self,
+        actor: ActorBinding,
+        credential: CredentialProvenance | None,
+        scopes: frozenset[str],
+        *,
+        _construction_token: object = None,
+    ) -> None:
+        if _construction_token is not _AUTHENTICATION_CONTEXT_TOKEN:
+            raise TypeError("authentication context is adapter-created")
+        object.__setattr__(self, "_VerifiedAuthenticationContext__actor", actor)
+        object.__setattr__(
+            self, "_VerifiedAuthenticationContext__credential", credential
+        )
+        object.__setattr__(self, "_VerifiedAuthenticationContext__scopes", scopes)
 
     @classmethod
     def from_verified_principal(
@@ -49,11 +67,17 @@ class VerifiedAuthenticationContext:
             principal.actor,
             CredentialProvenance.from_principal(principal),
             principal.scopes,
+            _construction_token=_AUTHENTICATION_CONTEXT_TOKEN,
         )
 
     @classmethod
     def internal_system_query(cls) -> "VerifiedAuthenticationContext":
-        return cls(ActorBinding.internal_system_query(), None, frozenset())
+        return cls(
+            ActorBinding.internal_system_query(),
+            None,
+            frozenset(),
+            _construction_token=_AUTHENTICATION_CONTEXT_TOKEN,
+        )
 
     def require(self, scope: str) -> None:
         if scope not in self.__scopes:
