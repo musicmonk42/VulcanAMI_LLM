@@ -229,6 +229,8 @@ case-projection, alignment, and research imports to canonical Graphix types.
 
 ### 2.3 Production import closure — M3 (qualification-ready; hosted artifact pending)
 
+The audit import boundary is **M2 — Tested locally**: shared audit values now live in an acyclic contract leaf, the segmented writer is persistence-owned, and the runtime module is a removal-bound compatibility re-export. Fresh-process normal and optimized-Python tests cover import order, application construction, and lifespan cleanup without pytest fixture preloading. Exact built-artifact evidence is still required for M4.
+
 The installed `vulcan` wheel is the sole canonical identity and setuptools uses the standard src layout. Runtime, server, constitutional-test, research, cloud, distributed, and development dependency sets are separated. A machine-enforced transitive allowlist/denylist proves canonical serving does not import legacy orchestration/deployment, retired semantic authority, Arena, cloud/distributed, experimental-memory, or NPT research packages. The exact non-root Linux image qualifies readiness, bounded arithmetic, durable episode/epistemic audit retrieval, same-volume restart, source immutability, and absence of legacy routes. CI publishes artifact and input digests. Gate E is qualification-ready for canonical Linux/Docker serving but remains pending until the committed workflow produces passing exact-image evidence; Windows serving is not claimed.
 
 The serving image also removes denied package trees and offline installation

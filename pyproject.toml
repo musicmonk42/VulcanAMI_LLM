@@ -133,6 +133,7 @@ minversion = "8.0"
 addopts = [
     "-q",
     "--disable-warnings",
+    "--strict-markers",
 ]
 testpaths = ["tests", "src/vulcan/tests"]
 # Tests retain ``src.*`` compatibility imports while exercising the canonical
@@ -140,7 +141,26 @@ testpaths = ["tests", "src/vulcan/tests"]
 pythonpath = ["src"]
 filterwarnings = [
     "ignore::coverage.exceptions.CoverageWarning",
+    "ignore::DeprecationWarning",
+    "ignore::UserWarning",
+    "ignore::pytest.PytestUnraisableExceptionWarning",
+    "ignore::ResourceWarning",
 ]
+markers = [
+    "slow: marks tests as slow",
+    "integration: marks tests as integration tests",
+    "load_test: marks tests as load tests",
+    "benchmark: marks tests as benchmark tests",
+    "requires_torch: marks tests requiring PyTorch",
+    "perf: marks tests requiring performance dependencies",
+    "boundedness: marks boundedness and leak-detection tests",
+]
+faulthandler_timeout = 60
+timeout = 120
+timeout_func_only = true
+timeout_method = "thread"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 
 [tool.coverage.run]
 source = ["src/vulcan", "src/gvulcan"]
