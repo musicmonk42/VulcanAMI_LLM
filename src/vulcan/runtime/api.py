@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -87,7 +89,9 @@ class CommandEnvelope:
             self.idempotency_key,
             self.deadline,
         )
-        object.__setattr__(self, "payload", _freeze_payload(self.payload))
+        payload = _freeze_payload(self.payload)
+        object.__setattr__(self, "payload", payload)
+        _require_payload_digest(self.kind.value, payload, self.request_digest)
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,7 +111,9 @@ class QueryEnvelope:
             self.idempotency_key,
             self.deadline,
         )
-        object.__setattr__(self, "payload", _freeze_payload(self.payload))
+        payload = _freeze_payload(self.payload)
+        object.__setattr__(self, "payload", payload)
+        _require_payload_digest(self.kind.value, payload, self.request_digest)
 
 
 def _validate_envelope(digest: str, auth: object, key: str, deadline: datetime) -> None:
@@ -140,6 +146,44 @@ def _freeze_payload(payload: Mapping[str, object]) -> Mapping[str, object]:
     return MappingProxyType(frozen)
 
 
+def request_digest(kind: CommandKind | QueryKind, payload: Mapping[str, object]) -> str:
+    frozen = _freeze_payload(payload)
+    document = {"kind": kind.value, "payload": dict(frozen)}
+    encoded = json.dumps(
+        document, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _require_payload_digest(
+    kind: str, payload: Mapping[str, object], supplied_digest: str
+) -> None:
+    expected = request_digest(
+        CommandKind(kind) if kind == CommandKind.CHAT.value else QueryKind(kind),
+        payload,
+    )
+    if supplied_digest != expected:
+        raise ValueError("request digest does not bind envelope payload")
+
+
+def _bounded_output(
+    payload: dict[str, object], budget: ExecutionBudget
+) -> Mapping[str, object]:
+    encoded = json.dumps(
+        payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    if len(encoded) > budget.max_output_bytes:
+        raise RuntimeError("response exceeds authorized output budget")
+    return MappingProxyType(payload)
+
+
+def _remaining(deadline: datetime) -> float:
+    seconds = (deadline - datetime.now(timezone.utc)).total_seconds()
+    if seconds <= 0:
+        raise TimeoutError("request deadline exceeded")
+    return seconds
+
+
 class RuntimeAPI:
     """Capability-minimized facade. Public operations are exactly execute/query."""
 
@@ -170,6 +214,10 @@ class RuntimeAPI:
             raise TimeoutError("request deadline exceeded")
         if envelope.kind is not CommandKind.CHAT:
             raise ValueError("unsupported command")
+        if envelope.budget.max_steps < 8:
+            raise RuntimeError(
+                "execution budget is insufficient for constitutional arithmetic"
+            )
         envelope.authentication.require("reason:write")
         message = envelope.payload.get("message")
         conversation_id = envelope.payload.get("conversation_id")
@@ -185,49 +233,52 @@ class RuntimeAPI:
             conversation_id=conversation_id,
             input_digest=utterance.digest,
         )
-        remaining = (envelope.deadline - datetime.now(timezone.utc)).total_seconds()
-        if remaining <= 0:
-            raise TimeoutError("request deadline exceeded")
-        async with asyncio.timeout(remaining):
+        async with asyncio.timeout(_remaining(envelope.deadline)):
             result = await runtime.kernel.handle(
                 KernelRequest(utterance, conversation_id), case
             )
-        if len(result.response.encode("utf-8")) > envelope.budget.max_output_bytes:
-            raise RuntimeError("response exceeds authorized output budget")
         output = result.transport(
             case_id=case.case_id,
             runtime_id=runtime.runtime_id,
             snapshot_id=case.state_snapshot_id,
         )
         output["status"] = result.status.value
-        return MappingProxyType(output)
+        return _bounded_output(output, envelope.budget)
 
     async def query(self, envelope: QueryEnvelope) -> Mapping[str, object]:
         if envelope.deadline <= datetime.now(timezone.utc):
             raise TimeoutError("request deadline exceeded")
         runtime = self.__runtime
         if envelope.kind is QueryKind.READINESS:
-            await runtime.shallow_readiness()
-            return MappingProxyType({"status": "ready"})
+            async with asyncio.timeout(_remaining(envelope.deadline)):
+                await runtime.shallow_readiness()
+            return _bounded_output({"status": "ready"}, envelope.budget)
         if envelope.kind is QueryKind.INTEGRITY:
             envelope.authentication.require("operator:read")
-            await runtime.deep_integrity()
-            return MappingProxyType(
-                {"status": "passed", "runtime_id": runtime.runtime_id}
+            async with asyncio.timeout(_remaining(envelope.deadline)):
+                await runtime.deep_integrity()
+            return _bounded_output(
+                {"status": "passed", "runtime_id": runtime.runtime_id},
+                envelope.budget,
             )
         if envelope.kind is QueryKind.CAPABILITIES:
             from .capabilities import public_capability_response
 
-            return MappingProxyType(
-                public_capability_response(runtime.capability_authority)
-            )
+            async with asyncio.timeout(_remaining(envelope.deadline)):
+                result = await asyncio.to_thread(
+                    public_capability_response, runtime.capability_authority
+                )
+            return _bounded_output(result, envelope.budget)
         if envelope.kind is QueryKind.EPISODE_AUDIT:
             envelope.authentication.require("audit:read")
             episode_id = envelope.payload.get("episode_id")
             if not isinstance(episode_id, str):
                 raise TypeError("episode id required")
-            events = runtime.audit.events_for_episode(episode_id)
-            return MappingProxyType(
+            async with asyncio.timeout(_remaining(envelope.deadline)):
+                events = await asyncio.to_thread(
+                    runtime.audit.events_for_episode, episode_id
+                )
+            return _bounded_output(
                 {
                     "episode_id": episode_id,
                     "events": tuple(
@@ -242,23 +293,13 @@ class RuntimeAPI:
                         }
                         for event in events[:64]
                     ),
-                }
+                },
+                envelope.budget,
             )
         raise ValueError("unsupported query")
 
 
 def _validate_phase_a_settings(settings: RuntimeSettings) -> None:
-    rejected = {
-        "memory": settings.memory_enabled,
-        "learning": settings.learning_enabled,
-        "csiu": settings.csiu_enabled,
-        "self_improvement": settings.self_improvement_enabled,
-        "openai": settings.openai_enabled,
-        "anthropic": settings.anthropic_enabled,
-        "transformer": settings.language_mode.value != "deterministic_only",
-    }
-    enabled = sorted(name for name, value in rejected.items() if value)
-    if enabled:
-        raise ValueError(
-            f"Phase-A profile rejects configured owners: {', '.join(enabled)}"
-        )
+    from .phase_a_composition import reject_forbidden_settings
+
+    reject_forbidden_settings(settings)

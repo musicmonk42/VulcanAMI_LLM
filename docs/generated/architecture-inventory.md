@@ -1,6 +1,6 @@
 # Generated architecture inventory
 
-Digest: `7c8f81cb30f7807a485801d3922d46d546ec1850934680bc3d5b9fb7547129ca`
+Digest: `b4e816d5c5f340911f7f3c5d25a8f1a1e389956e6ee2db62b8f06e3b01d5fd5e`
 
 This file is generated from `docs/generated/architecture-inventory.json`.
 
@@ -127,9 +127,9 @@ Count: 413
 - `src/platform/routes_arena.py:71` handler='arena_run_agent', method='POST', reachability='unknown', route='/api/arena/run/{agent_id}'
 - `src/platform/routes_arena.py:103` handler='arena_tournament', method='POST', reachability='unknown', route='/api/arena/tournament'
 - `src/full_platform.py:4652` handler='arena_tournament', method='POST', reachability='unknown', route='/api/arena/tournament'
-- `src/vulcan/runtime/app.py:221` handler='audit_case', method='GET', reachability='production-reachable', route='/v1/audit/cases/{episode_id}'
-- `src/vulcan/runtime/app.py:197` handler='capabilities', method='GET', reachability='production-reachable', route='/v1/capabilities'
-- `src/vulcan/runtime/app.py:201` handler='chat', method='POST', reachability='production-reachable', route='/v1/chat'
+- `src/vulcan/runtime/app.py:216` handler='audit_case', method='GET', reachability='production-reachable', route='/v1/audit/cases/{episode_id}'
+- `src/vulcan/runtime/app.py:192` handler='capabilities', method='GET', reachability='production-reachable', route='/v1/capabilities'
+- `src/vulcan/runtime/app.py:196` handler='chat', method='POST', reachability='production-reachable', route='/v1/chat'
 - `src/platform/routes_adversarial.py:324` handler='check_query_adversarial', method='POST', reachability='unknown', route='/api/adversarial/check-query'
 - `src/full_platform.py:5003` handler='check_query_adversarial', method='POST', reachability='unknown', route='/api/adversarial/check-query'
 - `src/vulcan/endpoints/distillation.py:279` handler='clear_distillation_buffer', method='POST', reachability='unknown', route='/clear'
@@ -159,7 +159,7 @@ Count: 413
 
 ## Import Identities
 
-Count: 1919
+Count: 1921
 
 - `tests/security/test_output_firewall.py:1` module='vulcan.runtime.output', reachability='test-only'
 - `tests/test_probabilistic_routing.py:10` module='src.vulcan.reasoning.probabilistic_reasoning', reachability='test-only'
@@ -211,7 +211,7 @@ Count: 1919
 - `src/vulcan/orchestrator/platform_status.py:99` module='vulcan.arena', reachability='unknown'
 - `src/vulcan/world_model/world_model_core.py:1020` module='vulcan.world_model.creative_handler', reachability='unknown'
 - `src/api_server.py:103` module='vulcan.reasoning.unified', reachability='unknown'
-- ... 1869 more in JSON
+- ... 1871 more in JSON
 
 ## Singletons
 

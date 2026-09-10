@@ -20,6 +20,7 @@ from vulcan.runtime.api import (
     RuntimeAPI,
     VerifiedAuthenticationContext,
     _validate_phase_a_settings,
+    request_digest,
 )
 from vulcan.runtime.auth import AuthenticatedPrincipal
 from vulcan.runtime.route_manifest import (
@@ -50,14 +51,15 @@ def authentication(*scopes: str) -> VerifiedAuthenticationContext:
 
 
 def command(**changes) -> CommandEnvelope:
+    payload = {"message": "2 + 2", "conversation_id": None}
     values = {
         "kind": CommandKind.CHAT,
-        "request_digest": "a" * 64,
+        "request_digest": request_digest(CommandKind.CHAT, payload),
         "authentication": authentication("reason:write"),
         "idempotency_key": "request-1",
         "deadline": datetime.now(timezone.utc) + timedelta(seconds=5),
         "budget": ExecutionBudget(64, 4096),
-        "payload": {"message": "2 + 2", "conversation_id": None},
+        "payload": payload,
     }
     values.update(changes)
     return CommandEnvelope(**values)
@@ -106,6 +108,8 @@ def test_envelope_requires_verified_context_digest_key_deadline_and_budget() -> 
         command(authentication=object())
     with pytest.raises(ValueError, match="request digest"):
         command(request_digest="not-a-digest")
+    with pytest.raises(ValueError, match="does not bind"):
+        command(request_digest="a" * 64)
     with pytest.raises(ValueError, match="idempotency"):
         command(idempotency_key="contains spaces")
     with pytest.raises(ValueError, match="UTC deadline"):
@@ -127,7 +131,7 @@ def test_manifest_requires_composed_app_or_typed_registry() -> None:
 def test_query_envelope_has_same_mandatory_boundary() -> None:
     envelope = QueryEnvelope(
         QueryKind.READINESS,
-        "b" * 64,
+        request_digest(QueryKind.READINESS, {}),
         authentication(),
         "query-1",
         datetime.now(timezone.utc) + timedelta(seconds=5),
@@ -225,5 +229,44 @@ async def test_reduced_graph_executes_arithmetic_without_forbidden_packages(
             for module in newly_imported
             for prefix in forbidden
         )
+        with pytest.raises(RuntimeError, match="output budget"):
+            await api.execute(command(budget=ExecutionBudget(64, 1)))
     finally:
         await runtime.close()
+
+
+def test_reduced_composition_closes_durable_owners_after_startup_failure(
+    tmp_path, monkeypatch
+) -> None:
+    from vulcan.persistence.audit import CanonicalAudit
+    from vulcan.runtime import phase_a_composition
+
+    root = tmp_path / "failed-start"
+    root.mkdir(mode=0o700)
+    settings = RuntimeSettings(
+        VulcanEnvironment.development,
+        "vulcan",
+        "vulcan-runtime",
+        OpaqueSecret(
+            SecretSource.direct,
+            "Phase-A-Test-Secret-0123456789!abcdef",
+            "VULCAN_JWT_SECRET",
+        ),
+        root,
+        durable_root_paths(root),
+        memory_enabled=False,
+        memory_backend=MemoryBackend.disabled,
+        memory_sqlite_path=None,
+        csiu_enabled=False,
+        learning_enabled=False,
+    )
+    monkeypatch.setattr(
+        phase_a_composition,
+        "load_capability_registry",
+        lambda: (_ for _ in ()).throw(RuntimeError("capability failure")),
+    )
+    with pytest.raises(RuntimeError, match="capability failure"):
+        phase_a_composition.compose_phase_a_runtime(settings)
+
+    reopened = CanonicalAudit(root / "audit" / "events.jsonl")
+    reopened.close()

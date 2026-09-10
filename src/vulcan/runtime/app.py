@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
@@ -20,6 +19,7 @@ from .api import (
     QueryKind,
     RuntimeAPI,
     VerifiedAuthenticationContext,
+    request_digest,
 )
 from .api_models import ReasonRequest
 from .auth import AuthError, AuthorizationError, authenticate_bearer
@@ -50,22 +50,16 @@ async def lifespan(app: FastAPI):
             await api._close()
 
 
-def _digest(value: object) -> str:
-    raw = json.dumps(
-        value, sort_keys=True, separators=(",", ":"), ensure_ascii=False
-    ).encode()
-    return hashlib.sha256(raw).hexdigest()
-
-
 def _public_query(kind: QueryKind) -> QueryEnvelope:
+    payload: dict[str, object] = {}
     return QueryEnvelope(
         kind,
-        _digest({"query": kind.value}),
+        request_digest(kind, payload),
         VerifiedAuthenticationContext.public(),
         f"public-{kind.value}",
         datetime.now(timezone.utc) + timedelta(seconds=5),
         ExecutionBudget(1, 65536),
-        {},
+        payload,
     )
 
 
@@ -182,14 +176,15 @@ def create_app() -> FastAPI:
 
     @app.get("/health/integrity")
     async def integrity(request: Request):
+        payload: dict[str, object] = {}
         envelope = QueryEnvelope(
             QueryKind.INTEGRITY,
-            _digest({"query": "integrity"}),
+            request_digest(QueryKind.INTEGRITY, payload),
             _authentication(request, "operator:read"),
             "integrity",
             datetime.now(timezone.utc) + timedelta(seconds=5),
             ExecutionBudget(1, 65536),
-            {},
+            payload,
         )
         return dict(await _api(request).query(envelope))
 
@@ -200,7 +195,7 @@ def create_app() -> FastAPI:
     @app.post("/v1/chat")
     async def chat(request: Request):
         body = ReasonRequest.model_validate(await _body(request))
-        utterance_digest = hashlib.sha256(body.message.encode("utf-8")).hexdigest()
+        payload = {"message": body.message, "conversation_id": body.conversation_id}
         key = request.headers.get("idempotency-key")
         if key is None:
             raise ApiContractError(
@@ -208,25 +203,26 @@ def create_app() -> FastAPI:
             )
         envelope = CommandEnvelope(
             CommandKind.CHAT,
-            utterance_digest,
+            request_digest(CommandKind.CHAT, payload),
             _authentication(request, "reason:write"),
             key,
             datetime.now(timezone.utc) + timedelta(seconds=30),
             ExecutionBudget(64, 65536),
-            {"message": body.message, "conversation_id": body.conversation_id},
+            payload,
         )
         return dict(await _api(request).execute(envelope))
 
     @app.get("/v1/audit/cases/{episode_id}")
     async def audit_case(episode_id: str, request: Request):
+        payload = {"episode_id": episode_id}
         envelope = QueryEnvelope(
             QueryKind.EPISODE_AUDIT,
-            _digest({"episode_id": episode_id}),
+            request_digest(QueryKind.EPISODE_AUDIT, payload),
             _authentication(request, "audit:read"),
             f"audit-{episode_id}",
             datetime.now(timezone.utc) + timedelta(seconds=5),
             ExecutionBudget(1, 65536),
-            {"episode_id": episode_id},
+            payload,
         )
         result = dict(await _api(request).query(envelope))
         if not result["events"]:
