@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from types import MappingProxyType
-from typing import Mapping
+from typing import Callable, Mapping
 
 from vulcan.constitution.primitives import canonical_json
 from vulcan.microkernel.episode import ActorBinding
@@ -28,7 +28,7 @@ from vulcan.microkernel.state_machine import (
 
 SCHEMA_VERSION = "vulcan-constitutional-journal/1"
 EXPECTED_SCHEMA_FINGERPRINT = (
-    "ebebe671bcf4c4ffc81329a9c66f67c4e01929c175080d19adfa92ba6143ea2c"
+    "9f777b533e5557be8fbb16b9182f485fce36f53df8929fdd388987f0acc073ca"
 )
 _HEX = re.compile(r"^[0-9a-f]{64}$")
 _ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$")
@@ -95,6 +95,13 @@ class NestedUnitOfWorkError(JournalError):
 
 class SuccessorError(JournalError):
     pass
+
+
+class IdempotencyConflict(JournalError):
+    """An actor/operation/key tuple was reused with non-identical facts."""
+
+
+Failpoint = Callable[[str], None]
 
 
 def _digest(value: object) -> str:
@@ -414,7 +421,13 @@ class UnitOfWork:
 class ConstitutionalDatabase:
     """The only connection and transaction owner for the constitutional journal."""
 
-    def __init__(self, path: str | Path, *, busy_timeout_ms: int = 5_000):
+    def __init__(
+        self,
+        path: str | Path,
+        *,
+        busy_timeout_ms: int = 5_000,
+        failpoint: Failpoint | None = None,
+    ):
         if not 1 <= busy_timeout_ms <= 30_000:
             raise ValueError("busy timeout must be bounded")
         supplied_path = Path(path)
@@ -425,6 +438,7 @@ class ConstitutionalDatabase:
         if self.path.exists() and not self.path.is_file():
             raise ValueError("constitutional database path must be a regular file")
         self.__busy_timeout_ms = busy_timeout_ms
+        self.__failpoint = failpoint or (lambda _name: None)
         self.__lock = threading.RLock()
         self.__local = threading.local()
         self.__active = 0
@@ -502,9 +516,10 @@ class ConstitutionalDatabase:
               credential_provenance_digest TEXT NOT NULL CHECK(length(credential_provenance_digest)=64 AND credential_provenance_digest NOT GLOB '*[^0-9a-f]*'),
               request_id TEXT NOT NULL CHECK(length(request_id) BETWEEN 1 AND 128),
               request_digest TEXT NOT NULL CHECK(length(request_digest)=64 AND request_digest NOT GLOB '*[^0-9a-f]*'),
+              operation TEXT NOT NULL CHECK(length(operation) BETWEEN 1 AND 128),
               idempotency_key TEXT NOT NULL CHECK(length(idempotency_key) BETWEEN 1 AND 128),
               commit_seq INTEGER NOT NULL REFERENCES journal_commits(commit_seq),
-              UNIQUE(actor_digest,idempotency_key)
+              UNIQUE(actor_digest,operation,idempotency_key)
             ) STRICT;
             CREATE TABLE IF NOT EXISTS artifacts(
               artifact_digest TEXT PRIMARY KEY CHECK(length(artifact_digest)=64 AND artifact_digest NOT GLOB '*[^0-9a-f]*'),
@@ -612,7 +627,9 @@ class ConstitutionalDatabase:
         connection: sqlite3.Connection | None = None
         try:
             connection = self.__connect()
+            self.__failpoint("before_begin")
             connection.execute("BEGIN IMMEDIATE")
+            self.__failpoint("after_begin")
             return connection, UnitOfWork(connection)
         except BaseException:
             if connection is not None:
@@ -633,7 +650,12 @@ class ConstitutionalDatabase:
             if success and uow._event_count == 0:
                 connection.execute("ROLLBACK")
                 raise JournalError("a constitutional commit requires an outbox event")
-            connection.execute("COMMIT" if success else "ROLLBACK")
+            if success:
+                self.__failpoint("before_commit")
+                connection.execute("COMMIT")
+                self.__failpoint("after_commit")
+            else:
+                connection.execute("ROLLBACK")
         finally:
             uow._finish()
             connection.close()
@@ -735,32 +757,40 @@ class ConstitutionalJournal:
         request_id: str,
         request_digest: str,
         idempotency_key: str,
+        operation: str = "execute",
     ) -> str:
         for value, name in (
             (command_id, "command id"),
             (request_id, "request id"),
             (idempotency_key, "idempotency key"),
+            (operation, "operation"),
         ):
             _id(value, name)
         _hex(actor_digest, "actor digest")
         _hex(credential_provenance_digest, "credential provenance digest")
         _hex(request_digest, "request digest")
         existing = uow._execute(
-            "SELECT command_id,request_digest FROM commands WHERE actor_digest=? AND idempotency_key=?",
-            (actor_digest, idempotency_key),
+            "SELECT command_id,request_id,request_digest,credential_provenance_digest "
+            "FROM commands WHERE actor_digest=? AND operation=? AND idempotency_key=?",
+            (actor_digest, operation, idempotency_key),
         ).fetchone()
         if existing is not None:
             if existing["request_digest"] != request_digest:
-                raise JournalError("idempotency key is bound to a different command")
-            return "replay"
+                raise IdempotencyConflict(
+                    "idempotency key is bound to different command facts"
+                )
+            # Request IDs are transport facts and intentionally do not alter the
+            # stable replay identity. Return the canonical persisted command.
+            return f"replay:{existing['command_id']}"
         uow._execute(
-            "INSERT INTO commands VALUES (?,?,?,?,?,?,?)",
+            "INSERT INTO commands VALUES (?,?,?,?,?,?,?,?)",
             (
                 command_id,
                 actor_digest,
                 credential_provenance_digest,
                 request_id,
                 request_digest,
+                operation,
                 idempotency_key,
                 uow.commit_seq,
             ),

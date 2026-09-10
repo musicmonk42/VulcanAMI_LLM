@@ -17,6 +17,7 @@ from vulcan.microkernel.constitutional_journal import (
     SCHEMA_VERSION,
     ConstitutionalDatabase,
     ConstitutionalJournal,
+    IdempotencyConflict,
     JournalError,
     JournalEvent,
     NestedUnitOfWorkError,
@@ -245,14 +246,14 @@ def test_successor_idempotency_and_lineage_constraints(tmp_path):
                 uow,
                 command_id="different-request-id",
                 actor_digest=actor,
-                credential_provenance_digest=D,
+                credential_provenance_digest=C,
                 request_id="request-replay",
                 request_digest="1" * 64,
                 idempotency_key="idem-1",
             )
-            == "replay"
+            == "replay:command-1"
         )
-        with pytest.raises(JournalError, match="different command"):
+        with pytest.raises(JournalError, match="different command facts"):
             journal.bind_command(
                 uow,
                 command_id="conflict",
@@ -469,3 +470,86 @@ def test_journal_owner_is_not_production_composed_or_dual_written() -> None:
     assert "sqlite3.connect" not in repositories
     assert '.execute("COMMIT"' not in repositories
     assert '.execute("ROLLBACK"' not in repositories
+
+
+@pytest.mark.parametrize(
+    ("boundary", "committed"),
+    (
+        ("before_begin", False),
+        ("after_begin", False),
+        ("before_commit", False),
+        ("after_commit", True),
+    ),
+)
+def test_transaction_boundary_failpoints_are_prior_or_complete(
+    tmp_path, boundary, committed
+):
+    armed = True
+
+    def failpoint(name):
+        nonlocal armed
+        if armed and name == boundary:
+            armed = False
+            raise RuntimeError(f"injected:{name}")
+
+    path = tmp_path / "constitutional.sqlite3"
+    db = ConstitutionalDatabase(path, failpoint=failpoint)
+    with pytest.raises(RuntimeError, match=f"injected:{boundary}"):
+        with db.transaction() as uow:
+            actor = genesis(ConstitutionalJournal(), uow)
+            uow.emit(event(actor))
+    db.close()
+
+    reopened = ConstitutionalDatabase(path)
+    with reopened.transaction() as uow:
+        count = uow.query("SELECT count(*) FROM commands")[0][0]
+        assert count == int(committed)
+        actor = ConstitutionalJournal.bind_actor(uow, ACTOR)
+        uow.emit(event(actor, "inspection"))
+    reopened.close()
+
+
+def test_idempotency_is_scoped_by_actor_operation_and_exact_provenance(tmp_path):
+    db = ConstitutionalDatabase(tmp_path / "constitutional.sqlite3")
+    journal = ConstitutionalJournal()
+    bob = ActorBinding._from_verified_identity(
+        tenant="tenant-b", issuer="issuer-a", subject="alice"
+    )
+    with db.transaction() as uow:
+        alice_digest = journal.bind_actor(uow, ACTOR)
+        bob_digest = journal.bind_actor(uow, bob)
+        for index, (actor, operation) in enumerate(
+            (
+                (alice_digest, "execute"),
+                (alice_digest, "query"),
+                (bob_digest, "execute"),
+            )
+        ):
+            assert (
+                journal.bind_command(
+                    uow,
+                    command_id=f"command-scope-{index}",
+                    actor_digest=actor,
+                    credential_provenance_digest=C,
+                    request_id=f"request-scope-{index}",
+                    request_digest=D,
+                    idempotency_key="shared-key",
+                    operation=operation,
+                )
+                == "created"
+            )
+        assert (
+            journal.bind_command(
+                uow,
+                command_id="command-rotated",
+                actor_digest=alice_digest,
+                credential_provenance_digest="e" * 64,
+                request_id="request-rotated",
+                request_digest=D,
+                idempotency_key="shared-key",
+                operation="execute",
+            )
+            == "replay:command-scope-0"
+        )
+        uow.emit(event(alice_digest, "scoped"))
+    db.close()

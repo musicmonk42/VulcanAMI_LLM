@@ -1,6 +1,6 @@
 {
   "schema": "vulcan-constitutional-journal/1",
-  "schema_fingerprint": "ebebe671bcf4c4ffc81329a9c66f67c4e01929c175080d19adfa92ba6143ea2c",
+  "schema_fingerprint": "9f777b533e5557be8fbb16b9182f485fce36f53df8929fdd388987f0acc073ca",
   "ordering_authority": ["commit_seq", "event_ordinal"],
   "receipt_chain": ["previous_receipt_digest", "receipt_digest"],
   "required_pragmas": {

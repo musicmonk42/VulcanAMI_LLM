@@ -182,10 +182,10 @@
       "sha256": "430a6cbf571c8388485564aa595e7f6658b0a45b55f8bd9b0da9b62f9947b442"
     },
     {
-      "loc": 573,
+      "loc": 562,
       "module": "vulcan.microkernel.transactions",
       "path": "src/vulcan/microkernel/transactions.py",
-      "sha256": "9e8b94104899565236c3f037e04e776a9fd1240df5de5a33c3110069f880feff"
+      "sha256": "8c2329bb51c582b34c70e9be0c9e9b789905f58725db78174faa41eaeaace7a7"
     },
     {
       "loc": 1,
@@ -362,7 +362,7 @@
       "sha256": "0acc6f0572bce53b836bbce1640f741d9f517c3e8a250ce500ecac654c7e0e94"
     }
   ],
-  "manifest_digest": "b53b60b8f68785e255ef50ba36381ad0878769d8a365b1bd75509d7f3b4b9cfa",
+  "manifest_digest": "9775761da83da64aee8e4e538989ec4822303fc43690e43402193ac4b9edea1b",
   "resources": [
     {
       "path": "config/actor-binding-schema.json",

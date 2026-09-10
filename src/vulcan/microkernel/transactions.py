@@ -189,11 +189,11 @@ class ConstitutionalTransactionService:
         ):
             raise AuthorityError("epistemic candidate authority binding mismatch")
         durable_head = self._epistemic_store.head(episode_id)
-        if durable_head is not None and self._same_epistemic_payload(
+        if durable_head is not None and self._same_epistemic_identity(
             durable_head, candidate
         ):
-            # Recovery for the DB-first crash window: epistemic persistence may
-            # have succeeded before its episode projection was acknowledged.
+            # Compatibility recovery is permitted only for byte-equivalent,
+            # identity-equivalent commits. Similar semantics are not identity.
             committed = durable_head
         else:
             committed = self._epistemic_store.append(
@@ -235,22 +235,11 @@ class ConstitutionalTransactionService:
         )
 
     @staticmethod
-    def _same_epistemic_payload(
+    def _same_epistemic_identity(
         committed: EpistemicCommit, candidate: EpistemicCommit
     ) -> bool:
-        def stable_document(value: EpistemicCommit) -> dict[str, object]:
-            document = commit_to_dict(value)
-            for field in (
-                "authority_evidence_digest",
-                "commit_digest",
-                "commit_id",
-                "committed_at",
-                "prior_commit_digest",
-            ):
-                document.pop(field)
-            return document
-
-        return stable_document(committed) == stable_document(candidate)
+        """Require equality of the complete canonical persisted identity."""
+        return commit_to_dict(committed) == commit_to_dict(candidate)
 
     def _advance(
         self,
