@@ -222,6 +222,50 @@ def verify_integrity(connection: sqlite3.Connection) -> None:
     for artifact_digest, content in artifacts:
         if hashlib.sha256(bytes(content)).hexdigest() != artifact_digest:
             raise JournalError("artifact content digest mismatch")
+    transition_receipts = connection.execute(
+        "SELECT artifact_digest,content FROM artifacts "
+        "WHERE kind='transition-receipt.v1'"
+    ).fetchall()
+    for artifact_digest, content in transition_receipts:
+        receipt = _strict_json(bytes(content).decode("utf-8"))
+        required = {
+            "actor_digest",
+            "artifact_digests",
+            "command_id",
+            "committed_at",
+            "commit_seq",
+            "constitution_digest",
+            "credential_provenance_digest",
+            "episode_id",
+            "expires_at_epoch",
+            "issued_at_epoch",
+            "nonce_digest",
+            "operation",
+            "policy_digest",
+            "predecessor_digest",
+            "qualified_release_digest",
+            "resulting_head_digest",
+            "schema_version",
+            "snapshot_digest",
+            "trust_root_digest",
+            "validation_digest",
+            "verifier_digest",
+        }
+        if (
+            set(receipt) != required
+            or receipt["schema_version"] != "vulcan-transition-receipt/1"
+        ):
+            raise JournalError("transition receipt schema is invalid")
+        committed = datetime.fromisoformat(receipt["committed_at"]).timestamp()
+        if not receipt["issued_at_epoch"] <= committed <= receipt["expires_at_epoch"]:
+            raise JournalError("transition receipt permit was expired at commit")
+        reference = connection.execute(
+            "SELECT 1 FROM transactional_outbox WHERE event_type='transition.receipt.recorded' "
+            "AND json_extract(payload,'$.receipt_artifact_digest')=?",
+            (artifact_digest,),
+        ).fetchone()
+        if reference is None:
+            raise JournalError("transition receipt is not receipt-chain bound")
     terminal_rows = connection.execute(
         "SELECT t.terminal_state,a.content,ed.document FROM terminal_results t "
         "JOIN artifacts a ON a.artifact_digest=t.result_digest "

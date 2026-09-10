@@ -34,7 +34,7 @@ Audit reads now use a deterministic, disposable projection of the journal receip
 chain; deleting or failing to deliver JSONL cannot affect readiness or cognition.
 The offline exclusive migrator preserves validated legacy sources as read-only
 rollback evidence and imports their records with `LEGACY_UNVERIFIED` attribution.
-Live transition-permit separation is the next ordered work.
+The serving mutation port now requires edge-specific, process-local, single-use live permits and persists distinct replay-only transition receipts. Python object capabilities protect only the supported import-isolated TCB; arbitrary malicious code in the same interpreter cannot be contained and all future untrusted components must run out of process.
 
 Persistent causal lineage is now M3 on the composed request path: episode
 genesis binds the current branch head and terminal episodes enter that branch's

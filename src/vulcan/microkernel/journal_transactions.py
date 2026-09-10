@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from hashlib import sha256
 
 from vulcan.constitution.primitives import AuthorityLevel, canonical_json
 from vulcan.graphix.epistemic import EpistemicCommit, dumps_commit
 
+from ._transition_permits import LiveTransitionPermit, MutationPort, TransitionEdge
 from .authority import AuthorityError
-from .constitutional_journal import ConstitutionalJournal, SuccessorError
+from .constitutional_journal import ConstitutionalJournal, JournalEvent, SuccessorError
 from .episode import ActorBinding, ArtifactRef, CognitiveEpisode, canonical_digest
 from .episode_store import episode_from_document
 from .journal_stores import (
@@ -48,9 +50,76 @@ class JournalConstitutionalTransactionService(ConstitutionalTransactionService):
         self._database = episodes.database
         self._journal = ConstitutionalJournal()
         self._branch_id = branch_id
+        self._mutation_port: MutationPort | None = None
+        self._verifier_digest: str | None = None
         self._pending_publication: dict[
-            str, tuple[list[tuple[CognitiveEpisode, CognitiveEpisode]], bytes, str]
+            str,
+            tuple[
+                list[tuple[CognitiveEpisode, CognitiveEpisode, dict[str, object]]],
+                bytes,
+                str,
+            ],
         ] = {}
+
+    def _configure_mutation_port(
+        self, *, qualified_release_digest: str, verifier_digest: str
+    ) -> None:
+        """Bind the private serving capability once during trusted composition."""
+        if self._mutation_port is not None:
+            raise RuntimeError("mutation port is already configured")
+        self._mutation_port = MutationPort(qualified_release_digest)
+        self._verifier_digest = verifier_digest
+
+    def _issue_transition_permit(
+        self,
+        *,
+        episode_id: str,
+        edge: TransitionEdge,
+        policy_digest: str,
+        validation_digest: str,
+        snapshot_digest: str,
+        expected_prior_episode_digest: str,
+    ) -> LiveTransitionPermit:
+        if self._mutation_port is None or self._verifier_digest is None:
+            raise AuthorityError("live mutation port is not configured")
+        rows = self._database.read(
+            "SELECT actor_digest FROM episodes WHERE episode_id=?", (episode_id,)
+        )
+        if not rows:
+            raise AuthorityError("admitted episode is missing")
+        return self._mutation_port.issue(
+            edge=edge,
+            actor_digest=rows[0]["actor_digest"],
+            episode_id=episode_id,
+            policy_digest=policy_digest,
+            snapshot_digest=snapshot_digest,
+            validation_digest=validation_digest,
+            verifier_digest=self._verifier_digest,
+            expected_prior_episode_digest=expected_prior_episode_digest,
+        )
+
+    def _consume_permit(self, permit, *, edge, head):
+        if self._mutation_port is None or self._verifier_digest is None:
+            raise AuthorityError("live mutation port is not configured")
+        rows = self._database.read(
+            "SELECT actor_digest FROM episodes WHERE episode_id=?", (head.episode_id,)
+        )
+        if not rows:
+            raise AuthorityError("admitted command binding is missing")
+        actor = rows[0]["actor_digest"]
+        try:
+            return self._mutation_port.consume(
+                permit,
+                edge=edge,
+                actor_digest=actor,
+                constitution_digest=self._mutation_port.constitution_digest,
+                episode_id=head.episode_id,
+                snapshot_digest=head.snapshot_bundle.state_digest,
+                verifier_digest=self._verifier_digest,
+                expected_prior_episode_digest=head.digest,
+            )
+        except PermissionError as exc:
+            raise AuthorityError(str(exc)) from exc
 
     def _binding(self, uow, episode_id: str) -> tuple[str, str]:
         rows = uow.query(
@@ -113,8 +182,30 @@ class JournalConstitutionalTransactionService(ConstitutionalTransactionService):
         idempotency_key: str,
         context_bytes: bytes,
     ) -> CognitiveEpisode:
+        if self._mutation_port is None or self._verifier_digest is None:
+            raise AuthorityError("live mutation port is not configured")
         with self._database.transaction() as uow:
             actor_digest = self._journal.bind_actor(uow, actor)
+            admission = self._mutation_port.issue(
+                edge=TransitionEdge.ADMISSION,
+                actor_digest=actor_digest,
+                episode_id=episode.episode_id,
+                policy_digest="0" * 64,
+                snapshot_digest=episode.snapshot_bundle.state_digest,
+                validation_digest=request_digest,
+                verifier_digest=self._verifier_digest,
+                expected_prior_episode_digest="0" * 64,
+            )
+            admission_facts = self._mutation_port.consume(
+                admission,
+                edge=TransitionEdge.ADMISSION,
+                actor_digest=actor_digest,
+                constitution_digest=self._mutation_port.constitution_digest,
+                episode_id=episode.episode_id,
+                snapshot_digest=episode.snapshot_bundle.state_digest,
+                verifier_digest=self._verifier_digest,
+                expected_prior_episode_digest="0" * 64,
+            )
             command_id = f"command:{episode.episode_id}"
             outcome = self._journal.bind_command(
                 uow,
@@ -153,6 +244,48 @@ class JournalConstitutionalTransactionService(ConstitutionalTransactionService):
                 actor_digest=actor_digest,
                 credential_provenance_digest=credential_provenance_digest,
                 episode=episode,
+            )
+            committed_at = datetime.now(timezone.utc)
+            receipt_document = {
+                "actor_digest": actor_digest,
+                "artifact_digests": [context_digest],
+                "command_id": command_id,
+                "committed_at": committed_at.isoformat(),
+                "commit_seq": uow.commit_seq,
+                "constitution_digest": admission_facts["constitution_digest"],
+                "credential_provenance_digest": credential_provenance_digest,
+                "episode_id": episode.episode_id,
+                "expires_at_epoch": admission_facts["expires_at_epoch"],
+                "issued_at_epoch": admission_facts["issued_at_epoch"],
+                "nonce_digest": admission_facts["nonce_digest"],
+                "operation": admission_facts["edge"],
+                "policy_digest": admission_facts["policy_digest"],
+                "predecessor_digest": "0" * 64,
+                "qualified_release_digest": admission_facts["qualified_release_digest"],
+                "resulting_head_digest": episode.digest,
+                "schema_version": "vulcan-transition-receipt/1",
+                "snapshot_digest": admission_facts["snapshot_digest"],
+                "trust_root_digest": admission_facts["verifier_digest"],
+                "validation_digest": admission_facts["validation_digest"],
+                "verifier_digest": admission_facts["verifier_digest"],
+            }
+            receipt_artifact = self._journal.put_artifact(
+                uow,
+                kind="transition-receipt.v1",
+                content=canonical_json(receipt_document),
+            )
+            uow.emit(
+                JournalEvent(
+                    "transition.receipt.recorded",
+                    actor_digest,
+                    credential_provenance_digest,
+                    {
+                        "episode_id": episode.episode_id,
+                        "receipt_artifact_digest": receipt_artifact,
+                        "resulting_head_digest": episode.digest,
+                    },
+                    committed_at,
+                )
             )
         return episode
 
@@ -209,12 +342,6 @@ class JournalConstitutionalTransactionService(ConstitutionalTransactionService):
         auth: CommandAuthority,
         candidate: EpistemicCommit,
     ) -> CognitiveEpisode:
-        if (
-            not auth.principal.is_kernel
-            or auth.grant.principal_digest != auth.principal.identity_digest
-            or not auth.grant.level.dominates(AuthorityLevel.COMMITTED_BELIEF)
-        ):
-            raise AuthorityError("epistemic commitment authority is insufficient")
         head = self._store.load(episode_id)
         snapshot = "sha256:" + auth.snapshot_digest
         if (
@@ -274,6 +401,9 @@ class JournalConstitutionalTransactionService(ConstitutionalTransactionService):
             else candidate.prior_commit_digest.removeprefix("sha256:")
         )
         with self._database.transaction() as uow:
+            permit_facts = self._consume_permit(
+                auth, edge=TransitionEdge.EPISTEMIC_COMMIT, head=head
+            )
             actor_digest, credential = self._binding(uow, episode_id)
             artifact = self._journal.put_artifact(
                 uow, kind="epistemic-commit.v1", content=dumps_commit(candidate)
@@ -288,7 +418,14 @@ class JournalConstitutionalTransactionService(ConstitutionalTransactionService):
                 credential_provenance_digest=credential,
             )
             self._epistemic_store.write_document(uow, digest, candidate)
-            self._persist_transition(uow, head, successor, actor_digest, credential)
+            self._persist_transition(
+                uow,
+                head,
+                successor,
+                actor_digest,
+                credential,
+                permit_facts=permit_facts,
+            )
         return successor
 
     def _successor(
@@ -346,6 +483,7 @@ class JournalConstitutionalTransactionService(ConstitutionalTransactionService):
         credential,
         *,
         terminal_content: bytes | None = None,
+        permit_facts: dict[str, object] | None = None,
     ):
         transition = successor.transitions[-1]
         self._journal.append_transition(
@@ -404,14 +542,63 @@ class JournalConstitutionalTransactionService(ConstitutionalTransactionService):
             credential_provenance_digest=credential,
             episode=successor,
         )
+        if permit_facts is not None:
+            command = uow.query(
+                "SELECT command_id FROM episodes WHERE episode_id=?",
+                (successor.episode_id,),
+            )[0]["command_id"]
+            receipt = {
+                "actor_digest": actor_digest,
+                "artifact_digests": sorted(
+                    ref.digest
+                    for ref in (
+                        *successor.claims,
+                        *successor.evidence,
+                        *successor.derivations,
+                        *successor.candidate_plans,
+                        *successor.consolidation_refs,
+                    )
+                ),
+                "command_id": command,
+                "committed_at": successor.transitions[-1].at.isoformat(),
+                "commit_seq": uow.commit_seq,
+                "constitution_digest": permit_facts["constitution_digest"],
+                "credential_provenance_digest": credential,
+                "episode_id": successor.episode_id,
+                "expires_at_epoch": permit_facts["expires_at_epoch"],
+                "issued_at_epoch": permit_facts["issued_at_epoch"],
+                "nonce_digest": permit_facts["nonce_digest"],
+                "operation": permit_facts["edge"],
+                "policy_digest": permit_facts["policy_digest"],
+                "predecessor_digest": head.digest,
+                "qualified_release_digest": permit_facts["qualified_release_digest"],
+                "resulting_head_digest": successor.digest,
+                "schema_version": "vulcan-transition-receipt/1",
+                "snapshot_digest": permit_facts["snapshot_digest"],
+                "trust_root_digest": permit_facts["verifier_digest"],
+                "validation_digest": permit_facts["validation_digest"],
+                "verifier_digest": permit_facts["verifier_digest"],
+            }
+            artifact = self._journal.put_artifact(
+                uow,
+                kind="transition-receipt.v1",
+                content=canonical_json(receipt),
+            )
+            uow.emit(
+                JournalEvent(
+                    "transition.receipt.recorded",
+                    actor_digest,
+                    credential,
+                    {
+                        "episode_id": successor.episode_id,
+                        "receipt_artifact_digest": artifact,
+                        "resulting_head_digest": successor.digest,
+                    },
+                    successor.transitions[-1].at,
+                )
+            )
 
     def _advance(self, episode_id, auth, target, *, reason, minimum, **updates):
-        if (
-            not auth.principal.is_kernel
-            or auth.grant.principal_digest != auth.principal.identity_digest
-            or not auth.grant.level.dominates(minimum)
-        ):
-            raise AuthorityError("constitutional transition authority is insufficient")
         pending = self._pending_publication.get(episode_id)
         head = (
             pending[0][-1][1]
@@ -419,23 +606,35 @@ class JournalConstitutionalTransactionService(ConstitutionalTransactionService):
             else self._store.load(episode_id)
         )
         successor = self._successor(head, auth, target, reason=reason, **updates)
+        edge = (
+            TransitionEdge.PUBLICATION
+            if target
+            in {
+                EpisodeState.NORMATIVELY_AUTHORIZED,
+                EpisodeState.COMMUNICATED,
+                EpisodeState.CONSOLIDATED,
+            }
+            else TransitionEdge.VALIDATION
+        )
+        permit_facts = self._consume_permit(auth, edge=edge, head=head)
         if pending is not None and target in {
             EpisodeState.NORMATIVELY_AUTHORIZED,
             EpisodeState.COMMUNICATED,
         }:
-            pending[0].append((head, successor))
+            pending[0].append((head, successor, permit_facts))
             return successor
         with self._database.transaction() as uow:
             actor_digest, credential = self._binding(uow, episode_id)
             if pending is not None:
-                pending[0].append((head, successor))
-                for index, (prior, current) in enumerate(pending[0]):
+                pending[0].append((head, successor, permit_facts))
+                for index, (prior, current, transition_permit) in enumerate(pending[0]):
                     self._persist_transition(
                         uow,
                         prior,
                         current,
                         actor_digest,
                         credential,
+                        permit_facts=transition_permit,
                         terminal_content=(
                             canonical_json(
                                 {
@@ -448,6 +647,13 @@ class JournalConstitutionalTransactionService(ConstitutionalTransactionService):
                         ),
                     )
             else:
-                self._persist_transition(uow, head, successor, actor_digest, credential)
+                self._persist_transition(
+                    uow,
+                    head,
+                    successor,
+                    actor_digest,
+                    credential,
+                    permit_facts=permit_facts,
+                )
         self._pending_publication.pop(episode_id, None)
         return successor

@@ -28,6 +28,7 @@ from vulcan.graphix.runtime import (
     validate_interpretation_artifact,
     validate_proposal,
 )
+from vulcan.microkernel._transition_permits import TransitionEdge
 from vulcan.microkernel.authority import EvidenceRecord, promote_authority
 from vulcan.microkernel.episode import (
     ArtifactRef,
@@ -142,6 +143,12 @@ class CognitiveKernel:
             raise TypeError("transaction authority must be SYSTEM_KERNEL")
         self._transactions = service
         self._kernel_principal = principal
+        configure = getattr(service, "_configure_mutation_port", None)
+        if configure is not None:
+            configure(
+                qualified_release_digest=principal.release_digest,
+                verifier_digest=principal.identity_digest,
+            )
 
     def disable_legacy_case_audit(self) -> None:
         """Retire mutable ``case.*`` lifecycle writes on the composed path.
@@ -157,7 +164,7 @@ class CognitiveKernel:
         policy_digest: str,
         validation_digest: str,
         level: AuthorityLevel,
-    ) -> CommandAuthority:
+    ):
         if (
             self._transactions is None
             or self._kernel_principal is None
@@ -170,6 +177,26 @@ class CognitiveKernel:
             if len(policy_digest) == 64
             else episode_digest({"policy": policy_digest or "default-deny"})
         )
+        issue = getattr(self._transactions, "_issue_transition_permit", None)
+        if issue is not None:
+            edge = {
+                AuthorityLevel.COMMITTED_BELIEF: TransitionEdge.EPISTEMIC_COMMIT,
+                AuthorityLevel.AUTHORIZED_PLAN: TransitionEdge.PUBLICATION,
+            }.get(level, TransitionEdge.VALIDATION)
+            return issue(
+                episode_id=case.episode.episode_id,
+                edge=edge,
+                policy_digest=policy,
+                validation_digest=validation_digest,
+                snapshot_digest=case.episode.snapshot_bundle.state_digest,
+                expected_prior_episode_digest=case.episode.digest,
+            )
+        return self._legacy_command_authority(case, policy, validation_digest, level)
+
+    def _legacy_command_authority(
+        self, case, policy, validation_digest, level
+    ) -> CommandAuthority:
+        """Removal-bound adapter for non-journal compatibility tests only."""
         evidence = EvidenceRecord(
             self._kernel_principal.identity_digest,
             validation_digest,
@@ -866,7 +893,7 @@ class CognitiveKernel:
                             case,
                             bound_policy,
                             consolidation.digest,
-                            AuthorityLevel.COMMITTED_BELIEF,
+                            AuthorityLevel.AUTHORIZED_PLAN,
                         ),
                         consolidation,
                     ),

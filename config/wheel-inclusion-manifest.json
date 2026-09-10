@@ -110,6 +110,12 @@
       "sha256": "9b6576ec5da0da5b48091f966e42635ef7da326c58c6e65eb0313630252dbe3c"
     },
     {
+      "loc": 161,
+      "module": "vulcan.microkernel._transition_permits",
+      "path": "src/vulcan/microkernel/_transition_permits.py",
+      "sha256": "7fdc3517ac92671bc75c53403ff441e7c1224c6d83845d7e5269e8a7ff646372"
+    },
+    {
       "loc": 116,
       "module": "vulcan.microkernel.authority",
       "path": "src/vulcan/microkernel/authority.py",
@@ -128,10 +134,10 @@
       "sha256": "125d2c3ffe5ce78ee8d6fca20602fb961867ee894ad86e362b69997583032e18"
     },
     {
-      "loc": 1161,
+      "loc": 1205,
       "module": "vulcan.microkernel.constitutional_journal",
       "path": "src/vulcan/microkernel/constitutional_journal.py",
-      "sha256": "e378f25b1cf9aa39cd5bd7d9671843e5995f6b9b345b5ea658a6991e78c4d2c3"
+      "sha256": "ee2be09a48c9c9e9bb6afdde24ef0d645257236eb084eabb4c5682ef04b9ff80"
     },
     {
       "loc": 1128,
@@ -164,10 +170,10 @@
       "sha256": "4f236c513e4d0f1f18f1e45f6ae11bd12af6136ce46ffe59aa9407c069c14e13"
     },
     {
-      "loc": 453,
+      "loc": 659,
       "module": "vulcan.microkernel.journal_transactions",
       "path": "src/vulcan/microkernel/journal_transactions.py",
-      "sha256": "31ee31f06c82fd36d80aa0c29d7e0c00551caef486c6d45ff512183b803440a4"
+      "sha256": "df33f7b833a3980fc70cf470d3dc0b422c94a0d84320749cc917dc7791012a43"
     },
     {
       "loc": 670,
@@ -290,10 +296,10 @@
       "sha256": "dab7c8cf27b4aa98838b591b7f996686a13d72c4742b32a844a5bbee196d4cc5"
     },
     {
-      "loc": 1004,
+      "loc": 1031,
       "module": "vulcan.runtime.kernel",
       "path": "src/vulcan/runtime/kernel.py",
-      "sha256": "326353db70a2b554ae0ea8accb095400f1c0150e73229d8ff358307cf5a0e951"
+      "sha256": "7f06813bcc2b68b47cfc0be37a8ae2b5042a4a95f11f1f8819049c334f1fe491"
     },
     {
       "loc": 321,
@@ -350,7 +356,7 @@
       "sha256": "0acc6f0572bce53b836bbce1640f741d9f517c3e8a250ce500ecac654c7e0e94"
     }
   ],
-  "manifest_digest": "e9ad26cb5a99591b635961c29afe01538f6f419cc24f387fc6c98bc27aa26b37",
+  "manifest_digest": "72881110b46671fb8ea2d04d9aa02dea6ed0c13c91f31d4d70ce0971ea47b7c0",
   "resources": [
     {
       "path": "config/actor-binding-schema.json",
@@ -364,7 +370,7 @@
     },
     {
       "path": "config/constitutional-journal-schema.json",
-      "sha256": "f4c34df35e65396ca363f25581f49d6c9f5a0bcf4c76f638be74c4f7069f3448",
+      "sha256": "4f688c1b6eac549c63378a4044e8eb7d3b7780b8ac32f9433b7fd7d07bc3d5cd",
       "wheel_path": "vulcan/_release_evidence/config/constitutional-journal-schema.json"
     },
     {

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import inspect
+import json
 import sqlite3
 import sys
 from dataclasses import FrozenInstanceError
@@ -12,6 +13,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from vulcan.microkernel.episode import canonical_digest
 from vulcan.runtime.api import (
     CommandEnvelope,
     CommandKind,
@@ -283,8 +285,21 @@ async def test_reduced_graph_executes_arithmetic_without_forbidden_packages(
                     "SELECT count(*) FROM transactional_outbox WHERE commit_seq=?",
                     (terminal[0],),
                 ).fetchone()[0]
-                == 3
+                == 6
             )
+            receipts = connection.execute(
+                "SELECT a.content FROM artifacts a "
+                "WHERE a.kind='transition-receipt.v1' ORDER BY a.artifact_digest"
+            ).fetchall()
+            assert len(receipts) == len(episode.transitions)
+            for row in receipts:
+                receipt = json.loads(row[0])
+                assert receipt["actor_digest"] == canonical_digest(
+                    episode.actor.to_json()
+                )
+                assert receipt["episode_id"] == episode.episode_id
+                assert receipt["issued_at_epoch"] <= receipt["expires_at_epoch"]
+                assert receipt["schema_version"] == "vulcan-transition-receipt/1"
         finally:
             connection.close()
         audit_payload = {"episode_id": episode.episode_id}

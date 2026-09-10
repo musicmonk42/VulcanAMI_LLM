@@ -12,7 +12,7 @@ research, and transformer providers are not composed.
 
 ## Threshold disposition
 
-The reviewed wheel manifest currently contains 58 Python files and 17,155
+The reviewed wheel manifest currently contains 59 Python files and 17,593
 non-test lines of code, exceeding both the 45-file and 15,000-LOC review
 thresholds. This is accepted as a review exception, not as proof
 of safety, because the constitutional arithmetic transaction still requires the
