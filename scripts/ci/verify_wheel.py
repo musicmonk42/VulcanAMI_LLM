@@ -26,8 +26,13 @@ def encoded(raw):
 
 def verify(wheel: Path):
     manifest = json.loads(MANIFEST.read_text())
-    expected = {row["path"].removeprefix("src/") for row in manifest["files"]}
-    expected.update(row["wheel_path"] for row in manifest["resources"])
+    expected_digests = {
+        row["path"].removeprefix("src/"): row["sha256"] for row in manifest["files"]
+    }
+    expected_digests.update(
+        {row["wheel_path"]: row["sha256"] for row in manifest["resources"]}
+    )
+    expected = set(expected_digests)
     with zipfile.ZipFile(wheel) as archive:
         names = archive.namelist()
         if len(names) != len(set(names)):
@@ -72,6 +77,16 @@ def verify(wheel: Path):
             name: hashlib.sha256(archive.read(name)).hexdigest()
             for name in sorted(actual)
         }
+        mismatched = {
+            name: {"expected": expected_digests[name], "actual": members[name]}
+            for name in sorted(actual)
+            if members[name] != expected_digests[name]
+        }
+        if mismatched:
+            raise RuntimeError(
+                "wheel content differs from reviewed inclusion manifest: "
+                + json.dumps(mismatched, sort_keys=True)
+            )
     return {
         "schema": "vulcan-wheel-verification/v1",
         "wheel_sha256": hashlib.sha256(wheel.read_bytes()).hexdigest(),
