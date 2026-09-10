@@ -8,10 +8,7 @@ import inspect
 import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any
-
-if TYPE_CHECKING:
-    from vulcan.memory.governed import GovernedMemoryPort
+from typing import Any
 
 from vulcan.constitution.primitives import AuthorityLevel
 from vulcan.graphix.runtime import (
@@ -116,7 +113,7 @@ class CognitiveKernel:
         finalizer: ResponseFinalizerPort,
         language_input: LanguageInputPort | None = None,
         language_output: LanguageOutputPort | None = None,
-        memory: "GovernedMemoryPort | None" = None,
+        memory: Any = None,
         audit: Any = None,
         alignment: Any = None,
         domain_lookup: Any = None,

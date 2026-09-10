@@ -4,7 +4,12 @@ from pathlib import Path
 
 import pytest
 
-from vulcan.runtime.settings import RuntimeSettings, SettingsError, generate_settings_schema, load_runtime_settings
+from vulcan.runtime.settings import (
+    RuntimeSettings,
+    SettingsError,
+    generate_settings_schema,
+    load_runtime_settings,
+)
 
 SECRET = "AbCdEfGhIjKlMnOpQrStUvWxYz7890+/safe"
 APPROVAL = "YnOpQrStUvWxAbCdEfGhIjKlM7890+/approval"
@@ -48,13 +53,19 @@ def test_conflicting_aliases_fail_closed(tmp_path: Path) -> None:
     with pytest.raises(SettingsError, match="conflicting values for VULCAN_JWT_SECRET"):
         load_runtime_settings(env(tmp_path, GRAPHIX_JWT_SECRET="z" * 40))
 
-def test_production_does_not_require_offline_approval_secret_but_requires_csiu(tmp_path: Path) -> None:
+def test_production_does_not_require_offline_approval_or_csiu_owner(tmp_path: Path) -> None:
     settings = load_runtime_settings(env(tmp_path, VULCAN_ENV="production"))
     assert settings.approval_hmac_secret is None
-    with pytest.raises(SettingsError, match="production requires"):
-        load_runtime_settings(env(tmp_path, VULCAN_ENV="production", VULCAN_APPROVAL_HMAC_SECRET=APPROVAL, VULCAN_CSIU_ENABLED="0"))
-    settings = load_runtime_settings(env(tmp_path, VULCAN_ENV="production", VULCAN_APPROVAL_HMAC_SECRET=APPROVAL))
+    settings = load_runtime_settings(
+        env(
+            tmp_path,
+            VULCAN_ENV="production",
+            VULCAN_APPROVAL_HMAC_SECRET=APPROVAL,
+            VULCAN_CSIU_ENABLED="0",
+        )
+    )
     assert settings.environment.value == "production"
+    assert settings.csiu_enabled is False
 
 def test_serving_self_improvement_switch_is_retired(tmp_path: Path) -> None:
     with pytest.raises(SettingsError, match="offline operator"):

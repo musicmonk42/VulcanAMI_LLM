@@ -238,6 +238,8 @@ code physically, and bundles only the read-only evidence files needed for live
 capability verification. Import closure includes every parent package
 initializer, preventing package-level side effects from bypassing the graph.
 
+The Phase-A application façade is **M2 — Tested locally**: its immutable envelopes expose only command/query dispatch, the ASGI surface is reduced to six routes with documentation disabled, and the reduced composition admits only deterministic arithmetic plus constitutional episode, epistemic, lineage, capability, safety, and audit owners. Exact wheel/image restart qualification remains required for M4.
+
 ### 2.4 Offline self-improvement — M3 serving boundary / M2 operator evidence
 
 Keep proposal generation and governed review, but move source installation out of the serving process. Use one approval issuer/verifier/store contract.

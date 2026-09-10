@@ -95,9 +95,15 @@ class CapabilitySnapshot:
 
 
 def composed_runtime_ports() -> set[str]:
-    from vulcan.runtime.route_manifest import generate_route_manifest
+    from vulcan.runtime.route_manifest import (
+        PHASE_A_ROUTE_REGISTRY,
+        generate_route_manifest,
+    )
 
-    return {f"{item['method']} {item['path']}" for item in generate_route_manifest()}
+    return {
+        f"{item['method']} {item['path']}"
+        for item in generate_route_manifest(registry=PHASE_A_ROUTE_REGISTRY)
+    }
 
 
 def load_capability_registry(now: datetime | None = None) -> CapabilityRegistry:

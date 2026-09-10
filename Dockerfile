@@ -21,6 +21,7 @@ LABEL org.opencontainers.image.revision=$SOURCE_COMMIT \
       org.vulcan.qualification-gate="E"
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 VULCAN_ENV=production \
     VULCAN_RUNTIME_DURABLE_ROOT=/var/lib/vulcan VULCAN_ENABLE_SELF_IMPROVEMENT=false \
+    VULCAN_MEMORY_ENABLED=false VULCAN_CSIU_ENABLED=false VULCAN_LEARNING_ENABLED=false \
     VULCAN_RELEASE_EVIDENCE_ROOT=/app PORT=8000
 WORKDIR /app
 COPY --from=builder /install /usr/local/lib/python3.11/site-packages

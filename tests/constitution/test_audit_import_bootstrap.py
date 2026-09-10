@@ -93,6 +93,9 @@ def test_canonical_app_constructs_and_lifespan_closes_in_fresh_process(
             "VULCAN_ENV": "development",
             "VULCAN_JWT_SECRET": "Fresh-Process-Secret-0123456789!abcdef",
             "VULCAN_RUNTIME_DURABLE_ROOT": str(durable_root),
+            "VULCAN_MEMORY_ENABLED": "false",
+            "VULCAN_CSIU_ENABLED": "false",
+            "VULCAN_LEARNING_ENABLED": "false",
         },
     )
     assert result.returncode == 0, result.stderr

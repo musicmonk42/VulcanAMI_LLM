@@ -1,6 +1,6 @@
 # Generated architecture inventory
 
-Digest: `7e3367d4f2332512cf79de56483cd7883279a50649a06c1882484b28fed4f821`
+Digest: `7c8f81cb30f7807a485801d3922d46d546ec1850934680bc3d5b9fb7547129ca`
 
 This file is generated from `docs/generated/architecture-inventory.json`.
 
@@ -40,6 +40,7 @@ This file is generated from `docs/generated/architecture-inventory.json`.
 | [`docs/architecture/effect-protocol.md`](../architecture/effect-protocol.md) | **current** | tested durable sandbox effect boundary pending canonical wiring |
 | [`docs/architecture/neutral-process-theory.md`](../architecture/neutral-process-theory.md) | **research-only** | falsifiable research hypothesis outside the authority path |
 | [`docs/architecture/persistent-agent-lineage.md`](../architecture/persistent-agent-lineage.md) | **current** | implemented neutral causal-lineage boundary |
+| [`docs/architecture/phase-a-serving-tcb.md`](../architecture/phase-a-serving-tcb.md) | **current** | Phase-A serving graph scope and TCB threshold justification |
 | [`docs/architecture/reafference-protocol.md`](../architecture/reafference-protocol.md) | **current** | tested observation and causal reafference boundary pending canonical wiring |
 | [`docs/architecture/sequence-6-baseline-audit.md`](../architecture/sequence-6-baseline-audit.md) | **historical** | point-in-time baseline audit |
 | [`docs/roadmap/constitutional-convergence-plan.md`](../roadmap/constitutional-convergence-plan.md) | **normative** | ordered convergence work and maturity vocabulary |
@@ -102,7 +103,7 @@ Count: 407
 
 ## Routes
 
-Count: 422
+Count: 413
 
 - `src/platform/routes_admin.py:104` handler='admin_get_service', method='GET', reachability='unknown', route='/admin/services/{service_name}'
 - `src/full_platform.py:3742` handler='admin_get_service', method='GET', reachability='unknown', route='/admin/services/{service_name}'
@@ -114,7 +115,6 @@ Count: 422
 - `src/full_platform.py:3778` handler='admin_stop_service', method='POST', reachability='unknown', route='/admin/services/{service_name}/stop'
 - `src/platform/routes_adversarial.py:268` handler='adversarial_status', method='GET', reachability='unknown', route='/api/adversarial/status'
 - `src/full_platform.py:4947` handler='adversarial_status', method='GET', reachability='unknown', route='/api/adversarial/status'
-- `src/vulcan/runtime/app.py:190` handler='alignment', method='POST', reachability='production-reachable', route='/v1/admin/alignment'
 - `src/platform/routes_health_ext.py:118` handler='api_status', method='GET', reachability='unknown', route='/api/status'
 - `src/full_platform.py:3683` handler='api_status', method='GET', reachability='unknown', route='/api/status'
 - `src/vulcan/endpoints/self_improvement.py:295` handler='approve_improvement', method='POST', reachability='unknown', route='/v1/improvement/approve'
@@ -127,9 +127,9 @@ Count: 422
 - `src/platform/routes_arena.py:71` handler='arena_run_agent', method='POST', reachability='unknown', route='/api/arena/run/{agent_id}'
 - `src/platform/routes_arena.py:103` handler='arena_tournament', method='POST', reachability='unknown', route='/api/arena/tournament'
 - `src/full_platform.py:4652` handler='arena_tournament', method='POST', reachability='unknown', route='/api/arena/tournament'
-- `src/vulcan/runtime/app.py:195` handler='audit_case', method='GET', reachability='production-reachable', route='/v1/audit/cases/{case_id}'
-- `src/vulcan/runtime/app.py:225` handler='audit_improvement', method='GET', reachability='production-reachable', route='/v1/audit/improvements/{proposal_digest}'
-- `src/vulcan/runtime/app.py:173` handler='capabilities', method='GET', reachability='production-reachable', route='/v1/capabilities'
+- `src/vulcan/runtime/app.py:221` handler='audit_case', method='GET', reachability='production-reachable', route='/v1/audit/cases/{episode_id}'
+- `src/vulcan/runtime/app.py:197` handler='capabilities', method='GET', reachability='production-reachable', route='/v1/capabilities'
+- `src/vulcan/runtime/app.py:201` handler='chat', method='POST', reachability='production-reachable', route='/v1/chat'
 - `src/platform/routes_adversarial.py:324` handler='check_query_adversarial', method='POST', reachability='unknown', route='/api/adversarial/check-query'
 - `src/full_platform.py:5003` handler='check_query_adversarial', method='POST', reachability='unknown', route='/api/adversarial/check-query'
 - `src/vulcan/endpoints/distillation.py:279` handler='clear_distillation_buffer', method='POST', reachability='unknown', route='/clear'
@@ -144,7 +144,6 @@ Count: 422
 - `src/full_platform.py:4048` handler='debug_parent_deployment', method='GET', reachability='unknown', route='/debug/deployment'
 - `src/governance/app.py:498` handler='deploy_proposal', method='ROUTE', reachability='unknown', route='/proposals/<proposal_id>/deploy'
 - `src/pii_service.py:391` handler='detect_pii', method='POST', reachability='production-reachable', route='/detect'
-- `src/vulcan/runtime/app.py:185` handler='domains', method='POST', reachability='production-reachable', route='/v1/admin/domains'
 - `src/vulcan/endpoints/world_model.py:84` handler='execute_causal_intervention', method='POST', reachability='unknown', route='/intervene'
 - `src/vulcan/endpoints/execution.py:30` handler='execute_step', method='POST', reachability='unknown', route='/v1/step'
 - `src/vulcan/endpoints/reasoning.py:97` handler='explain', method='POST', reachability='unknown', route='/llm/explain'
@@ -154,11 +153,13 @@ Count: 422
 - `src/governance/app.py:636` handler='get_agent', method='ROUTE', reachability='unknown', route='/agents/<agent_id>'
 - `src/vulcan/endpoints/agents.py:48` handler='get_agent_pool_status', method='GET', reachability='unknown', route='/status'
 - `src/governance/app.py:577` handler='get_audit_log', method='ROUTE', reachability='unknown', route='/audit/log'
-- ... 372 more in JSON
+- `src/vulcan/endpoints/safety.py:331` handler='get_audit_logs', method='GET', reachability='unknown', route='/audit-logs'
+- `src/vulcan/endpoints/distillation.py:114` handler='get_distillation_status', method='GET', reachability='unknown', route='/status'
+- ... 363 more in JSON
 
 ## Import Identities
 
-Count: 1910
+Count: 1919
 
 - `tests/security/test_output_firewall.py:1` module='vulcan.runtime.output', reachability='test-only'
 - `tests/test_probabilistic_routing.py:10` module='src.vulcan.reasoning.probabilistic_reasoning', reachability='test-only'
@@ -196,6 +197,7 @@ Count: 1910
 - `src/vulcan/api_gateway.py:101` module='src.vulcan.learning', reachability='unknown'
 - `src/vulcan/endpoints/planning.py:101` module='vulcan.reasoning.singletons', reachability='unknown'
 - `tests/test_conclusion_loss_fixes.py:101` module='vulcan.reasoning.unified.strategies', reachability='test-only'
+- `src/vulcan/runtime/capabilities.py:98` module='vulcan.runtime.route_manifest', reachability='production-reachable'
 - `src/vulcan/tests/test_vulcan_cost_model.py:1010` module='vulcan.reasoning.selection.cost_model', reachability='test-only'
 - `src/vulcan/learning/__init__.py:1012` module='vulcan.reasoning.selection.semantic_tool_matcher', reachability='unknown'
 - `src/vulcan/tests/test_extracted_modules.py:1014` module='vulcan.utils_main.timing', reachability='test-only'
@@ -209,8 +211,7 @@ Count: 1910
 - `src/vulcan/orchestrator/platform_status.py:99` module='vulcan.arena', reachability='unknown'
 - `src/vulcan/world_model/world_model_core.py:1020` module='vulcan.world_model.creative_handler', reachability='unknown'
 - `src/api_server.py:103` module='vulcan.reasoning.unified', reachability='unknown'
-- `src/vulcan/world_model/world_model_core.py:1037` module='vulcan.world_model.llm_guidance', reachability='unknown'
-- ... 1860 more in JSON
+- ... 1869 more in JSON
 
 ## Singletons
 
@@ -291,7 +292,7 @@ Count: 455
 
 ## Fallbacks
 
-Count: 4431
+Count: 4428
 
 - `src/vulcan/endpoints/self_improvement.py:98` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/vulcan/safety/rollback_audit.py:99` kind='except_exception', reachability='unknown', review='unreviewed'
@@ -343,7 +344,7 @@ Count: 4431
 - `src/vulcan/knowledge_crystallizer/principle_extractor.py:1018` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/vulcan/curiosity_engine/curiosity_engine_core.py:1012` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/memory/governed_unlearning.py:1019` kind='except_exception', reachability='unknown', review='unreviewed'
-- ... 4381 more in JSON
+- ... 4378 more in JSON
 
 ## Mocks
 
@@ -403,7 +404,7 @@ Count: 400
 
 ## Persistence
 
-Count: 459
+Count: 462
 
 - `src/vulcan/improvement/offline.py:101` kind='call', reachability='unknown', value='fcntl.flock'
 - `tests/persistence/test_memory_outbox_v2.py:103` kind='call', reachability='test-only', value='SQLiteMemoryRepository'
@@ -455,7 +456,7 @@ Count: 459
 - `src/vulcan/world_model/meta_reasoning/governed_transaction.py:244` kind='call', reachability='unknown', value='fcntl.flock'
 - `src/vulcan/safety/governance_alignment.py:248` kind='call', reachability='unknown', value='sqlite3.connect'
 - `tests/microkernel/test_lineage.py:256` kind='call', reachability='test-only', value='sqlite3.connect'
-- ... 409 more in JSON
+- ... 412 more in JSON
 
 ## Environment Readers
 
@@ -515,7 +516,7 @@ Count: 432
 
 ## Capability Claims
 
-Count: 20
+Count: 19
 
 - `src/vulcan/orchestrator/agent_lifecycle.py:83` reachability='unknown', text='Agent capability types with hierarchical relationships\n    \n    AGENT POOL CONFIGURATION FIX: Added specialized reasoning engine capabilities\n    to enable prop'
 - `src/vulcan/orchestrator/agent_pool.py:1289` reachability='unknown', text="\n        Assign agent with timeout and proper locking to prevent race conditions\n        FIXED: Won't hang if no agents available\n        Note: Triggers cleanup"
@@ -523,7 +524,6 @@ Count: 20
 - `src/vulcan/orchestrator/agent_pool.py:1368` reachability='unknown', text=') with no available agents for capability '
 - `src/utils/faiss_config.py:141` reachability='unknown', text='✓ FAISS library imported successfully (CPU capability detection unavailable: '
 - `src/vulcan/orchestrator/agent_scoring.py:148` reachability='unknown', text='\n    Get available agents that can handle the specified capabilities.\n\n    Args:\n        manager: AgentPoolManager instance\n        capabilities: List of capabi'
-- `src/vulcan/runtime/app.py:177` reachability='production-reachable', text='capability authority unavailable'
 - `src/vulcan/orchestrator/agent_scoring.py:176` reachability='unknown', text='\n    Get the current capability distribution in the agent pool.\n\n    AGENT POOL CONFIGURATION FIX: This method provides observability into\n    which capabilitie'
 - `src/utils/faiss_config.py:1` reachability='unknown', text='\nFAISS Configuration and Initialization Module\n\nHandles FAISS import with proper CPU capability detection and informative\nmessaging about instruction set usage '
 - `src/memory/cost_optimizer.py:223` reachability='unknown', text="\n        Analyze current cost structure with defensive programming.\n\n        FIXED: Now provides fallback logic when memory system methods don't exist.\n        "
@@ -540,7 +540,7 @@ Count: 20
 
 ## Ownership Graph
 
-Count: 310
+Count: 313
 
 - `src/vulcan/persistence/alignment.py:` owner_domain='alignment', reachability='unknown'
 - `src/vulcan/runtime/alignment.py:` owner_domain='alignment', reachability='production-reachable'
@@ -592,7 +592,7 @@ Count: 310
 - `tests/security/test_persistent_domain_registry.py:` owner_domain='domain', reachability='test-only'
 - `tests/test_domain_specific_formatting.py:` owner_domain='domain', reachability='test-only'
 - `src/vulcan/graphix/language.py:` owner_domain='language', reachability='production-reachable'
-- ... 260 more in JSON
+- ... 263 more in JSON
 
 ## Text Entrypoints
 
@@ -647,9 +647,9 @@ Count: 310
 - `docker-compose.prod.yml:627` image: nginx:1.27-alpine
 
 ### docker
-- `Dockerfile:52` CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready',timeout=2)" || exit 1
-- `Dockerfile:53` ENTRYPOINT ["/app/entrypoint.sh"]
-- `Dockerfile:54` CMD ["sh", "-c", "python -m uvicorn vulcan.runtime.app:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"]
+- `Dockerfile:53` CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready',timeout=2)" || exit 1
+- `Dockerfile:54` ENTRYPOINT ["/app/entrypoint.sh"]
+- `Dockerfile:55` CMD ["sh", "-c", "python -m uvicorn vulcan.runtime.app:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"]
 - `docker/api/Dockerfile:135` CMD curl -fsS http://localhost:8000/health/live || exit 1
 - `docker/api/Dockerfile:137` ENTRYPOINT ["/app/entrypoint.sh"]
 - `docker/api/Dockerfile:140` CMD ["python", "-m", "uvicorn", "src.api_gateway:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

@@ -22,6 +22,7 @@
     {"path": "docs/architecture/ADR-001-metaprogramming.md", "status": "historical", "purpose": "legacy metaprogramming decision"},
     {"path": "docs/architecture/IMPLEMENTATION-SUMMARY.md", "status": "historical", "purpose": "legacy implementation snapshot, not production evidence"},
     {"path": "docs/architecture/SECURITY-metaprogramming.md", "status": "historical", "purpose": "legacy metaprogramming security notes"},
-    {"path": "docs/architecture/sequence-6-baseline-audit.md", "status": "historical", "purpose": "point-in-time baseline audit"}
+    {"path": "docs/architecture/sequence-6-baseline-audit.md", "status": "historical", "purpose": "point-in-time baseline audit"},
+    {"path": "docs/architecture/phase-a-serving-tcb.md", "status": "current", "purpose": "Phase-A serving graph scope and TCB threshold justification"}
   ]
 }

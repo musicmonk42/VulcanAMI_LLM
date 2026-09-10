@@ -231,8 +231,8 @@ def load_runtime_settings(env:Mapping[str,str]|None=None)->RuntimeSettings:
     csiu_val=get("VULCAN_CSIU_ENABLED"); csiu = (not _bool(csiu_val,"VULCAN_CSIU_ENABLED",False)) if "INTRINSIC_CSIU_OFF" in env and "VULCAN_CSIU_ENABLED" not in env else _bool(csiu_val,"VULCAN_CSIU_ENABLED",True)
     dev_stub=_bool(get("VULCAN_DEVELOPMENT_STUB_MODE"),"VULCAN_DEVELOPMENT_STUB_MODE",False)
     if environment is VulcanEnvironment.production and dev_stub: raise SettingsError("development stub mode is forbidden in production")
-    if environment is VulcanEnvironment.production and (not csiu or not _bool(get("VULCAN_AUDIT_ENABLED"),"VULCAN_AUDIT_ENABLED",True)):
-        raise SettingsError("production requires audit and CSIU")
+    if environment is VulcanEnvironment.production and not _bool(get("VULCAN_AUDIT_ENABLED"),"VULCAN_AUDIT_ENABLED",True):
+        raise SettingsError("production requires audit")
     if self_imp: raise SettingsError("serving-process self-improvement is retired; use the offline operator")
     mem_enabled=_bool(get("VULCAN_MEMORY_ENABLED"),"VULCAN_MEMORY_ENABLED",True)
     mem_backend=MemoryBackend(_text(get("VULCAN_MEMORY_BACKEND"),"VULCAN_MEMORY_BACKEND","sqlite" if mem_enabled else "disabled"))
