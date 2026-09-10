@@ -229,12 +229,57 @@ case-projection, alignment, and research imports to canonical Graphix types.
 
 ### 2.3 Production import closure — M3 (qualification-ready; hosted artifact pending)
 
+The audit import boundary is **M2 — Tested locally**: shared audit values now live in an acyclic contract leaf, the segmented writer is persistence-owned, and the runtime module is a removal-bound compatibility re-export. Fresh-process normal and optimized-Python tests cover import order, application construction, and lifespan cleanup without pytest fixture preloading. Exact built-artifact evidence is still required for M4.
+
 The installed `vulcan` wheel is the sole canonical identity and setuptools uses the standard src layout. Runtime, server, constitutional-test, research, cloud, distributed, and development dependency sets are separated. A machine-enforced transitive allowlist/denylist proves canonical serving does not import legacy orchestration/deployment, retired semantic authority, Arena, cloud/distributed, experimental-memory, or NPT research packages. The exact non-root Linux image qualifies readiness, bounded arithmetic, durable episode/epistemic audit retrieval, same-volume restart, source immutability, and absence of legacy routes. CI publishes artifact and input digests. Gate E is qualification-ready for canonical Linux/Docker serving but remains pending until the committed workflow produces passing exact-image evidence; Windows serving is not claimed.
 
 The serving image also removes denied package trees and offline installation
 code physically, and bundles only the read-only evidence files needed for live
 capability verification. Import closure includes every parent package
 initializer, preventing package-level side effects from bypassing the graph.
+
+The Phase-A application façade is **M2 — Tested locally**: its immutable envelopes expose only command/query dispatch, the ASGI surface is reduced to six routes with documentation disabled, and the reduced composition admits only deterministic arithmetic plus constitutional episode, epistemic, lineage, capability, safety, and audit owners. Exact wheel/image restart qualification remains required for M4.
+
+The minimal Phase-A wheel is **M2 — reproducibly built and locally verified**: a reviewed positive inclusion manifest admits the 59-module serving closure and ten content-bound release inputs; two clean builds produce identical wheel bytes; full RECORD, member digest, excluded-import, undeclared-import, mutation, and outside-checkout controls pass. Installed lifespan qualification remains below M4 until the locked runtime dependencies are available in the qualification environment.
+
+Authenticated actor binding is **M3 — canonical for the Phase-A request path**:
+the versioned `vulcan.actor-binding/1` identity binds only tenant, issuer, and
+subject, while key ID, token ID, scopes, authentication time, method, and adapter
+release remain nonpersistent credential provenance. Request ID and idempotency key
+remain envelope transaction facts. Canonical admission has no default actor,
+cross-tenant/issuer audit reads fail closed, and legacy actor documents remain
+`LEGACY_UNVERIFIED` without inferred provenance or automatic upgrade. The golden
+serialization and classification rules are emitted in
+`config/actor-binding-schema.json`. Exact installed-artifact and key-rotation
+qualification remain required for M4.
+
+The constitutional journal is **M3 — canonical on the Phase-A serving path**:
+`ConstitutionalDatabase` owns one SQLite file, connection lifecycle, and caller-owned
+units of work. Its schema covers actor-bound commands/idempotency, episodes,
+transitions, artifacts, epistemic heads, lineage membership, admitted contexts,
+terminal results, a transactional outbox, serialized commit sequences, ordinals,
+and receipt chaining. It deliberately contains no Phase-C memory, effect,
+reafference, or autobiography tables and performs no production dual writes.
+Persisted command facts are independently content-bound, operation-scoped replay
+returns the original command identity across request IDs and credential rotation,
+and deterministic transaction failpoints prove prior-or-complete restart state.
+The stable schema fingerprint is emitted in
+`config/constitutional-journal-schema.json`. Phase-A now composes journal-backed
+episode, epistemic, and lineage repositories over the caller-owned unit of work.
+Admission, epistemic commitment, and terminal publication/lineage completion use
+the three indivisible boundaries required by A06. The legacy store implementations
+remain compatibility-only for non-Phase-A callers and are removed when those callers
+migrate; they are neither opened nor dual-written by the canonical serving graph.
+The A07 offline migrator validates and exclusively locks legacy episode, epistemic,
+and lineage sources, stops with a reconciliation report on disagreement, imports
+deterministically through caller-owned journal transactions, verifies and fsyncs a
+temporary database, atomically installs it, and preserves sources read-only. Audit
+is now an idempotent journal-receipt projector: JSONL deletion/delivery failure does
+not gate readiness, and repeated rebuilds are byte-identical. A parent/child harness
+proves named SQL, artifact, head, terminal, outbox, and commit crash boundaries under
+normal and optimized Python; an unreached failpoint is `NOT_EXECUTED`. This is M3
+source qualification, not installed-artifact M4 evidence. The A08 serving path now separates unpicklable process-local edge permits from receipt-chain-bound durable transition receipts. Principal kinds and compatibility grants are descriptive only on that path; process isolation remains mandatory for untrusted code. Stable external cryptographic signing is not claimed: receipts use an unsigned content digest plus the constitutional journal hash chain.
+A09 has a fail-closed immutable-subject runner and exact-wheel image recipe, but remains NOT_EXECUTED locally because the qualification environment has no container engine and denies registry access. Phase A therefore remains below M4; no Phase-B admission bundle or qualified image digest is claimed.
 
 ### 2.4 Offline self-improvement — M3 serving boundary / M2 operator evidence
 

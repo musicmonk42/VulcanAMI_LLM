@@ -1,0 +1,4 @@
+# Canonical Phase-A server inputs. Regenerate requirements-runtime.lock with hashes.
+fastapi==0.121.3
+pydantic==2.10.6
+uvicorn[standard]==0.34.0

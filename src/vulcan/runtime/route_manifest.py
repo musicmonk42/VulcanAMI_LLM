@@ -16,18 +16,10 @@ _PUBLIC = {
 _SCOPE_BY_ROUTE: dict[tuple[str, str], str] = {
     ("GET", "/health/integrity"): "operator:read",
     ("POST", "/v1/chat"): "reason:write",
-    ("POST", "/v1/admin/domains"): "domains:write",
-    ("POST", "/v1/admin/alignment"): "alignment:write",
-    ("GET", "/v1/audit/cases/{case_id}"): "audit:read",
-    ("GET", "/v1/admin/improvements"): "self_improvement:read",
-    ("GET", "/v1/admin/improvements/{proposal_id}"): "self_improvement:read",
-    ("POST", "/v1/admin/improvements/{proposal_id}"): "self_improvement:propose",
-    ("GET", "/v1/audit/improvements/{proposal_digest}"): "audit:read",
-    ("POST", "/v1/memory/preferences"): "memory:write",
-    ("GET", "/v1/memory/preferences/{key}"): "memory:read",
-    ("PATCH", "/v1/memory/preferences/{record_id}"): "memory:write",
-    ("DELETE", "/v1/memory/preferences/{record_id}"): "memory:forget",
+    ("GET", "/v1/audit/cases/{episode_id}"): "audit:read",
 }
+
+PHASE_A_ROUTE_REGISTRY = tuple(sorted(_PUBLIC | set(_SCOPE_BY_ROUTE)))
 
 
 @dataclass(frozen=True)
@@ -58,11 +50,11 @@ def _exposure(path: str, scope: str | None) -> RouteExposure:
     return "tenant"
 
 
-def route_manifest(app=None) -> tuple[RouteManifestEntry, ...]:
+def route_manifest(app=None, *, registry=None) -> tuple[RouteManifestEntry, ...]:
+    if app is None and registry is None:
+        raise RuntimeError("an application or typed route registry is required")
     if app is None:
-        routes = tuple(
-            (path, method) for (method, path) in sorted(_PUBLIC | set(_SCOPE_BY_ROUTE))
-        )
+        routes = tuple((path, method) for method, path in registry)
     else:
         rows: list[tuple[str, str]] = []
         for route in app.routes:
@@ -96,5 +88,9 @@ def route_manifest(app=None) -> tuple[RouteManifestEntry, ...]:
     return tuple(entries)
 
 
-def generate_route_manifest(app=None) -> tuple[dict[str, str | bool | None], ...]:
-    return tuple(entry.public_dict() for entry in route_manifest(app))
+def generate_route_manifest(
+    app=None, *, registry=None
+) -> tuple[dict[str, str | bool | None], ...]:
+    return tuple(
+        entry.public_dict() for entry in route_manifest(app, registry=registry)
+    )

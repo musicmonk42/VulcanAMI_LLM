@@ -9,6 +9,10 @@ ROOT = Path(__file__).resolve().parents[2]
 REQUIRED = [
     ROOT / "requirements.txt",
     ROOT / "requirements-constitutional.txt",
+    ROOT / "requirements-build.in",
+    ROOT / "requirements-build.lock",
+    ROOT / "requirements-runtime.in",
+    ROOT / "requirements-runtime.lock",
     ROOT / "config/capabilities.yaml",
     ROOT / "docs/governance/controls.yaml",
 ]
@@ -89,6 +93,13 @@ def main() -> int:
     errors = validate_hashed_requirements(
         (ROOT / "requirements-constitutional.txt").read_text(encoding="utf-8")
     )
+    for lock_name in ("requirements-build.lock", "requirements-runtime.lock"):
+        errors.extend(
+            f"{lock_name}: {error}"
+            for error in validate_hashed_requirements(
+                (ROOT / lock_name).read_text(encoding="utf-8")
+            )
+        )
     if errors:
         print(
             "Invalid constitutional dependency lock:",

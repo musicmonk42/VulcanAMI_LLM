@@ -76,7 +76,7 @@ def test_installed_runtime_uses_explicit_release_evidence_root(
     referenced = (
         "config/capabilities.yaml",
         "config/architecture-status.json",
-        "tests/security/test_language_contracts.py",
+        "evidence/qualification/language-contracts.json",
         "docs/architecture/ami-invariants.yaml",
         "docs/architecture/adr-006-local-language-interface.md",
         "docs/governance/controls.yaml",

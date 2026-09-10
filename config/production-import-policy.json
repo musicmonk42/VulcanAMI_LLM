@@ -4,10 +4,6 @@
   "allowed_prefixes": [
     "vulcan.constitution",
     "vulcan.graphix",
-    "vulcan.improvement.proposal",
-    "vulcan.learning_owner",
-    "vulcan.memory.composition",
-    "vulcan.memory.governed",
     "vulcan.microkernel",
     "vulcan.platform",
     "vulcan.runtime",
@@ -15,9 +11,6 @@
     "vulcan.safety.safety_types",
     "vulcan.state_authorities",
     "vulcan.assurance.capabilities",
-    "vulcan.learning_bandit",
-    "vulcan.local_language",
-    "vulcan.memory.outbox",
     "vulcan.persistence",
     "vulcan.core",
     "vulcan.assurance.evidence"
@@ -35,6 +28,10 @@
     "vulcan.experimental",
     "vulcan.cloud",
     "vulcan.distributed",
-    "vulcan.runtime.semantic"
+    "vulcan.runtime.semantic",
+    "vulcan.memory",
+    "vulcan.learning_owner",
+    "vulcan.learning_bandit",
+    "vulcan.improvement"
   ]
 }

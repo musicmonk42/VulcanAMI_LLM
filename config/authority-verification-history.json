@@ -1,0 +1,8 @@
+{
+  "schema": "vulcan-authority-verification-history/1",
+  "mode": "unsigned-content-digest-plus-journal-receipt-chain",
+  "cryptographic_attestation_claimed": false,
+  "signing_roots": [],
+  "rotation_history": [],
+  "rule": "A durable receipt proves replay history only and is never accepted as a live transition permit. Any future signing root must be externally provisioned and its public verification history retained."
+}

@@ -8,10 +8,7 @@ import inspect
 import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any
-
-if TYPE_CHECKING:
-    from vulcan.memory.governed import GovernedMemoryPort
+from typing import Any
 
 from vulcan.constitution.primitives import AuthorityLevel
 from vulcan.graphix.runtime import (
@@ -31,6 +28,7 @@ from vulcan.graphix.runtime import (
     validate_interpretation_artifact,
     validate_proposal,
 )
+from vulcan.microkernel._transition_permits import TransitionEdge
 from vulcan.microkernel.authority import EvidenceRecord, promote_authority
 from vulcan.microkernel.episode import (
     ArtifactRef,
@@ -116,7 +114,7 @@ class CognitiveKernel:
         finalizer: ResponseFinalizerPort,
         language_input: LanguageInputPort | None = None,
         language_output: LanguageOutputPort | None = None,
-        memory: "GovernedMemoryPort | None" = None,
+        memory: Any = None,
         audit: Any = None,
         alignment: Any = None,
         domain_lookup: Any = None,
@@ -141,8 +139,6 @@ class CognitiveKernel:
     ) -> None:
         if self._transactions is not None and self._transactions is not service:
             raise RuntimeError("transaction service already bound")
-        if not principal.is_kernel:
-            raise TypeError("transaction authority must be SYSTEM_KERNEL")
         self._transactions = service
         self._kernel_principal = principal
 
@@ -159,8 +155,8 @@ class CognitiveKernel:
         case: CognitiveCase,
         policy_digest: str,
         validation_digest: str,
-        level: AuthorityLevel,
-    ) -> CommandAuthority:
+        edge: TransitionEdge,
+    ):
         if (
             self._transactions is None
             or self._kernel_principal is None
@@ -173,12 +169,32 @@ class CognitiveKernel:
             if len(policy_digest) == 64
             else episode_digest({"policy": policy_digest or "default-deny"})
         )
+        issue = getattr(self._transactions, "_issue_transition_permit", None)
+        if issue is not None:
+            return issue(
+                episode_id=case.episode.episode_id,
+                edge=edge,
+                policy_digest=policy,
+                validation_digest=validation_digest,
+                snapshot_digest=case.episode.snapshot_bundle.state_digest,
+                expected_prior_episode_digest=case.episode.digest,
+            )
+        return self._legacy_command_authority(case, policy, validation_digest, edge)
+
+    def _legacy_command_authority(
+        self, case, policy, validation_digest, edge
+    ) -> CommandAuthority:
+        """Removal-bound adapter for non-journal compatibility tests only."""
         evidence = EvidenceRecord(
             self._kernel_principal.identity_digest,
             validation_digest,
             policy,
             datetime.now(timezone.utc),
         )
+        level = {
+            TransitionEdge.EPISTEMIC_COMMIT: AuthorityLevel.COMMITTED_BELIEF,
+            TransitionEdge.PUBLICATION: AuthorityLevel.AUTHORIZED_PLAN,
+        }.get(edge, AuthorityLevel.VALIDATED_CANDIDATE)
         grant = promote_authority(
             current=AuthorityLevel.UNTRUSTED_PROPOSAL,
             target=level,
@@ -305,7 +321,7 @@ class CognitiveKernel:
                         case,
                         policy_digest,
                         validation_digest,
-                        AuthorityLevel.VALIDATED_CANDIDATE,
+                        TransitionEdge.VALIDATION,
                     ),
                     {
                         "parser_identity": bundle.parser_identity,
@@ -322,7 +338,7 @@ class CognitiveKernel:
                         case,
                         policy_digest,
                         validation_digest,
-                        AuthorityLevel.VALIDATED_CANDIDATE,
+                        TransitionEdge.VALIDATION,
                     ),
                 ),
             )
@@ -360,7 +376,7 @@ class CognitiveKernel:
                             case,
                             policy_digest,
                             validation_digest,
-                            AuthorityLevel.VALIDATED_CANDIDATE,
+                            TransitionEdge.VALIDATION,
                         ),
                         (
                             ArtifactRef(
@@ -406,7 +422,7 @@ class CognitiveKernel:
                             ],
                         }
                     ),
-                    AuthorityLevel.COMMITTED_BELIEF,
+                    TransitionEdge.EPISTEMIC_COMMIT,
                 )
                 prior = self._transactions.epistemic_head(case.case_id)
                 candidate = adapt_runtime_semantic_candidate(
@@ -517,7 +533,7 @@ class CognitiveKernel:
                                 case,
                                 policy_digest,
                                 validation_digest,
-                                AuthorityLevel.VALIDATED_CANDIDATE,
+                                TransitionEdge.VALIDATION,
                             ),
                             (
                                 ArtifactRef(
@@ -580,7 +596,7 @@ class CognitiveKernel:
                     case,
                     policy_digest,
                     ledger_digest,
-                    AuthorityLevel.COMMITTED_BELIEF,
+                    TransitionEdge.EPISTEMIC_COMMIT,
                 )
                 prior = self._transactions.epistemic_head(case.case_id)
                 candidate = adapt_runtime_semantic_candidate(
@@ -831,10 +847,12 @@ class CognitiveKernel:
                             case,
                             bound_policy,
                             authorization.finalizer_decision_digest,
-                            AuthorityLevel.AUTHORIZED_PLAN,
+                            TransitionEdge.PUBLICATION,
                         ),
                         authorization=authorization,
                         response=response_ref,
+                        response_text=finalization.public_text,
+                        response_status=status.value,
                     ),
                 )
                 self._apply(
@@ -845,7 +863,7 @@ class CognitiveKernel:
                             case,
                             bound_policy,
                             authorization.rendered_text_digest,
-                            AuthorityLevel.AUTHORIZED_PLAN,
+                            TransitionEdge.PUBLICATION,
                         ),
                     ),
                 )
@@ -867,7 +885,7 @@ class CognitiveKernel:
                             case,
                             bound_policy,
                             consolidation.digest,
-                            AuthorityLevel.COMMITTED_BELIEF,
+                            TransitionEdge.PUBLICATION,
                         ),
                         consolidation,
                     ),
@@ -888,7 +906,7 @@ class CognitiveKernel:
                             case,
                             policy_digest,
                             canonical_digest({"terminal": status.value}),
-                            AuthorityLevel.VALIDATED_CANDIDATE,
+                            TransitionEdge.VALIDATION,
                         ),
                         outcomes[status],
                     ),
@@ -944,7 +962,7 @@ class CognitiveKernel:
                             case,
                             policy_digest,
                             canonical_digest({"terminal": "cancelled"}),
-                            AuthorityLevel.VALIDATED_CANDIDATE,
+                            TransitionEdge.VALIDATION,
                         ),
                         TerminalOutcome.CANCELLATION,
                     ),
@@ -976,7 +994,7 @@ class CognitiveKernel:
                             canonical_digest(
                                 {"terminal": "failed", "category": type(exc).__name__}
                             ),
-                            AuthorityLevel.VALIDATED_CANDIDATE,
+                            TransitionEdge.VALIDATION,
                         ),
                         TerminalOutcome.FAILURE,
                     ),

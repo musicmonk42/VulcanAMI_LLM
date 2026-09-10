@@ -9,6 +9,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from vulcan.microkernel.episode import ActorBinding
 from vulcan.runtime.composition import (
     CompositionSpecification,
     LegacyWorldReadOnlyAdapter,
@@ -25,6 +26,10 @@ from vulcan.runtime.settings import (
     durable_root_paths,
 )
 from vulcan.safety.safety_types import ResponseSafetyDecision, ResponseSafetyStatus
+
+TEST_ACTOR = ActorBinding._from_verified_identity(
+    tenant="test-tenant", issuer="test-issuer", subject="test-subject"
+)
 
 
 def settings(
@@ -198,6 +203,7 @@ async def test_canonical_admission_binds_and_advances_lineage(tmp_path):
             request_id="request-lineage",
             conversation_id="conversation-is-not-lineage",
             input_digest="a" * 64,
+            actor=TEST_ACTOR,
         )
         assert case.episode.lineage_head.digest == prior.digest
         current = runtime.lineage_store.load("branch-primary")
@@ -219,6 +225,7 @@ async def test_canonical_terminal_episode_enters_lineage_history(tmp_path):
             request_id="request-terminal-lineage",
             conversation_id="conversation-terminal",
             input_digest=utterance.digest,
+            actor=TEST_ACTOR,
         )
         result = await runtime.kernel.handle(
             KernelRequest(utterance, "conversation-terminal"), case

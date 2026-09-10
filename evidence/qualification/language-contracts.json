@@ -1,0 +1,1 @@
+{"authority":"qualification evidence only","command":"python -m pytest tests/security/test_language_contracts.py -q","result":"passed","schema":"vulcan-test-result/v1","test_source_sha256":"db6ccdb32d6372cd79486909aa17bcd097198adc3f39ae8246794f8f35bad018"}

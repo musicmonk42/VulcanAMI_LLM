@@ -1,0 +1,34 @@
+{
+  "schema": "vulcan.actor-binding/1",
+  "digest_algorithm": "sha256-jcs",
+  "identity_fields": ["issuer", "subject", "tenant"],
+  "credential_provenance_fields": [
+    "adapter_release",
+    "authenticated_at",
+    "key_id",
+    "method",
+    "scopes",
+    "token_id"
+  ],
+  "transaction_fields": ["idempotency_key", "request_id"],
+  "persistence": {
+    "actor_binding": true,
+    "credential_provenance": false,
+    "raw_credentials": false
+  },
+  "legacy_classification": {
+    "classification": "LEGACY_UNVERIFIED",
+    "rule": "Any actor document without schema_version vulcan.actor-binding/1 and complete issuer, subject, and tenant provenance remains unverified; no field may be inferred and no automatic upgrade is permitted."
+  },
+  "golden_vectors": [
+    {
+      "identity": {
+        "issuer": "https://issuer.example",
+        "subject": "alice",
+        "tenant": "tenant-a"
+      },
+      "canonical_utf8": "{\"issuer\":\"https://issuer.example\",\"subject\":\"alice\",\"tenant\":\"tenant-a\"}",
+      "sha256": "d0baf78dd35d4866e653000d7ea03441cab002f6b3338095d15f1b0da500bf96"
+    }
+  ]
+}

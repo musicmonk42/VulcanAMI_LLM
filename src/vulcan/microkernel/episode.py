@@ -8,6 +8,7 @@ serialized aggregate.
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from types import MappingProxyType
@@ -26,6 +27,8 @@ from vulcan.constitution.primitives import canonical_json as _canonical_json
 from .state_machine import EpisodeState, EpisodeTransitionError, ensure_transition
 
 SCHEMA_VERSION = "cognitive-episode.v1"
+ACTOR_BINDING_SCHEMA = "vulcan.actor-binding/1"
+ACTOR_BINDING_DIGEST_ALGORITHM = "sha256-jcs"
 GENESIS_DIGEST = "0" * 64
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
 _ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{2,127}$")
@@ -68,14 +71,115 @@ class ActorBinding:
     actor_id: str
     principal_digest: str
     authority: str
+    schema_version: str = "legacy.actor-binding/0"
+    classification: str = "LEGACY_UNVERIFIED"
+    tenant: str | None = None
+    issuer: str | None = None
+    subject: str | None = None
 
     def __post_init__(self) -> None:
         PrincipalId(self.actor_id)
         Digest.from_legacy_hex(self.principal_digest)
         if not isinstance(self.authority, str) or not _ID.fullmatch(self.authority):
             raise ValueError("invalid actor authority")
+        if self.classification == "AUTHENTICATED":
+            if self.schema_version != ACTOR_BINDING_SCHEMA:
+                raise ValueError("invalid authenticated actor schema")
+            identity = {
+                "issuer": self.issuer,
+                "subject": self.subject,
+                "tenant": self.tenant,
+            }
+            for name, value in identity.items():
+                limit = 256 if name == "issuer" else 128
+                if (
+                    not isinstance(value, str)
+                    or not value
+                    or len(value) > limit
+                    or unicodedata.normalize("NFC", value) != value
+                    or any(
+                        ord(character) < 32 or ord(character) == 127
+                        for character in value
+                    )
+                ):
+                    raise ValueError("authenticated actor identity is invalid")
+            if canonical_digest(identity) != self.principal_digest:
+                raise ValueError("authenticated actor identity digest mismatch")
+            if self.actor_id != f"actor:{self.principal_digest}":
+                raise ValueError("authenticated actor identifier mismatch")
+            if self.authority != "VerifiedAuthentication":
+                raise ValueError("invalid authenticated actor authority")
+        elif self.classification == "INTERNAL_SYSTEM_QUERY":
+            identity = {
+                "issuer": "vulcan",
+                "subject": "health-query",
+                "tenant": "internal",
+            }
+            expected = canonical_digest(identity)
+            if (
+                self.schema_version != ACTOR_BINDING_SCHEMA
+                or self.authority != "SystemQuery"
+                or self.issuer != identity["issuer"]
+                or self.subject != identity["subject"]
+                or self.tenant != identity["tenant"]
+                or self.principal_digest != expected
+                or self.actor_id != f"actor:{expected}"
+            ):
+                raise ValueError("invalid internal query actor")
+        elif self.classification != "LEGACY_UNVERIFIED":
+            raise ValueError("invalid actor classification")
+        elif (
+            self.schema_version != "legacy.actor-binding/0"
+            or self.tenant is not None
+            or self.issuer is not None
+            or self.subject is not None
+        ):
+            raise ValueError("legacy actor cannot claim verified provenance")
 
-    def to_json(self) -> dict[str, str]:
+    @classmethod
+    def _from_verified_identity(
+        cls, *, tenant: str, issuer: str, subject: str
+    ) -> "ActorBinding":
+        identity = {"issuer": issuer, "subject": subject, "tenant": tenant}
+        digest = canonical_digest(identity)
+        return cls(
+            f"actor:{digest}",
+            digest,
+            "VerifiedAuthentication",
+            ACTOR_BINDING_SCHEMA,
+            "AUTHENTICATED",
+            tenant,
+            issuer,
+            subject,
+        )
+
+    @classmethod
+    def internal_system_query(cls) -> "ActorBinding":
+        identity = {"issuer": "vulcan", "subject": "health-query", "tenant": "internal"}
+        digest = canonical_digest(identity)
+        return cls(
+            f"actor:{digest}",
+            digest,
+            "SystemQuery",
+            ACTOR_BINDING_SCHEMA,
+            "INTERNAL_SYSTEM_QUERY",
+            "internal",
+            "vulcan",
+            "health-query",
+        )
+
+    def to_json(self) -> dict[str, object]:
+        if self.classification != "LEGACY_UNVERIFIED":
+            return {
+                "actor_id": self.actor_id,
+                "authority": self.authority,
+                "classification": self.classification,
+                "issuer": self.issuer,
+                "principal_digest": self.principal_digest,
+                "schema_version": self.schema_version,
+                "subject": self.subject,
+                "tenant": self.tenant,
+            }
         return {
             "actor_id": self.actor_id,
             "authority": self.authority,
@@ -413,7 +517,7 @@ class CognitiveEpisode:
         return episode._append_event(
             EpisodeState.PERCEIVED,
             reason="created",
-            authority=actor.authority,
+            authority=actor.principal_digest,
             clock=clock,
             snapshot_ids=(
                 (snapshot_bundle.bundle_id, snapshot_bundle.state_digest)

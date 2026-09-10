@@ -55,7 +55,9 @@ def test_registry_loads_current_config_and_public_projection_is_evidence_backed(
     assert set(loaded.records) >= {"cap.bounded_arithmetic", "cap.broad_reasoning", "cap.internal_llm", "cap.learning", "cap.self_improvement"}
     public_ids = {item["capability_id"] for item in loaded.public_capabilities()}
     assert public_ids == {"cap.bounded_arithmetic"}
-    assert loaded.records["cap.bounded_arithmetic"].evaluation_artifact.artifact_uri.startswith("file://tests/")
+    assert loaded.records[
+        "cap.bounded_arithmetic"
+    ].evaluation_artifact.artifact_uri.startswith("file://evidence/qualification/")
     assert loaded.records["cap.bounded_arithmetic"].port_reachability == ("POST /v1/chat",)
 
 

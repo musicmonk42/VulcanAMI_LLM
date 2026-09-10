@@ -1,0 +1,6 @@
+# Hashed build toolchain for Python 3.11. Source: requirements-build.in.
+--only-binary=:all:
+pip==24.0 \
+    --hash=sha256:ba0d021a166865d2265246961bec0152ff124de910c5cc39f1156ce3fa7c69dc
+setuptools==79.0.1 \
+    --hash=sha256:e147c0549f27767ba362f9da434eab9c5dc0045d5304feb602a0af001089fc51

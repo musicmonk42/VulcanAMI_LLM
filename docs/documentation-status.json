@@ -22,6 +22,10 @@
     {"path": "docs/architecture/ADR-001-metaprogramming.md", "status": "historical", "purpose": "legacy metaprogramming decision"},
     {"path": "docs/architecture/IMPLEMENTATION-SUMMARY.md", "status": "historical", "purpose": "legacy implementation snapshot, not production evidence"},
     {"path": "docs/architecture/SECURITY-metaprogramming.md", "status": "historical", "purpose": "legacy metaprogramming security notes"},
-    {"path": "docs/architecture/sequence-6-baseline-audit.md", "status": "historical", "purpose": "point-in-time baseline audit"}
+    {"path": "docs/architecture/sequence-6-baseline-audit.md", "status": "historical", "purpose": "point-in-time baseline audit"},
+    {"path": "docs/architecture/phase-a-serving-tcb.md", "status": "current", "purpose": "Phase-A serving graph scope and TCB threshold justification"},
+    {"path": "docs/architecture/legacy-migration-and-audit-projection.md", "status": "current", "purpose": "A07 offline migration, disposable audit projection, and crash qualification boundary"},
+    {"path": "docs/architecture/live-transition-permits.md", "status": "current", "purpose": "A08 process-local mutation permits and durable replay receipt boundary"},
+    {"path": "docs/architecture/phase-a-artifact-qualification.md", "status": "current", "purpose": "A09 immutable wheel/image qualification procedure and fail-closed evidence boundary"}
   ]
 }
