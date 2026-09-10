@@ -1,0 +1,21 @@
+{
+  "schema": "vulcan-constitutional-journal/1",
+  "schema_fingerprint": "9d18a2c748305017e03879a3f39724e281ef584ca8a549250a3a6952142776fd",
+  "ordering_authority": ["commit_seq", "event_ordinal"],
+  "receipt_chain": ["previous_receipt_digest", "receipt_digest"],
+  "required_pragmas": {
+    "journal_mode": "WAL",
+    "synchronous": "FULL",
+    "foreign_keys": "ON",
+    "trusted_schema": "OFF",
+    "busy_timeout_ms": {"minimum": 1, "maximum": 30000}
+  },
+  "credential_persistence": "digest-only; raw tokens, signing keys, and secrets prohibited",
+  "excluded_phase_c_authorities": [
+    "autobiography",
+    "effects",
+    "memory",
+    "reafference"
+  ],
+  "production_wiring": "not-composed-no-dual-write"
+}

@@ -67,6 +67,7 @@ CHECKS: dict[str, tuple[tuple[str, ...], ...]] = {
             "tests/microkernel/test_epistemic_store.py",
             "tests/persistence/test_epistemic_audit_projection.py",
             "tests/microkernel/test_constitutional_transactions.py",
+            "tests/microkernel/test_constitutional_journal.py",
             "tests/architecture/test_ami_constitution.py",
             "tests/ci/test_workflow_gates.py",
         ),
@@ -83,6 +84,7 @@ CHECKS: dict[str, tuple[tuple[str, ...], ...]] = {
             "tests/microkernel/test_epistemic_store.py",
             "tests/persistence/test_epistemic_audit_projection.py",
             "tests/microkernel/test_constitutional_transactions.py",
+            "tests/microkernel/test_constitutional_journal.py",
             "tests/architecture/test_ami_constitution.py",
         ),
         (
@@ -97,6 +99,7 @@ CHECKS: dict[str, tuple[tuple[str, ...], ...]] = {
             "tests/microkernel/test_epistemic_store.py",
             "tests/persistence/test_epistemic_audit_projection.py",
             "tests/microkernel/test_constitutional_transactions.py",
+            "tests/microkernel/test_constitutional_journal.py",
             "tests/architecture/test_ami_constitution.py",
         ),
     ),

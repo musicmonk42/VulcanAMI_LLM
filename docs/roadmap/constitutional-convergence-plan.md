@@ -253,6 +253,17 @@ serialization and classification rules are emitted in
 `config/actor-binding-schema.json`. Exact installed-artifact and key-rotation
 qualification remain required for M4.
 
+The constitutional journal is **M2 — implemented and locally tested, not composed**:
+`ConstitutionalDatabase` owns one SQLite file, connection lifecycle, and caller-owned
+units of work. Its schema covers actor-bound commands/idempotency, episodes,
+transitions, artifacts, epistemic heads, lineage membership, admitted contexts,
+terminal results, a transactional outbox, serialized commit sequences, ordinals,
+and receipt chaining. It deliberately contains no Phase-C memory, effect,
+reafference, or autobiography tables and performs no production dual writes.
+The stable schema fingerprint is emitted in
+`config/constitutional-journal-schema.json`. Production migration remains blocked
+until A06 defines atomic cutover and restart/replay evidence.
+
 ### 2.4 Offline self-improvement — M3 serving boundary / M2 operator evidence
 
 Keep proposal generation and governed review, but move source installation out of the serving process. Use one approval issuer/verifier/store contract.
