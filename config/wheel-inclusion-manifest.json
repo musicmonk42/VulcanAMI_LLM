@@ -134,10 +134,10 @@
       "sha256": "a1f5ebef6eb0c2ce84001246d02bcd2da97aba17bc5e34969604fb7b22b16128"
     },
     {
-      "loc": 585,
+      "loc": 667,
       "module": "vulcan.microkernel.episode",
       "path": "src/vulcan/microkernel/episode.py",
-      "sha256": "f335d8a25ecfd3a07d2886c9ccf5fdbc146956cce91a87682cc649693a5faacf"
+      "sha256": "aa4673c7a3d1298ae363a4f2b133f3a4d2b0b7a7050c3614295b005134512ae6"
     },
     {
       "loc": 619,
@@ -236,10 +236,10 @@
       "sha256": "275b7c08568993cb166ffaa8b7219cc6933cdc3c002382d2840f2f969332f91d"
     },
     {
-      "loc": 305,
+      "loc": 333,
       "module": "vulcan.runtime.api",
       "path": "src/vulcan/runtime/api.py",
-      "sha256": "65044ceed719ea120b304c1308b639a0ef4859298cf681e2c3ff5834ae1ec242"
+      "sha256": "854eb40b794e0b7f90f6a1c27d8ac8376c796b406ab3ae54fff188d41b5110e0"
     },
     {
       "loc": 35,
@@ -248,10 +248,10 @@
       "sha256": "6fe9ef9c3a9691d5a9c6f7f7314e8dd3758705cc176f383e788fa1d12856262a"
     },
     {
-      "loc": 236,
+      "loc": 258,
       "module": "vulcan.runtime.app",
       "path": "src/vulcan/runtime/app.py",
-      "sha256": "d5eb76beddfc1c0d9bd1f4b787c549bcbcd7eaaef1f24e7f109cd814d01c64dd"
+      "sha256": "7a6a962a06b1c63e77291ae43c5fed94f9491c738509d7dee788f4402fcdce02"
     },
     {
       "loc": 22,
@@ -260,10 +260,10 @@
       "sha256": "8dcd59b92b3287fbeb19342b5e413486fc8d39721f34d2ab00a3941b4dd52486"
     },
     {
-      "loc": 117,
+      "loc": 361,
       "module": "vulcan.runtime.auth",
       "path": "src/vulcan/runtime/auth.py",
-      "sha256": "15f1810b04c6d8398c0f608bc94e4a068d307e2b5691c8d69d4c1aaec67b47aa"
+      "sha256": "9481db5e1693939cc6b235bf330748e947a6580b4179fe9f19564d9ff020f57b"
     },
     {
       "loc": 305,
@@ -275,13 +275,13 @@
       "loc": 348,
       "module": "vulcan.runtime.case",
       "path": "src/vulcan/runtime/case.py",
-      "sha256": "ce649f8542dc17cb4d06af67ad0996b5aaf11f81f8b303157811a99699fc3521"
+      "sha256": "01a099eaa29d6b6b8cb3a472006624e755ad387fe722374c2f358ce58836c15d"
     },
     {
-      "loc": 291,
+      "loc": 292,
       "module": "vulcan.runtime.constitutional_kernel",
       "path": "src/vulcan/runtime/constitutional_kernel.py",
-      "sha256": "0d2c36e42d21e5c4695b25187d95466fb0910572aca4dbf0646bda6ca10d5fd1"
+      "sha256": "7c203ffbfc6cb2fc332c4800e428eb60b5ab62e648a49d66ba3b23b6a957b12f"
     },
     {
       "loc": 193,
@@ -362,8 +362,18 @@
       "sha256": "0acc6f0572bce53b836bbce1640f741d9f517c3e8a250ce500ecac654c7e0e94"
     }
   ],
-  "manifest_digest": "0a5661e1c66973abd3953d980653fed03e24dc2f2b812a06202f834310588f22",
+  "manifest_digest": "8e4fbda9e832c10532ebe22e4824150bcf4bd02b09e58a2c5103c8fd502d6891",
   "resources": [
+    {
+      "path": "config/actor-binding-schema.json",
+      "sha256": "73980fbb453021ba847c320da4097dbdbcc79d487c6eb47b92b80b36415e6049",
+      "wheel_path": "vulcan/_release_evidence/config/actor-binding-schema.json"
+    },
+    {
+      "path": "config/actor-binding-schema.sha256",
+      "sha256": "f1a077f00c910c567625898b174b7e3d889b8796a1ee0221fb4ee67911b63a2d",
+      "wheel_path": "vulcan/_release_evidence/config/actor-binding-schema.sha256"
+    },
     {
       "path": "config/capabilities.yaml",
       "sha256": "642ee28d85da27063d050bc3d0a758960420d02bac3812bd9760b5173ee1a102",

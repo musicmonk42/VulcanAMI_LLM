@@ -5,7 +5,7 @@ WORKDIR /build
 COPY pyproject.toml setup.py README.md LICENSE requirements-build.lock requirements-build.in ./
 COPY scripts/ci/check_production_imports.py scripts/ci/generate_wheel_manifest.py scripts/ci/verify_wheel.py ./scripts/ci/
 COPY config/production-import-policy.json config/wheel-inclusion-manifest.json ./config/
-COPY config/capabilities.yaml config/architecture-status.json ./config/
+COPY config/capabilities.yaml config/architecture-status.json config/actor-binding-schema.json config/actor-binding-schema.sha256 ./config/
 COPY docs/architecture/ami-invariants.yaml docs/architecture/adr-006-local-language-interface.md ./docs/architecture/
 COPY docs/governance/controls.yaml docs/governance/impact-assessment.yaml ./docs/governance/
 COPY evidence/qualification/language-contracts.json ./evidence/qualification/language-contracts.json

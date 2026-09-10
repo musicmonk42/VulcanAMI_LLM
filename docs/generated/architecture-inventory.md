@@ -1,6 +1,6 @@
 # Generated architecture inventory
 
-Digest: `7046497a813a7c246047c43517c6b88d25efb3a42ad4dcb4fcc1d90e31767e4f`
+Digest: `e748b97bbc1b592702f51693bcff51dcd05b1529ec6c0b79c6b8ad4de89ec659`
 
 This file is generated from `docs/generated/architecture-inventory.json`.
 
@@ -93,12 +93,12 @@ Count: 410
 - `tests/test_os_import_unified_chat.py:69` kind='python_main_guard', reachability='test-only'
 - `src/audit_log.py:1074` kind='python_main_guard', reachability='unknown'
 - `tests/test_ontology_validation.py:1132` kind='python_main_guard', reachability='test-only'
+- `scripts/ci/verify_wheel.py:113` kind='python_main_guard', reachability='research-only'
 - `tests/test_demo_graphix.py:1145` kind='python_main_guard', reachability='test-only'
 - `scripts/ci/verify_dependency_inputs.py:114` kind='python_main_guard', reachability='research-only'
 - `src/vulcan/tests/test_contraindication_tracker.py:1157` kind='python_main_guard', reachability='test-only'
 - `src/vulcan/tests/test_exploration_budget.py:1158` kind='python_main_guard', reachability='test-only'
 - `src/vulcan/tests/test_principle_learner.py:1163` kind='python_main_guard', reachability='test-only'
-- `src/vulcan/tests/test_dynamics_model.py:1169` kind='python_main_guard', reachability='test-only'
 - ... 360 more in JSON
 
 ## Routes
@@ -127,9 +127,9 @@ Count: 413
 - `src/platform/routes_arena.py:71` handler='arena_run_agent', method='POST', reachability='unknown', route='/api/arena/run/{agent_id}'
 - `src/platform/routes_arena.py:103` handler='arena_tournament', method='POST', reachability='unknown', route='/api/arena/tournament'
 - `src/full_platform.py:4652` handler='arena_tournament', method='POST', reachability='unknown', route='/api/arena/tournament'
-- `src/vulcan/runtime/app.py:216` handler='audit_case', method='GET', reachability='production-reachable', route='/v1/audit/cases/{episode_id}'
-- `src/vulcan/runtime/app.py:192` handler='capabilities', method='GET', reachability='production-reachable', route='/v1/capabilities'
-- `src/vulcan/runtime/app.py:196` handler='chat', method='POST', reachability='production-reachable', route='/v1/chat'
+- `src/vulcan/runtime/app.py:237` handler='audit_case', method='GET', reachability='production-reachable', route='/v1/audit/cases/{episode_id}'
+- `src/vulcan/runtime/app.py:212` handler='capabilities', method='GET', reachability='production-reachable', route='/v1/capabilities'
+- `src/vulcan/runtime/app.py:216` handler='chat', method='POST', reachability='production-reachable', route='/v1/chat'
 - `src/platform/routes_adversarial.py:324` handler='check_query_adversarial', method='POST', reachability='unknown', route='/api/adversarial/check-query'
 - `src/full_platform.py:5003` handler='check_query_adversarial', method='POST', reachability='unknown', route='/api/adversarial/check-query'
 - `src/vulcan/endpoints/distillation.py:279` handler='clear_distillation_buffer', method='POST', reachability='unknown', route='/clear'
@@ -159,7 +159,7 @@ Count: 413
 
 ## Import Identities
 
-Count: 1921
+Count: 1927
 
 - `tests/security/test_output_firewall.py:1` module='vulcan.runtime.output', reachability='test-only'
 - `tests/test_probabilistic_routing.py:10` module='src.vulcan.reasoning.probabilistic_reasoning', reachability='test-only'
@@ -211,7 +211,7 @@ Count: 1921
 - `src/vulcan/world_model/world_model_core.py:1020` module='vulcan.world_model.creative_handler', reachability='unknown'
 - `src/api_server.py:103` module='vulcan.reasoning.unified', reachability='unknown'
 - `src/vulcan/world_model/world_model_core.py:1037` module='vulcan.world_model.llm_guidance', reachability='unknown'
-- ... 1871 more in JSON
+- ... 1877 more in JSON
 
 ## Singletons
 
@@ -540,7 +540,7 @@ Count: 19
 
 ## Ownership Graph
 
-Count: 313
+Count: 314
 
 - `src/vulcan/persistence/alignment.py:` owner_domain='alignment', reachability='unknown'
 - `src/vulcan/runtime/alignment.py:` owner_domain='alignment', reachability='production-reachable'
@@ -592,7 +592,7 @@ Count: 313
 - `tests/security/test_persistent_domain_registry.py:` owner_domain='domain', reachability='test-only'
 - `tests/test_domain_specific_formatting.py:` owner_domain='domain', reachability='test-only'
 - `src/vulcan/graphix/language.py:` owner_domain='language', reachability='production-reachable'
-- ... 263 more in JSON
+- ... 264 more in JSON
 
 ## Text Entrypoints
 

@@ -106,9 +106,9 @@ class CognitiveCase:
             input_digest = sha256(message.encode("utf-8")).hexdigest()
         resolved_case_id = case_id or f"case-{uuid4().hex}"
         actor_binding = actor or ActorBinding(
-            actor_id="canonical-runtime",
-            principal_digest=sha256(request_id.encode("utf-8")).hexdigest(),
-            authority="CognitiveKernel",
+            actor_id="legacy-unverified",
+            principal_digest=sha256(b"legacy-unverified").hexdigest(),
+            authority="LegacyCompatibility",
         )
         episode = CognitiveEpisode.create(
             actor=actor_binding,
@@ -337,9 +337,9 @@ def episode_from_case(case: CognitiveCase) -> CognitiveEpisode:
         return case.episode
     return CognitiveEpisode.create(
         actor=ActorBinding(
-            actor_id="canonical-runtime",
-            principal_digest=sha256(case.request_id.encode("utf-8")).hexdigest(),
-            authority="CognitiveKernel",
+            actor_id="legacy-unverified",
+            principal_digest=sha256(b"legacy-unverified").hexdigest(),
+            authority="LegacyCompatibility",
         ),
         request_id=case.request_id,
         input_digest=case.input_hash,

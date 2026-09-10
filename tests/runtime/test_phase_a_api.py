@@ -22,7 +22,7 @@ from vulcan.runtime.api import (
     _validate_phase_a_settings,
     request_digest,
 )
-from vulcan.runtime.auth import AuthenticatedPrincipal
+from vulcan.runtime.auth import AuthenticatedPrincipal, AuthorizationError
 from vulcan.runtime.route_manifest import (
     PHASE_A_ROUTE_REGISTRY,
     generate_route_manifest,
@@ -37,15 +37,18 @@ from vulcan.runtime.settings import (
 )
 
 
-def authentication(*scopes: str) -> VerifiedAuthenticationContext:
-    principal = AuthenticatedPrincipal(
+def authentication(
+    *scopes: str, tenant: str = "tenant", issuer: str = "issuer"
+) -> VerifiedAuthenticationContext:
+    principal = AuthenticatedPrincipal._from_verified_adapter(
         "subject",
-        "tenant",
-        "issuer",
+        tenant,
+        issuer,
         ("audience",),
         frozenset(scopes),
         "0123456789abcdef",
         "v1",
+        datetime(2026, 1, 1, tzinfo=timezone.utc),
     )
     return VerifiedAuthenticationContext.from_verified_principal(principal)
 
@@ -56,6 +59,7 @@ def command(**changes) -> CommandEnvelope:
         "kind": CommandKind.CHAT,
         "request_digest": request_digest(CommandKind.CHAT, payload),
         "authentication": authentication("reason:write"),
+        "request_id": "request-transport-1",
         "idempotency_key": "request-1",
         "deadline": datetime.now(timezone.utc) + timedelta(seconds=5),
         "budget": ExecutionBudget(64, 4096),
@@ -133,6 +137,7 @@ def test_query_envelope_has_same_mandatory_boundary() -> None:
         QueryKind.READINESS,
         request_digest(QueryKind.READINESS, {}),
         authentication(),
+        "query-transport-1",
         "query-1",
         datetime.now(timezone.utc) + timedelta(seconds=5),
         ExecutionBudget(1, 1024),
@@ -213,9 +218,27 @@ async def test_reduced_graph_executes_arithmetic_without_forbidden_packages(
         result = await api.execute(command())
         assert result["response"] == "The computed result is 4."
         assert result["status"] == "success"
-        assert runtime.episode_store.load(
-            result["metadata"]["case_id"]
-        ).state.is_terminal
+        episode = runtime.episode_store.load(result["metadata"]["case_id"])
+        assert episode.state.is_terminal
+        assert episode.request.request_id == "request-transport-1"
+        assert episode.actor == command().authentication._actor_binding()
+        assert episode.actor.classification == "AUTHENTICATED"
+        serialized = episode.canonical_json()
+        assert "0123456789abcdef" not in serialized
+        assert "key_version" not in serialized
+        audit_payload = {"episode_id": episode.episode_id}
+        cross_tenant = QueryEnvelope(
+            QueryKind.EPISODE_AUDIT,
+            request_digest(QueryKind.EPISODE_AUDIT, audit_payload),
+            authentication("audit:read", tenant="other-tenant"),
+            "cross-tenant-read",
+            "audit-cross-tenant",
+            datetime.now(timezone.utc) + timedelta(seconds=5),
+            ExecutionBudget(1, 4096),
+            audit_payload,
+        )
+        with pytest.raises(AuthorizationError, match="cross-tenant"):
+            await api.query(cross_tenant)
         forbidden = (
             "vulcan.memory",
             "vulcan.learning",

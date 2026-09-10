@@ -57,7 +57,7 @@ class EpisodeAdmissionService:
         request_id: str,
         conversation_id: str | None,
         input_digest: str,
-        actor: ActorBinding | None = None,
+        actor: ActorBinding,
     ) -> CognitiveCase:
         episode_id = f"case-{uuid4().hex}"
         bundle = self.snapshot_admitter(episode_id)
@@ -65,15 +65,10 @@ class EpisodeAdmissionService:
             bundle.validate_active(datetime.now(timezone.utc))
             if bundle.episode_id != episode_id:
                 raise ValueError("snapshot bundle/episode identity mismatch")
-            binding = actor or ActorBinding(
-                actor_id="canonical-runtime",
-                principal_digest=sha256(request_id.encode("utf-8")).hexdigest(),
-                authority="CognitiveKernel",
-            )
 
             def genesis(lineage_head: ArtifactRef | None) -> CognitiveEpisode:
                 return CognitiveEpisode.create(
-                    actor=binding,
+                    actor=actor,
                     request_id=request_id,
                     input_digest=input_digest,
                     conversation_id=conversation_id,
@@ -207,12 +202,18 @@ class ConstitutionalCognitiveKernel:
         return self._delegate.capabilities()
 
     def create_case(
-        self, *, request_id: str, conversation_id: str | None, input_digest: str
+        self,
+        *,
+        request_id: str,
+        conversation_id: str | None,
+        input_digest: str,
+        actor: ActorBinding,
     ) -> CognitiveCase:
         return self.admission.admit(
             request_id=request_id,
             conversation_id=conversation_id,
             input_digest=input_digest,
+            actor=actor,
         )
 
     async def handle(self, request: KernelRequest, case: CognitiveCase) -> KernelResult:

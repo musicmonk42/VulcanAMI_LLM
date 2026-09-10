@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from vulcan.microkernel.episode import CognitiveEpisode
+from vulcan.microkernel.episode import ActorBinding, CognitiveEpisode
 from vulcan.microkernel.snapshots import construct_snapshot_bundle
 from vulcan.microkernel.state_machine import EpisodeState
 from vulcan.runtime.case import CognitiveCase, CognitiveCaseStatus
@@ -13,6 +13,10 @@ from vulcan.runtime.finalization import FinalizationDecision, FinalizationResult
 from vulcan.runtime.kernel import CognitiveKernel, KernelRequest
 from vulcan.runtime.semantic import Utterance, canonical_digest
 from vulcan.testing.snapshots import AttributeSnapshotProvider
+
+TEST_ACTOR = ActorBinding._from_verified_identity(
+    tenant="test-tenant", issuer="test-issuer", subject="test-subject"
+)
 
 
 class _Finalizer:
@@ -52,6 +56,7 @@ async def test_successful_request_binds_snapshot_and_consolidates_episode():
         request_id="request-1",
         conversation_id="conversation-1",
         input_digest=utterance.digest,
+        actor=TEST_ACTOR,
     )
 
     result = await kernel.handle(
@@ -110,6 +115,7 @@ async def test_released_abstention_is_durably_communicated_and_consolidated():
         request_id="request-2",
         conversation_id=None,
         input_digest=utterance.digest,
+        actor=TEST_ACTOR,
     )
 
     result = await kernel.handle(KernelRequest(utterance, None), case)
@@ -175,7 +181,10 @@ def test_admission_failure_releases_bundle_once():
     )
     with pytest.raises(ValueError, match="identity mismatch"):
         kernel.create_case(
-            request_id="request-admission", conversation_id=None, input_digest="d" * 64
+            request_id="request-admission",
+            conversation_id=None,
+            input_digest="d" * 64,
+            actor=TEST_ACTOR,
         )
     assert lease.closes == 1
 
@@ -184,7 +193,10 @@ def test_admission_failure_releases_bundle_once():
 async def test_constitutional_kernel_rejects_direct_case_bypass():
     utterance = Utterance.from_text("2+2")
     case = CognitiveCase.create(
-        request_id="request-bypass", conversation_id=None, input_digest=utterance.digest
+        request_id="request-bypass",
+        conversation_id=None,
+        input_digest=utterance.digest,
+        actor=TEST_ACTOR,
     )
     with pytest.raises(RuntimeError, match="unadmitted"):
         await _kernel().handle(KernelRequest(utterance, None), case)
@@ -199,6 +211,7 @@ async def test_concurrent_admissions_have_distinct_genesis_bound_episodes():
             request_id=f"request-{i}",
             conversation_id=None,
             input_digest=utterance.digest,
+            actor=TEST_ACTOR,
         )
         for i in range(12)
     ]
@@ -218,7 +231,10 @@ def test_invalid_and_duplicate_artifact_references_fail_closed():
         ArtifactRef("response-ok", "not-a-digest", "response-ir.v3")
     ref = ArtifactRef("claim-valid", "d" * 64, "semantic-claim.v2")
     case = CognitiveCase.create(
-        request_id="request-duplicates", conversation_id=None, input_digest="d" * 64
+        request_id="request-duplicates",
+        conversation_id=None,
+        input_digest="d" * 64,
+        actor=TEST_ACTOR,
     )
     with pytest.raises(ValueError, match="duplicate"):
         __import__("dataclasses").replace(case.episode, claims=(ref, ref))
@@ -249,7 +265,10 @@ async def test_cancellation_releases_admitted_leases_exactly_once():
     )
     utterance = Utterance.from_text("2+2")
     case = kernel.create_case(
-        request_id="request-cancel", conversation_id=None, input_digest=utterance.digest
+        request_id="request-cancel",
+        conversation_id=None,
+        input_digest=utterance.digest,
+        actor=TEST_ACTOR,
     )
     with pytest.raises(asyncio.CancelledError):
         await kernel.handle(KernelRequest(utterance, None), case)
@@ -271,7 +290,10 @@ def test_compatibility_ledger_cannot_invoke_episode_transition(monkeypatch):
 
     utterance = Utterance.from_text("2+2")
     case = _kernel().create_case(
-        request_id="request-atomic", conversation_id=None, input_digest=utterance.digest
+        request_id="request-atomic",
+        conversation_id=None,
+        input_digest=utterance.digest,
+        actor=TEST_ACTOR,
     )
     bundle = asyncio.run(DeterministicLanguageInput().propose(utterance))
     case.interpretation = validate_proposal(utterance, bundle)
@@ -351,6 +373,7 @@ async def test_response_is_withheld_when_episode_persistence_fails(tmp_path):
         request_id="request-persist-failure",
         conversation_id=None,
         input_digest=utterance.digest,
+        actor=TEST_ACTOR,
     )
     genesis = case.episode.digest
     armed["value"] = True
@@ -385,6 +408,7 @@ async def test_cancellation_after_finalization_before_transport_keeps_durable_he
         request_id="request-cancel-before-transport",
         conversation_id=None,
         input_digest=utterance.digest,
+        actor=TEST_ACTOR,
     )
 
     with pytest.raises(asyncio.CancelledError):
@@ -419,6 +443,7 @@ async def test_transport_rejects_nonterminal_delegate_result(tmp_path):
         request_id="request-nonterminal",
         conversation_id=None,
         input_digest=utterance.digest,
+        actor=TEST_ACTOR,
     )
     with pytest.raises(RuntimeError, match="not terminal"):
         await kernel.handle(KernelRequest(utterance, None), case)

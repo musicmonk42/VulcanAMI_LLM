@@ -12,6 +12,8 @@ from check_production_imports import ROOT, _path, check
 
 MANIFEST = ROOT / "config/wheel-inclusion-manifest.json"
 RESOURCES = (
+    "config/actor-binding-schema.json",
+    "config/actor-binding-schema.sha256",
     "config/capabilities.yaml",
     "config/architecture-status.json",
     "docs/architecture/ami-invariants.yaml",

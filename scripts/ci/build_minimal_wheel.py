@@ -203,8 +203,8 @@ from vulcan.runtime.auth import AuthenticatedPrincipal
 async def main():
  async with app.router.lifespan_context(app):
   payload={'message':'2 + 2','conversation_id':None}
-  principal=AuthenticatedPrincipal('subject','tenant','vulcan',('vulcan-runtime',),frozenset({'reason:write'}),'0123456789abcdef','v1')
-  envelope=CommandEnvelope(CommandKind.CHAT,request_digest(CommandKind.CHAT,payload),VerifiedAuthenticationContext.from_verified_principal(principal),'installed-arithmetic',datetime.now(timezone.utc)+timedelta(seconds=30),ExecutionBudget(64,4096),payload)
+  principal=AuthenticatedPrincipal._from_verified_adapter('subject','tenant','vulcan',('vulcan-runtime',),frozenset({'reason:write'}),'0123456789abcdef','v1',datetime.now(timezone.utc))
+  envelope=CommandEnvelope(CommandKind.CHAT,request_digest(CommandKind.CHAT,payload),VerifiedAuthenticationContext.from_verified_principal(principal),'installed-request','installed-arithmetic',datetime.now(timezone.utc)+timedelta(seconds=30),ExecutionBudget(64,4096),payload)
   result=await app.state.api.execute(envelope)
   if result['response']!='The computed result is 4.': raise RuntimeError('installed arithmetic mismatch')
  if app.state.api is not None or app.state.ready: raise RuntimeError('lifespan resources not closed')

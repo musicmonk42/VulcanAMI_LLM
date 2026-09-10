@@ -13,8 +13,9 @@ from types import MappingProxyType
 from typing import Mapping
 
 from vulcan.graphix.runtime import Utterance
+from vulcan.microkernel.episode import ActorBinding
 
-from .auth import AuthenticatedPrincipal
+from .auth import AuthenticatedPrincipal, CredentialProvenance
 from .kernel import KernelRequest
 from .settings import RuntimeSettings
 
@@ -32,9 +33,11 @@ class QueryKind(str, Enum):
 
 @dataclass(frozen=True, slots=True, repr=False)
 class VerifiedAuthenticationContext:
-    """Opaque, request-local authentication proof; never persisted as authority."""
+    """Opaque verified actor plus nonpersistent credential provenance."""
 
-    __principal: AuthenticatedPrincipal
+    __actor: ActorBinding
+    __credential: CredentialProvenance | None
+    __scopes: frozenset[str]
 
     @classmethod
     def from_verified_principal(
@@ -42,24 +45,24 @@ class VerifiedAuthenticationContext:
     ) -> "VerifiedAuthenticationContext":
         if not isinstance(principal, AuthenticatedPrincipal):
             raise TypeError("verified authentication principal required")
-        return cls(principal)
-
-    @classmethod
-    def public(cls) -> "VerifiedAuthenticationContext":
         return cls(
-            AuthenticatedPrincipal(
-                "public-route",
-                "public",
-                "vulcan-runtime",
-                ("vulcan-runtime",),
-                frozenset(),
-                "public-route-context",
-                "internal",
-            )
+            principal.actor,
+            CredentialProvenance.from_principal(principal),
+            principal.scopes,
         )
 
+    @classmethod
+    def internal_system_query(cls) -> "VerifiedAuthenticationContext":
+        return cls(ActorBinding.internal_system_query(), None, frozenset())
+
     def require(self, scope: str) -> None:
-        self.__principal.require(scope)
+        if scope not in self.__scopes:
+            from .auth import AuthorizationError
+
+            raise AuthorizationError("missing required scope")
+
+    def _actor_binding(self) -> ActorBinding:
+        return self.__actor
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,6 +80,7 @@ class CommandEnvelope:
     kind: CommandKind
     request_digest: str
     authentication: VerifiedAuthenticationContext
+    request_id: str
     idempotency_key: str
     deadline: datetime
     budget: ExecutionBudget
@@ -86,6 +90,7 @@ class CommandEnvelope:
         _validate_envelope(
             self.request_digest,
             self.authentication,
+            self.request_id,
             self.idempotency_key,
             self.deadline,
         )
@@ -99,6 +104,7 @@ class QueryEnvelope:
     kind: QueryKind
     request_digest: str
     authentication: VerifiedAuthenticationContext
+    request_id: str
     idempotency_key: str
     deadline: datetime
     budget: ExecutionBudget
@@ -108,6 +114,7 @@ class QueryEnvelope:
         _validate_envelope(
             self.request_digest,
             self.authentication,
+            self.request_id,
             self.idempotency_key,
             self.deadline,
         )
@@ -116,7 +123,9 @@ class QueryEnvelope:
         _require_payload_digest(self.kind.value, payload, self.request_digest)
 
 
-def _validate_envelope(digest: str, auth: object, key: str, deadline: datetime) -> None:
+def _validate_envelope(
+    digest: str, auth: object, request_id: str, key: str, deadline: datetime
+) -> None:
     if (
         not isinstance(digest, str)
         or len(digest) != 64
@@ -125,6 +134,11 @@ def _validate_envelope(digest: str, auth: object, key: str, deadline: datetime) 
         raise ValueError("invalid request digest")
     if not isinstance(auth, VerifiedAuthenticationContext):
         raise TypeError("verified authentication context required")
+    if (
+        not isinstance(request_id, str)
+        or re.fullmatch(r"[A-Za-z0-9_.:-]{1,128}", request_id) is None
+    ):
+        raise ValueError("invalid request id")
     if not isinstance(key, str) or re.fullmatch(r"[A-Za-z0-9_.:-]{1,128}", key) is None:
         raise ValueError("invalid idempotency key")
     if deadline.tzinfo is None or deadline.utcoffset() != timezone.utc.utcoffset(
@@ -229,9 +243,10 @@ class RuntimeAPI:
         runtime = self.__runtime
         await runtime.admission()
         case = runtime.kernel.create_case(
-            request_id=envelope.idempotency_key,
+            request_id=envelope.request_id,
             conversation_id=conversation_id,
             input_digest=utterance.digest,
+            actor=envelope.authentication._actor_binding(),
         )
         async with asyncio.timeout(_remaining(envelope.deadline)):
             result = await runtime.kernel.handle(
@@ -275,6 +290,19 @@ class RuntimeAPI:
             if not isinstance(episode_id, str):
                 raise TypeError("episode id required")
             async with asyncio.timeout(_remaining(envelope.deadline)):
+                episode = await asyncio.to_thread(
+                    runtime.episode_store.load, episode_id
+                )
+                requester = envelope.authentication._actor_binding()
+                if (
+                    requester.classification != "AUTHENTICATED"
+                    or episode.actor.classification != "AUTHENTICATED"
+                    or (requester.tenant, requester.issuer)
+                    != (episode.actor.tenant, episode.actor.issuer)
+                ):
+                    from .auth import AuthorizationError
+
+                    raise AuthorizationError("cross-tenant episode access denied")
                 events = await asyncio.to_thread(
                     runtime.audit.events_for_episode, episode_id
                 )

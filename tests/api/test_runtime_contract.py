@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -52,7 +53,7 @@ class Runtime:
 
 
 def principal(scopes):
-    return AuthenticatedPrincipal("sub", "tenant", "iss", ("aud",), frozenset(scopes), "j" * 16, "v1")
+    return AuthenticatedPrincipal._from_verified_adapter("sub", "tenant", "iss", ("aud",), frozenset(scopes), "j" * 16, "v1", datetime(2026, 1, 1, tzinfo=timezone.utc))
 
 
 @pytest.fixture

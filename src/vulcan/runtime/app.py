@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 
@@ -30,6 +31,7 @@ from .errors import (
 from .route_manifest import generate_route_manifest
 
 MAX_BODY = 16_384
+_TRANSACTION_ID = re.compile(r"^[A-Za-z0-9_.:-]{1,128}$")
 
 
 @asynccontextmanager
@@ -55,7 +57,8 @@ def _public_query(kind: QueryKind) -> QueryEnvelope:
     return QueryEnvelope(
         kind,
         request_digest(kind, payload),
-        VerifiedAuthenticationContext.public(),
+        VerifiedAuthenticationContext.internal_system_query(),
+        f"system-{kind.value}",
         f"public-{kind.value}",
         datetime.now(timezone.utc) + timedelta(seconds=5),
         ExecutionBudget(1, 65536),
@@ -76,6 +79,15 @@ def _authentication(request: Request, scope: str) -> VerifiedAuthenticationConte
         raise ApiContractError(
             401, ApiErrorCategory.AUTHENTICATION_REQUIRED, "authentication required"
         ) from None
+
+
+def _request_id(request: Request) -> str:
+    value = request.headers.get("x-request-id")
+    if value is None or _TRANSACTION_ID.fullmatch(value) is None:
+        raise ApiContractError(
+            400, ApiErrorCategory.SCHEMA_INVALID, "X-Request-ID required"
+        )
+    return value
 
 
 def _api(request: Request) -> RuntimeAPI:
@@ -160,6 +172,13 @@ def create_app() -> FastAPI:
             status_code=400,
         )
 
+    @app.exception_handler(AuthorizationError)
+    async def authorization_error(request: Request, exc: AuthorizationError):
+        return JSONResponse(
+            content={"error": {"code": "forbidden", "message": "forbidden"}},
+            status_code=403,
+        )
+
     @app.get("/health/live")
     async def live():
         return {"status": "alive"}
@@ -181,6 +200,7 @@ def create_app() -> FastAPI:
             QueryKind.INTEGRITY,
             request_digest(QueryKind.INTEGRITY, payload),
             _authentication(request, "operator:read"),
+            _request_id(request),
             "integrity",
             datetime.now(timezone.utc) + timedelta(seconds=5),
             ExecutionBudget(1, 65536),
@@ -197,7 +217,7 @@ def create_app() -> FastAPI:
         body = ReasonRequest.model_validate(await _body(request))
         payload = {"message": body.message, "conversation_id": body.conversation_id}
         key = request.headers.get("idempotency-key")
-        if key is None:
+        if key is None or _TRANSACTION_ID.fullmatch(key) is None:
             raise ApiContractError(
                 400, ApiErrorCategory.SCHEMA_INVALID, "Idempotency-Key required"
             )
@@ -205,6 +225,7 @@ def create_app() -> FastAPI:
             CommandKind.CHAT,
             request_digest(CommandKind.CHAT, payload),
             _authentication(request, "reason:write"),
+            _request_id(request),
             key,
             datetime.now(timezone.utc) + timedelta(seconds=30),
             ExecutionBudget(64, 65536),
@@ -219,6 +240,7 @@ def create_app() -> FastAPI:
             QueryKind.EPISODE_AUDIT,
             request_digest(QueryKind.EPISODE_AUDIT, payload),
             _authentication(request, "audit:read"),
+            _request_id(request),
             f"audit-{episode_id}",
             datetime.now(timezone.utc) + timedelta(seconds=5),
             ExecutionBudget(1, 65536),

@@ -240,7 +240,18 @@ initializer, preventing package-level side effects from bypassing the graph.
 
 The Phase-A application façade is **M2 — Tested locally**: its immutable envelopes expose only command/query dispatch, the ASGI surface is reduced to six routes with documentation disabled, and the reduced composition admits only deterministic arithmetic plus constitutional episode, epistemic, lineage, capability, safety, and audit owners. Exact wheel/image restart qualification remains required for M4.
 
-The minimal Phase-A wheel is **M2 — reproducibly built and locally verified**: a reviewed positive inclusion manifest admits the 60-module serving closure and seven content-bound release inputs; two clean builds produce identical wheel bytes; full RECORD, member digest, excluded-import, undeclared-import, mutation, and outside-checkout controls pass. Installed lifespan qualification remains below M4 until the locked runtime dependencies are available in the qualification environment.
+The minimal Phase-A wheel is **M2 — reproducibly built and locally verified**: a reviewed positive inclusion manifest admits the 60-module serving closure and nine content-bound release inputs; two clean builds produce identical wheel bytes; full RECORD, member digest, excluded-import, undeclared-import, mutation, and outside-checkout controls pass. Installed lifespan qualification remains below M4 until the locked runtime dependencies are available in the qualification environment.
+
+Authenticated actor binding is **M3 — canonical for the Phase-A request path**:
+the versioned `vulcan.actor-binding/1` identity binds only tenant, issuer, and
+subject, while key ID, token ID, scopes, authentication time, method, and adapter
+release remain nonpersistent credential provenance. Request ID and idempotency key
+remain envelope transaction facts. Canonical admission has no default actor,
+cross-tenant/issuer audit reads fail closed, and legacy actor documents remain
+`LEGACY_UNVERIFIED` without inferred provenance or automatic upgrade. The golden
+serialization and classification rules are emitted in
+`config/actor-binding-schema.json`. Exact installed-artifact and key-rotation
+qualification remain required for M4.
 
 ### 2.4 Offline self-improvement — M3 serving boundary / M2 operator evidence
 
