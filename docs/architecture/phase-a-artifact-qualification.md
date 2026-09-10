@@ -26,6 +26,9 @@ build/runtime locks and bases, ActorBinding schema and vectors, journal and
 receipt-chain schema, authority-verification mode/history, migration policy,
 route/import manifests, test catalog, and harness. Capability evidence may be
 redirected to this bundle only after the bundle exists and independently verifies.
+These binding digests are derived from the checked-out reviewed inputs and the
+immutable base references; caller-supplied values must match exactly and cannot
+substitute arbitrary claims.
 
 This container does not provide Docker or Podman and registry access is denied.
 Consequently image construction and the A09 critical catalog are `NOT_EXECUTED`;

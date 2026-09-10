@@ -44,6 +44,22 @@ def test_catalog_and_binding_sets_are_exact():
     assert "actor_binding_vectors" in module.REQUIRED_BINDINGS
 
 
+def test_bindings_are_derived_from_reviewed_inputs(tmp_path):
+    catalog = tmp_path / "catalog.json"
+    catalog.write_text("{}\n")
+    base = "registry.example/python@sha256:" + "a" * 64
+    bindings = module.derive_bindings(
+        revision="b" * 40,
+        catalog=catalog,
+        builder_base=base,
+        runtime_base=base,
+    )
+    assert set(bindings) == module.REQUIRED_BINDINGS
+    assert bindings["builder_base"] == "a" * 64
+    assert bindings["runtime_base"] == "a" * 64
+    assert bindings["test_catalog"] == module.digest(b"{}\n")
+
+
 def test_e2e_uses_admitted_arithmetic_contract_and_immutable_subject():
     script = Path("scripts/e2e/run_runtime_qualification.sh").read_text()
     assert '"message":"2 + 2"' in script

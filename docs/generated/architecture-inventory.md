@@ -1,6 +1,6 @@
 # Generated architecture inventory
 
-Digest: `caed61d443d5b03816ef65b5f37f4dd9a27cb1124a7b13420df536396e56efcd`
+Digest: `ab72d46657a5401fe58a8c5ea8f12491a91dee83422649b630e70f345da67167`
 
 This file is generated from `docs/generated/architecture-inventory.json`.
 
@@ -93,7 +93,6 @@ Count: 414
 - `src/vulcan/tests/test_vulcan_cost_model.py:1108` kind='python_main_guard', reachability='test-only'
 - `src/vulcan/tests/test_domain_validators.py:1119` kind='python_main_guard', reachability='test-only'
 - `src/vulcan/tests/test_hierarchical.py:1122` kind='python_main_guard', reachability='test-only'
-- `scripts/qualification/build_candidate_images.py:108` kind='python_main_guard', reachability='research-only'
 - `tests/test_os_import_unified_chat.py:69` kind='python_main_guard', reachability='test-only'
 - `src/audit_log.py:1074` kind='python_main_guard', reachability='unknown'
 - `tests/test_ontology_validation.py:1132` kind='python_main_guard', reachability='test-only'
@@ -102,6 +101,7 @@ Count: 414
 - `scripts/ci/verify_dependency_inputs.py:114` kind='python_main_guard', reachability='research-only'
 - `src/vulcan/tests/test_contraindication_tracker.py:1157` kind='python_main_guard', reachability='test-only'
 - `src/vulcan/tests/test_exploration_budget.py:1158` kind='python_main_guard', reachability='test-only'
+- `src/vulcan/tests/test_principle_learner.py:1163` kind='python_main_guard', reachability='test-only'
 - ... 364 more in JSON
 
 ## Routes

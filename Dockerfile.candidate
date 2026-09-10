@@ -2,6 +2,8 @@
 ARG PYTHON_BASE
 FROM ${PYTHON_BASE}
 ARG WHEEL_SHA256
+ARG SOURCE_DATE_EPOCH=1704067200
+ENV SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH}
 WORKDIR /app
 COPY candidate.whl /tmp/candidate.whl
 COPY requirements-runtime.lock /tmp/requirements-runtime.lock

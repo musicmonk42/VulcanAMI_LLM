@@ -92,6 +92,44 @@ def load_document(path: Path) -> object:
     return json.loads(path.read_text())
 
 
+def derive_bindings(
+    *, revision: str, catalog: Path, builder_base: str, runtime_base: str
+) -> dict[str, str]:
+    actor = load_document(ROOT / "config/actor-binding-schema.json")
+    return {
+        "source": digest(revision.encode()),
+        "runtime_lock": digest((ROOT / "requirements-runtime.lock").read_bytes()),
+        "build_lock": digest((ROOT / "requirements-build.lock").read_bytes()),
+        "builder_base": immutable_image(builder_base).rsplit(":", 1)[1],
+        "runtime_base": immutable_image(runtime_base).rsplit(":", 1)[1],
+        "actor_binding_schema": digest(
+            (ROOT / "config/actor-binding-schema.json").read_bytes()
+        ),
+        "actor_binding_vectors": digest(canonical(actor["golden_vectors"])),
+        "journal_schema": digest(
+            (ROOT / "config/constitutional-journal-schema.json").read_bytes()
+        ),
+        "authority_verification": digest(
+            (ROOT / "config/authority-verification-history.json").read_bytes()
+        ),
+        "migration_policy": digest(
+            (
+                ROOT / "docs/architecture/legacy-migration-and-audit-projection.md"
+            ).read_bytes()
+        ),
+        "route_manifest": digest(
+            (ROOT / "src/vulcan/runtime/route_manifest.py").read_bytes()
+        ),
+        "import_manifest": digest(
+            (ROOT / "config/production-import-policy.json").read_bytes()
+        ),
+        "test_catalog": digest(catalog.read_bytes()),
+        "harness": digest(
+            (ROOT / "scripts/qualification/journal_recovery_harness.py").read_bytes()
+        ),
+    }
+
+
 def execute(argv: list[str], *, subject: str, wheel: Path) -> dict[str, object]:
     expanded = [
         part.replace("{subject}", subject).replace("{wheel}", str(wheel))
@@ -116,6 +154,8 @@ def main() -> int:
     parser.add_argument("--wheel-sha256", required=True)
     parser.add_argument("--catalog", type=Path, required=True)
     parser.add_argument("--bindings", type=Path, required=True)
+    parser.add_argument("--builder-base", required=True)
+    parser.add_argument("--runtime-base", required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     subject = immutable_image(args.subject)
@@ -129,10 +169,18 @@ def main() -> int:
     revision = require_clean_revision()
     catalog = load_document(args.catalog)
     bindings = load_document(args.bindings)
+    derived_bindings = derive_bindings(
+        revision=revision,
+        catalog=args.catalog,
+        builder_base=args.builder_base,
+        runtime_base=args.runtime_base,
+    )
     if not isinstance(catalog, dict) or set(catalog) != REQUIRED_SCENARIOS:
         raise ValueError("critical scenario catalog is incomplete or contains aliases")
     if not isinstance(bindings, dict) or set(bindings) != REQUIRED_BINDINGS:
         raise ValueError("qualification bindings are incomplete")
+    if bindings != derived_bindings:
+        raise ValueError("qualification bindings do not match reviewed inputs")
     if any(
         not isinstance(value, str) or not HEX.fullmatch(value)
         for value in bindings.values()

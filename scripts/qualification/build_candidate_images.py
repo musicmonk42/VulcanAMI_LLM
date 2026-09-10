@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -22,7 +23,11 @@ def sha(path: Path) -> str:
 
 
 def run(argv: list[str], cwd: Path) -> subprocess.CompletedProcess:
-    result = subprocess.run(argv, cwd=cwd, text=True, capture_output=True)
+    environment = os.environ.copy()
+    environment["DOCKER_BUILDKIT"] = "1"
+    result = subprocess.run(
+        argv, cwd=cwd, text=True, capture_output=True, env=environment
+    )
     if result.returncode:
         raise RuntimeError(result.stdout + result.stderr)
     return result
@@ -43,6 +48,11 @@ def main() -> int:
         raise RuntimeError("frozen wheel digest mismatch")
     if args.output.exists():
         raise RuntimeError("output must not already exist")
+    base_inspection = json.loads(
+        run(["docker", "image", "inspect", base], ROOT).stdout
+    )[0]
+    if base not in base_inspection.get("RepoDigests", []):
+        raise RuntimeError("local base image does not match the immutable reference")
     with tempfile.TemporaryDirectory() as temporary:
         context = Path(temporary)
         shutil.copy2(args.wheel, context / "candidate.whl")
@@ -64,6 +74,8 @@ def main() -> int:
                     f"PYTHON_BASE={base}",
                     "--build-arg",
                     f"WHEEL_SHA256={args.wheel_sha256}",
+                    "--build-arg",
+                    "SOURCE_DATE_EPOCH=1704067200",
                     "--iidfile",
                     str(iid),
                     ".",
@@ -98,10 +110,14 @@ def main() -> int:
             "schema": "vulcan-image-rebuild-comparison/1",
             "wheel_sha256": args.wheel_sha256,
         }
+        raw = json.dumps(evidence, sort_keys=True, separators=(",", ":")) + "\n"
         args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(
-            json.dumps(evidence, sort_keys=True, separators=(",", ":")) + "\n"
-        )
+        descriptor = os.open(args.output, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o444)
+        try:
+            os.write(descriptor, raw.encode())
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
     return 0
 
 
