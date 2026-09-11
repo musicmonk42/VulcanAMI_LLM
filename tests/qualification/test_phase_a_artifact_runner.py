@@ -67,6 +67,25 @@ def test_e2e_uses_admitted_arithmetic_contract_and_immutable_subject():
     assert "IMAGE_TAG" not in script
     assert "@sha256:[0-9a-f]{64}" in script
     assert "--read-only" in script
+    assert "org.vulcan.require-hashes" in script
+    assert "org.vulcan.dependency-lock-digest" in script
+
+
+def test_candidate_image_binds_wheel_lock_and_hash_enforcement():
+    dockerfile = Path("Dockerfile.candidate").read_text()
+    builder = Path("scripts/qualification/build_candidate_images.py").read_text()
+    for field in (
+        "WHEEL_SHA256",
+        "DEPENDENCY_LOCK_DIGEST",
+        "REQUIRE_HASHES=1",
+        "org.vulcan.candidate-wheel-sha256",
+        "org.vulcan.dependency-lock-digest",
+        "org.vulcan.require-hashes",
+        'org.vulcan.qualification-gate="A09"',
+    ):
+        assert field in dockerfile
+    assert '"REQUIRE_HASHES=1"' in builder
+    assert "candidate image qualification labels mismatch" in builder
 
 
 def test_candidate_builder_refuses_without_container_engine(tmp_path, monkeypatch):

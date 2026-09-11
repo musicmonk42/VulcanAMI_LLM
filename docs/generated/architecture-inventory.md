@@ -1,6 +1,6 @@
 # Generated architecture inventory
 
-Digest: `ab72d46657a5401fe58a8c5ea8f12491a91dee83422649b630e70f345da67167`
+Digest: `2e2ff7829e2d9e1d560838ae6248093363f7c4729497b71ff05196329ea1ceac`
 
 This file is generated from `docs/generated/architecture-inventory.json`.
 
@@ -50,7 +50,7 @@ This file is generated from `docs/generated/architecture-inventory.json`.
 
 ## Entrypoints
 
-Count: 414
+Count: 415
 
 - `src/vulcan/tests/test_multimodal_reasoning.py:999` kind='python_main_guard', reachability='test-only'
 - `src/vulcan/tests/test_curiosity_engine_integration.py:1000` kind='python_main_guard', reachability='test-only'
@@ -102,7 +102,7 @@ Count: 414
 - `src/vulcan/tests/test_contraindication_tracker.py:1157` kind='python_main_guard', reachability='test-only'
 - `src/vulcan/tests/test_exploration_budget.py:1158` kind='python_main_guard', reachability='test-only'
 - `src/vulcan/tests/test_principle_learner.py:1163` kind='python_main_guard', reachability='test-only'
-- ... 364 more in JSON
+- ... 365 more in JSON
 
 ## Routes
 
@@ -162,25 +162,28 @@ Count: 413
 
 ## Import Identities
 
-Count: 1965
+Count: 1990
 
 - `tests/security/test_output_firewall.py:1` module='vulcan.runtime.output', reachability='test-only'
 - `tests/test_probabilistic_routing.py:10` module='src.vulcan.reasoning.probabilistic_reasoning', reachability='test-only'
 - `tests/test_wm_request_handling.py:10` module='src.vulcan.world_model.request_handling', reachability='test-only'
 - `tests/assurance/test_capability_registry.py:10` module='vulcan.assurance.capabilities', reachability='test-only'
+- `src/vulcan/microkernel/journal_transactions.py:10` module='vulcan.constitution.primitives', reachability='production-reachable'
 - `src/vulcan/microkernel/snapshots.py:10` module='vulcan.constitution.primitives', reachability='production-reachable'
+- `tests/graphix/test_verifier_registry.py:10` module='vulcan.constitution.primitives', reachability='test-only'
 - `tests/microkernel/test_autobiography.py:10` module='vulcan.constitution.primitives', reachability='test-only'
 - `tests/core/test_core_primitives.py:10` module='vulcan.core.decisions', reachability='test-only'
 - `src/vulcan/endpoints/__init__.py:10` module='vulcan.endpoints.distillation', reachability='unknown'
 - `src/vulcan/graphix/validation/pipeline.py:10` module='vulcan.graphix.codec', reachability='production-reachable'
-- `src/vulcan/microkernel/journal_transactions.py:10` module='vulcan.graphix.epistemic', reachability='production-reachable'
 - `tests/graphix/test_epistemic_dialect.py:10` module='vulcan.graphix.epistemic', reachability='test-only'
+- `tests/security/test_persistent_audit_alignment.py:10` module='vulcan.graphix.evaluation', reachability='test-only'
 - `tests/test_progressive_research.py:10` module='vulcan.learning_owner', reachability='test-only'
 - `tests/test_world_model_research.py:10` module='vulcan.learning_owner', reachability='test-only'
 - `tests/security/test_local_language_governance.py:10` module='vulcan.local_language.tokenizer', reachability='test-only'
 - `src/vulcan/tests/test_consolidation.py:10` module='vulcan.memory.base', reachability='test-only'
 - `src/vulcan/runtime/composition.py:10` module='vulcan.memory.composition', reachability='production-reachable'
 - `tests/microkernel/test_transition_permits.py:10` module='vulcan.microkernel._transition_permits', reachability='test-only'
+- `tests/microkernel/test_verifier_commit_boundary.py:10` module='vulcan.microkernel.authority', reachability='test-only'
 - `src/vulcan/persistence/journal_audit.py:10` module='vulcan.microkernel.constitutional_journal', reachability='unknown'
 - `tests/persistence/test_legacy_constitutional_migration.py:10` module='vulcan.microkernel.constitutional_journal', reachability='test-only'
 - `tests/microkernel/test_lineage.py:10` module='vulcan.microkernel.episode', reachability='test-only'
@@ -188,7 +191,6 @@ Count: 1965
 - `tests/persistence/test_episode_audit_projection.py:10` module='vulcan.microkernel.state_machine', reachability='test-only'
 - `tests/test_learning_outbox.py:10` module='vulcan.runtime.audit', reachability='test-only'
 - `tests/runtime/test_authoritative_episode_path.py:10` module='vulcan.runtime.case', reachability='test-only'
-- `tests/security/test_persistent_audit_alignment.py:10` module='vulcan.runtime.finalization', reachability='test-only'
 - `tests/security/test_language_contracts.py:10` module='vulcan.runtime.kernel', reachability='test-only'
 - `tests/security/test_real_response_safety_composition.py:10` module='vulcan.runtime.kernel', reachability='test-only'
 - `tests/security/test_runtime_convergence.py:10` module='vulcan.runtime.kernel', reachability='test-only'
@@ -212,9 +214,7 @@ Count: 1965
 - `src/vulcan/tests/test_unified_chat_imports.py:102` module='vulcan.endpoints', reachability='test-only'
 - `src/vulcan/tests/test_planning_endpoint.py:102` module='vulcan.endpoints.planning', reachability='test-only'
 - `tests/microkernel/test_episode.py:102` module='vulcan.microkernel.episode', reachability='test-only'
-- `tests/security/test_runtime_convergence.py:102` module='vulcan.runtime.app', reachability='test-only'
-- `src/vulcan/llm/__init__.py:89` module='vulcan.llm.openai_client', reachability='unknown'
-- ... 1915 more in JSON
+- ... 1940 more in JSON
 
 ## Singletons
 
@@ -335,7 +335,6 @@ Count: 4430
 - `src/generate_transparency_report.py:1011` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/vulcan/semantic_bridge/semantic_bridge_core.py:1011` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/governance_loop.py:1012` kind='except_exception', reachability='unknown', review='unreviewed'
-- `src/vulcan/runtime/kernel.py:982` kind='except_exception', reachability='production-reachable', review='unreviewed'
 - `src/integration/graphix_vulcan_bridge.py:1013` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/vulcan/curiosity_engine/exploration_budget.py:1015` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/vulcan/reasoning/selection/memory_prior.py:1015` kind='except_exception', reachability='unknown', review='unreviewed'
@@ -347,6 +346,7 @@ Count: 4430
 - `src/generate_transparency_report.py:1014` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/vulcan/knowledge_crystallizer/principle_extractor.py:1018` kind='except_exception', reachability='unknown', review='unreviewed'
 - `src/vulcan/curiosity_engine/curiosity_engine_core.py:1012` kind='except_exception', reachability='unknown', review='unreviewed'
+- `src/memory/governed_unlearning.py:1019` kind='except_exception', reachability='unknown', review='unreviewed'
 - ... 4380 more in JSON
 
 ## Mocks
@@ -407,11 +407,10 @@ Count: 400
 
 ## Persistence
 
-Count: 544
+Count: 546
 
 - `src/vulcan/improvement/offline.py:101` kind='call', reachability='unknown', value='fcntl.flock'
 - `tests/persistence/test_memory_outbox_v2.py:103` kind='call', reachability='test-only', value='SQLiteMemoryRepository'
-- `src/vulcan/runtime/alignment.py:107` kind='call', reachability='production-reachable', value='fcntl.flock'
 - `src/platform/background.py:108` kind='call', reachability='unknown', value='fcntl.flock'
 - `tests/persistence/test_memory_outbox_v2.py:108` kind='call', reachability='test-only', value='SQLiteMemoryRepository'
 - `src/adversarial_tester.py:1109` kind='call', reachability='unknown', value='sqlite3.connect'
@@ -459,7 +458,8 @@ Count: 544
 - `src/vulcan/world_model/meta_reasoning/governed_transaction.py:244` kind='call', reachability='unknown', value='fcntl.flock'
 - `tests/runtime/test_phase_a_api.py:245` kind='call', reachability='test-only', value='sqlite3.connect'
 - `src/vulcan/safety/governance_alignment.py:248` kind='call', reachability='unknown', value='sqlite3.connect'
-- ... 494 more in JSON
+- `tests/microkernel/test_lineage.py:256` kind='call', reachability='test-only', value='sqlite3.connect'
+- ... 496 more in JSON
 
 ## Environment Readers
 
@@ -543,7 +543,7 @@ Count: 19
 
 ## Ownership Graph
 
-Count: 317
+Count: 315
 
 - `src/vulcan/persistence/alignment.py:` owner_domain='alignment', reachability='unknown'
 - `src/vulcan/runtime/alignment.py:` owner_domain='alignment', reachability='production-reachable'
@@ -595,7 +595,7 @@ Count: 317
 - `src/vulcan/tests/test_tool_domain_bridge.py:` owner_domain='domain', reachability='test-only'
 - `src/vulcan/world_model/introspection_domain.py:` owner_domain='domain', reachability='unknown'
 - `tests/persistence/test_domain_registry_v2.py:` owner_domain='domain', reachability='test-only'
-- ... 267 more in JSON
+- ... 265 more in JSON
 
 ## Text Entrypoints
 

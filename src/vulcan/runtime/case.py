@@ -10,14 +10,11 @@ from typing import TYPE_CHECKING
 from uuid import uuid4
 
 if TYPE_CHECKING:
-    from vulcan.microkernel.snapshots import SnapshotBundle
+    from vulcan.microkernel.snapshots import GraphixEvaluationContext, SnapshotBundle
 
     from vulcan.graphix.runtime import (
         AcceptedInterpretation,
-        Claim,
         ClarificationRequest,
-        Derivation,
-        EvidenceArtifact,
         InterpretationBundle,
         ResponseIR,
     )
@@ -76,9 +73,6 @@ class CognitiveCase:
         default=None, repr=False
     )
     clarification: "ClarificationRequest | None" = field(default=None, repr=False)
-    _evidence: tuple["EvidenceArtifact", ...] = field(default=(), repr=False)
-    _claims: tuple["Claim", ...] = field(default=(), repr=False)
-    _derivations: tuple["Derivation", ...] = field(default=(), repr=False)
     response_ir: "ResponseIR | None" = field(default=None, repr=False)
     selected_components: tuple[str, ...] = ()
     terminal_status: CognitiveCaseStatus = CognitiveCaseStatus.OPEN
@@ -88,6 +82,9 @@ class CognitiveCase:
     events: list[CaseEvent] = field(default_factory=list)
     episode: CognitiveEpisode | None = field(default=None, repr=False)
     _snapshot_bundle: "SnapshotBundle | None" = field(default=None, repr=False)
+    _evaluation_context: "GraphixEvaluationContext | None" = field(
+        default=None, repr=False
+    )
 
     @classmethod
     def create(
@@ -147,6 +144,12 @@ class CognitiveCase:
             state_snapshot_id=bundle.digest,
             episode=episode,
             _snapshot_bundle=bundle,
+            _evaluation_context=(
+                bundle.evaluation_context()
+                if bundle.domain.live_view is not None
+                and bundle.alignment.live_view is not None
+                else None
+            ),
         )
         case.record("created")
         case.record("snapshot_admitted", bundle.bundle_id)
@@ -160,20 +163,14 @@ class CognitiveCase:
         self.events.append(CaseEvent(stage, datetime.now(timezone.utc), detail))
 
     @property
-    def evidence(self) -> tuple["EvidenceArtifact", ...]:
-        return tuple(self._evidence)
-
-    @property
-    def claims(self) -> tuple["Claim", ...]:
-        return tuple(self._claims)
-
-    @property
-    def derivations(self) -> tuple["Derivation", ...]:
-        return tuple(self._derivations)
-
-    @property
     def snapshot_bundle(self) -> "SnapshotBundle | None":
         return self._snapshot_bundle
+
+    @property
+    def evaluation_context(self) -> "GraphixEvaluationContext":
+        if self._evaluation_context is None:
+            raise RuntimeError("case has no admitted evaluation context")
+        return self._evaluation_context
 
     def bind_snapshot_bundle(self, bundle: "SnapshotBundle") -> None:
         """Migration adapter for pre-admission callers; never used in production.
@@ -198,54 +195,6 @@ class CognitiveCase:
     def release_snapshot_bundle(self) -> None:
         if self._snapshot_bundle is not None:
             self._snapshot_bundle.close()
-
-    def append_ledger(
-        self,
-        *,
-        claim: "Claim",
-        derivation: "Derivation",
-        evidence: tuple["EvidenceArtifact", ...] = (),
-    ) -> None:
-        """Retired authority seam; callers must project a durable commit."""
-        raise RuntimeError("direct case ledger mutation is prohibited")
-
-    def project_committed_ledger(
-        self,
-        *,
-        episode: CognitiveEpisode,
-        claim: "Claim",
-        derivation: "Derivation",
-        evidence: tuple["EvidenceArtifact", ...] = (),
-    ) -> None:
-        """Mirror objects only after their durable epistemic commit is in the episode.
-
-        This named compatibility projection is removed when runtime.semantic emits
-        Graphix Epistemic values directly.  It is deliberately replacement-only:
-        old callers cannot append a second mutable history.
-        """
-        if self.terminal_status is not CognitiveCaseStatus.OPEN:
-            raise RuntimeError("cannot project into a terminal case")
-        if (
-            episode.episode_id != self.case_id
-            or episode.state is not EpisodeState.EPISTEMICALLY_COMMITTED
-        ):
-            raise RuntimeError("durable epistemic episode head is required")
-        from vulcan.graphix.runtime import validate_ledger
-
-        validate_ledger(evidence, (derivation,), (claim,), case_id=self.case_id)
-        if {item.artifact_id for item in evidence} != {
-            item.artifact_id for item in episode.evidence
-        }:
-            raise RuntimeError("evidence projection differs from durable episode")
-        if {claim.claim_id} != {item.artifact_id for item in episode.claims}:
-            raise RuntimeError("claim projection differs from durable episode")
-        if {derivation.derivation_id} != {
-            item.artifact_id for item in episode.derivations
-        }:
-            raise RuntimeError("derivation projection differs from durable episode")
-        self._evidence = evidence
-        self._derivations = (derivation,)
-        self._claims = (claim,)
 
     def record_finalization(self, decision: str) -> None:
         if self.terminal_status is not CognitiveCaseStatus.OPEN:
@@ -277,58 +226,6 @@ class CognitiveCase:
             raise ValueError("episode projection identity mismatch")
         self.episode = episode
         self.record("episode_transition", episode.state.value)
-
-    def _ledger_refs(
-        self,
-    ) -> tuple[
-        tuple[ArtifactRef, ...],
-        tuple[ArtifactRef, ...],
-        tuple[ArtifactRef, ...],
-    ]:
-        return self._ledger_refs_for(self.claims, self.derivations, self.evidence)
-
-    @staticmethod
-    def _ledger_refs_for(claim_items, derivation_items, evidence_items):
-        from vulcan.graphix.runtime import canonical_digest
-
-        claims = tuple(
-            ArtifactRef(claim.claim_id, canonical_digest(claim), "semantic-claim.v2")
-            for claim in claim_items
-        )
-        derivations = tuple(
-            ArtifactRef(
-                derivation.derivation_id,
-                canonical_digest(derivation),
-                "semantic-derivation.v2",
-            )
-            for derivation in derivation_items
-        )
-        evidence = tuple(
-            ArtifactRef(
-                item.artifact_id,
-                item.content_digest,
-                "semantic-evidence.v2",
-            )
-            for item in evidence_items
-        )
-        return claims, derivations, evidence
-
-    def _response_ref(self) -> ArtifactRef | None:
-        from vulcan.graphix.runtime import canonical_digest
-
-        if self.response_ir is None or self.render_artifact is None:
-            return None
-        return ArtifactRef(
-            self.response_ir.response_id,
-            str(
-                getattr(
-                    self.render_artifact,
-                    "ir_digest",
-                    canonical_digest(self.response_ir),
-                )
-            ),
-            "response-ir.v3",
-        )
 
 
 def episode_from_case(case: CognitiveCase) -> CognitiveEpisode:

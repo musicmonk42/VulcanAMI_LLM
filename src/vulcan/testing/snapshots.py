@@ -2,11 +2,7 @@
 
 from __future__ import annotations
 
-import re
-
-from vulcan.microkernel.snapshots import SnapshotRef, default_snapshot_ref
-
-_HEX64 = re.compile(r"^[0-9a-f]{64}$")
+from vulcan.microkernel.snapshots import default_snapshot_ref
 
 
 class AttributeSnapshotProvider:
@@ -29,27 +25,12 @@ class AttributeSnapshotProvider:
         revision = (
             getattr(target, "revision", None) or getattr(target, "version", None) or "0"
         )
-        if isinstance(digest, str) and _HEX64.fullmatch(digest):
-            return (
-                SnapshotRef(
-                    kind,
-                    digest,
-                    "legacy-reflective.v1",
-                    self.owner_name,
-                    str(revision),
-                    acquired_at,
-                    acquired_at,
-                    expires_at,
-                    f"migration:{episode_id}",
-                ),
-                lease,
-            )
         return (
             default_snapshot_ref(
                 kind,
                 self.owner_name,
                 revision,
-                repr(digest),
+                {"legacy_digest": repr(digest)},
                 acquired_at=acquired_at,
                 expires_at=expires_at,
                 release_id=f"migration:{episode_id}",

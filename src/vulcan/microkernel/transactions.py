@@ -12,6 +12,7 @@ from typing import Mapping, Sequence
 
 from vulcan.constitution.primitives import AuthorityLevel
 from vulcan.graphix.epistemic import EpistemicCommit, commit_to_dict
+from vulcan.graphix.verifier import VerifiedEpistemicCandidate, VerifierRegistry
 
 from .authority import AuthorityError, AuthorityGrant, EvidenceRecord, Operation
 from .capability_tokens import CapabilityToken, CapabilityTokenIssuer
@@ -138,12 +139,24 @@ class ConstitutionalTransactionService:
     """Validate a command against the durable head and advance it by CAS."""
 
     def __init__(
-        self, store: EpisodeStore, epistemic_store: EpistemicStore | None = None
+        self,
+        store: EpisodeStore,
+        epistemic_store: EpistemicStore | None = None,
+        verifier_registry: VerifierRegistry | None = None,
     ) -> None:
         if not isinstance(store, EpisodeStore):
             raise TypeError("a durable EpisodeStore is required")
         self._store = store
         self._epistemic_store = epistemic_store
+        self._verifier_registry = verifier_registry
+
+    def bind_verifier_registry(self, registry: VerifierRegistry) -> None:
+        if (
+            self._verifier_registry is not None
+            and self._verifier_registry is not registry
+        ):
+            raise RuntimeError("epistemic verifier registry already bound")
+        self._verifier_registry = registry
 
     def epistemic_head(self, episode_id: str) -> EpistemicCommit | None:
         if self._epistemic_store is None:
@@ -158,11 +171,19 @@ class ConstitutionalTransactionService:
         self,
         episode_id: str,
         auth: CommandAuthority,
-        candidate: EpistemicCommit,
+        candidate: VerifiedEpistemicCandidate,
     ) -> CognitiveEpisode:
         """Commit Graphix Epistemic bytes before projecting them into the episode."""
         if self._epistemic_store is None:
             raise AuthorityError("durable epistemic authority is not bound")
+        if self._verifier_registry is None:
+            raise AuthorityError("epistemic verifier registry is not bound")
+        try:
+            commit = self._verifier_registry.validate(candidate)
+        except (TypeError, ValueError) as exc:
+            raise AuthorityError(
+                "verifier-backed epistemic candidate required"
+            ) from exc
         if (
             not auth.principal.is_kernel
             or auth.grant.principal_digest != auth.principal.identity_digest
@@ -172,16 +193,16 @@ class ConstitutionalTransactionService:
         head = self._store.load(episode_id)
         snapshot = "sha256:" + auth.snapshot_digest
         if (
-            candidate.episode_id != episode_id
-            or candidate.case_id != episode_id
-            or candidate.snapshot_digest != snapshot
-            or candidate.authority_principal_id
+            commit.episode_id != episode_id
+            or commit.case_id != episode_id
+            or commit.snapshot_digest != snapshot
+            or commit.authority_principal_id
             != f"principal:{auth.principal.identity_digest[:32]}"
-            or candidate.authority_release_digest
+            or commit.authority_release_digest
             != f"sha256:{auth.principal.release_digest}"
-            or candidate.validation_digest != f"sha256:{auth.validation_digest}"
-            or candidate.policy_digest != f"sha256:{auth.policy_digest}"
-            or candidate.authority_evidence_digest
+            or commit.validation_digest != f"sha256:{auth.validation_digest}"
+            or commit.policy_digest != f"sha256:{auth.policy_digest}"
+            or commit.authority_evidence_digest
             != f"sha256:{auth.grant.evidence_digest}"
             or head.snapshot_bundle is None
             or head.snapshot_bundle.state_digest != auth.snapshot_digest
@@ -190,15 +211,13 @@ class ConstitutionalTransactionService:
             raise AuthorityError("epistemic candidate authority binding mismatch")
         durable_head = self._epistemic_store.head(episode_id)
         if durable_head is not None and self._same_epistemic_identity(
-            durable_head, candidate
+            durable_head, commit
         ):
             # Compatibility recovery is permitted only for byte-equivalent,
             # identity-equivalent commits. Similar semantics are not identity.
             committed = durable_head
         else:
-            committed = self._epistemic_store.append(
-                candidate, candidate.prior_commit_digest
-            )
+            committed = self._epistemic_store.append(commit, commit.prior_commit_digest)
         claims = tuple(
             ArtifactRef(
                 item.claim_id,

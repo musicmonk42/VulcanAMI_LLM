@@ -49,12 +49,33 @@ proposal, validated candidate, arithmetic/domain plan candidate, epistemic
 commit candidate, and response projection. Only the registered, non-dynamic
 `arithmetic` and `lookup` operations can compile. Graphix output remains a
 `VALIDATED_CANDIDATE`, and the constitutional transaction service remains the
-only commitment boundary. `runtime.semantic` is now a compatibility re-export
-for tests and research callers and is removed when those imports migrate.
+only commitment boundary. The former `runtime.semantic` compatibility re-export
+and `runtime.epistemic_adapter` translation boundary are deleted; the kernel
+constructs its candidate through the Graphix evaluation package and immediately
+reads the durable Graphix Epistemic head for alignment, audit, and projection.
 Every success and abstention validates a live interpretation envelope; supported
 operations also require a validated plan artifact before execution, and every
 durable claim records the producing Graphix artifact digest.
 Exact built-artifact restart qualification remains below M4.
+
+Replayable admitted context is **M2 — Tested, canonical cutover pending**:
+all nine authority references now carry digest-verified canonical material, one
+admission time, and a deterministic aggregate identity. Journal admission
+reconstructs those exact bytes and requires the context identity to match episode
+genesis before its private admission permit is issued. Unsupported legacy
+statuses, including `ASSUMED`, are rejected rather than coerced. Full module-owner
+decomposition remains blocked on removal of `graphix.runtime`; it gains no
+commit authority.
+
+The B04 admission transition is **M3 — authority-sealed on the composed path**:
+a closed `vulcan-admission-proposal/1` digest binds actor, request, idempotency,
+credential provenance, exact context artifact, predecessor, journal schema,
+constitution, verifier, and qualified release before the private process-local
+permit is issued. The journal recomputes the context artifact digest and commits
+proposal-bound admission, genesis, lineage, receipt, and outbox facts in one
+transaction. Live nonce/time data remains deliberately non-replayable; durable
+replay depends only on the sealed proposal and journal receipt chain. Exact-image
+qualification remains below M4.
 
 Atomic episode admission is **M3 — Canonical for the composed request path**: every supported production handler asks the composed kernel admission service to create a snapshot-bound genesis episode before the compatibility case becomes visible. Admission and cancellation release leases, direct unadmitted bypass fails closed, and compatibility ledger mutation rolls back when an episode transition fails. The legacy semantic ledger and migration-only post-genesis bind adapters keep overall episode authority below complete Wave 1 convergence, and exact artifact/restart qualification remains below M4.
 
@@ -222,10 +243,11 @@ until Wave 2.3 import closure and exact built-image restart qualification pass.
 Port deterministic arithmetic and typed lookup onto the registered Graphix pipeline; retire duplicate runtime semantic plans, claims, evidence, statuses, and response contracts.
 
 The bounded production kernel now uses `vulcan.graphix.runtime`, with a frozen
-code-owned operation allowlist and explicit provenance-link contracts. The old
-`vulcan.runtime.semantic` module is compatibility-only and owns no definitions
-or authority. Its removal condition is migration of remaining test, output,
-case-projection, alignment, and research imports to canonical Graphix types.
+code-owned operation allowlist and explicit provenance-link contracts. The old `vulcan.runtime.semantic` and `vulcan.runtime.epistemic_adapter` modules
+are deleted. `CognitiveCase` no longer stores or receives projected claims,
+evidence, or derivations. The remaining removal condition is decomposition of
+the broad `vulcan.graphix.runtime` module into its language, plan, evaluation,
+and response owners without introducing re-exports or a second live write.
 
 ### 2.3 Production import closure — M3 (qualification-ready; hosted artifact pending)
 
@@ -404,6 +426,16 @@ every rival. Gate G and M5 remain closed, and the theory must be revised before
 stronger claims. Gate F is still incomplete, so no Vulcan telemetry was
 analysed and this M2 slice does not override the prerequisite.
 
+The executable `vulcan-npt-engineering-contract/v1` is also M2 repository
+assurance, not NPT cognition. Its canonical, digest-verified artifact fixes all
+seven closure dimensions, observables, interventions, rivals, evidence schemas,
+open gates, authority separation, exact replay, and forbidden claims. The
+blocking constitutional gate validates the contract and every bound source
+digest under normal and optimized Python. Production may import only its
+dependency-light inspector; estimator and instrumentor packages remain denied.
+This changes no cognitive transaction or authority, and M3+ remains unavailable
+until exact-artifact evidence closes the applicable prerequisites.
+
 **Wave exit gate:** a true closed-loop action and an observation-matched replay produce different, predicted causal and ownership updates, and NPT-specific variables add held-out predictive value.
 
 ## Hard gates
@@ -430,3 +462,23 @@ analysed and this M2 slice does not override the prerequisite.
 - no artificial suffering experiments;
 - no Boolean consciousness claim;
 - no new major subsystem before its prerequisite gate passes.
+
+### B05 verifier-backed warrant — M3 (bounded composed path; artifact qualification pending)
+
+The closed Phase-B verifier contract independently represents content integrity,
+epistemic warrant, durable commit state, publication authorization, and effect
+state. It supports only COMPUTED, RETRIEVED, UNKNOWN, and CONTESTED receipts,
+recomputes registered operations or exact admitted material, and rejects caller
+lookalikes through a private process-local issuer boundary. The response matrix
+prevents non-value modes from exposing values and gives CONTESTED no winner.
+The composed arithmetic/unknown transaction path now requires a privately issued
+`VerifiedEpistemicCandidate` and persists its material-bearing receipt in the
+same journal unit of work as the epistemic head. Cold startup reconstructs each
+receipt from canonical journal bytes, binds it to the durable epistemic head,
+and independently re-executes its registered operation or admitted-material
+extraction; UNKNOWN and CONTESTED receipts are revalidated without selecting a
+value. This is M3 only for the composed arithmetic/unknown slice. Composed
+RETRIEVED/CONTESTED paths, `graphix.runtime` decomposition, and exact-image cold
+qualification remain open. The registry and mutation/noninterference matrices are
+recorded in `config/phase-b-verifier-registry.json` and
+`config/phase-b-verifier-matrices.json`; neither artifact grants authority.

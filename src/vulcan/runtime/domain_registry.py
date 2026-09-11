@@ -58,6 +58,7 @@ class _Lease:
     def close(self):
         if not self._closed: self._closed=True; self._r._release(self._s.snapshot_id)
     def lookup_exact(self, key: str) -> DomainLookupResult: return self._r._lookup(self._s, key)
+    def lookup_at(self, key: str, evaluated_at: datetime) -> DomainLookupResult: return self._r._lookup(self._s, key, evaluated_at=evaluated_at)
 
 class _ProcessLock:
     def __init__(self, path: Path): self._path=path; self._fd: int | None=None
@@ -173,8 +174,8 @@ class PersistentDomainRegistry:
             if old and b.revision<=old.revision: raise ValueError("conflicting history")
             domains[dom]=b
         return _build_snapshot(domains)
-    def _lookup(self,snap:_Snapshot,key:str)->DomainLookupResult:
-        sub,pred=_split_key(key); now=self._now(); supports=[]; vals={}
+    def _lookup(self,snap:_Snapshot,key:str,*,evaluated_at:datetime|None=None)->DomainLookupResult:
+        sub,pred=_split_key(key); now=evaluated_at.astimezone(timezone.utc) if evaluated_at is not None else self._now(); supports=[]; vals={}
         for fact, bundle, evs in snap.index.get((sub,pred),()):
             if fact.valid_from and fact.valid_from > now: continue
             if fact.valid_until and fact.valid_until < now: continue

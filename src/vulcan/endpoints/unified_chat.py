@@ -2444,7 +2444,7 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
     from vulcan.runtime.app import _runtime
     from vulcan.runtime.case import CognitiveCase
     from vulcan.runtime.kernel import KernelRequest
-    from vulcan.runtime.semantic import Utterance
+    from vulcan.graphix.runtime import Utterance
 
     runtime = _runtime(request)
     utterance = Utterance.from_text(body.message)

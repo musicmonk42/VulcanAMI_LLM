@@ -1,5 +1,5 @@
 from vulcan.runtime.output import DraftSegment, ResponseIRProjection, ProjectedClaim, SemanticFirewall, UntrustedRenderDraft
-from vulcan.runtime.semantic import EpistemicStatus, ResponseMode
+from vulcan.graphix.runtime import EpistemicStatus, ResponseMode
 
 
 def _projection():
@@ -20,7 +20,7 @@ def test_transport_never_releases_text_other_than_the_authorized_digest():
     from hashlib import sha256
     from vulcan.runtime.case import CognitiveCaseStatus
     from vulcan.runtime.kernel import KernelResult
-    from vulcan.runtime.semantic import ResponseIR
+    from vulcan.graphix.runtime import ResponseIR
 
     ir = ResponseIR("3", "r", "case", None, "s", ResponseMode.STRICT, ("claim-a",))
     result = KernelResult("The computed result is 5.", ir, CognitiveCaseStatus.SUCCESS, "allow", sha256(b"The computed result is 4.").hexdigest())

@@ -39,11 +39,11 @@ def test_language_port_contracts_have_one_canonical_module_identity():
     assert LanguageInputPort.__module__ == "vulcan.graphix.runtime"
     assert LanguageOutputPort.__module__ == "vulcan.runtime.output"
     assert not hasattr(
-        __import__("vulcan.runtime.semantic", fromlist=["x"]), "LanguageOutputPort"
+        __import__("vulcan.graphix.runtime", fromlist=["x"]), "LanguageOutputPort"
     )
     assert (
         __import__(
-            "vulcan.runtime.semantic", fromlist=["LanguageInputPort"]
+            "vulcan.graphix.runtime", fromlist=["LanguageInputPort"]
         ).LanguageInputPort
         is LanguageInputPort
     )

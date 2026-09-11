@@ -11,7 +11,7 @@ from vulcan.runtime.case import CognitiveCase, CognitiveCaseStatus
 from vulcan.runtime.constitutional_kernel import ConstitutionalCognitiveKernel
 from vulcan.runtime.finalization import FinalizationDecision, FinalizationResult
 from vulcan.runtime.kernel import CognitiveKernel, KernelRequest
-from vulcan.runtime.semantic import Utterance, canonical_digest
+from vulcan.graphix.runtime import Utterance, canonical_digest
 from vulcan.testing.snapshots import AttributeSnapshotProvider
 
 TEST_ACTOR = ActorBinding._from_verified_identity(
@@ -279,7 +279,7 @@ async def test_cancellation_releases_admitted_leases_exactly_once():
 def test_compatibility_ledger_cannot_invoke_episode_transition(monkeypatch):
     import asyncio
 
-    from vulcan.runtime.semantic import (
+    from vulcan.graphix.runtime import (
         DeterministicLanguageInput,
         accept,
         build_graphix_plan,
@@ -324,14 +324,17 @@ def test_compatibility_ledger_cannot_invoke_episode_transition(monkeypatch):
         raise RuntimeError("compatibility case attempted authority promotion")
 
     monkeypatch.setattr(CognitiveEpisode, "transition", deny_case_promotion)
-    with pytest.raises(RuntimeError, match="direct case ledger mutation is prohibited"):
-        case.append_ledger(claim=claim, derivation=derivation, evidence=evidence)
+    assert not hasattr(case, "append_ledger")
     assert case.episode == before
-    assert case.claims == ()
-    assert case.derivations == ()
-    assert case.evidence == ()
-    with pytest.raises(AttributeError):
-        case._claims.append(claim)
+    for field in (
+        "claims",
+        "derivations",
+        "evidence",
+        "_claims",
+        "_derivations",
+        "_evidence",
+    ):
+        assert not hasattr(case, field)
 
 
 def test_cognitive_case_has_no_authority_promotion_or_persistence_logic():

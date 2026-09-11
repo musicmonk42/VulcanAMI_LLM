@@ -2,7 +2,14 @@
 ARG PYTHON_BASE
 FROM ${PYTHON_BASE}
 ARG WHEEL_SHA256
+ARG DEPENDENCY_LOCK_DIGEST
+ARG REQUIRE_HASHES=1
 ARG SOURCE_DATE_EPOCH=1704067200
+RUN test "$REQUIRE_HASHES" = "1"
+LABEL org.vulcan.candidate-wheel-sha256=$WHEEL_SHA256 \
+      org.vulcan.dependency-lock-digest=$DEPENDENCY_LOCK_DIGEST \
+      org.vulcan.require-hashes=$REQUIRE_HASHES \
+      org.vulcan.qualification-gate="A09"
 ENV SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH}
 WORKDIR /app
 COPY candidate.whl /tmp/candidate.whl

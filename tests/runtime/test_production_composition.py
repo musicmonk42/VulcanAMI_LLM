@@ -17,7 +17,7 @@ from vulcan.runtime.composition import (
 )
 from vulcan.runtime.errors import StartupErrorCategory, StartupFailure
 from vulcan.runtime.kernel import KernelRequest
-from vulcan.runtime.semantic import Utterance
+from vulcan.graphix.runtime import Utterance
 from vulcan.runtime.settings import (
     OpaqueSecret,
     RuntimeSettings,

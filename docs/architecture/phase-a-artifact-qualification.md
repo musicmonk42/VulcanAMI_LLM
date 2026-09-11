@@ -11,7 +11,9 @@ are refused before a PASS bundle can be written.
 image and an offline hash-locked wheelhouse, builds two untagged images, and
 requires identical immutable image IDs plus normalized config/rootfs inspection.
 The first identical ID is the sole candidate. Registry publication is outside
-this procedure.
+this procedure. Each candidate also carries and is inspected for exact wheel,
+runtime-lock, hash-enforcement, and A09-purpose labels; missing or substituted
+labels fail before comparison evidence can be emitted.
 
 `qualify_phase_a_artifact.py` executes argv arrays without a shell and derives each
 result only from the real exit status. The evidence bundle stores argv and

@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from vulcan.constitution.primitives import AuthorityLevel
+from vulcan.graphix.evaluation import build_epistemic_candidate, verification_requests
 from vulcan.graphix.runtime import (
     RESPONSE_IR_VERSION,
     ClarificationRequest,
@@ -28,6 +29,7 @@ from vulcan.graphix.runtime import (
     validate_interpretation_artifact,
     validate_proposal,
 )
+from vulcan.graphix.verifier import VerifierRegistry, phase_b_registry
 from vulcan.microkernel._transition_permits import TransitionEdge
 from vulcan.microkernel.authority import EvidenceRecord, promote_authority
 from vulcan.microkernel.episode import (
@@ -47,10 +49,6 @@ from vulcan.microkernel.transactions import (
 from vulcan.safety.safety_types import ResponseSafetyContext
 
 from .case import CognitiveCase, CognitiveCaseStatus
-from .epistemic_adapter import (
-    adapt_runtime_semantic_candidate,
-    verify_runtime_semantic_projection,
-)
 from .finalization import FinalizationDecision, ResponseFinalizerPort
 from .output import (
     DeterministicLanguageOutput,
@@ -118,6 +116,7 @@ class CognitiveKernel:
         audit: Any = None,
         alignment: Any = None,
         domain_lookup: Any = None,
+        verifier_registry: VerifierRegistry | None = None,
     ) -> None:
         # The kernel owns the only memory port exposed to the production path.
         # It deliberately does not turn retrieved text into executable semantics.
@@ -129,6 +128,7 @@ class CognitiveKernel:
         self._audit = audit
         self._alignment = alignment
         self._domain_lookup = domain_lookup
+        self._verifier_registry = verifier_registry
         self.calls = 0
         self._transactions: ConstitutionalTransactionService | None = None
         self._kernel_principal: Principal | None = None
@@ -141,6 +141,14 @@ class CognitiveKernel:
             raise RuntimeError("transaction service already bound")
         self._transactions = service
         self._kernel_principal = principal
+
+    def bind_verifier_registry(self, registry: VerifierRegistry) -> None:
+        if (
+            self._verifier_registry is not None
+            and self._verifier_registry is not registry
+        ):
+            raise RuntimeError("epistemic verifier registry already bound")
+        self._verifier_registry = registry
 
     def disable_legacy_case_audit(self) -> None:
         """Retire mutable ``case.*`` lifecycle writes on the composed path.
@@ -237,10 +245,14 @@ class CognitiveKernel:
                 "direct-kernel-compatibility",
                 hashlib.sha256(b"direct-kernel-compatibility-v1").hexdigest(),
             )
+            self._verifier_registry = self._verifier_registry or phase_b_registry(
+                qualified_core_release=f"sha256:{principal.release_digest}"
+            )
             self.bind_transaction_service(
                 ConstitutionalTransactionService(
                     self._direct_compatibility_store,
                     EpistemicStore(path + ".epistemic"),
+                    self._verifier_registry,
                 ),
                 principal,
             )
@@ -266,13 +278,46 @@ class CognitiveKernel:
         case.state_snapshot_id = case.state_snapshot_id or self._snapshot_id()
         self._bind_direct_compatibility(case)
         case.record("semantic_ingress")
+        evaluation_context = case._evaluation_context
         alignment_lease = (
-            self._alignment.lease() if self._alignment is not None else None
+            None
+            if evaluation_context is not None
+            else self._alignment.lease() if self._alignment is not None else None
         )
         alignment_lease_closed = False
         terminal_commit_started = False
-        policy = getattr(alignment_lease, "policy", None)
+        policy = (
+            evaluation_context.alignment.policy
+            if evaluation_context is not None
+            else getattr(alignment_lease, "policy", None)
+        )
         policy_digest = getattr(policy, "policy_digest", "")
+        alignment_kwargs = (
+            {"evaluated_at": evaluation_context.evaluated_at}
+            if evaluation_context is not None
+            and self._alignment is not None
+            and "evaluated_at" in inspect.signature(self._alignment.decide).parameters
+            else {}
+        )
+        alignment_accepts_commit = (
+            self._alignment is not None
+            and "commit" in inspect.signature(self._alignment.decide).parameters
+        )
+
+        def decide_alignment(epistemic_head):
+            if self._alignment is None:
+                return None
+            if alignment_accepts_commit:
+                return self._alignment.decide(
+                    epistemic_head, policy, **alignment_kwargs
+                )
+            # Removal-bound test-double protocol; production consumes the commit.
+            return self._alignment.decide(
+                epistemic_head.claims,
+                epistemic_head.evidence,
+                epistemic_head.derivations,
+                policy,
+            )
 
         def close_alignment_lease() -> None:
             nonlocal alignment_lease_closed
@@ -425,7 +470,7 @@ class CognitiveKernel:
                     TransitionEdge.EPISTEMIC_COMMIT,
                 )
                 prior = self._transactions.epistemic_head(case.case_id)
-                candidate = adapt_runtime_semantic_candidate(
+                candidate = build_epistemic_candidate(
                     episode_id=case.case_id,
                     case_id=case.case_id,
                     snapshot_digest=case.state_snapshot_id or "",
@@ -435,27 +480,31 @@ class CognitiveKernel:
                     authority=epistemic_auth,
                     prior_commit_digest=None if prior is None else prior.commit_digest,
                     graphix_artifact_digest=interpretation_artifact_digest,
+                    evaluated_at=(
+                        evaluation_context.evaluated_at
+                        if evaluation_context is not None
+                        else datetime.now(timezone.utc)
+                    ),
+                )
+                if self._verifier_registry is None:
+                    raise RuntimeError("epistemic verifier registry is not bound")
+                verified_candidate = self._verifier_registry.issue(
+                    commit=candidate,
+                    requests=verification_requests(candidate),
+                    admitted_at=candidate.committed_at,
+                    context_digest=candidate.snapshot_digest,
                 )
                 self._apply(
                     case,
                     self._transactions.commit_epistemic_candidate(
                         case.case_id,
                         epistemic_auth,
-                        candidate,
+                        verified_candidate,
                     ),
                 )
-                case.project_committed_ledger(
-                    episode=case.episode,
-                    claim=claim,
-                    derivation=derivation,
-                    evidence=proposed_evidence,
-                )
-                verify_runtime_semantic_projection(
-                    self._transactions.epistemic_head(case.case_id),
-                    claims=proposed_claims,
-                    evidence=proposed_evidence,
-                    derivations=proposed_derivations,
-                )
+                epistemic_head = self._transactions.epistemic_head(case.case_id)
+                if epistemic_head is None:
+                    raise RuntimeError("durable epistemic head is unavailable")
                 if self._audit:
                     self._audit.append(
                         "case.ledger_committed",
@@ -470,9 +519,7 @@ class CognitiveKernel:
                         },
                     )
                 decision = (
-                    self._alignment.decide(
-                        case.claims, case.evidence, case.derivations, policy
-                    )
+                    decide_alignment(epistemic_head)
                     if self._alignment is not None
                     else type(
                         "D",
@@ -505,9 +552,15 @@ class CognitiveKernel:
                 case.accepted_interpretation = selection
                 domain_port = self._domain_lookup
                 lease_cm = (
-                    domain_port.lease() if hasattr(domain_port, "lease") else None
+                    None
+                    if evaluation_context is not None
+                    else domain_port.lease() if hasattr(domain_port, "lease") else None
                 )
-                leased_domain = lease_cm if lease_cm is not None else domain_port
+                leased_domain = (
+                    evaluation_context.domain
+                    if evaluation_context is not None
+                    else lease_cm if lease_cm is not None else domain_port
+                )
                 try:
                     domain_snapshot_id = getattr(
                         leased_domain, "domain_snapshot_id", "domain:none"
@@ -599,7 +652,7 @@ class CognitiveKernel:
                     TransitionEdge.EPISTEMIC_COMMIT,
                 )
                 prior = self._transactions.epistemic_head(case.case_id)
-                candidate = adapt_runtime_semantic_candidate(
+                candidate = build_epistemic_candidate(
                     episode_id=case.case_id,
                     case_id=case.case_id,
                     snapshot_digest=case.state_snapshot_id or "",
@@ -610,27 +663,31 @@ class CognitiveKernel:
                     prior_commit_digest=None if prior is None else prior.commit_digest,
                     graphix_artifact_digest=compiled.plan_artifact_digest
                     or interpretation_artifact_digest,
+                    evaluated_at=(
+                        evaluation_context.evaluated_at
+                        if evaluation_context is not None
+                        else datetime.now(timezone.utc)
+                    ),
+                )
+                if self._verifier_registry is None:
+                    raise RuntimeError("epistemic verifier registry is not bound")
+                verified_candidate = self._verifier_registry.issue(
+                    commit=candidate,
+                    requests=verification_requests(candidate),
+                    admitted_at=candidate.committed_at,
+                    context_digest=candidate.snapshot_digest,
                 )
                 self._apply(
                     case,
                     self._transactions.commit_epistemic_candidate(
                         case.case_id,
                         epistemic_auth,
-                        candidate,
+                        verified_candidate,
                     ),
                 )
-                case.project_committed_ledger(
-                    episode=case.episode,
-                    claim=claim,
-                    derivation=derivation,
-                    evidence=proposed_evidence,
-                )
-                verify_runtime_semantic_projection(
-                    self._transactions.epistemic_head(case.case_id),
-                    claims=proposed_claims,
-                    evidence=proposed_evidence,
-                    derivations=proposed_derivations,
-                )
+                epistemic_head = self._transactions.epistemic_head(case.case_id)
+                if epistemic_head is None:
+                    raise RuntimeError("durable epistemic head is unavailable")
                 if self._audit:
                     self._audit.append(
                         "case.ledger_committed",
@@ -638,32 +695,36 @@ class CognitiveKernel:
                             "case_id": case.case_id,
                             "request_id": case.request_id,
                             "request_digest": case.input_hash,
-                            "claim_digests": [c.claim_id for c in case.claims],
-                            "derivation_digests": [
-                                d.derivation_id for d in case.derivations
+                            "claim_digests": [
+                                c.claim_id for c in epistemic_head.claims
                             ],
-                            "evidence_ids": [e.artifact_id for e in case.evidence],
+                            "derivation_digests": [
+                                d.derivation_id for d in epistemic_head.derivations
+                            ],
+                            "evidence_ids": [
+                                e.evidence_id for e in epistemic_head.evidence
+                            ],
                             "evidence": [
                                 {
-                                    "evidence_id": e.artifact_id,
-                                    "origin": e.origin,
+                                    "evidence_id": e.evidence_id,
+                                    "origin": e.provenance_id,
                                     "content_digest": e.content_digest,
-                                    "citation": e.citation or "",
-                                    "source_integrity": e.source_integrity,
+                                    "citation": (
+                                        e.citations[0].uri if e.citations else ""
+                                    ),
+                                    "source_integrity": "digest-verified",
                                     "valid_until": (
                                         e.valid_until.isoformat().replace("+00:00", "Z")
                                         if e.valid_until
                                         else ""
                                     ),
                                 }
-                                for e in case.evidence
+                                for e in epistemic_head.evidence
                             ],
                         },
                     )
                 decision = (
-                    self._alignment.decide(
-                        case.claims, case.evidence, case.derivations, policy
-                    )
+                    decide_alignment(epistemic_head)
                     if self._alignment is not None
                     else type(
                         "D",

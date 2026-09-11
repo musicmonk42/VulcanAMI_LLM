@@ -4,7 +4,7 @@ import pytest
 
 from vulcan.runtime.case import CognitiveCase
 from vulcan.runtime.domain_registry import DomainEvidenceSupport, DomainLookupResult
-from vulcan.runtime.semantic import (
+from vulcan.graphix.runtime import (
     AcceptedInterpretation, Claim, CompiledGraphixPlan, Derivation, EpistemicStatus,
     EvidenceArtifact, EvidenceKind, ExecutionStatus, GraphixPlan, InterpretationProposal,
     ProposedCandidate, Proposition, RESPONSE_IR_VERSION, ResponseIR, ResponseMode,

@@ -8,7 +8,7 @@ import pytest
 from vulcan.runtime.case import CognitiveCase, CognitiveCaseStatus
 from vulcan.runtime.finalization import FinalizationDecision, FinalizationResult, SafetyResponseFinalizer
 from vulcan.runtime.kernel import CognitiveKernel, KernelRequest, KernelResult
-from vulcan.runtime.semantic import Utterance
+from vulcan.graphix.runtime import Utterance
 from vulcan.safety.response_adapter import EnhancedSafetyResponseAdapter
 from vulcan.safety.safety_types import ResponseSafetyContext, ResponseSafetyStatus, SafetyReport, SafetyValidator
 from vulcan.safety.safety_validator import EnhancedSafetyValidator
@@ -153,7 +153,7 @@ async def test_case_terminal_status_reflects_final_response_safety_decision(deci
 
 
 def test_transport_exposes_terminal_and_release_semantics_without_second_authority():
-    from vulcan.runtime.semantic import ResponseIR, ResponseMode
+    from vulcan.graphix.runtime import ResponseIR, ResponseMode
 
     response_ir = ResponseIR("1", "response-1", "case-1", None, "snapshot-1", ResponseMode.STRICT, ("claim-1",))
     result = KernelResult(

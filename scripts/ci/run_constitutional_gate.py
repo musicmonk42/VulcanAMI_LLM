@@ -15,6 +15,7 @@ CHECKS: dict[str, tuple[tuple[str, ...], ...]] = {
     "workflow": (
         (PYTHON, "scripts/architecture_inventory.py", "--check"),
         (PYTHON, "scripts/ci/check_production_imports.py"),
+        (PYTHON, "scripts/ci/validate_npt_contract.py"),
         (PYTHON, "scripts/ci/generate_wheel_manifest.py", "--check"),
         (PYTHON, "scripts/ci/workflow_lint.py"),
         (PYTHON, "scripts/ci/verify_dependency_inputs.py"),
@@ -27,6 +28,7 @@ CHECKS: dict[str, tuple[tuple[str, ...], ...]] = {
             "-q",
             "tests/architecture/test_ami_constitution.py",
             "tests/assurance/test_control_catalog.py",
+            "tests/assurance/test_npt_contract.py",
         ),
     ),
     "typing": ((PYTHON, "-m", "mypy", "scripts/ci"),),
@@ -78,6 +80,14 @@ CHECKS: dict[str, tuple[tuple[str, ...], ...]] = {
         ),
     ),
     "security": (
+        (
+            PYTHON,
+            "-O",
+            "-m",
+            "pytest",
+            "-q",
+            "tests/assurance/test_npt_contract.py",
+        ),
         (
             PYTHON,
             "-m",

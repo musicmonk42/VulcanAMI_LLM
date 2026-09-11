@@ -3,15 +3,22 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from hashlib import sha256
 
 from vulcan.constitution.primitives import AuthorityLevel, canonical_json
 from vulcan.graphix.epistemic import EpistemicCommit, dumps_commit
+from vulcan.graphix.verifier import VerifiedEpistemicCandidate, VerifierRegistry
 
 from ._transition_permits import LiveTransitionPermit, MutationPort, TransitionEdge
 from .authority import AuthorityError
-from .constitutional_journal import ConstitutionalJournal, JournalEvent, SuccessorError
+from .constitutional_journal import SCHEMA_VERSION as JOURNAL_SCHEMA_VERSION
+from .constitutional_journal import (
+    ConstitutionalJournal,
+    JournalEvent,
+    SuccessorError,
+)
 from .episode import ActorBinding, ArtifactRef, CognitiveEpisode, canonical_digest
 from .episode_store import episode_from_document
 from .journal_stores import (
@@ -20,12 +27,48 @@ from .journal_stores import (
     JournalLineageStore,
     emit_transition,
 )
+from .snapshots import AdmittedContext
 from .state_machine import EpisodeState
 from .transactions import (
     CommandAuthority,
     ConstitutionalTransactionService,
     PublicationAuthorization,
 )
+
+
+@dataclass(frozen=True, slots=True)
+class AdmissionProposal:
+    """Closed, content-bound request for the sole genesis transition."""
+
+    episode_id: str
+    actor_digest: str
+    request_digest: str
+    request_id: str
+    idempotency_key: str
+    credential_provenance_digest: str
+    context_digest: str
+    qualified_release_digest: str
+    constitution_digest: str
+    verifier_digest: str
+    journal_schema_version: str = JOURNAL_SCHEMA_VERSION
+    expected_predecessor_digest: str = "0" * 64
+    edge: str = TransitionEdge.ADMISSION.value
+    schema_version: str = "vulcan-admission-proposal/1"
+    digest: str = field(init=False)
+
+    def __post_init__(self) -> None:
+        if (
+            self.edge != "admission"
+            or self.schema_version != "vulcan-admission-proposal/1"
+            or self.journal_schema_version != JOURNAL_SCHEMA_VERSION
+        ):
+            raise AuthorityError("invalid admission proposal schema or edge")
+        body = {
+            name: getattr(self, name)
+            for name in self.__dataclass_fields__
+            if name != "digest"
+        }
+        object.__setattr__(self, "digest", sha256(canonical_json(body)).hexdigest())
 
 
 class JournalConstitutionalTransactionService(ConstitutionalTransactionService):
@@ -40,6 +83,7 @@ class JournalConstitutionalTransactionService(ConstitutionalTransactionService):
         branch_id: str,
         qualified_release_digest: str,
         verifier_digest: str,
+        verifier_registry: VerifierRegistry,
     ) -> None:
         if not (
             episodes.database is epistemic.database
@@ -54,6 +98,7 @@ class JournalConstitutionalTransactionService(ConstitutionalTransactionService):
         self._branch_id = branch_id
         self._mutation_port = MutationPort(qualified_release_digest)
         self._verifier_digest = verifier_digest
+        self._verifier_registry = verifier_registry
         self._pending_publication: dict[
             str,
             tuple[
@@ -171,15 +216,38 @@ class JournalConstitutionalTransactionService(ConstitutionalTransactionService):
         idempotency_key: str,
         context_bytes: bytes,
     ) -> CognitiveEpisode:
+        try:
+            context = AdmittedContext.from_bytes(context_bytes)
+        except (TypeError, ValueError) as exc:
+            raise AuthorityError("admitted context is invalid") from exc
+        if (
+            episode.snapshot_bundle is None
+            or context.episode_id != episode.episode_id
+            or context.bundle_ref() != episode.snapshot_bundle
+        ):
+            raise AuthorityError("admitted context does not match episode genesis")
         with self._database.transaction() as uow:
             actor_digest = self._journal.bind_actor(uow, actor)
+            context_digest = sha256(context_bytes).hexdigest()
+            proposal = AdmissionProposal(
+                episode.episode_id,
+                actor_digest,
+                request_digest,
+                request_id,
+                idempotency_key,
+                credential_provenance_digest,
+                context_digest,
+                self._mutation_port.release_digest,
+                self._mutation_port.constitution_digest,
+                self._verifier_digest,
+            )
             admission = self._mutation_port.issue(
                 edge=TransitionEdge.ADMISSION,
                 actor_digest=actor_digest,
                 episode_id=episode.episode_id,
                 policy_digest="0" * 64,
                 snapshot_digest=episode.snapshot_bundle.state_digest,
-                validation_digest=request_digest,
+                validation_digest=proposal.digest,
                 verifier_digest=self._verifier_digest,
                 expected_prior_episode_digest="0" * 64,
             )
@@ -192,6 +260,7 @@ class JournalConstitutionalTransactionService(ConstitutionalTransactionService):
                 snapshot_digest=episode.snapshot_bundle.state_digest,
                 verifier_digest=self._verifier_digest,
                 expected_prior_episode_digest="0" * 64,
+                validation_digest=proposal.digest,
             )
             command_id = f"command:{episode.episode_id}"
             outcome = self._journal.bind_command(
@@ -206,15 +275,17 @@ class JournalConstitutionalTransactionService(ConstitutionalTransactionService):
             )
             if outcome.startswith("replay:"):
                 raise AuthorityError("idempotent command is already in progress")
-            context_digest = self._journal.put_artifact(
+            persisted_context_digest = self._journal.put_artifact(
                 uow, kind="admitted-context.v1", content=context_bytes
             )
+            if persisted_context_digest != proposal.context_digest:
+                raise AuthorityError("persisted context digest diverged from proposal")
             self._journal.create_episode(
                 uow,
                 episode_id=episode.episode_id,
                 command_id=command_id,
                 actor_digest=actor_digest,
-                context_digest=context_digest,
+                context_digest=persisted_context_digest,
             )
             self._store.write_genesis(uow, episode)
             expected = self.lineage_head_digest()
@@ -235,7 +306,7 @@ class JournalConstitutionalTransactionService(ConstitutionalTransactionService):
             committed_at = datetime.now(timezone.utc)
             receipt_document = {
                 "actor_digest": actor_digest,
-                "artifact_digests": [context_digest],
+                "artifact_digests": [persisted_context_digest],
                 "command_id": command_id,
                 "committed_at": committed_at.isoformat(),
                 "commit_seq": uow.commit_seq,
@@ -327,21 +398,27 @@ class JournalConstitutionalTransactionService(ConstitutionalTransactionService):
         self,
         episode_id: str,
         auth: CommandAuthority,
-        candidate: EpistemicCommit,
+        candidate: VerifiedEpistemicCandidate,
     ) -> CognitiveEpisode:
+        try:
+            commit = self._verifier_registry.validate(candidate)
+        except (TypeError, ValueError) as exc:
+            raise AuthorityError(
+                "verifier-backed epistemic candidate required"
+            ) from exc
         head = self._store.load(episode_id)
         snapshot = "sha256:" + auth.snapshot_digest
         if (
-            candidate.episode_id != episode_id
-            or candidate.case_id != episode_id
-            or candidate.snapshot_digest != snapshot
-            or candidate.authority_principal_id
+            commit.episode_id != episode_id
+            or commit.case_id != episode_id
+            or commit.snapshot_digest != snapshot
+            or commit.authority_principal_id
             != f"principal:{auth.principal.identity_digest[:32]}"
-            or candidate.authority_release_digest
+            or commit.authority_release_digest
             != f"sha256:{auth.principal.release_digest}"
-            or candidate.validation_digest != f"sha256:{auth.validation_digest}"
-            or candidate.policy_digest != f"sha256:{auth.policy_digest}"
-            or candidate.authority_evidence_digest
+            or commit.validation_digest != f"sha256:{auth.validation_digest}"
+            or commit.policy_digest != f"sha256:{auth.policy_digest}"
+            or commit.authority_evidence_digest
             != f"sha256:{auth.grant.evidence_digest}"
             or head.digest != auth.expected_prior_episode_digest
             or head.snapshot_bundle is None
@@ -351,10 +428,10 @@ class JournalConstitutionalTransactionService(ConstitutionalTransactionService):
         claims = tuple(
             ArtifactRef(
                 item.claim_id,
-                candidate.commit_digest.removeprefix("sha256:"),
+                commit.commit_digest.removeprefix("sha256:"),
                 "graphix-epistemic-claim.v1",
             )
-            for item in candidate.claims
+            for item in commit.claims
         )
         evidence = tuple(
             ArtifactRef(
@@ -362,15 +439,15 @@ class JournalConstitutionalTransactionService(ConstitutionalTransactionService):
                 item.content_digest.removeprefix("sha256:"),
                 "graphix-epistemic-evidence.v1",
             )
-            for item in candidate.evidence
+            for item in commit.evidence
         )
         derivations = tuple(
             ArtifactRef(
                 item.derivation_id,
-                candidate.commit_digest.removeprefix("sha256:"),
+                commit.commit_digest.removeprefix("sha256:"),
                 "graphix-epistemic-derivation.v1",
             )
-            for item in candidate.derivations
+            for item in commit.derivations
         )
         successor = self._successor(
             head,
@@ -381,11 +458,11 @@ class JournalConstitutionalTransactionService(ConstitutionalTransactionService):
             evidence=evidence,
             derivations=derivations,
         )
-        digest = candidate.commit_digest.removeprefix("sha256:")
+        digest = commit.commit_digest.removeprefix("sha256:")
         prior = (
             None
-            if candidate.prior_commit_digest is None
-            else candidate.prior_commit_digest.removeprefix("sha256:")
+            if commit.prior_commit_digest is None
+            else commit.prior_commit_digest.removeprefix("sha256:")
         )
         with self._database.transaction() as uow:
             permit_facts = self._consume_permit(
@@ -393,7 +470,15 @@ class JournalConstitutionalTransactionService(ConstitutionalTransactionService):
             )
             actor_digest, credential = self._binding(uow, episode_id)
             artifact = self._journal.put_artifact(
-                uow, kind="epistemic-commit.v1", content=dumps_commit(candidate)
+                uow, kind="epistemic-commit.v1", content=dumps_commit(commit)
+            )
+            warrant_artifacts = tuple(
+                self._journal.put_artifact(
+                    uow,
+                    kind="epistemic-warrant-receipt.v1",
+                    content=receipt.canonical_bytes(),
+                )
+                for receipt in candidate.receipts
             )
             self._journal.commit_epistemic(
                 uow,
@@ -404,7 +489,7 @@ class JournalConstitutionalTransactionService(ConstitutionalTransactionService):
                 actor_digest=actor_digest,
                 credential_provenance_digest=credential,
             )
-            self._epistemic_store.write_document(uow, digest, candidate)
+            self._epistemic_store.write_document(uow, digest, commit)
             self._persist_transition(
                 uow,
                 head,
@@ -412,7 +497,7 @@ class JournalConstitutionalTransactionService(ConstitutionalTransactionService):
                 actor_digest,
                 credential,
                 permit_facts=permit_facts,
-                extra_artifact_digests=(artifact,),
+                extra_artifact_digests=(artifact, *warrant_artifacts),
             )
         return successor
 
