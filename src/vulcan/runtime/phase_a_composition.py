@@ -9,8 +9,10 @@ from datetime import timedelta
 from pathlib import Path
 from uuid import uuid4
 
-from vulcan.constitution.primitives import Digest, canonical_json
+from vulcan.constitution.primitives import Digest, canonical_json, canonical_json_loads
+from vulcan.graphix.epistemic import loads_commit
 from vulcan.graphix.runtime import DeterministicLanguageInput
+from vulcan.graphix.verifier import VerifierRegistry, phase_b_registry
 from vulcan.microkernel.constitutional_journal import ConstitutionalDatabase
 from vulcan.microkernel.journal_stores import (
     JournalEpisodeStore,
@@ -54,6 +56,7 @@ class PhaseARuntime:
     epistemic_store: JournalEpistemicStore
     lineage_store: JournalLineageStore
     constitutional_database: ConstitutionalDatabase
+    verifier_registry: VerifierRegistry
     closed: bool = False
 
     async def admission(self) -> None:
@@ -71,6 +74,24 @@ class PhaseARuntime:
         self.epistemic_store.reconcile()
         self.lineage_store.verify_all()
         self.constitutional_database.verify()
+        for row in self.constitutional_database.read(
+            "SELECT content FROM artifacts WHERE kind=?",
+            ("epistemic-warrant-receipt.v1",),
+        ):
+            raw = bytes(row["content"])
+            receipt = canonical_json_loads(raw)
+            if not isinstance(receipt, dict) or canonical_json(receipt) != raw:
+                raise RuntimeError("warrant receipt artifact is not canonical")
+            candidate_digest = str(receipt["candidate"]).removeprefix("sha256:")
+            documents = self.constitutional_database.read(
+                "SELECT document FROM epistemic_documents WHERE epistemic_digest=?",
+                (candidate_digest,),
+            )
+            if len(documents) != 1:
+                raise RuntimeError("warrant candidate document is unavailable")
+            self.verifier_registry.reverify_persisted(
+                raw, commit=loads_commit(bytes(documents[0]["document"]))
+            )
 
     async def close(self) -> None:
         if self.closed:
@@ -99,11 +120,18 @@ def compose_phase_a_runtime(settings: RuntimeSettings) -> PhaseARuntime:
 
         validator = CanonicalResponseSafetyValidator()
         response_safety = EnhancedSafetyResponseAdapter(validator)
+        qualified_release_digest = hashlib.sha256(
+            b"vulcan-constitutional-kernel-v1"
+        ).hexdigest()
+        verifier_registry = phase_b_registry(
+            qualified_core_release=f"sha256:{qualified_release_digest}"
+        )
         delegate = CognitiveKernel(
             state_authority=object(),
             finalizer=SafetyResponseFinalizer(response_safety),
             language_input=DeterministicLanguageInput(),
             language_output=DeterministicLanguageOutput(),
+            verifier_registry=verifier_registry,
         )
         registry = load_capability_registry()
         arithmetic = registry.records["cap.bounded_arithmetic"]
@@ -176,10 +204,9 @@ def compose_phase_a_runtime(settings: RuntimeSettings) -> PhaseARuntime:
             epistemic_store,
             lineage_store,
             branch_id=branch_id,
-            qualified_release_digest=hashlib.sha256(
-                b"vulcan-constitutional-kernel-v1"
-            ).hexdigest(),
+            qualified_release_digest=qualified_release_digest,
             verifier_digest=verifier_digest,
+            verifier_registry=verifier_registry,
         )
         kernel = ConstitutionalCognitiveKernel.from_kernel(
             delegate,
@@ -199,6 +226,7 @@ def compose_phase_a_runtime(settings: RuntimeSettings) -> PhaseARuntime:
             epistemic_store,
             lineage_store,
             constitutional_database,
+            verifier_registry,
         )
 
 

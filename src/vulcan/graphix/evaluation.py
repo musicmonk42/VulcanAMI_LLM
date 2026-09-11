@@ -1,13 +1,8 @@
-"""Named compatibility boundary from runtime.semantic to Graphix Epistemic.
-
-Remove this adapter when the semantic runtime directly emits validated Graphix
-Epistemic candidates.  It translates only typed, locally validated objects; it
-does not commit them or promote their authority.
-"""
+"""Canonical Graphix evaluation-to-epistemic candidate construction."""
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 
 from vulcan.constitution.primitives import Digest
 from vulcan.graphix import runtime as semantic
@@ -21,6 +16,7 @@ from vulcan.graphix.epistemic import (
     EvidenceKind,
     Proposition,
 )
+from vulcan.graphix.verifier import VerificationRequest
 from vulcan.microkernel.transactions import CommandAuthority
 
 
@@ -29,15 +25,10 @@ def _digest(value: str) -> str:
 
 
 _STATUS = {
-    semantic.EpistemicStatus.PROVEN: ClaimStatus.PROVEN,
     semantic.EpistemicStatus.COMPUTED: ClaimStatus.COMPUTED,
-    semantic.EpistemicStatus.OBSERVED: ClaimStatus.OBSERVED,
     semantic.EpistemicStatus.RETRIEVED: ClaimStatus.RETRIEVED,
-    semantic.EpistemicStatus.HYPOTHESIS: ClaimStatus.HYPOTHESIS,
     semantic.EpistemicStatus.CONTESTED: ClaimStatus.CONTESTED,
     semantic.EpistemicStatus.UNKNOWN: ClaimStatus.UNKNOWN,
-    semantic.EpistemicStatus.ERROR: ClaimStatus.ERROR,
-    semantic.EpistemicStatus.ASSUMED: ClaimStatus.HYPOTHESIS,
 }
 
 _EVIDENCE_KIND = {
@@ -49,7 +40,7 @@ _EVIDENCE_KIND = {
 }
 
 
-def verify_runtime_semantic_projection(
+def verify_evaluation_projection(
     commit: EpistemicCommit | None,
     *,
     claims: tuple[semantic.Claim, ...],
@@ -85,7 +76,7 @@ def verify_runtime_semantic_projection(
         raise ValueError("runtime derivation projection is not durably committed")
 
 
-def adapt_runtime_semantic_candidate(
+def build_epistemic_candidate(
     *,
     episode_id: str,
     case_id: str,
@@ -96,9 +87,16 @@ def adapt_runtime_semantic_candidate(
     authority: CommandAuthority,
     prior_commit_digest: str | None,
     graphix_artifact_digest: str,
+    evaluated_at: datetime,
 ) -> EpistemicCommit:
     """Translate a validated request ledger without granting it authority."""
     semantic.validate_ledger(evidence, derivations, claims, case_id=case_id)
+    unsupported = tuple(item.status for item in claims if item.status not in _STATUS)
+    if unsupported:
+        raise ValueError(
+            "epistemic status has no registered Phase-B verifier: "
+            + ",".join(item.value for item in unsupported)
+        )
     snapshot = _digest(snapshot_digest)
     evidence_ids = {item.artifact_id for item in evidence}
     claim_ids = {item.claim_id for item in claims}
@@ -110,7 +108,7 @@ def adapt_runtime_semantic_candidate(
             snapshot,
             _digest(item.content_digest),
             f"provenance:{semantic.canonical_digest(item)}",
-            item.observed_at or datetime.now(timezone.utc),
+            item.observed_at or evaluated_at,
             item.valid_until,
             (
                 (
@@ -152,6 +150,7 @@ def adapt_runtime_semantic_candidate(
                         if item.proposition.expression is None
                         else str(Digest.of_json(item.proposition.expression))
                     ),
+                    "expression": item.proposition.expression,
                     "modality": item.proposition.modality,
                     "negated": item.proposition.negated,
                     "quantifier": item.proposition.quantifier,
@@ -185,9 +184,35 @@ def adapt_runtime_semantic_candidate(
         validation_digest=_digest(authority.validation_digest),
         policy_digest=_digest(authority.policy_digest),
         authority_evidence_digest=_digest(authority.grant.evidence_digest),
-        committed_at=datetime.now(timezone.utc),
+        committed_at=evaluated_at,
         claims=graph_claims,
         evidence=graph_evidence,
         derivations=graph_derivations,
         prior_commit_digest=prior_commit_digest,
     )
+
+
+def verification_requests(commit: EpistemicCommit) -> tuple[VerificationRequest, ...]:
+    """Derive closed verifier inputs from the canonical candidate itself."""
+    requests = []
+    for claim in commit.claims:
+        if claim.status is ClaimStatus.COMPUTED:
+            expression = claim.proposition.qualifiers.get("expression")
+            if not isinstance(expression, str) or not expression:
+                raise ValueError("computed candidate lacks its exact expression")
+            requests.append(
+                VerificationRequest(
+                    claim.claim_id,
+                    claim.status,
+                    claim.proposition.object_value,
+                    operation_id="bounded-rational-expression/1",
+                    operands=(expression,),
+                )
+            )
+        elif claim.status is ClaimStatus.UNKNOWN:
+            requests.append(VerificationRequest(claim.claim_id, claim.status, None))
+        else:
+            raise ValueError(
+                f"{claim.status.value} requires admitted material verification"
+            )
+    return tuple(requests)

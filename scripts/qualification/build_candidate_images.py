@@ -61,6 +61,7 @@ def main() -> int:
         shutil.copy2(ROOT / "Dockerfile.candidate", context / "Dockerfile")
         ids = []
         inspections = []
+        lock_digest = sha(ROOT / "requirements-runtime.lock")
         for name in ("a", "b"):
             iid = context / f"{name}.iid"
             run(
@@ -74,6 +75,10 @@ def main() -> int:
                     f"PYTHON_BASE={base}",
                     "--build-arg",
                     f"WHEEL_SHA256={args.wheel_sha256}",
+                    "--build-arg",
+                    f"DEPENDENCY_LOCK_DIGEST={lock_digest}",
+                    "--build-arg",
+                    "REQUIRE_HASHES=1",
                     "--build-arg",
                     "SOURCE_DATE_EPOCH=1704067200",
                     "--iidfile",
@@ -89,6 +94,15 @@ def main() -> int:
             inspection = json.loads(
                 run(["docker", "image", "inspect", image_id], context).stdout
             )[0]
+            labels = inspection.get("Config", {}).get("Labels", {}) or {}
+            expected_labels = {
+                "org.vulcan.candidate-wheel-sha256": args.wheel_sha256,
+                "org.vulcan.dependency-lock-digest": lock_digest,
+                "org.vulcan.require-hashes": "1",
+                "org.vulcan.qualification-gate": "A09",
+            }
+            if any(labels.get(key) != value for key, value in expected_labels.items()):
+                raise RuntimeError("candidate image qualification labels mismatch")
             inspections.append(
                 {
                     "architecture": inspection["Architecture"],

@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from vulcan.microkernel._transition_permits import MutationPort, TransitionEdge
+from vulcan.microkernel.journal_transactions import AdmissionProposal
 from vulcan.microkernel.principals import Principal, PrincipalKind
 
 D = "d" * 64
@@ -85,3 +86,25 @@ def test_untrusted_packages_cannot_import_or_name_private_mutation_port():
             text = path.read_text()
             assert "_transition_permits" not in text, path
             assert "MutationPort" not in text, path
+
+
+def test_admission_proposal_binds_every_stable_genesis_coordinate():
+    values = {
+        "episode_id": "episode-one",
+        "actor_digest": "a" * 64,
+        "request_digest": "b" * 64,
+        "request_id": "request-one",
+        "idempotency_key": "idempotency-one",
+        "credential_provenance_digest": "c" * 64,
+        "context_digest": "d" * 64,
+        "qualified_release_digest": "e" * 64,
+        "constitution_digest": "f" * 64,
+        "verifier_digest": "1" * 64,
+    }
+    baseline = AdmissionProposal(**values)
+    for name in values:
+        changed = dict(values)
+        changed[name] = "changed" if not name.endswith("digest") else "2" * 64
+        assert AdmissionProposal(**changed).digest != baseline.digest
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        baseline.context_digest = "3" * 64

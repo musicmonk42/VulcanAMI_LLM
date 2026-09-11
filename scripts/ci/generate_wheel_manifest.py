@@ -17,16 +17,26 @@ RESOURCES = (
     "config/constitutional-journal-schema.json",
     "config/capabilities.yaml",
     "config/architecture-status.json",
+    "config/npt-engineering-contract.json",
+    "config/npt-engineering-contract.sha256",
+    "config/phase-b-verifier-matrices.json",
+    "config/phase-b-verifier-registry.json",
+    "config/production-import-policy.json",
     "docs/architecture/ami-invariants.yaml",
     "docs/architecture/adr-006-local-language-interface.md",
     "docs/governance/controls.yaml",
     "docs/governance/impact-assessment.yaml",
     "evidence/qualification/language-contracts.json",
 )
+INSPECTION_MODULES = (
+    "vulcan.assurance.npt_contract",
+    "vulcan.graphix.verifier",
+)
 
 
 def document():
     modules, errors = check()
+    modules.update(INSPECTION_MODULES)
     if errors:
         raise RuntimeError("\n".join(errors))
     rows = []

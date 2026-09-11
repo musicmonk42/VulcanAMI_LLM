@@ -33,7 +33,9 @@ def test_qualification_harness_fails_closed_on_startup_degraded_fallback_and_blo
     assert "audit-after-restart" in script
     assert '[ "$code" = 404 ]' in script
     assert "cmp /tmp/e2e-audit.json" in script
-    assert "gate-e.json" in script
+    # The harness may emit an observation on stdout, but only the A09 argv
+    # runner may derive and persist qualification evidence.
+    assert "gate-e.json" not in script
     assert "DEPENDENCY_LOCK_DIGEST" in script
 
 

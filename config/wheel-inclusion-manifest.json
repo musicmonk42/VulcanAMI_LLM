@@ -26,6 +26,12 @@
       "sha256": "d680d942b8403cc6ff4f931d0279a799166bede00501d9e62c377f32b6b686e6"
     },
     {
+      "loc": 374,
+      "module": "vulcan.assurance.npt_contract",
+      "path": "src/vulcan/assurance/npt_contract.py",
+      "sha256": "20617ea1797ae7cce7eaf90137194b9142f919d8ae9bdbcfd4f8ada2b5dd28fa"
+    },
+    {
       "loc": 35,
       "module": "vulcan.constitution",
       "path": "src/vulcan/constitution/__init__.py",
@@ -74,10 +80,16 @@
       "sha256": "98b710356913e758c25dc866fa8ee69256b94d864cd54fe16c208eac0e5831f6"
     },
     {
-      "loc": 898,
+      "loc": 977,
       "module": "vulcan.graphix.epistemic",
       "path": "src/vulcan/graphix/epistemic.py",
-      "sha256": "13cb79cc37a6961ce5a58b9ef40a161e40f00602f486f99406f55912890f27b4"
+      "sha256": "f27db70030ceb85b94ed81745034eeb30c2c739446e9ec1209ab4b73301e929a"
+    },
+    {
+      "loc": 218,
+      "module": "vulcan.graphix.evaluation",
+      "path": "src/vulcan/graphix/evaluation.py",
+      "sha256": "0e0b7f23d0b2abd6dab47aea824e3235cc886ef8dded4114185be0f5915eabcf"
     },
     {
       "loc": 61,
@@ -86,10 +98,10 @@
       "sha256": "ee99babf290daf0b8ca382c22cea35532794375c115c5ebe54f20267bb87fe16"
     },
     {
-      "loc": 1099,
+      "loc": 1100,
       "module": "vulcan.graphix.runtime",
       "path": "src/vulcan/graphix/runtime.py",
-      "sha256": "8e03e11b4299989553b5d749ce1931cc473eb522967662637c7abe514e6b53aa"
+      "sha256": "19e68c7344a9a3e5e87cc9994998f75a7c730f32d2b7b4954e195839b6dd1576"
     },
     {
       "loc": 2,
@@ -102,6 +114,12 @@
       "module": "vulcan.graphix.validation.pipeline",
       "path": "src/vulcan/graphix/validation/pipeline.py",
       "sha256": "454545abc356081892811c385718dcfe2f34c19478b0f7e15cd068a9d77991e9"
+    },
+    {
+      "loc": 634,
+      "module": "vulcan.graphix.verifier",
+      "path": "src/vulcan/graphix/verifier.py",
+      "sha256": "e9843bbab08d2f2151b12e4b29ac4e2a9d709cbcaecf601d37f6d78d938f2fdf"
     },
     {
       "loc": 10,
@@ -170,10 +188,10 @@
       "sha256": "4f236c513e4d0f1f18f1e45f6ae11bd12af6136ce46ffe59aa9407c069c14e13"
     },
     {
-      "loc": 648,
+      "loc": 733,
       "module": "vulcan.microkernel.journal_transactions",
       "path": "src/vulcan/microkernel/journal_transactions.py",
-      "sha256": "6c03238e78f0da68f254719ef74d4dfd108407e816653a9793332a0c3fb4e9f7"
+      "sha256": "a8102c685183778fbd80a8c7f0e463c9cc3f28b554fe148aefcc6099b44a5636"
     },
     {
       "loc": 670,
@@ -194,10 +212,10 @@
       "sha256": "a0ab6c037d97fd0ee93cccabb0b78f949b28dd04730c94307da86a71c4f25cbc"
     },
     {
-      "loc": 176,
+      "loc": 431,
       "module": "vulcan.microkernel.snapshots",
       "path": "src/vulcan/microkernel/snapshots.py",
-      "sha256": "93b93392a0319a4db8e6f04db60bd16ade264d9404784ffa611b19bf463b250f"
+      "sha256": "30c5eb57f0471d6ae34e796e85e54be94dcb8aff7513dbfbf2277aadd6e06e50"
     },
     {
       "loc": 128,
@@ -206,10 +224,10 @@
       "sha256": "430a6cbf571c8388485564aa595e7f6658b0a45b55f8bd9b0da9b62f9947b442"
     },
     {
-      "loc": 564,
+      "loc": 583,
       "module": "vulcan.microkernel.transactions",
       "path": "src/vulcan/microkernel/transactions.py",
-      "sha256": "db27b204ae597a091f031cee6fc2d342b46aa3e32c7fe7931498a90291ab47f7"
+      "sha256": "fb28bd7765785c02c1f418160248d3d06d8b987a04023f11c232e7c89ba161e5"
     },
     {
       "loc": 1,
@@ -260,28 +278,22 @@
       "sha256": "205c465d7cd4432ab90182d2639b11b554cd07ff90ebcc03d3fba71f3c07fe8c"
     },
     {
-      "loc": 305,
+      "loc": 307,
       "module": "vulcan.runtime.capabilities",
       "path": "src/vulcan/runtime/capabilities.py",
-      "sha256": "17d3938623b144cca0c491f61ccbff304d552da89fa90fefed32c5cd50070515"
+      "sha256": "920488d56b1ebc84a5d819606dc1d523c06cb3172d0ca8f607bdb9d88114e520"
     },
     {
-      "loc": 348,
+      "loc": 245,
       "module": "vulcan.runtime.case",
       "path": "src/vulcan/runtime/case.py",
-      "sha256": "01a099eaa29d6b6b8cb3a472006624e755ad387fe722374c2f358ce58836c15d"
+      "sha256": "d7230cedce4e5ff6ea918523205c81c097b45318991217d1ced8a34f89ee4c30"
     },
     {
-      "loc": 342,
+      "loc": 359,
       "module": "vulcan.runtime.constitutional_kernel",
       "path": "src/vulcan/runtime/constitutional_kernel.py",
-      "sha256": "2cf57702a1a45e68b68bf39df43f6723c543b3ffebb2bf46f8d1f0ff3705905f"
-    },
-    {
-      "loc": 193,
-      "module": "vulcan.runtime.epistemic_adapter",
-      "path": "src/vulcan/runtime/epistemic_adapter.py",
-      "sha256": "ca6ee585c1022c3e451a8e960a90f1c41a8c284050a59a67f358b0cc77d29f3d"
+      "sha256": "43ffc71141f0b8f1c276af9f2b96463df80fb5f8e566e35b53e8b9f7658970a2"
     },
     {
       "loc": 57,
@@ -296,22 +308,22 @@
       "sha256": "dab7c8cf27b4aa98838b591b7f996686a13d72c4742b32a844a5bbee196d4cc5"
     },
     {
-      "loc": 1023,
+      "loc": 1084,
       "module": "vulcan.runtime.kernel",
       "path": "src/vulcan/runtime/kernel.py",
-      "sha256": "1c1755ab9c767b3097bf1ce4c4afe964a7388907b2130e9b5322b523106eb874"
+      "sha256": "e8e21cd07f125057f112e6305ec0fb97dfb1a0dedb70f7f950299c0375438592"
     },
     {
-      "loc": 321,
+      "loc": 363,
       "module": "vulcan.runtime.output",
       "path": "src/vulcan/runtime/output.py",
-      "sha256": "fe9b4328bb281bc84ce8e302cf2afea32e3fd1ba0b8959555f5cfde1004428bd"
+      "sha256": "f95401620e090ceb0717bc3d4364d7e254bf914879c1f935687122195e888583"
     },
     {
-      "loc": 219,
+      "loc": 247,
       "module": "vulcan.runtime.phase_a_composition",
       "path": "src/vulcan/runtime/phase_a_composition.py",
-      "sha256": "7b3ed7f4ea1e5ec9ca203dfc4722611822fc6ace559a96c758db39f8dda467de"
+      "sha256": "6752bec74f578b6788eb59671e33ae9ea4958d6a941a130ac47e2983aada6de8"
     },
     {
       "loc": 23,
@@ -332,10 +344,10 @@
       "sha256": "5fd3960ff3e0c3b2c56afadb8eaa07e23f26a51a777ab1b1e38e748353d6f030"
     },
     {
-      "loc": 152,
+      "loc": 158,
       "module": "vulcan.runtime.state_authorities",
       "path": "src/vulcan/runtime/state_authorities.py",
-      "sha256": "278d0255c83a84d0140a25db8eeb83f3abb7775632bd37cbaed31467b0b9f572"
+      "sha256": "c170cb0ee4ba7b76ba2e5ec13392ad0e03012f5454ea594d8f75ff15cef2cec5"
     },
     {
       "loc": 44,
@@ -356,7 +368,7 @@
       "sha256": "0acc6f0572bce53b836bbce1640f741d9f517c3e8a250ce500ecac654c7e0e94"
     }
   ],
-  "manifest_digest": "7d7b95d3b3ae86102e346f47faecd083421d07025683c0f29ac15f64f4b74945",
+  "manifest_digest": "bc34817bd6b97204e2d0f9a9cc2e3a343ac2db01732bf592f32225f95ec3fa70",
   "resources": [
     {
       "path": "config/actor-binding-schema.json",
@@ -382,6 +394,31 @@
       "path": "config/architecture-status.json",
       "sha256": "34365721b43caf145fa5483ffc8b8021c4b8120daa033892d921b756010c792f",
       "wheel_path": "vulcan/_release_evidence/config/architecture-status.json"
+    },
+    {
+      "path": "config/npt-engineering-contract.json",
+      "sha256": "f45ece3a3d63c809b3143b873435b3aaa5de0bdd84a705ebc178299d0a39fef7",
+      "wheel_path": "vulcan/_release_evidence/config/npt-engineering-contract.json"
+    },
+    {
+      "path": "config/npt-engineering-contract.sha256",
+      "sha256": "807e60e7f00354cfa99d491d891bffcc9bc0c5994ba324457bde2dec2ec85075",
+      "wheel_path": "vulcan/_release_evidence/config/npt-engineering-contract.sha256"
+    },
+    {
+      "path": "config/phase-b-verifier-matrices.json",
+      "sha256": "f174965bdedeab5df86ce15783552086411c8e3a001924356b2b27cd93c89694",
+      "wheel_path": "vulcan/_release_evidence/config/phase-b-verifier-matrices.json"
+    },
+    {
+      "path": "config/phase-b-verifier-registry.json",
+      "sha256": "d4bd6df9065b43719931e85ab5dab232fe49487173bd3951822b0f362c8b2263",
+      "wheel_path": "vulcan/_release_evidence/config/phase-b-verifier-registry.json"
+    },
+    {
+      "path": "config/production-import-policy.json",
+      "sha256": "a0d2b20cbd48f8750ff370cb3f72822bae4ca8694034a888f161d85cce445601",
+      "wheel_path": "vulcan/_release_evidence/config/production-import-policy.json"
     },
     {
       "path": "docs/architecture/ami-invariants.yaml",

@@ -8,9 +8,9 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from hashlib import sha256
 from typing import Callable, Protocol
-from uuid import uuid4
 
 from vulcan.constitution.primitives import canonical_json
+from vulcan.graphix.verifier import phase_b_registry
 from vulcan.microkernel.episode import (
     ActorBinding,
     ArtifactRef,
@@ -64,7 +64,20 @@ class EpisodeAdmissionService:
         request_digest: str | None = None,
         idempotency_key: str | None = None,
     ) -> CognitiveCase:
-        episode_id = f"case-{uuid4().hex}"
+        episode_id = (
+            "case-"
+            + sha256(
+                canonical_json(
+                    {
+                        "actor": actor.to_json(),
+                        "conversation_id": conversation_id,
+                        "idempotency_key": idempotency_key,
+                        "input_digest": input_digest,
+                        "request_id": request_id,
+                    }
+                )
+            ).hexdigest()[:32]
+        )
         bundle = self.snapshot_admitter(episode_id)
         try:
             bundle.validate_active(datetime.now(timezone.utc))
@@ -108,12 +121,7 @@ class EpisodeAdmissionService:
                     request_digest=request_digest,
                     request_id=request_id,
                     idempotency_key=idempotency_key,
-                    context_bytes=canonical_json(
-                        {
-                            "bundle": bundle.bundle_ref().to_json(),
-                            "refs": [ref.to_json() for ref in bundle.refs()],
-                        }
-                    ),
+                    context_bytes=canonical_json(bundle.to_json()),
                 )
             elif self.lineage is not None:
                 if self.branch_id is None:
@@ -221,6 +229,15 @@ class ConstitutionalCognitiveKernel:
             "constitutional-cognitive-kernel",
             sha256(b"vulcan-constitutional-kernel-v1").hexdigest(),
         )
+        verifier_registry = getattr(service, "_verifier_registry", None)
+        if verifier_registry is None:
+            verifier_registry = phase_b_registry(
+                qualified_core_release=f"sha256:{principal.release_digest}"
+            )
+        service.bind_verifier_registry(verifier_registry)
+        verifier_binder = getattr(kernel, "bind_verifier_registry", None)
+        if callable(verifier_binder):
+            verifier_binder(verifier_registry)
         binder = getattr(kernel, "bind_transaction_service", None)
         if callable(binder):
             binder(service, principal)

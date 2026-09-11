@@ -91,8 +91,9 @@ class ExecutionStatus(str, Enum):
 class ResponseMode(str, Enum):
     STRICT = "strict"
     CLARIFICATION = "clarification"
-    PARTIAL = "partial"
     UNKNOWN = "unknown"
+    CONTESTED = "contested"
+    DENIED = "denied"
     ERROR = "error"
     ACTION_CONFIRMATION = "action_confirmation"
 

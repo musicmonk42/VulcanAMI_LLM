@@ -1,6 +1,6 @@
 import json, hashlib, os, pytest
 from vulcan.runtime.domain_registry import PersistentDomainRegistry
-from vulcan.runtime.semantic import AcceptedInterpretation, GraphixPlan, compile_graphix_plan, execute_graphix_plan
+from vulcan.graphix.runtime import AcceptedInterpretation, GraphixPlan, compile_graphix_plan, execute_graphix_plan
 
 def bundle(domain='geo', rev=1, value='Paris', evidence_contents=None, refs=None, acquired=None, valid_until=None):
     if evidence_contents is None:

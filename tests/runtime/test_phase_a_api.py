@@ -300,6 +300,15 @@ async def test_reduced_graph_executes_arithmetic_without_forbidden_packages(
                 assert receipt["episode_id"] == episode.episode_id
                 assert receipt["issued_at_epoch"] <= receipt["expires_at_epoch"]
                 assert receipt["schema_version"] == "vulcan-transition-receipt/1"
+            warrants = connection.execute(
+                "SELECT a.content FROM artifacts a "
+                "WHERE a.kind='epistemic-warrant-receipt.v1'"
+            ).fetchall()
+            assert len(warrants) == 1
+            warrant = json.loads(warrants[0][0])
+            assert warrant["status"] == "COMPUTED"
+            assert warrant["episode"] == episode.episode_id
+            assert warrant["candidate"].startswith("sha256:")
         finally:
             connection.close()
         audit_payload = {"episode_id": episode.episode_id}
@@ -335,6 +344,7 @@ async def test_reduced_graph_executes_arithmetic_without_forbidden_packages(
         await runtime.close()
     restarted = compose_phase_a_runtime(settings)
     try:
+        await restarted.deep_integrity()
         replayed = await RuntimeAPI(restarted).execute(command())
         assert replayed["response"] == "The computed result is 4."
         assert replayed["metadata"]["case_id"] == result["metadata"]["case_id"]

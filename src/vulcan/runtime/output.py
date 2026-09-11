@@ -12,10 +12,6 @@ from hashlib import sha256
 from typing import Protocol
 
 from vulcan.graphix.epistemic import ClaimStatus, EpistemicCommit
-from vulcan.microkernel.episode import CognitiveEpisode
-from vulcan.microkernel.state_machine import EpisodeState
-from vulcan.microkernel.transactions import PublicationAuthorization
-
 from vulcan.graphix.runtime import (
     Claim,
     EpistemicStatus,
@@ -24,9 +20,43 @@ from vulcan.graphix.runtime import (
     ResponseMode,
     canonical_digest,
 )
+from vulcan.microkernel.episode import CognitiveEpisode
+from vulcan.microkernel.state_machine import EpisodeState
+from vulcan.microkernel.transactions import PublicationAuthorization
 
 OUTPUT_DRAFT_SCHEMA = "untrusted-render/1"
 SUPPORTED_LOCALES = frozenset({"und"})
+_RESPONSE_STATUS_MATRIX = {
+    ResponseMode.STRICT: frozenset({ClaimStatus.COMPUTED, ClaimStatus.RETRIEVED}),
+    ResponseMode.UNKNOWN: frozenset({ClaimStatus.UNKNOWN}),
+    ResponseMode.CONTESTED: frozenset({ClaimStatus.CONTESTED}),
+    ResponseMode.CLARIFICATION: frozenset({ClaimStatus.UNKNOWN}),
+    ResponseMode.DENIED: frozenset({ClaimStatus.UNKNOWN}),
+    ResponseMode.ERROR: frozenset({ClaimStatus.ERROR}),
+}
+
+
+def validate_response_coordinate(
+    mode: ResponseMode,
+    status: ClaimStatus,
+    value: str | None,
+    citations: tuple[str, ...],
+) -> None:
+    """Enforce the exhaustive status/mode disclosure matrix before rendering."""
+    allowed = _RESPONSE_STATUS_MATRIX.get(mode)
+    if allowed is None or status not in allowed:
+        raise ValueError("response mode and epistemic status are incompatible")
+    if mode is ResponseMode.STRICT:
+        if value is None:
+            raise ValueError("STRICT requires a verifier-backed value")
+        return
+    if value is not None:
+        raise ValueError("non-strict response modes cannot expose a value")
+    if mode is ResponseMode.CONTESTED:
+        if not 2 <= len(citations) <= 8 or len(set(citations)) != len(citations):
+            raise ValueError("CONTESTED requires bounded distinct support references")
+    elif citations:
+        raise ValueError("non-value response mode cannot expose citations")
 
 
 @dataclass(frozen=True)
@@ -94,6 +124,8 @@ def project(ir: ResponseIR, claims: tuple[Claim, ...]) -> ResponseIRProjection:
         ResponseMode.UNKNOWN,
         ResponseMode.CLARIFICATION,
         ResponseMode.ERROR,
+        ResponseMode.CONTESTED,
+        ResponseMode.DENIED,
     }:
         raise ValueError("unsupported output locale or mode")
     indexed = {claim.claim_id: claim for claim in claims}
@@ -177,12 +209,17 @@ def project_committed(
         ClaimStatus.RETRIEVED: EpistemicStatus.RETRIEVED,
         ClaimStatus.UNKNOWN: EpistemicStatus.UNKNOWN,
         ClaimStatus.ERROR: EpistemicStatus.ERROR,
-        ClaimStatus.PROVEN: EpistemicStatus.PROVEN,
+        ClaimStatus.CONTESTED: EpistemicStatus.CONTESTED,
     }
     projected = []
     for claim_id in ir.required_claim_ids:
         claim = indexed[claim_id]
-        if claim.status not in status_map:
+        allowed = _RESPONSE_STATUS_MATRIX.get(ir.mode)
+        if (
+            allowed is None
+            or claim.status not in allowed
+            or claim.status not in status_map
+        ):
             raise ValueError("committed claim is outside the rendering surface")
         citations = tuple(
             citation.citation_id
@@ -190,15 +227,18 @@ def project_committed(
             if evidence.evidence_id in claim.evidence_ids
             for citation in evidence.citations
         )
+        projected_value = (
+            None
+            if claim.status
+            in {ClaimStatus.UNKNOWN, ClaimStatus.CONTESTED, ClaimStatus.ERROR}
+            else claim.proposition.object_value
+        )
+        validate_response_coordinate(ir.mode, claim.status, projected_value, citations)
         projected.append(
             ProjectedClaim(
                 claim_id,
                 claim.status.value.lower(),
-                (
-                    None
-                    if claim.status in {ClaimStatus.UNKNOWN, ClaimStatus.ERROR}
-                    else claim.proposition.object_value
-                ),
+                projected_value,
                 status_map[claim.status],
                 None,
                 citations,
@@ -234,6 +274,8 @@ def render_projection(projection: ResponseProjection) -> RenderArtifact:
             value = "This request is not supported by the deterministic interpreter."
         elif claim.status is EpistemicStatus.ERROR:
             value = "The deterministic interpreter could not complete this request."
+        elif claim.status is EpistemicStatus.CONTESTED:
+            value = "The admitted sources contain incompatible supported values."
         else:
             value = f"{claim.status.value.capitalize()}: {claim.value}."
         if claim.caveat:

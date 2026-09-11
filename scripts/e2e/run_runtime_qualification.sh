@@ -8,6 +8,11 @@ cleanup(){ set +e; [ -n "$CID" ] && docker rm -f "$CID" >/dev/null 2>&1; [ -n "$
 trap cleanup EXIT
 require(){ command -v "$1" >/dev/null || { echo "missing command: $1" >&2; exit 2; }; }
 require docker; require curl; require "$PYTHON_BIN"
+REQUIRE_HASHES=1
+DEPENDENCY_LOCK_DIGEST="$(sha256sum requirements-runtime.lock | cut -d' ' -f1)"
+image_labels="$(docker image inspect --format '{{json .Config.Labels}}' "$IMAGE_REF")"
+printf '%s' "$image_labels" | env REQUIRE_HASHES="$REQUIRE_HASHES" DEPENDENCY_LOCK_DIGEST="$DEPENDENCY_LOCK_DIGEST" \
+  "$PYTHON_BIN" -c 'import json,os,sys; d=json.load(sys.stdin) or {}; expected={"org.vulcan.require-hashes":os.environ["REQUIRE_HASHES"],"org.vulcan.dependency-lock-digest":os.environ["DEPENDENCY_LOCK_DIGEST"],"org.vulcan.qualification-gate":"A09"}; raise SystemExit(0 if all(d.get(k)==v for k,v in expected.items()) else 1)'
 SECRET="${VULCAN_JWT_SECRET:-RuntimeE2ESecret-0123456789-ABCDEFGHIJKLMNOPQRSTUVWXYZ!}"
 PORT="${PORT:-18080}"
 VOL="$(docker volume create vulcan-runtime-e2e-$(date +%s)-$RANDOM)"

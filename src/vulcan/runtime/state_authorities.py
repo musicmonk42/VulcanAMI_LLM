@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Callable, Final
 
 from vulcan.constitution.primitives import Digest, canonical_json
-from vulcan.microkernel.snapshots import SnapshotLease, SnapshotRef
+from vulcan.microkernel.snapshots import SnapshotLease, SnapshotMaterialRef
 
 StateReader = Callable[[], tuple[str, object, SnapshotLease | None]]
 AUTHORITY_KINDS: Final = (
@@ -64,7 +64,7 @@ class ContentBoundStateAuthority:
                 "state": state,
             }
             digest = Digest.of_bytes(canonical_json(document)).hex
-            ref = SnapshotRef(
+            ref = SnapshotMaterialRef(
                 kind,
                 digest,
                 self.schema,
@@ -74,6 +74,8 @@ class ContentBoundStateAuthority:
                 acquired_at,
                 expires_at,
                 f"{self.owner}:{episode_id}:{revision}",
+                canonical_json(document),
+                lease,
             )
             return ref, lease
         except BaseException as exc:
@@ -108,7 +110,11 @@ class DisabledCSIUPolicyAuthority(ContentBoundStateAuthority):
             owner="constitutional:disabled-csiu-policy",
             schema="vulcan-csiu-policy-disabled.v1",
             release="constitutional-v1",
-            read=lambda: ("0", {"enabled": False, "mode": "proposal-only", "reason": reason}, None),
+            read=lambda: (
+                "0",
+                {"enabled": False, "mode": "proposal-only", "reason": reason},
+                None,
+            ),
         )
 
 

@@ -13,7 +13,8 @@
     "vulcan.assurance.capabilities",
     "vulcan.persistence",
     "vulcan.core",
-    "vulcan.assurance.evidence"
+    "vulcan.assurance.evidence",
+    "vulcan.assurance.npt_contract"
   ],
   "denied_prefixes": [
     "src.vulcan",

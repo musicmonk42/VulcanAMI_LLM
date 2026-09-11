@@ -15,7 +15,7 @@ from typing import Callable, Mapping
 
 from vulcan.assurance.capabilities import CapabilityRegistry, CapabilityStatus
 from vulcan.constitution.primitives import Digest, canonical_json
-from vulcan.microkernel.snapshots import SnapshotRef
+from vulcan.microkernel.snapshots import SnapshotMaterialRef
 
 _SOURCE_ROOT = Path(__file__).resolve().parents[3]
 _PACKAGED_EVIDENCE_ROOT = Path(__file__).resolve().parents[1] / "_release_evidence"
@@ -276,9 +276,10 @@ class CapabilityManifestAuthority:
     ):
         if kind != self.kind:
             raise RuntimeError("capability authority cannot serve another state kind")
-        digest = self.snapshot().digest
+        snapshot = self.snapshot()
+        digest = snapshot.digest
         return (
-            SnapshotRef(
+            SnapshotMaterialRef(
                 kind,
                 digest,
                 self.schema,
@@ -288,6 +289,7 @@ class CapabilityManifestAuthority:
                 acquired_at,
                 expires_at,
                 f"capability-lease:{digest[:32]}:{episode_id[-32:]}",
+                canonical_json([asdict(item) for item in snapshot.attestations]),
             ),
             None,
         )

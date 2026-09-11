@@ -8,7 +8,7 @@ import pytest
 from vulcan.runtime.case import CognitiveCase, CognitiveCaseStatus
 from vulcan.runtime.container import RuntimeContainer
 from vulcan.runtime.kernel import KernelRequest
-from vulcan.runtime.semantic import Utterance
+from vulcan.graphix.runtime import Utterance
 
 
 class _Safety:

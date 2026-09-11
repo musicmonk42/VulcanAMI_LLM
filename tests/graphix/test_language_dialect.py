@@ -12,7 +12,7 @@ from vulcan.graphix.language import (
     UngroundedSemanticValueError, UtteranceRef, external_provider_projection,
     from_runtime_proposal, from_runtime_utterance, validate_provider_proposal,
 )
-from vulcan.runtime.semantic import DeterministicLanguageInput, Utterance
+from vulcan.graphix.runtime import DeterministicLanguageInput, Utterance
 
 
 def test_span_reconstruction_and_unicode_normalization():

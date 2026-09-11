@@ -6,6 +6,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+from fractions import Fraction
 from types import MappingProxyType
 from typing import Iterable, Mapping, Sequence
 
@@ -179,11 +180,49 @@ class UncertaintyDescriptor:
             self.interval_low is None or self.interval_high is None
         ):
             raise EpistemicContractError("interval requires bounds")
+        if self.kind is UncertaintyKind.INTERVAL:
+            try:
+                low, high = Fraction(self.interval_low), Fraction(self.interval_high)
+            except (ValueError, ZeroDivisionError, TypeError) as exc:
+                raise EpistemicContractError(
+                    "interval bounds must be finite rational numbers"
+                ) from exc
+            if low > high:
+                raise EpistemicContractError("invalid or reversed interval")
         if (
             self.kind is UncertaintyKind.CALIBRATION_IDENTITY
             and not self.calibration_id
         ):
             raise EpistemicContractError("calibration requires identity")
+        fields = (
+            self.distribution_digest,
+            self.interval_low,
+            self.interval_high,
+            self.calibration_id,
+        )
+        expected = {
+            UncertaintyKind.UNKNOWN: (None, None, None, None),
+            UncertaintyKind.PROBABILITY_DISTRIBUTION: (
+                self.distribution_digest,
+                None,
+                None,
+                None,
+            ),
+            UncertaintyKind.INTERVAL: (
+                None,
+                self.interval_low,
+                self.interval_high,
+                None,
+            ),
+            UncertaintyKind.CALIBRATION_IDENTITY: (
+                None,
+                None,
+                None,
+                self.calibration_id,
+            ),
+        }[self.kind]
+        if fields != expected:
+            raise EpistemicContractError("uncertainty fields do not match kind")
 
 
 @dataclass(frozen=True, slots=True)
@@ -396,6 +435,13 @@ def _validate_commit(c: EpistemicCommit) -> None:
             raise ReferenceValidationError("evidence snapshot mismatch")
         if evidence.valid_until is not None and evidence.valid_until <= c.committed_at:
             raise TemporalValidityError("expired evidence")
+        if evidence.observed_at > c.committed_at:
+            raise TemporalValidityError("future observation")
+        if (
+            evidence.valid_until is not None
+            and evidence.valid_until <= evidence.observed_at
+        ):
+            raise TemporalValidityError("invalid evidence time window")
     for claim in c.claims:
         if (
             claim.episode_id != c.episode_id
@@ -424,6 +470,11 @@ def _validate_commit(c: EpistemicCommit) -> None:
             "derivation claim",
         )
         _references_exist(derivation.evidence_ids, ev, "derivation evidence")
+    producers: dict[str, str] = {}
+    for derivation in c.derivations:
+        if derivation.output_claim_id in producers:
+            raise ReferenceValidationError("claim has multiple derivation producers")
+        producers[derivation.output_claim_id] = derivation.derivation_id
     for assumption in c.assumptions:
         if assumption.proposition_id not in propositions:
             raise ReferenceValidationError("dangling assumption proposition")
@@ -435,6 +486,7 @@ def _validate_commit(c: EpistemicCommit) -> None:
     for contradiction in c.contradictions:
         _references_exist(contradiction.claim_ids, claims, "contradiction claim")
     _detect_cycles(c.derivations)
+    _detect_supersession_cycles(c.claims)
 
 
 def _references_exist(
@@ -456,7 +508,11 @@ def _unique(name: str, values: Iterable[str]) -> None:
 
 
 def _detect_cycles(derivations: Sequence[Derivation]) -> None:
-    graph = {d.output_claim_id: set(d.input_claim_ids) for d in derivations}
+    graph: dict[str, set[str]] = {}
+    for derivation in derivations:
+        graph.setdefault(derivation.output_claim_id, set()).update(
+            derivation.input_claim_ids
+        )
     visiting: set[str] = set()
     seen: set[str] = set()
 
@@ -467,6 +523,29 @@ def _detect_cycles(derivations: Sequence[Derivation]) -> None:
             return
         visiting.add(node)
         for dependency in graph.get(node, ()):
+            visit(dependency)
+        visiting.remove(node)
+        seen.add(node)
+
+    for node in graph:
+        visit(node)
+
+
+def _detect_supersession_cycles(claims: Sequence[Claim]) -> None:
+    claim_ids = {claim.claim_id for claim in claims}
+    graph = {claim.claim_id: set(claim.supersedes) for claim in claims}
+    for dependencies in graph.values():
+        _references_exist(tuple(dependencies), claim_ids, "superseded claim")
+    visiting: set[str] = set()
+    seen: set[str] = set()
+
+    def visit(node: str) -> None:
+        if node in visiting:
+            raise ReferenceValidationError("cyclic supersession")
+        if node in seen:
+            return
+        visiting.add(node)
+        for dependency in graph[node]:
             visit(dependency)
         visiting.remove(node)
         seen.add(node)
