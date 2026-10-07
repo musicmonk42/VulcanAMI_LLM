@@ -38,7 +38,7 @@ jobs:
       - run: scripts/e2e/run_runtime_qualification.sh
       - run: PYTHON_BIN='python -O' scripts/e2e/run_runtime_qualification.sh
       - if: success()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: gate-e-qualification-evidence
           path: evidence/runtime-e2e/gate-e.json
@@ -52,7 +52,7 @@ jobs:
             docker logs "$container_id" 2>&1 | sed -E 's/(Bearer )[A-Za-z0-9._-]+/\1[REDACTED]/g;s/(VULCAN_JWT_SECRET=)[^ ]+/\1[REDACTED]/g' > evidence/runtime-e2e/container.log
           fi
       - if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: runtime-e2e-failure-evidence
           path: evidence/runtime-e2e

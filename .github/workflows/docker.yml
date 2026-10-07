@@ -21,7 +21,7 @@ jobs:
           python-version: '3.11'
       - run: python scripts/ci/verify_image_inputs.py
       - run: python scripts/ci/write_evidence.py --job image-e2e --command "verify image inputs" --output evidence/image-e2e.json
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: image-e2e-evidence
           path: evidence/image-e2e.json
@@ -39,7 +39,7 @@ jobs:
           python-version: '3.11'
       - run: python scripts/ci/verify_supply_chain_inputs.py
       - run: python scripts/ci/write_evidence.py --job supply-chain-evidence --command "verify supply-chain inputs" --output evidence/supply-chain-evidence.json
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: supply-chain-evidence
           path: evidence/supply-chain-evidence.json
