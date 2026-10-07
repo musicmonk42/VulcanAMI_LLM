@@ -33,7 +33,7 @@ jobs:
       - name: Write evidence
         run: python scripts/ci/write_evidence.py --job dependency-light-unit-contract --command "dependency-light constitutional contracts" --output evidence/dependency-light-unit-contract.json
       - name: Upload evidence
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: dependency-light-unit-contract-evidence
           path: evidence/dependency-light-unit-contract.json
@@ -50,7 +50,7 @@ jobs:
       - run: python -m pip install --require-hashes -r requirements-constitutional.txt
       - run: python scripts/ci/run_constitutional_gate.py --check integration
       - run: python scripts/ci/write_evidence.py --job full-integration --command "authoritative episode constitutional integration" --output evidence/full-integration.json
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: full-integration-evidence
           path: evidence/full-integration.json

@@ -377,7 +377,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: stress-test-results-${{ github.run_number }}
           path: |
@@ -393,7 +393,7 @@ jobs:
 
       - name: Upload provenance archive
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: stress-test-provenance-${{ github.run_number }}
           path: test_results/provenance_archive/
