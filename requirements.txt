@@ -378,7 +378,7 @@ responses==0.25.8
 rich==14.2.0
 rpds-py==0.29.0
 rsa==4.9.1
-ruamel.yaml==0.18.16
+ruamel.yaml==0.19.1
 ruamel.yaml.clib==0.2.15
 # RestrictedPython for safe code execution in mathematical computations
 # Allows SymPy/NumPy code execution in a restricted sandbox environment
